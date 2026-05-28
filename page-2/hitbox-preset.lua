@@ -1,23 +1,36 @@
 local HitboxPreset={}
 
+local function trim(s)
+	return tostring(s or ""):gsub("^%s*(.-)%s*$","%1")
+end
+
+local function makeCode(name)
+	local base=string.upper(string.sub(string.gsub(tostring(name or ""),"[^%w]",""),1,3))
+	if base=="" then base="GUI" end
+	return base..tostring(math.random(100,999))
+end
+
 function HitboxPreset.new(ctx,ownedSection)
 	local New=ctx.New
 	local THEME=ctx.THEME
 	local SG=ctx.SG
 	local PRESETS=ctx.PRESETS
-	local OWNED_PRESETS=ctx.OWNED_PRESETS
+	local OWNED_PRESETS=ctx.OWNED_PRESETS or {}
+	ctx.OWNED_PRESETS=OWNED_PRESETS
+
 	local fmtNumber=ctx.fmtNumber
 	local bindingToLabel=ctx.bindingToLabel
 	local wrapTextButton=ctx.wrapTextButton
 	local wrapTextBox=ctx.wrapTextBox
 
 	local api={}
-	local expandedOwned={}
+	local expandedOwned=ctx.expandedOwned or {}
+	ctx.expandedOwned=expandedOwned
+
 	local modalOverlay=nil
 	local refreshAll=nil
 
 	local ownedList=New("ScrollingFrame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,190),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BorderSizePixel=0,ZIndex=5},ownedSection)
-
 	New("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},ownedList)
 
 	function api.SetRefreshAll(fn)
@@ -27,6 +40,8 @@ function HitboxPreset.new(ctx,ownedSection)
 	local function requestRefresh()
 		api.Refresh()
 		if refreshAll then refreshAll() end
+		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
+		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
 	end
 
 	local function clearOwnedList()
@@ -68,10 +83,9 @@ function HitboxPreset.new(ctx,ownedSection)
 			local code=tostring(preset.Code or preset.code or presetIndex)
 			local name=tostring(preset.Name or preset.name or "Unnamed")
 			local data=preset.Data or preset.data or {}
-			local editor=data.PresetEditor or data.presetEditor or {}
+			local editor=data.PresetEditor or data.presetEditor or preset.presetEditor or {}
 
 			local row=New("Frame",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Size=UDim2.new(1,-6,0,expandedOwned[code] and 178 or 32),ZIndex=6},ownedList)
-
 			New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},row)
 
 			local toggle=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-8,0,30),Position=UDim2.fromOffset(4,1),Text=(expandedOwned[code] and"[-] " or"[+] ")..name.."  |  "..code,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=7},row)
@@ -83,7 +97,6 @@ function HitboxPreset.new(ctx,ownedSection)
 
 			if expandedOwned[code] then
 				local detail=New("Frame",{BackgroundTransparency=1,Position=UDim2.fromOffset(10,34),Size=UDim2.new(1,-20,0,136),ZIndex=7},row)
-
 				New("UIListLayout",{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder},detail)
 
 				addDetailLine(detail,"Code: "..code,1)
@@ -95,7 +108,6 @@ function HitboxPreset.new(ctx,ownedSection)
 				end
 
 				local actionRow=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,28),ZIndex=8,LayoutOrder=7},detail)
-
 				New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},actionRow)
 
 				local equipBtn=makePresetActionButton(actionRow,"EQUIP")
@@ -121,6 +133,27 @@ function HitboxPreset.new(ctx,ownedSection)
 		end
 	end
 
+	function api.AddPreset(name,collectFn)
+		local cleanName=trim(name)
+		if cleanName=="" then
+			return false,"Name cannot be empty."
+		end
+
+		local ok,editor=pcall(collectFn)
+		if not ok then
+			return false,"Could not collect preset: "..tostring(editor)
+		end
+
+		local code=makeCode(cleanName)
+		local preset={Code=code,Name=cleanName,Data={PresetEditor=editor}}
+
+		table.insert(OWNED_PRESETS,preset)
+		expandedOwned[code]=true
+		requestRefresh()
+
+		return true,preset
+	end
+
 	local function closePresetModal()
 		if modalOverlay then
 			modalOverlay:Destroy()
@@ -130,10 +163,16 @@ function HitboxPreset.new(ctx,ownedSection)
 
 	local function modalButton(parent,text,x)
 		local btn=New("TextButton",{Size=UDim2.fromOffset(96,30),Position=UDim2.fromOffset(x,118),BackgroundColor3=THEME.BG,BorderSizePixel=0,Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=101},parent)
-
 		local wrap=wrapTextButton(btn,THEME.BG,2)
-		btn.MouseEnter:Connect(function() wrap.BackgroundColor3=Color3.fromRGB(43,43,43) end)
-		btn.MouseLeave:Connect(function() wrap.BackgroundColor3=THEME.PANEL end)
+
+		btn.MouseEnter:Connect(function()
+			wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+		end)
+
+		btn.MouseLeave:Connect(function()
+			wrap.BackgroundColor3=THEME.PANEL
+		end)
+
 		return btn
 	end
 
@@ -143,13 +182,11 @@ function HitboxPreset.new(ctx,ownedSection)
 		modalOverlay=New("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.35,BorderSizePixel=0,ZIndex=90},SG)
 
 		local box=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),Size=UDim2.fromOffset(360,188),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=100},modalOverlay)
-
 		New("UIStroke",{Color=THEME.STROKE,Thickness=2,Transparency=0},box)
 
 		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="Name this preset",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
 
 		local nameBox=New("TextBox",{Size=UDim2.fromOffset(328,30),Position=UDim2.fromOffset(16,52),BackgroundColor3=THEME.BG,BorderSizePixel=0,ClearTextOnFocus=false,Text="",PlaceholderText="Preset name",TextColor3=THEME.TEXT,PlaceholderColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,Font=Enum.Font.Gotham,TextSize=13,ZIndex=101},box)
-
 		wrapTextBox(nameBox,THEME.BG,2)
 
 		local warning=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,88),Size=UDim2.new(1,-32,0,18),Text="",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
@@ -160,22 +197,18 @@ function HitboxPreset.new(ctx,ownedSection)
 		cancel.MouseButton1Click:Connect(closePresetModal)
 
 		save.MouseButton1Click:Connect(function()
-			local cleanName=string.gsub(nameBox.Text or"","^%s*(.-)%s*$","%1")
-			if cleanName=="" then
-				warning.Text="Name cannot be empty."
+			local ok,result=api.AddPreset(nameBox.Text,collectFn)
+			if not ok then
+				warning.Text=tostring(result)
 				return
 			end
-
-			local code=string.upper(string.sub(string.gsub(cleanName,"%W",""),1,3))
-			if code=="" then code="GUI" end
-			code=code..tostring(math.random(100,999))
-
-			local preset={Code=code,Name=cleanName,Data={PresetEditor=collectFn(),}}
-
-			table.insert(OWNED_PRESETS,preset)
-			expandedOwned[preset.Code]=true
 			closePresetModal()
-			requestRefresh()
+		end)
+
+		task.defer(function()
+			pcall(function()
+				nameBox:CaptureFocus()
+			end)
 		end)
 	end
 
@@ -185,12 +218,11 @@ function HitboxPreset.new(ctx,ownedSection)
 		modalOverlay=New("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.35,BorderSizePixel=0,ZIndex=90},SG)
 
 		local box=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),Size=UDim2.fromOffset(360,166),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=100},modalOverlay)
-
 		New("UIStroke",{Color=THEME.STROKE,Thickness=2,Transparency=0},box)
 
 		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="Save current preset?",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
 
-		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,44),Size=UDim2.new(1,-32,0,42),Text="GUI-only version: this saves the preset locally for the current session.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,ZIndex=101},box)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,44),Size=UDim2.new(1,-32,0,42),Text="This saves the preset locally for the current session.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,ZIndex=101},box)
 
 		local no=modalButton(box,"NO",146)
 		local yes=modalButton(box,"YES",248)
