@@ -46,8 +46,23 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 		return b
 	end
 
-	local saveRow=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},editorSection)
+	function api.Collect()
+		local savedPresets={}
 
+		for i=1,4 do
+			local p=PRESETS[i]
+			table.insert(savedPresets,{
+				x=p.size.X,
+				y=p.size.Y,
+				z=p.size.Z,
+				key=p.key,
+			})
+		end
+
+		return savedPresets
+	end
+
+	local saveRow=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},editorSection)
 	local saveBtn=keybinds.MakeBindButton(saveRow,0,0,150)
 	placeWrappedButton(saveBtn,UDim2.new(1,-150,0,0))
 	saveBtn.Text="SAVE PRESET"
@@ -55,19 +70,12 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 	saveBtn.MouseButton1Click:Connect(function()
 		if hitboxPresets and hitboxPresets.ShowSaveConfirm then
 			hitboxPresets.ShowSaveConfirm(api.Collect)
+		elseif hitboxPresets and hitboxPresets.AddPreset then
+			hitboxPresets.AddPreset("Custom Preset",api.Collect)
+		else
+			warn("PresetEditor: hitboxPresets module is missing ShowSaveConfirm/AddPreset.")
 		end
 	end)
-
-	function api.Collect()
-		local savedPresets={}
-
-		for i=1,4 do
-			local p=PRESETS[i]
-			table.insert(savedPresets,{x=p.size.X,y=p.size.Y,z=p.size.Z,key=p.key,})
-		end
-
-		return savedPresets
-	end
 
 	local function buildPresetRow(i)
 		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,62),ZIndex=5},editorSection)
@@ -91,7 +99,11 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 
 		local function applyPresetSize()
 			local p=PRESETS[i]
-			p.size=Vector3.new(math.clamp(tonumber(xBox.Text) or p.size.X,0.1,50),math.clamp(tonumber(yBox.Text) or p.size.Y,0.1,50),math.clamp(tonumber(zBox.Text) or p.size.Z,0.1,50))
+			p.size=Vector3.new(
+				math.clamp(tonumber(xBox.Text) or p.size.X,0.1,50),
+				math.clamp(tonumber(yBox.Text) or p.size.Y,0.1,50),
+				math.clamp(tonumber(zBox.Text) or p.size.Z,0.1,50)
+			)
 			xBox.Text=fmtNumber(p.size.X,2)
 			yBox.Text=fmtNumber(p.size.Y,2)
 			zBox.Text=fmtNumber(p.size.Z,2)
