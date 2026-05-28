@@ -34,6 +34,12 @@ local function clampNumber(value,min,max,fallback)
 	return math.clamp(n,min,max)
 end
 
+local function clampStaminaDeplete(value)
+	local n=tonumber(value)
+	if not n then return 8 end
+	return math.clamp(math.floor(math.abs(n)+0.5),0,50)
+end
+
 local function isEnumItem(v)
 	return typeof and typeof(v)=="EnumItem"
 end
@@ -395,8 +401,8 @@ function DataSave.new(ctx)
 
 			gameParams={
 				staminaRegen=getValue(ctx,"staminaRegenValue",12),
-				staminaDeplete=getValue(ctx,"staminaDepleteValue",-8),
-				jumpPower=getValue(ctx,"jumpPowerValue",50),
+				staminaDeplete=getValue(ctx,"staminaDepleteValue",8),
+				jumpPower=getValue(ctx,"jumpPowerValue",53.5),
 				divePower=getValue(ctx,"divePowerValue",1.9),
 			},
 
@@ -429,6 +435,7 @@ function DataSave.new(ctx)
 				gradientG=uiStyle.GradientG,
 				gradientB=uiStyle.GradientB,
 				strokeGradient=uiStyle.StrokeGradient and true or false,
+				liquidStroke=uiStyle.LiquidStroke and true or false,
 			},
 
 			workspace={
@@ -510,12 +517,12 @@ function DataSave.new(ctx)
 		end
 
 		if gameParams.staminaDeplete~=nil then
-			local sd=clampNumber(gameParams.staminaDeplete,-50,0,-8)
+			local sd=clampStaminaDeplete(gameParams.staminaDeplete)
 			if ctx.setStaminaDepleteValue then pcall(ctx.setStaminaDepleteValue,sd) else setValue(ctx,"staminaDepleteValue",sd) end
 		end
 
 		if gameParams.jumpPower~=nil then
-			local jp=clampNumber(gameParams.jumpPower,0,300,50)
+			local jp=clampNumber(gameParams.jumpPower,0,300,53.5)
 			if ctx.setJumpPowerValue then pcall(ctx.setJumpPowerValue,jp) else setValue(ctx,"jumpPowerValue",jp) end
 		end
 
@@ -563,6 +570,7 @@ function DataSave.new(ctx)
 			if uiStyle.gradientG~=nil then ctx.UI_STYLE.GradientG=clampNumber(uiStyle.gradientG,0,255,ctx.UI_STYLE.GradientG or 255) end
 			if uiStyle.gradientB~=nil then ctx.UI_STYLE.GradientB=clampNumber(uiStyle.gradientB,0,255,ctx.UI_STYLE.GradientB or 255) end
 			if uiStyle.strokeGradient~=nil then ctx.UI_STYLE.StrokeGradient=uiStyle.strokeGradient and true or false end
+			if uiStyle.liquidStroke~=nil then ctx.UI_STYLE.LiquidStroke=uiStyle.liquidStroke and true or false end
 		end
 
 		local workspaceSettings=settings.workspace or {}
