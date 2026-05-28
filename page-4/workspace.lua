@@ -1,56 +1,36 @@
 local WorkspaceModule={}
 
-local originals=setmetatable({},{__mode="k"})
-
-local function save(obj,props)
-	if originals[obj] then return end
-
-	local data={}
-	for _,prop in ipairs(props) do
-		local ok,value=pcall(function()
-			return obj[prop]
+local function safeDisconnect(conn)
+	if conn and typeof(conn)=="RBXScriptConnection" then
+		pcall(function()
+			conn:Disconnect()
 		end)
-
-		if ok then
-			data[prop]=value
-		end
 	end
-
-	originals[obj]=data
 end
 
-local function restoreOne(obj)
-	local data=originals[obj]
-	if not data then return end
+local function ensureWorldSettings(ctx)
+	local ws=ctx.WORLD_SETTINGS or ctx.WorldSettings or {}
 
-	for prop,value in pairs(data) do
-		pcall(function()
-			obj[prop]=value
-		end)
+	if ws.SmoothPlastic==nil then
+		ws.SmoothPlastic=false
 	end
 
-	originals[obj]=nil
+	if type(ws.OriginalMaterials)~="table" then
+		ws.OriginalMaterials=setmetatable({},{__mode="k"})
+	end
+
+	ctx.WORLD_SETTINGS=ws
+	return ws
 end
 
-local function applyPotatoTo(obj)
-	if obj:IsA("BasePart") then
-		save(obj,{"Material","Reflectance","CastShadow"})
-		pcall(function()
-			obj.Material=Enum.Material.SmoothPlastic
-			obj.Reflectance=0
-			obj.CastShadow=false
-		end)
-	elseif obj:IsA("Decal") or obj:IsA("Texture") then
-		save(obj,{"Transparency"})
-		pcall(function()
-			obj.Transparency=1
-		end)
-	elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Fire") or obj:IsA("Smoke") or obj:IsA("Sparkles") then
-		save(obj,{"Enabled"})
-		pcall(function()
-			obj.Enabled=false
-		end)
+local function applySmoothPlasticToPart(worldSettings,part)
+	if not part or not part:IsA("BasePart") then return end
+
+	if worldSettings.OriginalMaterials[part]==nil then
+		worldSettings.OriginalMaterials[part]=part.Material
 	end
+
+	part.Material=Enum.Material.SmoothPlastic
 end
 
 function WorkspaceModule.new(ctx,page)
@@ -59,16 +39,10 @@ function WorkspaceModule.new(ctx,page)
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
 
+	local worldSettings=ensureWorldSettings(ctx)
 	local api={}
-	local enabled=false
-	local descendantConn=nil
+	local materialToggle=nil
 	local statusLabel=nil
-	local toggle=nil
-
-	local state=ctx.State or {}
-	ctx.State=state
-
-	local targetWorkspace=ctx.Workspace or workspace
 
 	local function setStatus(text)
 		if statusLabel then
@@ -76,85 +50,70 @@ function WorkspaceModule.new(ctx,page)
 		end
 	end
 
-	function api.Apply()
-		for _,obj in ipairs(targetWorkspace:GetDescendants()) do
-			applyPotatoTo(obj)
-		end
+	function api.SetEnabled(state)
+		worldSettings.SmoothPlastic=state and true or false
 
-		if not descendantConn then
-			descendantConn=targetWorkspace.DescendantAdded:Connect(function(obj)
-				if enabled then
-					task.defer(function()
-						if obj and obj.Parent then
-							applyPotatoTo(obj)
-						end
-					end)
+		safeDisconnect(worldSettings.Conn)
+		worldSettings.Conn=nil
+
+		if worldSettings.SmoothPlastic then
+			for _,inst in ipairs(workspace:GetDescendants()) do
+				applySmoothPlasticToPart(worldSettings,inst)
+			end
+
+			worldSettings.Conn=workspace.DescendantAdded:Connect(function(inst)
+				if worldSettings.SmoothPlastic then
+					applySmoothPlasticToPart(worldSettings,inst)
 				end
 			end)
-		end
 
-		setStatus("Potato PC mode is enabled.")
-	end
-
-	function api.Restore()
-		for obj,_ in pairs(originals) do
-			if obj and obj.Parent then
-				restoreOne(obj)
-			else
-				originals[obj]=nil
-			end
-		end
-
-		if descendantConn then
-			descendantConn:Disconnect()
-			descendantConn=nil
-		end
-
-		setStatus("Potato PC mode is disabled.")
-	end
-
-	function api.SetEnabled(value)
-		enabled=value and true or false
-		state.potatoMode=enabled
-		ctx.potatoMode=enabled
-
-		if enabled then
-			api.Apply()
+			setStatus("Potato PC mode is enabled. Workspace materials are SmoothPlastic.")
 		else
-			api.Restore()
+			for part,material in pairs(worldSettings.OriginalMaterials) do
+				if part and part.Parent and part:IsA("BasePart") then
+					part.Material=material
+				end
+			end
+
+			worldSettings.OriginalMaterials=setmetatable({},{__mode="k"})
+			setStatus("Potato PC mode is disabled. Original materials restored.")
 		end
 
-		if toggle then
-			toggle.set(enabled)
+		if materialToggle then
+			materialToggle.set(worldSettings.SmoothPlastic)
+		end
+
+		if ctx.onChanged then
+			pcall(ctx.onChanged,worldSettings.SmoothPlastic)
 		end
 	end
 
 	function api.GetEnabled()
-		return enabled
+		return worldSettings.SmoothPlastic and true or false
 	end
 
 	function api.Refresh()
-		if toggle then
-			toggle.set(enabled)
+		if materialToggle then
+			materialToggle.set(worldSettings.SmoothPlastic)
 		end
 
-		setStatus(enabled and "Potato PC mode is enabled." or "Potato PC mode is disabled.")
+		setStatus(worldSettings.SmoothPlastic and "Potato PC mode is enabled. Workspace materials are SmoothPlastic." or "Potato PC mode is disabled. Original materials restored.")
 	end
 
 	function api.Destroy()
-		api.Restore()
+		api.SetEnabled(false)
 	end
 
 	local section=makeSection(page,1,"Workspace","for potato pc players")
 
-	toggle=buildToggleRow(section,"Potato PC mode",state.potatoMode or ctx.potatoMode or false,function(value)
-		api.SetEnabled(value)
+	materialToggle=buildToggleRow(section,"Potato PC mode",worldSettings.SmoothPlastic,function(state)
+		api.SetEnabled(state)
 	end)
 
 	statusLabel=New("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,34),
-		Text="Potato PC mode is disabled.",
+		Text="Potato PC mode is disabled. Original materials restored.",
 		Font=Enum.Font.Gotham,
 		TextSize=11,
 		TextColor3=THEME.MUTED,
@@ -164,9 +123,7 @@ function WorkspaceModule.new(ctx,page)
 		ZIndex=6,
 	},section)
 
-	api.SetEnabled(state.potatoMode or ctx.potatoMode or false)
 	api.Refresh()
-
 	return api
 end
 
