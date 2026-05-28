@@ -1,5 +1,110 @@
 local Boost={}
 
+local Players=game:GetService("Players")
+local UIS=game:GetService("UserInputService")
+local Debris=game:GetService("Debris")
+
+local me=Players.LocalPlayer
+
+local DEFAULT_FORCE_Y=32
+local DEFAULT_COOLDOWN=5
+local DEFAULT_CHANCE=100
+local DEFAULT_RADIUS=10
+local TOGGLE_JB_KEY=Enum.KeyCode.Unknown
+local TOGGLE_AB_KEY=Enum.KeyCode.Unknown
+
+local function safeDisconnect(conn)
+	if conn and typeof(conn)=="RBXScriptConnection" then
+		pcall(function()
+			conn:Disconnect()
+		end)
+	end
+end
+
+local function clampNumber(value,min,max,fallback)
+	local n=tonumber(value)
+	if not n then return fallback end
+	return math.clamp(n,min,max)
+end
+
+local function inputToBinding(input)
+	local uiType=tostring(input.UserInputType)
+
+	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
+	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
+	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
+	if uiType=="Enum.UserInputType.MouseButton4" then return"MouseButton4" end
+	if uiType=="Enum.UserInputType.MouseButton5" then return"MouseButton5" end
+
+	local key=input.KeyCode
+	if key and key~=Enum.KeyCode.Unknown then return key end
+	return nil
+end
+
+local function isBound(binding,key)
+	return key~=nil and key~=Enum.KeyCode.Unknown and binding==key
+end
+
+local function getFootball()
+	local parkMap=workspace:FindFirstChild("ParkMap")
+	if parkMap and parkMap:FindFirstChild("Replicated") then
+		local fields=parkMap.Replicated:FindFirstChild("Fields")
+		if fields then
+			local parkFields={
+				fields:FindFirstChild("LeftField"),
+				fields:FindFirstChild("RightField"),
+				fields:FindFirstChild("BLeftField"),
+				fields:FindFirstChild("BRightField"),
+				fields:FindFirstChild("HighField"),
+				fields:FindFirstChild("TLeftField"),
+				fields:FindFirstChild("TRightField"),
+			}
+
+			for _,field in ipairs(parkFields) do
+				if field and field:FindFirstChild("Replicated") then
+					local football=field.Replicated:FindFirstChild("Football")
+					if football and football:IsA("BasePart") then
+						return football
+					end
+				end
+			end
+		end
+	end
+
+	local parkMatchMap=workspace:FindFirstChild("ParkMatchMap")
+	if parkMatchMap and parkMatchMap:FindFirstChild("Replicated") then
+		local fields=parkMatchMap.Replicated:FindFirstChild("Fields")
+		local matchField=fields and fields:FindFirstChild("MatchField")
+		local replicated=matchField and matchField:FindFirstChild("Replicated")
+		local football=replicated and replicated:FindFirstChild("Football")
+
+		if football and football:IsA("BasePart") then
+			return football
+		end
+	end
+
+	local gamesFolder=workspace:FindFirstChild("Games")
+	if gamesFolder then
+		for _,gameInstance in ipairs(gamesFolder:GetChildren()) do
+			local replicatedFolder=gameInstance:FindFirstChild("Replicated")
+			if replicatedFolder then
+				local kickoffFootball=replicatedFolder:FindFirstChild("918f5408-d86a-4fb8-a88c-5cab57410acf")
+				if kickoffFootball and kickoffFootball:IsA("BasePart") then
+					return kickoffFootball
+				end
+
+				for _,item in ipairs(replicatedFolder:GetChildren()) do
+					if item:IsA("BasePart") and item.Name=="Football" then
+						return item
+					end
+				end
+			end
+		end
+	end
+
+	return nil
+end
+
 function Boost.new(ctx,parent)
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
@@ -11,39 +116,27 @@ function Boost.new(ctx,parent)
 	local forceSlider=nil
 	local chanceSlider=nil
 	local radiusSlider=nil
+	local jumpBoostTouchConn=nil
+	local characterAddedConn=nil
+	local inputConn=nil
+	local destroyConn=nil
+	local boostReady=true
+	local section=nil
 
 	local function changed()
 		if ctx.onChanged then pcall(ctx.onChanged,state) end
 	end
 
-	local section=makeSection(parent,2,"Boost","")
+	local function normalizeState()
+		state.jumpBoostOn=state.jumpBoostOn and true or false
+		state.jumpBoostTradeMode=state.jumpBoostTradeMode and true or false
+		state.boostForceY=clampNumber(state.boostForceY,10,100,DEFAULT_FORCE_Y)
+		state.boostCooldown=clampNumber(state.boostCooldown,0,60,DEFAULT_COOLDOWN)
+		state.boostChance=clampNumber(state.boostChance,0,100,DEFAULT_CHANCE)
+		state.ballDetectionRadius=clampNumber(state.ballDetectionRadius,1,50,DEFAULT_RADIUS)
+	end
 
-	jumpBoostToggle=buildToggleRow(section,"Jump Boost",state.jumpBoostOn,function(value)
-		state.jumpBoostOn=value
-		changed()
-	end)
-
-	jumpBoostModeToggle=buildToggleRow(section,"Always Boost",state.jumpBoostTradeMode,function(value)
-		state.jumpBoostTradeMode=value
-		changed()
-	end)
-
-	forceSlider=buildSlider(section,"F",10,100,state.boostForceY,1,function(v)
-		state.boostForceY=v
-		changed()
-	end)
-
-	chanceSlider=buildSlider(section,"C",0,100,state.boostChance,0,function(v)
-		state.boostChance=v
-		changed()
-	end)
-
-	radiusSlider=buildSlider(section,"R",1,50,state.ballDetectionRadius,1,function(v)
-		state.ballDetectionRadius=v
-		changed()
-	end)
-
-	function api.Refresh()
+	local function syncControls()
 		if jumpBoostToggle then jumpBoostToggle.set(state.jumpBoostOn) end
 		if jumpBoostModeToggle then jumpBoostModeToggle.set(state.jumpBoostTradeMode) end
 		if forceSlider then forceSlider.set(state.boostForceY) end
@@ -51,15 +144,245 @@ function Boost.new(ctx,parent)
 		if radiusSlider then radiusSlider.set(state.ballDetectionRadius) end
 	end
 
+	local function isAlive()
+		return section==nil or section.Parent~=nil
+	end
+
+	local function applyJumpBoost(rootPart)
+		local bv=Instance.new("BodyVelocity")
+		bv.Velocity=Vector3.new(0,state.boostForceY,0)
+		bv.MaxForce=Vector3.new(0,math.huge,0)
+		bv.P=5000
+		bv.Parent=rootPart
+
+		Debris:AddItem(bv,0.2)
+	end
+
+	local function rollBoostChance()
+		local chance=math.clamp(state.boostChance or 0,0,100)
+
+		if chance>=100 then
+			return true
+		end
+
+		if chance<=0 then
+			return false
+		end
+
+		return math.random(1,100)<=chance
+	end
+
+	local function tryJumpBoost(rootPart)
+		if not boostReady or not rollBoostChance() then
+			return false
+		end
+
+		boostReady=false
+		applyJumpBoost(rootPart)
+
+		task.delay(state.boostCooldown,function()
+			if isAlive() then
+				boostReady=true
+			end
+		end)
+
+		return true
+	end
+
+	local function clearJumpBoostTouchConnection()
+		safeDisconnect(jumpBoostTouchConn)
+		jumpBoostTouchConn=nil
+	end
+
+	local function setupJumpBoost(character)
+		clearJumpBoostTouchConnection()
+
+		local root=character and (character:FindFirstChild("HumanoidRootPart") or character:WaitForChild("HumanoidRootPart",3))
+		if not root then
+			return
+		end
+
+		jumpBoostTouchConn=root.Touched:Connect(function(hit)
+			if not isAlive() or not state.jumpBoostOn or not boostReady then
+				return
+			end
+
+			if root.AssemblyLinearVelocity.Y>=-2 then
+				return
+			end
+
+			local otherChar=hit:FindFirstAncestorWhichIsA("Model")
+			local otherHumanoid=otherChar and otherChar:FindFirstChildOfClass("Humanoid")
+
+			if not otherChar or otherChar==character or not otherHumanoid then
+				return
+			end
+
+			if state.jumpBoostTradeMode then
+				tryJumpBoost(root)
+				return
+			end
+
+			local football=getFootball()
+			if football then
+				local distance=(football.Position-root.Position).Magnitude
+				if distance<=state.ballDetectionRadius then
+					tryJumpBoost(root)
+				end
+			end
+		end)
+	end
+
+	function api.SetJumpBoostState(value,fire)
+		state.jumpBoostOn=value and true or false
+		boostReady=true
+
+		if state.jumpBoostOn then
+			local character=me.Character
+			if character then
+				setupJumpBoost(character)
+			end
+		else
+			clearJumpBoostTouchConnection()
+		end
+
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetAlwaysBoostState(value,fire)
+		state.jumpBoostTradeMode=value and true or false
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetBoostForceY(value,fire)
+		state.boostForceY=clampNumber(value,10,100,DEFAULT_FORCE_Y)
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetBoostChance(value,fire)
+		state.boostChance=clampNumber(value,0,100,DEFAULT_CHANCE)
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetBallDetectionRadius(value,fire)
+		state.ballDetectionRadius=clampNumber(value,1,50,DEFAULT_RADIUS)
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
+	end
+
+	normalizeState()
+	section=makeSection(parent,2,"Boost","")
+
+	jumpBoostToggle=buildToggleRow(section,"Jump Boost",state.jumpBoostOn,function(value)
+		api.SetJumpBoostState(value,true)
+	end)
+
+	jumpBoostModeToggle=buildToggleRow(section,"Always Boost",state.jumpBoostTradeMode,function(value)
+		api.SetAlwaysBoostState(value,true)
+	end)
+
+	forceSlider=buildSlider(section,"F",10,100,state.boostForceY,1,function(v)
+		api.SetBoostForceY(v,true)
+	end)
+
+	chanceSlider=buildSlider(section,"C",0,100,state.boostChance,0,function(v)
+		api.SetBoostChance(v,true)
+	end)
+
+	radiusSlider=buildSlider(section,"R",1,50,state.ballDetectionRadius,1,function(v)
+		api.SetBallDetectionRadius(v,true)
+	end)
+
+	function api.Refresh()
+		normalizeState()
+		api.SetJumpBoostState(state.jumpBoostOn,false)
+		syncControls()
+	end
+
 	function api.Reset()
 		state.jumpBoostOn=false
 		state.jumpBoostTradeMode=false
-		state.boostForceY=32
-		state.boostChance=100
-		state.ballDetectionRadius=10
-		api.Refresh()
+		state.boostForceY=DEFAULT_FORCE_Y
+		state.boostCooldown=DEFAULT_COOLDOWN
+		state.boostChance=DEFAULT_CHANCE
+		state.ballDetectionRadius=DEFAULT_RADIUS
+		api.SetJumpBoostState(false,false)
+		syncControls()
 		changed()
 	end
+
+	function api.Destroy()
+		safeDisconnect(inputConn)
+		inputConn=nil
+		safeDisconnect(characterAddedConn)
+		characterAddedConn=nil
+		safeDisconnect(destroyConn)
+		destroyConn=nil
+		clearJumpBoostTouchConnection()
+		boostReady=true
+	end
+
+	characterAddedConn=me.CharacterAdded:Connect(function(character)
+		if not isAlive() then return end
+
+		if state.jumpBoostOn then
+			task.defer(function()
+				setupJumpBoost(character)
+			end)
+		end
+	end)
+
+	inputConn=UIS.InputBegan:Connect(function(input,processed)
+		if processed then return end
+
+		local jumpBoostKey=TOGGLE_JB_KEY
+		local alwaysBoostKey=TOGGLE_AB_KEY
+
+		if ctx.getJumpBoostToggleKey then
+			jumpBoostKey=ctx.getJumpBoostToggleKey() or Enum.KeyCode.Unknown
+		end
+
+		if ctx.getAlwaysBoostToggleKey then
+			alwaysBoostKey=ctx.getAlwaysBoostToggleKey() or Enum.KeyCode.Unknown
+		end
+
+		local binding=(ctx.inputToBinding or inputToBinding)(input)
+
+		if isBound(binding,jumpBoostKey) then
+			api.SetJumpBoostState(not state.jumpBoostOn,true)
+		end
+
+		if isBound(binding,alwaysBoostKey) then
+			api.SetAlwaysBoostState(not state.jumpBoostTradeMode,true)
+		end
+	end)
+
+	destroyConn=section.AncestryChanged:Connect(function()
+		if not isAlive() then
+			api.Destroy()
+		end
+	end)
+
+	api.Refresh()
 
 	return api
 end
