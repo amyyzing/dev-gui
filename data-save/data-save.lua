@@ -10,7 +10,6 @@ local DEFAULT_ROOT={
 local KEYBIND_FIELDS={
 	{"toggleUI","TOGGLE_UI_KEY"},
 	{"toggleHitbox","TOGGLE_HB_KEY"},
-	{"toggleGameParams","TOGGLE_GP_KEY"},
 	{"toggleJumpBoost","TOGGLE_JB_KEY"},
 	{"toggleAlwaysBoost","TOGGLE_AB_KEY"},
 	{"toggleActionStatus","TOGGLE_ACTION_KEY"},
@@ -418,7 +417,6 @@ function DataSave.new(ctx)
 			keybinds={
 				toggleUI=encodeBinding(getValue(ctx,"TOGGLE_UI_KEY",Enum.KeyCode.Unknown)),
 				toggleHitbox=encodeBinding(getValue(ctx,"TOGGLE_HB_KEY",Enum.KeyCode.Unknown)),
-				toggleGameParams=encodeBinding(getValue(ctx,"TOGGLE_GP_KEY",Enum.KeyCode.Unknown)),
 				toggleJumpBoost=encodeBinding(getValue(ctx,"TOGGLE_JB_KEY",Enum.KeyCode.Unknown)),
 				toggleAlwaysBoost=encodeBinding(getValue(ctx,"TOGGLE_AB_KEY",Enum.KeyCode.Unknown)),
 				toggleActionStatus=encodeBinding(getValue(ctx,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
@@ -546,7 +544,6 @@ function DataSave.new(ctx)
 		local keyMap={
 			toggleUI="TOGGLE_UI_KEY",
 			toggleHitbox="TOGGLE_HB_KEY",
-			toggleGameParams="TOGGLE_GP_KEY",
 			toggleJumpBoost="TOGGLE_JB_KEY",
 			toggleAlwaysBoost="TOGGLE_AB_KEY",
 			toggleActionStatus="TOGGLE_ACTION_KEY",
