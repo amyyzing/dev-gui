@@ -196,6 +196,13 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			end)
 		end)
 
+		keyBtn.InputBegan:Connect(function(input)
+			if input.UserInputType==Enum.UserInputType.MouseButton2 then
+				setPresetKey(i,Enum.KeyCode.Unknown)
+				requestRefresh()
+			end
+		end)
+
 		resetBtn.MouseButton1Click:Connect(function()
 			resetPreset(i)
 			api.Refresh()
