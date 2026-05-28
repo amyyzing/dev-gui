@@ -1,5 +1,7 @@
 local StrokeColour={}
 
+local TweenService=game:GetService("TweenService")
+
 local function clampByte(v)
 	return math.clamp(math.floor((tonumber(v) or 0)+0.5),0,255)
 end
@@ -43,6 +45,7 @@ function StrokeColour.new(ctx,page)
 	local gradientToggle
 	local liquidToggle
 	local previewBox
+	local colourTweenToken=0
 
 	local function getUIStrokeColor()
 		if ctx.getUIStrokeColor then
@@ -183,7 +186,7 @@ function StrokeColour.new(ctx,page)
 		UI_STYLE.GradientB=math.floor(c.B*255+0.5)
 	end
 
-	function api.Refresh()
+	local function syncColourControls()
 		if rSlider then rSlider.set(UI_STYLE.StrokeR) end
 		if gSlider then gSlider.set(UI_STYLE.StrokeG) end
 		if bSlider then bSlider.set(UI_STYLE.StrokeB) end
@@ -199,7 +202,52 @@ function StrokeColour.new(ctx,page)
 		tintSlider(grSlider,Color3.fromRGB(clampByte(UI_STYLE.GradientR),0,0))
 		tintSlider(ggSlider,Color3.fromRGB(0,clampByte(UI_STYLE.GradientG),0))
 		tintSlider(gbSlider,Color3.fromRGB(0,0,clampByte(UI_STYLE.GradientB)))
+	end
 
+	local function tweenStyleTo(c1,c2,gradientEnabled)
+		colourTweenToken=colourTweenToken+1
+		local token=colourTweenToken
+		local mainValue=Instance.new("Color3Value")
+		local gradientValue=Instance.new("Color3Value")
+
+		mainValue.Value=getUIStrokeColor()
+		gradientValue.Value=getUIStrokeGradientColor()
+		UI_STYLE.StrokeGradient=gradientEnabled and true or false
+
+		local function applyStep()
+			if token~=colourTweenToken then return end
+			setMainColour(mainValue.Value)
+			setGradientColour(gradientValue.Value)
+			syncColourControls()
+			updateEverything()
+		end
+
+		mainValue.Changed:Connect(applyStep)
+		gradientValue.Changed:Connect(applyStep)
+
+		local info=TweenInfo.new(0.24,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		local t1=TweenService:Create(mainValue,info,{Value=c1})
+		local t2=TweenService:Create(gradientValue,info,{Value=c2 or c1})
+
+		t2.Completed:Connect(function()
+			if token==colourTweenToken then
+				setMainColour(c1)
+				setGradientColour(c2 or c1)
+				syncColourControls()
+				updateEverything()
+			end
+
+			mainValue:Destroy()
+			gradientValue:Destroy()
+		end)
+
+		t1:Play()
+		t2:Play()
+	end
+
+	function api.Refresh()
+		colourTweenToken=colourTweenToken+1
+		syncColourControls()
 		updateEverything()
 	end
 
@@ -216,26 +264,28 @@ function StrokeColour.new(ctx,page)
 	end
 
 	function api.ApplyMainColour(c)
-		setMainColour(c)
 		UI_STYLE.StrokeGradient=false
+		UI_STYLE.LiquidStroke=false
 
 		if gradientToggle then
 			gradientToggle.set(false)
 		end
 
-		api.Refresh()
+		if liquidToggle then
+			liquidToggle.set(false)
+		end
+
+		tweenStyleTo(c,c,false)
 	end
 
 	function api.ApplyGradient(c1,c2)
-		setMainColour(c1)
-		setGradientColour(c2)
 		UI_STYLE.StrokeGradient=true
 
 		if gradientToggle then
 			gradientToggle.set(true)
 		end
 
-		api.Refresh()
+		tweenStyleTo(c1,c2,true)
 	end
 
 	clearPage()
