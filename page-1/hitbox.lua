@@ -1,400 +1,103 @@
--- hitbox.lua
--- Complete hitbox watcher module, with mode‑aware scanning.
--- Public API: init(), setSize(x,y,z), setAlpha(a), setOn(state), isOn(), getSize(), getAlpha(), rescan(mode), destroy()
+local Hitbox={}
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+function Hitbox.new(ctx,parent)
+	local New=ctx.New
+	local THEME=ctx.THEME
+	local makeSection=ctx.makeSection
+	local buildSlider=ctx.buildSlider
+	local fmtNumber=ctx.fmtNumber
+	local TweenService=game:GetService("TweenService")
+	local state=ctx.State
+	local api={}
+	local toggleWrap=nil
+	local tKnob=nil
+	local boxX=nil
+	local boxY=nil
+	local boxZ=nil
+	local transparencySlider=nil
 
-local me = Players.LocalPlayer
-local ZERO = Vector3.new(0, 0, 0)
-
--- ---------- state ----------
-local hitboxOn = false
-local toolAlive = true
-local sizeX, sizeY, sizeZ = 2.52, 5.4, 1.41
-local targetTransparency = 0.7
-local CURRENT_MODE = 1   -- 1=Games, 2=Park, 3=Squads
-
--- ---------- helpers ----------
-local watchers = setmetatable({}, { __mode = "k" })
-
-local function safeDisconnect(conn)
-	if conn and typeof(conn) == "RBXScriptConnection" then
-		pcall(function() conn:Disconnect() end)
-	end
-end
-
-local function safeDisconnectAll(t)
-	if not t then return end
-	for _, c in ipairs(t) do
-		safeDisconnect(c)
-	end
-	table.clear(t)
-end
-
-local function ensureWatcher(inst)
-	watchers[inst] = watchers[inst] or {
-		cons = {},
-		parts = {},
-		partConns = setmetatable({}, { __mode = "k" }),
-		origT = setmetatable({}, { __mode = "k" }),
-		origS = setmetatable({}, { __mode = "k" }),
-	}
-	return watchers[inst]
-end
-
-local function applyVisuals(w, on)
-	if not w then return end
-	for i = #w.parts, 1, -1 do
-		local p = w.parts[i]
-		if not (p and p.Parent) then
-			table.remove(w.parts, i)
-		elseif p:IsA("BasePart") then
-			if on then
-				if p.Transparency ~= targetTransparency then
-					p.Transparency = targetTransparency
-				end
-				local targetSize = Vector3.new(sizeX, sizeY, sizeZ)
-				if targetSize ~= ZERO and p.Size ~= targetSize then
-					p.Size = targetSize
-				end
-			else
-				if w.origT[p] ~= nil and p.Transparency ~= w.origT[p] then
-					p.Transparency = w.origT[p]
-				end
-				if w.origS[p] ~= nil and p.Size ~= w.origS[p] then
-					p.Size = w.origS[p]
-				end
-			end
-		end
-	end
-end
-
-local function trackPart(w, part)
-	if not toolAlive then return end
-	if not part:IsA("BasePart") then return end
-
-	if not table.find(w.parts, part) then
-		table.insert(w.parts, part)
+	local function changed()
+		if ctx.onChanged then pcall(ctx.onChanged,state) end
 	end
 
-	if w.origT[part] == nil then
-		w.origT[part] = part.Transparency
-	end
-	if w.origS[part] == nil then
-		w.origS[part] = part.Size
-	end
-
-	if not w.partConns[part] then
-		w.partConns[part] = {}
-
-		local c1 = part:GetPropertyChangedSignal("Size"):Connect(function()
-			if toolAlive and hitboxOn then
-				local targetSize = Vector3.new(sizeX, sizeY, sizeZ)
-				if targetSize ~= ZERO and part.Size ~= targetSize then
-					part.Size = targetSize
-				end
-			end
-		end)
-		local c2 = part:GetPropertyChangedSignal("Transparency"):Connect(function()
-			if toolAlive and hitboxOn and part.Transparency ~= targetTransparency then
-				part.Transparency = targetTransparency
-			end
-		end)
-		local c3 = part.AncestryChanged:Connect(function(_, parent)
-			if parent == nil then
-				safeDisconnectAll(w.partConns[part])
-				w.partConns[part] = nil
-			end
-		end)
-
-		table.insert(w.partConns[part], c1)
-		table.insert(w.partConns[part], c2)
-		table.insert(w.partConns[part], c3)
+	local function paintToggle()
+		if not toggleWrap or not tKnob then return end
+		local ti=TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out)
+		local bg=state.hitboxOn and THEME.GREEN or THEME.CARD
+		local pos=state.hitboxOn and UDim2.new(1,-22,0,2) or UDim2.fromOffset(2,2)
+		TweenService:Create(toggleWrap,ti,{BackgroundColor3=bg}):Play()
+		TweenService:Create(tKnob,ti,{Position=pos,BackgroundColor3=THEME.TEXT}):Play()
 	end
 
-	if hitboxOn then
-		part.Transparency = targetTransparency
-		local targetSize = Vector3.new(sizeX, sizeY, sizeZ)
-		if targetSize ~= ZERO then
-			part.Size = targetSize
-		end
-	end
-end
-
-local function attachNode(node)
-	if not toolAlive then return end
-	if not node then return end
-
-	local w = ensureWatcher(node)
-
-	for _, d in ipairs(node:GetDescendants()) do
-		if d:IsA("BasePart") then
-			trackPart(w, d)
-		end
+	function api.SetHitboxLock(value)
+		state.hitboxOn=value and true or false
+		paintToggle()
+		changed()
 	end
 
-	if node:IsA("BasePart") then
-		trackPart(w, node)
+	function api.Refresh()
+		if boxX then boxX.Text="X: "..fmtNumber(state.sizeX,2) end
+		if boxY then boxY.Text="Y: "..fmtNumber(state.sizeY,2) end
+		if boxZ then boxZ.Text="Z: "..fmtNumber(state.sizeZ,2) end
+		if transparencySlider then transparencySlider.set(state.targetTransparency) end
+		paintToggle()
 	end
 
-	table.insert(w.cons, node.DescendantAdded:Connect(function(d)
-		if toolAlive and d:IsA("BasePart") then
-			trackPart(w, d)
-		end
-	end))
-
-	table.insert(w.cons, node.AncestryChanged:Connect(function(_, parent)
-		if parent == nil then
-			applyVisuals(w, false)
-			for _, conns in pairs(w.partConns) do
-				safeDisconnectAll(conns)
-			end
-			w.partConns = setmetatable({}, { __mode = "k" })
-			safeDisconnectAll(w.cons)
-			watchers[node] = nil
-		end
-	end))
-
-	applyVisuals(w, hitboxOn)
-end
-
-local function hookHitboxesFolder(hitboxes)
-	if not toolAlive then return end
-	if not hitboxes then return end
-
-	ensureWatcher(hitboxes)
-	local myNode = hitboxes:FindFirstChild(me.Name)
-	if myNode then attachNode(myNode) end
-
-	local w = ensureWatcher(hitboxes)
-	table.insert(w.cons, hitboxes.ChildAdded:Connect(function(c)
-		if toolAlive and c.Name == me.Name then
-			attachNode(c)
-		end
-	end))
-	table.insert(w.cons, hitboxes.AncestryChanged:Connect(function(_, parent)
-		if parent == nil then
-			safeDisconnectAll(w.cons)
-			watchers[hitboxes] = nil
-		end
-	end))
-end
-
--- Mode 1: workspace.Games
-local function attachGameFolder(gameFolder)
-	if not toolAlive then return end
-	if not gameFolder then return end
-
-	ensureWatcher(gameFolder)
-	local replicated = gameFolder:FindFirstChild("Replicated")
-	local hitboxes = replicated and replicated:FindFirstChild("Hitboxes")
-	if hitboxes then hookHitboxesFolder(hitboxes) end
-
-	local w = ensureWatcher(gameFolder)
-	table.insert(w.cons, gameFolder.DescendantAdded:Connect(function(d)
-		if not toolAlive then return end
-		if (d:IsA("Folder") or d:IsA("Model")) then
-			if d.Name == "Hitboxes" and d.Parent and d.Parent.Name == "Replicated" then
-				hookHitboxesFolder(d)
-			elseif d.Name == me.Name and d.Parent and d.Parent.Name == "Hitboxes" then
-				attachNode(d)
-			end
-		end
-	end))
-	table.insert(w.cons, gameFolder.AncestryChanged:Connect(function(_, parent)
-		if parent == nil then
-			safeDisconnectAll(w.cons)
-			watchers[gameFolder] = nil
-		end
-	end))
-end
-
-local function scanAllGames()
-	if not toolAlive then return end
-	local games = workspace:FindFirstChild("Games")
-	if not games then return end
-	ensureWatcher(games)
-
-	for _, gameFolder in ipairs(games:GetChildren()) do
-		attachGameFolder(gameFolder)
+	function api.Reset()
+		state.hitboxOn=false
+		state.sizeX=2.52
+		state.sizeY=5.4
+		state.sizeZ=1.41
+		state.targetTransparency=0.7
+		api.Refresh()
+		changed()
 	end
 
-	local w = ensureWatcher(games)
-	table.insert(w.cons, games.ChildAdded:Connect(function(gameFolder)
-		if toolAlive then attachGameFolder(gameFolder) end
-	end))
-	table.insert(w.cons, games.AncestryChanged:Connect(function(_, parent)
-		if parent == nil then
-			safeDisconnectAll(w.cons)
-			watchers[games] = nil
+	local section=makeSection(parent,1,"Hitbox","")
+
+	local hitboxToggleRow=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},section)
+	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-76,1,0),Text="Hitbox Toggle",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},hitboxToggleRow)
+
+	toggleWrap=New("Frame",{Size=UDim2.fromOffset(58,24),Position=UDim2.new(1,-58,0.5,-12),BackgroundColor3=THEME.CARD,BorderSizePixel=0,ZIndex=6},hitboxToggleRow)
+	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},toggleWrap)
+
+	tKnob=New("Frame",{Size=UDim2.fromOffset(20,20),Position=UDim2.fromOffset(2,2),BackgroundColor3=THEME.TEXT,BorderSizePixel=0,ZIndex=7},toggleWrap)
+	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},tKnob)
+
+	toggleWrap.InputBegan:Connect(function(i)
+		if i.UserInputType==Enum.UserInputType.MouseButton1 then
+			api.SetHitboxLock(not state.hitboxOn)
 		end
-	end))
-end
+	end)
 
--- Mode 2 & 3: workspace.MiniGames
-local function attachMiniGameFolder(miniGameFolder)
-	if not toolAlive then return end
-	if not miniGameFolder then return end
-
-	ensureWatcher(miniGameFolder)
-	local replicated = miniGameFolder:FindFirstChild("Replicated")
-	local hitboxes = replicated and replicated:FindFirstChild("Hitboxes")
-	if hitboxes then hookHitboxesFolder(hitboxes) end
-
-	local w = ensureWatcher(miniGameFolder)
-	table.insert(w.cons, miniGameFolder.DescendantAdded:Connect(function(d)
-		if not toolAlive then return end
-		if d:IsA("Folder") or d:IsA("Model") then
-			if d.Name == "Hitboxes"
-				and d.Parent
-				and d.Parent.Name == "Replicated"
-				and d.Parent.Parent == miniGameFolder then
-				hookHitboxesFolder(d)
-			elseif d.Name == me.Name
-				and d.Parent
-				and d.Parent.Name == "Hitboxes"
-				and d.Parent.Parent
-				and d.Parent.Parent.Name == "Replicated"
-				and d.Parent.Parent.Parent == miniGameFolder then
-				attachNode(d)
-			end
+	tKnob.InputBegan:Connect(function(i)
+		if i.UserInputType==Enum.UserInputType.MouseButton1 then
+			api.SetHitboxLock(not state.hitboxOn)
 		end
-	end))
-	table.insert(w.cons, miniGameFolder.AncestryChanged:Connect(function(_, parent)
-		if parent == nil then
-			safeDisconnectAll(w.cons)
-			watchers[miniGameFolder] = nil
-		end
-	end))
-end
+	end)
 
-local function scanAllMiniGames()
-	if not toolAlive then return end
-	local miniGames = workspace:FindFirstChild("MiniGames")
-	if not miniGames then return end
-	ensureWatcher(miniGames)
+	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="HITBOX SIZE",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 
-	for _, miniGameFolder in ipairs(miniGames:GetChildren()) do
-		attachMiniGameFolder(miniGameFolder)
+	local sizeReadout=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),ZIndex=5},section)
+	New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder,HorizontalAlignment=Enum.HorizontalAlignment.Left},sizeReadout)
+
+	local function makeReadout(prefix)
+		return New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(0.333,0,1,0),Text=prefix,Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},sizeReadout)
 	end
 
-	local w = ensureWatcher(miniGames)
-	table.insert(w.cons, miniGames.ChildAdded:Connect(function(miniGameFolder)
-		if toolAlive then attachMiniGameFolder(miniGameFolder) end
-	end))
-	table.insert(w.cons, miniGames.AncestryChanged:Connect(function(_, parent)
-		if parent == nil then
-			safeDisconnectAll(w.cons)
-			watchers[miniGames] = nil
-		end
-	end))
+	boxX=makeReadout("X: "..fmtNumber(state.sizeX,2))
+	boxY=makeReadout("Y: "..fmtNumber(state.sizeY,2))
+	boxZ=makeReadout("Z: "..fmtNumber(state.sizeZ,2))
+
+	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="TRANSPARENCY",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+
+	transparencySlider=buildSlider(section,"A",0,1,state.targetTransparency,2,function(v)
+		state.targetTransparency=v
+		changed()
+	end)
+
+	api.Refresh()
+	return api
 end
 
-local function scanCurrentMode()
-	-- clear existing watchers (restore visuals first)
-	for _, w in pairs(watchers) do
-		if type(w) == "table" and w.parts then
-			applyVisuals(w, false)
-		end
-		for inst, wData in pairs(watchers) do
-			if type(wData) == "table" then
-				if wData.cons then safeDisconnectAll(wData.cons) end
-				if wData.partConns then
-					for _, conns in pairs(wData.partConns) do
-						safeDisconnectAll(conns)
-					end
-				end
-				watchers[inst] = nil
-			end
-		end
-	end
-
-	if CURRENT_MODE == 1 then
-		scanAllGames()
-	elseif CURRENT_MODE == 2 then
-		scanAllMiniGames()
-	elseif CURRENT_MODE == 3 then
-		-- Squads: only the single MiniGames child
-		local miniGames = workspace:FindFirstChild("MiniGames")
-		local onlyChild = miniGames and miniGames:GetChildren()[1]
-		if onlyChild then
-			attachMiniGameFolder(onlyChild)
-		end
-	end
-end
-
--- ---------- public API ----------
-local module = {}
-
-function module.init()
-	toolAlive = true
-	scanCurrentMode()
-end
-
-function module.rescan(mode)
-	mode = mode or 1
-	CURRENT_MODE = math.clamp(mode, 1, 3)
-	scanCurrentMode()
-end
-
-function module.destroy()
-	toolAlive = false
-	module.setOn(false)
-	-- kill all watchers
-	for inst, w in pairs(watchers) do
-		if type(w) == "table" then
-			if w.parts then applyVisuals(w, false) end
-			if w.partConns then
-				for _, conns in pairs(w.partConns) do
-					safeDisconnectAll(conns)
-				end
-			end
-			if w.cons then safeDisconnectAll(w.cons) end
-			watchers[inst] = nil
-		end
-	end
-end
-
-function module.setSize(x, y, z)
-	x = math.clamp(x, 0.2, 50)
-	y = math.clamp(y, 0.2, 50)
-	z = math.clamp(z, 0.2, 50)
-	sizeX, sizeY, sizeZ = x, y, z
-	if hitboxOn then
-		for _, w in pairs(watchers) do
-			applyVisuals(w, true)
-		end
-	end
-end
-
-function module.getSize()
-	return sizeX, sizeY, sizeZ
-end
-
-function module.setAlpha(a)
-	targetTransparency = math.clamp(a, 0, 1)
-	if hitboxOn then
-		for _, w in pairs(watchers) do
-			applyVisuals(w, true)
-		end
-	end
-end
-
-function module.getAlpha()
-	return targetTransparency
-end
-
-function module.setOn(state)
-	if not toolAlive then return end
-	hitboxOn = state
-	for _, w in pairs(watchers) do
-		applyVisuals(w, hitboxOn)
-	end
-end
-
-function module.isOn()
-	return hitboxOn
-end
-
-return module
+return Hitbox
