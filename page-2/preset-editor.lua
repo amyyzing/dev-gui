@@ -25,6 +25,81 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 		if refreshAll then refreshAll() end
 	end
 
+	local function setPresetSize(index,x,y,z)
+		if ctx.setPresetSize then
+			local ok,success,err=pcall(ctx.setPresetSize,index,x,y,z)
+			if ok and success~=false then
+				return
+			end
+
+			if not ok then
+				warn("PresetEditor: setPresetSize failed:",success)
+			elseif err then
+				warn("PresetEditor: setPresetSize failed:",err)
+			end
+		end
+
+		local p=PRESETS[index]
+		if not p then return end
+
+		p.size=Vector3.new(
+			math.clamp(tonumber(x) or p.size.X,0.1,50),
+			math.clamp(tonumber(y) or p.size.Y,0.1,50),
+			math.clamp(tonumber(z) or p.size.Z,0.1,50)
+		)
+
+		if ctx.requestPlayerAutosave then
+			ctx.requestPlayerAutosave()
+		end
+	end
+
+	local function setPresetKey(index,binding)
+		if ctx.setPresetKey then
+			local ok,success,err=pcall(ctx.setPresetKey,index,binding)
+			if ok and success~=false then
+				return
+			end
+
+			if not ok then
+				warn("PresetEditor: setPresetKey failed:",success)
+			elseif err then
+				warn("PresetEditor: setPresetKey failed:",err)
+			end
+		end
+
+		if PRESETS[index] then
+			PRESETS[index].key=binding or Enum.KeyCode.Unknown
+		end
+
+		if ctx.requestPlayerAutosave then
+			ctx.requestPlayerAutosave()
+		end
+	end
+
+	local function resetPreset(index)
+		if ctx.resetPreset then
+			local ok,success,err=pcall(ctx.resetPreset,index)
+			if ok and success~=false then
+				return
+			end
+
+			if not ok then
+				warn("PresetEditor: resetPreset failed:",success)
+			elseif err then
+				warn("PresetEditor: resetPreset failed:",err)
+			end
+		end
+
+		if PRESETS[index] and DEFAULT_PRESETS[index] then
+			PRESETS[index].key=DEFAULT_PRESETS[index].key
+			PRESETS[index].size=DEFAULT_PRESETS[index].size
+		end
+
+		if ctx.requestPlayerAutosave then
+			ctx.requestPlayerAutosave()
+		end
+	end
+
 	local function makeBox(parent,w,txt,placeholder)
 		if ctx.makeBox then
 			return ctx.makeBox(parent,w,txt,placeholder)
@@ -99,11 +174,11 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 
 		local function applyPresetSize()
 			local p=PRESETS[i]
-			p.size=Vector3.new(
-				math.clamp(tonumber(xBox.Text) or p.size.X,0.1,50),
-				math.clamp(tonumber(yBox.Text) or p.size.Y,0.1,50),
-				math.clamp(tonumber(zBox.Text) or p.size.Z,0.1,50)
-			)
+			if not p then return end
+
+			setPresetSize(i,xBox.Text,yBox.Text,zBox.Text)
+			p=PRESETS[i]
+
 			xBox.Text=fmtNumber(p.size.X,2)
 			yBox.Text=fmtNumber(p.size.Y,2)
 			zBox.Text=fmtNumber(p.size.Z,2)
@@ -117,13 +192,12 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			keybinds.StartCapture(keyBtn,function()
 				return PRESETS[i].key
 			end,function(v)
-				PRESETS[i].key=v
+				setPresetKey(i,v)
 			end)
 		end)
 
 		resetBtn.MouseButton1Click:Connect(function()
-			PRESETS[i].key=DEFAULT_PRESETS[i].key
-			PRESETS[i].size=DEFAULT_PRESETS[i].size
+			resetPreset(i)
 			api.Refresh()
 			if refreshAll then refreshAll() end
 		end)
