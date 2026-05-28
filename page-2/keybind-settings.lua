@@ -4,13 +4,18 @@ local UIS=game:GetService("UserInputService")
 
 local function inputToBinding(input)
 	local uiType=tostring(input.UserInputType)
+	local key=input.KeyCode
+	if key and key~=Enum.KeyCode.Unknown then return key end
+
 	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
 	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
 	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
 	if uiType=="Enum.UserInputType.MouseButton4" then return"MouseButton4" end
 	if uiType=="Enum.UserInputType.MouseButton5" then return"MouseButton5" end
-	local key=input.KeyCode
-	if key and key~=Enum.KeyCode.Unknown then return key end
+
+	local name=uiType:gsub("Enum.UserInputType%.","")
+	if name:match("^Gamepad") then return name end
+
 	return nil
 end
 
@@ -22,7 +27,6 @@ local function defaultBindingRows(ctx)
 	end
 	ensure("TOGGLE_UI_KEY")
 	ensure("TOGGLE_HB_KEY")
-	ensure("TOGGLE_GP_KEY")
 	ensure("TOGGLE_JB_KEY")
 	ensure("TOGGLE_AB_KEY")
 	ensure("TOGGLE_ACTION_KEY")
@@ -30,7 +34,6 @@ local function defaultBindingRows(ctx)
 	return{
 		{label="Toggle open / hide GUI",key="TOGGLE_UI_KEY"},
 		{label="Hitbox Toggle",key="TOGGLE_HB_KEY"},
-		{label="Game Params Toggle",key="TOGGLE_GP_KEY"},
 		{label="Jump Boost Toggle",key="TOGGLE_JB_KEY"},
 		{label="Always Boost Toggle",key="TOGGLE_AB_KEY"},
 		{label="Action Status Toggle",key="TOGGLE_ACTION_KEY"},
@@ -132,6 +135,13 @@ function KeybindSettings.new(ctx,bindSection)
 			api.StartCapture(btn,getter,setter)
 		end)
 
+		btn.InputBegan:Connect(function(input)
+			if input.UserInputType==Enum.UserInputType.MouseButton2 then
+				setter(Enum.KeyCode.Unknown)
+				requestRefresh()
+			end
+		end)
+
 		table.insert(bindRows,{button=btn,getter=getter})
 		return btn
 	end
@@ -164,13 +174,6 @@ function KeybindSettings.new(ctx,bindSection)
 		local cap=activeCapture
 
 		if inp.KeyCode==Enum.KeyCode.Escape then
-			activeCapture=nil
-			requestRefresh()
-			return
-		end
-
-		if inp.KeyCode==Enum.KeyCode.Backspace or inp.KeyCode==Enum.KeyCode.Delete then
-			cap.setter(Enum.KeyCode.Unknown)
 			activeCapture=nil
 			requestRefresh()
 			return
