@@ -13,6 +13,7 @@ local function copyDefaultStyle(style)
 		GradientG=style.GradientG,
 		GradientB=style.GradientB,
 		StrokeGradient=style.StrokeGradient and true or false,
+		LiquidStroke=style.LiquidStroke and true or false,
 	}
 end
 
@@ -40,6 +41,7 @@ function StrokeColour.new(ctx,page)
 	local rSlider,gSlider,bSlider
 	local grSlider,ggSlider,gbSlider
 	local gradientToggle
+	local liquidToggle
 	local previewBox
 
 	local function getUIStrokeColor()
@@ -73,9 +75,12 @@ function StrokeColour.new(ctx,page)
 		for _,obj in ipairs(SG:GetDescendants()) do
 			if obj:IsA("UIStroke") then
 				obj.Color=color
+				pcall(function()
+					obj.LineJoinMode=Enum.LineJoinMode.Round
+				end)
 
 				local gradient=obj:FindFirstChild("StrokeGradient")
-				if UI_STYLE.StrokeGradient then
+				if UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke then
 					if not gradient then
 						gradient=Instance.new("UIGradient")
 						gradient.Name="StrokeGradient"
@@ -83,10 +88,18 @@ function StrokeColour.new(ctx,page)
 					end
 
 					gradient.Rotation=0
-					gradient.Color=ColorSequence.new({
-						ColorSequenceKeypoint.new(0,color),
-						ColorSequenceKeypoint.new(1,color2),
-					})
+					if UI_STYLE.LiquidStroke then
+						gradient.Color=ColorSequence.new({
+							ColorSequenceKeypoint.new(0,color),
+							ColorSequenceKeypoint.new(0.5,color2),
+							ColorSequenceKeypoint.new(1,color),
+						})
+					else
+						gradient.Color=ColorSequence.new({
+							ColorSequenceKeypoint.new(0,color),
+							ColorSequenceKeypoint.new(1,color2),
+						})
+					end
 				else
 					if gradient then
 						gradient:Destroy()
@@ -122,7 +135,7 @@ function StrokeColour.new(ctx,page)
 		previewBox.BackgroundColor3=c1
 
 		local grad=previewBox:FindFirstChild("PreviewGradient")
-		if UI_STYLE.StrokeGradient then
+		if UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke then
 			if not grad then
 				grad=Instance.new("UIGradient")
 				grad.Name="PreviewGradient"
@@ -130,10 +143,18 @@ function StrokeColour.new(ctx,page)
 			end
 
 			grad.Rotation=0
-			grad.Color=ColorSequence.new({
-				ColorSequenceKeypoint.new(0,c1),
-				ColorSequenceKeypoint.new(1,c2),
-			})
+			if UI_STYLE.LiquidStroke then
+				grad.Color=ColorSequence.new({
+					ColorSequenceKeypoint.new(0,c1),
+					ColorSequenceKeypoint.new(0.5,c2),
+					ColorSequenceKeypoint.new(1,c1),
+				})
+			else
+				grad.Color=ColorSequence.new({
+					ColorSequenceKeypoint.new(0,c1),
+					ColorSequenceKeypoint.new(1,c2),
+				})
+			end
 		else
 			if grad then
 				grad:Destroy()
@@ -170,6 +191,7 @@ function StrokeColour.new(ctx,page)
 		if ggSlider then ggSlider.set(UI_STYLE.GradientG) end
 		if gbSlider then gbSlider.set(UI_STYLE.GradientB) end
 		if gradientToggle then gradientToggle.set(UI_STYLE.StrokeGradient) end
+		if liquidToggle then liquidToggle.set(UI_STYLE.LiquidStroke) end
 
 		tintSlider(rSlider,Color3.fromRGB(clampByte(UI_STYLE.StrokeR),0,0))
 		tintSlider(gSlider,Color3.fromRGB(0,clampByte(UI_STYLE.StrokeG),0))
@@ -189,6 +211,7 @@ function StrokeColour.new(ctx,page)
 		UI_STYLE.GradientG=defaultStyle.GradientG
 		UI_STYLE.GradientB=defaultStyle.GradientB
 		UI_STYLE.StrokeGradient=defaultStyle.StrokeGradient
+		UI_STYLE.LiquidStroke=defaultStyle.LiquidStroke
 		api.Refresh()
 	end
 
@@ -320,6 +343,17 @@ function StrokeColour.new(ctx,page)
 
 	gradientToggle=buildToggleRow(strokeSettings,"Gradient Stroke",UI_STYLE.StrokeGradient,function(state)
 		UI_STYLE.StrokeGradient=state and true or false
+		updateEverything()
+	end)
+
+	liquidToggle=buildToggleRow(strokeSettings,"Liquid Stroke",UI_STYLE.LiquidStroke,function(state)
+		UI_STYLE.LiquidStroke=state and true or false
+		if state then
+			UI_STYLE.StrokeGradient=true
+			if gradientToggle then
+				gradientToggle.set(true)
+			end
+		end
 		updateEverything()
 	end)
 
