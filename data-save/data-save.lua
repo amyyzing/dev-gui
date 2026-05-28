@@ -69,6 +69,41 @@ local function encodeBinding(binding)
 end
 
 local function decodeBinding(binding)
+	if binding==nil then
+		return Enum.KeyCode.Unknown
+	end
+
+	if binding==Enum.KeyCode.Unknown then
+		return Enum.KeyCode.Unknown
+	end
+
+	if isEnumItem(binding) then
+		return binding
+	end
+
+	if type(binding)=="string" then
+		if binding=="NIL" then
+			return Enum.KeyCode.Unknown
+		end
+
+		binding=binding:gsub("^Enum%.UserInputType%.","")
+		binding=binding:gsub("^Enum%.KeyCode%.","")
+
+		if binding:match("^MouseButton") then
+			return binding
+		end
+
+		local ok,key=pcall(function()
+			return Enum.KeyCode[binding]
+		end)
+
+		if ok and key then
+			return key
+		end
+
+		return Enum.KeyCode.Unknown
+	end
+
 	if type(binding)~="table" then
 		return Enum.KeyCode.Unknown
 	end
@@ -91,6 +126,25 @@ local function decodeBinding(binding)
 	end
 
 	return Enum.KeyCode.Unknown
+end
+
+local function encodePresetEditor(presetEditor)
+	if type(presetEditor)~="table" then return {} end
+
+	local output={}
+
+	for i=1,4 do
+		local item=presetEditor[i] or {}
+
+		output[i]={
+			x=clampNumber(item.x or item.X,0.1,50,1),
+			y=clampNumber(item.y or item.Y,0.1,50,1),
+			z=clampNumber(item.z or item.Z,0.1,50,1),
+			key=encodeBinding(decodeBinding(item.key or item.Key or item.binding or item.Binding)),
+		}
+	end
+
+	return output
 end
 
 local function normalizeRoot(raw)
@@ -250,6 +304,12 @@ local function clearArray(t)
 	end
 end
 
+local function makeLocalCode(name)
+	local base=string.upper(string.sub(string.gsub(tostring(name or ""),"[^%w]",""),1,3))
+	if base=="" then base="GUI" end
+	return base..tostring(math.random(100,999))
+end
+
 function DataSave.new(ctx)
 	ctx=ctx or {}
 
@@ -334,7 +394,8 @@ function DataSave.new(ctx)
 			},
 
 			gameParams={
-				athleticism=getValue(ctx,"athleticismOn",false),
+				staminaRegen=getValue(ctx,"staminaRegenValue",12),
+				staminaDeplete=getValue(ctx,"staminaDepleteValue",-8),
 				jumpPower=getValue(ctx,"jumpPowerValue",50),
 				divePower=getValue(ctx,"divePowerValue",1.9),
 			},
@@ -441,6 +502,16 @@ function DataSave.new(ctx)
 		local gameParams=settings.gameParams or {}
 		if gameParams.athleticism~=nil then
 			if ctx.setAthleticism then pcall(ctx.setAthleticism,gameParams.athleticism) else setValue(ctx,"athleticismOn",gameParams.athleticism and true or false) end
+		end
+
+		if gameParams.staminaRegen~=nil then
+			local sr=clampNumber(gameParams.staminaRegen,0,50,12)
+			if ctx.setStaminaRegenValue then pcall(ctx.setStaminaRegenValue,sr) else setValue(ctx,"staminaRegenValue",sr) end
+		end
+
+		if gameParams.staminaDeplete~=nil then
+			local sd=clampNumber(gameParams.staminaDeplete,-50,0,-8)
+			if ctx.setStaminaDepleteValue then pcall(ctx.setStaminaDepleteValue,sd) else setValue(ctx,"staminaDepleteValue",sd) end
 		end
 
 		if gameParams.jumpPower~=nil then
@@ -571,6 +642,216 @@ function DataSave.new(ctx)
 		end)
 	end
 
+	function api.SetPresetSize(index,x,y,z,skipSave)
+		local presets=ctx.PRESETS or {}
+		local i=tonumber(index)
+		local preset=i and presets[i]
+
+		if not preset then
+			return false,"missing preset"
+		end
+
+		local oldSize=preset.size or Vector3.new(1,1,1)
+		local nx=clampNumber(x,0.1,50,oldSize.X)
+		local ny=clampNumber(y,0.1,50,oldSize.Y)
+		local nz=clampNumber(z,0.1,50,oldSize.Z)
+
+		preset.size=Vector3.new(nx,ny,nz)
+
+		if skipSave~=true then
+			api.Schedule()
+		end
+
+		return true,preset.size
+	end
+
+	function api.SetPresetKey(index,binding,skipSave)
+		local presets=ctx.PRESETS or {}
+		local i=tonumber(index)
+		local preset=i and presets[i]
+
+		if not preset then
+			return false,"missing preset"
+		end
+
+		preset.key=decodeBinding(binding)
+
+		if skipSave~=true then
+			api.Schedule()
+		end
+
+		return true,preset.key
+	end
+
+	function api.ResetPreset(index,skipSave)
+		local presets=ctx.PRESETS or {}
+		local defaults=ctx.DEFAULT_PRESETS or {}
+		local i=tonumber(index)
+		local preset=i and presets[i]
+		local default=i and defaults[i]
+
+		if not preset or not default then
+			return false,"missing preset"
+		end
+
+		preset.key=default.key or Enum.KeyCode.Unknown
+		preset.size=default.size or Vector3.new(1,1,1)
+
+		if skipSave~=true then
+			api.Schedule()
+		end
+
+		return true,preset
+	end
+
+	function api.ResetPresetEditor(skipSave)
+		for i=1,4 do
+			api.ResetPreset(i,true)
+		end
+
+		if skipSave~=true then
+			api.Schedule()
+		end
+
+		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
+		return true
+	end
+
+	function api.ApplyPresetEditor(presetEditor,skipSave)
+		applyPresetEditor(ctx,presetEditor)
+
+		if skipSave~=true then
+			api.Schedule()
+		end
+
+		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
+		return true
+	end
+
+	function api.CreateOwnedPreset(name,presetEditor)
+		local cleanName=trim(name)
+		if cleanName=="" then
+			return false,"Name cannot be empty."
+		end
+
+		local editorForApi=encodePresetEditor(presetEditor or collectPresetEditor(ctx))
+		local preset=nil
+
+		if ctx.BOT_API and ctx.BOT_API.Post then
+			local response=ctx.BOT_API.Post("/preset/create",{
+				playerId=getPlayerId(ctx),
+				name=cleanName,
+				presetEditor=editorForApi,
+			})
+
+			if not response or not response.ok then
+				return false,response and response.error or "Save failed."
+			end
+
+			preset=normalizePreset(response.preset or {
+				code=response.code,
+				name=cleanName,
+				presetEditor=editorForApi,
+			})
+		else
+			preset=normalizePreset({
+				code=makeLocalCode(cleanName),
+				name=cleanName,
+				presetEditor=editorForApi,
+			})
+		end
+
+		if not preset then
+			return false,"Save returned invalid preset data."
+		end
+
+		if ctx.OWNED_PRESETS then
+			table.insert(ctx.OWNED_PRESETS,preset)
+		end
+
+		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
+		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
+
+		return true,preset
+	end
+
+	function api.EquipOwnedPreset(preset)
+		local normalized=normalizePreset(preset)
+		if not normalized then
+			return false,"Invalid preset."
+		end
+
+		api.ApplyPresetEditor(normalized.Data.PresetEditor,true)
+
+		if ctx.BOT_API and ctx.BOT_API.Post then
+			task.spawn(function()
+				local response=ctx.BOT_API.Post("/preset/equip",{
+					playerId=getPlayerId(ctx),
+					code=normalized.Code,
+				})
+
+				if not response or not response.ok then
+					warn("Preset API equip failed:",response and response.error or "unknown error")
+				end
+			end)
+		end
+
+		api.Schedule()
+		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
+
+		return true,normalized
+	end
+
+	function api.DeleteOwnedPreset(code,index)
+		local response=nil
+		local usedApi=false
+
+		if ctx.BOT_API and ctx.BOT_API.Post then
+			usedApi=true
+			response=ctx.BOT_API.Post("/preset/delete",{
+				playerId=getPlayerId(ctx),
+				code=code,
+			})
+		end
+
+		if response and response.ok and type(response.presets)=="table" and ctx.OWNED_PRESETS then
+			clearArray(ctx.OWNED_PRESETS)
+
+			for _,rawPreset in ipairs(response.presets) do
+				local normalized=normalizePreset(rawPreset)
+				if normalized then
+					table.insert(ctx.OWNED_PRESETS,normalized)
+				end
+			end
+		elseif usedApi then
+			warn("Preset API delete failed:",response and response.error or "unknown error")
+			return false,response and response.error or "Delete failed."
+		elseif ctx.OWNED_PRESETS then
+			local removed=false
+
+			for i=#ctx.OWNED_PRESETS,1,-1 do
+				local preset=ctx.OWNED_PRESETS[i]
+				if tostring(preset.Code or preset.code or "")==tostring(code or "") then
+					table.remove(ctx.OWNED_PRESETS,i)
+					removed=true
+				end
+			end
+
+			if not removed and index and ctx.OWNED_PRESETS[index] then
+				table.remove(ctx.OWNED_PRESETS,index)
+			end
+		end
+
+		if ctx.expandedOwned then
+			ctx.expandedOwned[tostring(code or "")]=nil
+		end
+
+		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
+		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
+
+		return true
+	end
+
 	function api.Load()
 		if not ctx.BOT_API or not ctx.BOT_API.Post then
 			api.Apply(api.GetSavedSettingsForCurrentMode())
@@ -636,6 +917,7 @@ function DataSave.new(ctx)
 
 	api.EncodeBinding=encodeBinding
 	api.DecodeBinding=decodeBinding
+	api.EncodePresetEditor=encodePresetEditor
 	api.NormalizeRoot=normalizeRoot
 	api.NormalizePreset=normalizePreset
 	api.CollectPresetEditor=function()
