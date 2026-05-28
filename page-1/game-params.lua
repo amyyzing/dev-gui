@@ -27,6 +27,12 @@ local function safeDisconnectAll(t)
 	table.clear(t)
 end
 
+local function clampStaminaDeplete(value)
+	local n=tonumber(value)
+	if not n then return 8 end
+	return math.clamp(math.floor(math.abs(n)+0.5),0,50)
+end
+
 function GameParams.new(ctx,parent)
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
@@ -54,8 +60,8 @@ function GameParams.new(ctx,parent)
 
 	local function normalizeState()
 		state.staminaRegenValue=clampNumber(state.staminaRegenValue,0,50,12)
-		state.staminaDepleteValue=clampNumber(state.staminaDepleteValue,-50,0,-8)
-		state.jumpPowerValue=clampNumber(state.jumpPowerValue,0,300,50)
+		state.staminaDepleteValue=clampStaminaDeplete(state.staminaDepleteValue)
+		state.jumpPowerValue=clampNumber(state.jumpPowerValue,0,300,53.5)
 		state.divePowerValue=clampNumber(state.divePowerValue,0,15,1.9)
 	end
 
@@ -243,7 +249,7 @@ function GameParams.new(ctx,parent)
 	end
 
 	function api.SetStaminaDepleteValue(value,fire)
-		state.staminaDepleteValue=clampNumber(value,-50,0,-8)
+		state.staminaDepleteValue=clampStaminaDeplete(value)
 		applyGameParams()
 		syncControls()
 
@@ -253,7 +259,7 @@ function GameParams.new(ctx,parent)
 	end
 
 	function api.SetJumpPowerValue(value,fire)
-		state.jumpPowerValue=clampNumber(value,0,300,50)
+		state.jumpPowerValue=clampNumber(value,0,300,53.5)
 		applyGameParams()
 		syncControls()
 
@@ -280,7 +286,7 @@ function GameParams.new(ctx,parent)
 		api.SetStaminaRegenValue(v,true)
 	end)
 
-	staminaDepleteSlider=buildSlider(section,"SD",-50,0,state.staminaDepleteValue,1,function(v)
+	staminaDepleteSlider=buildSlider(section,"SD",0,50,state.staminaDepleteValue,0,function(v)
 		api.SetStaminaDepleteValue(v,true)
 	end)
 
@@ -301,8 +307,8 @@ function GameParams.new(ctx,parent)
 	function api.Reset()
 		state.athleticismOn=false
 		state.staminaRegenValue=12
-		state.staminaDepleteValue=-8
-		state.jumpPowerValue=50
+		state.staminaDepleteValue=8
+		state.jumpPowerValue=53.5
 		state.divePowerValue=1.9
 		api.Refresh()
 		changed()
