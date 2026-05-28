@@ -105,7 +105,7 @@ function PlayerData.new(ctx,page,deps)
 		},box)
 
 		local no=modalButton(box,"CANCEL",160)
-		local yes=modalButton(box,yesText or "YES",274)
+		local yes=modalButton(box,yesText or"YES",274)
 
 		no.MouseButton1Click:Connect(function()
 			modal:Destroy()
@@ -118,16 +118,10 @@ function PlayerData.new(ctx,page,deps)
 	end
 
 	local function getPlayerId()
-		if ctx.playerId then
-			return tostring(ctx.playerId)
-		end
+		if ctx.playerId then return tostring(ctx.playerId) end
+		if ctx.me and ctx.me.UserId then return tostring(ctx.me.UserId) end
 
-		if ctx.me and ctx.me.UserId then
-			return tostring(ctx.me.UserId)
-		end
-
-		local players=game:GetService("Players")
-		local lp=players.LocalPlayer
+		local lp=game:GetService("Players").LocalPlayer
 		return lp and tostring(lp.UserId) or ""
 	end
 
@@ -148,25 +142,11 @@ function PlayerData.new(ctx,page,deps)
 			ctx.WorkspaceAPI.SetEnabled(false)
 		end
 
-		if ctx.resetMainPageDefaults then
-			pcall(ctx.resetMainPageDefaults)
-		end
-
-		if ctx.resetCustomizePageDefaults then
-			pcall(ctx.resetCustomizePageDefaults)
-		end
-
-		if ctx.rebuildOwnedList then
-			pcall(ctx.rebuildOwnedList)
-		end
-
-		if ctx.refreshPage2UI then
-			pcall(ctx.refreshPage2UI)
-		end
-
-		if ctx.refreshSettingsPage then
-			pcall(ctx.refreshSettingsPage)
-		end
+		if ctx.resetMainPageDefaults then pcall(ctx.resetMainPageDefaults) end
+		if ctx.resetCustomizePageDefaults then pcall(ctx.resetCustomizePageDefaults) end
+		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
+		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
+		if ctx.refreshSettingsPage then pcall(ctx.refreshSettingsPage) end
 	end
 
 	function api.Wipe()
@@ -174,11 +154,8 @@ function PlayerData.new(ctx,page,deps)
 		busy=true
 		setStatus("Wiping player data...",THEME.MUTED)
 
-		local ok=true
-		local result=nil
-
 		if ctx.BOT_API and ctx.BOT_API.Post then
-			ok,result=pcall(function()
+			local ok,result=pcall(function()
 				return ctx.BOT_API.Post("/player/wipe",{
 					playerId=getPlayerId(),
 				})
@@ -198,7 +175,6 @@ function PlayerData.new(ctx,page,deps)
 		end
 
 		wipeLocal()
-
 		busy=false
 		setStatus("Player data wiped.",THEME.GREEN or THEME.TEXT)
 	end
