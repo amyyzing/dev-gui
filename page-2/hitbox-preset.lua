@@ -44,6 +44,72 @@ function HitboxPreset.new(ctx,ownedSection)
 		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
 	end
 
+	local function applyEditorLocally(editor)
+		editor=editor or {}
+
+		for i=1,4 do
+			local item=editor[i]
+			if item and PRESETS[i] then
+				PRESETS[i].key=item.key or item.Key or Enum.KeyCode.Unknown
+				PRESETS[i].size=Vector3.new(tonumber(item.x or item.X) or 1,tonumber(item.y or item.Y) or 1,tonumber(item.z or item.Z) or 1)
+			end
+		end
+
+		if ctx.requestPlayerAutosave then
+			ctx.requestPlayerAutosave()
+		end
+	end
+
+	local function applyOwnedPreset(preset,editor)
+		if ctx.equipOwnedPreset then
+			local ok,success,err=pcall(ctx.equipOwnedPreset,preset)
+			if ok and success~=false then
+				return true
+			end
+
+			if not ok then
+				warn("HitboxPreset: equip failed:",success)
+			elseif err then
+				warn("HitboxPreset: equip failed:",err)
+			end
+		elseif ctx.applyPresetEditor then
+			local ok,success,err=pcall(ctx.applyPresetEditor,editor)
+			if ok and success~=false then
+				return true
+			end
+
+			if not ok then
+				warn("HitboxPreset: applyPresetEditor failed:",success)
+			elseif err then
+				warn("HitboxPreset: applyPresetEditor failed:",err)
+			end
+		end
+
+		applyEditorLocally(editor)
+		return true
+	end
+
+	local function deleteOwnedPreset(code,index)
+		if ctx.deleteOwnedPreset then
+			local ok,success,err=pcall(ctx.deleteOwnedPreset,code,index)
+			if ok and success~=false then
+				return true
+			end
+
+			if not ok then
+				warn("HitboxPreset: delete failed:",success)
+			elseif err then
+				warn("HitboxPreset: delete failed:",err)
+			end
+
+			return false
+		end
+
+		table.remove(OWNED_PRESETS,index)
+		expandedOwned[code]=nil
+		return true
+	end
+
 	local function clearOwnedList()
 		for _,child in ipairs(ownedList:GetChildren()) do
 			if not child:IsA("UIListLayout") then
@@ -114,20 +180,14 @@ function HitboxPreset.new(ctx,ownedSection)
 				local deleteBtn=makePresetActionButton(actionRow,"DELETE")
 
 				equipBtn.MouseButton1Click:Connect(function()
-					for i=1,4 do
-						local item=editor[i]
-						if item and PRESETS[i] then
-							PRESETS[i].key=item.key or item.Key or Enum.KeyCode.Unknown
-							PRESETS[i].size=Vector3.new(tonumber(item.x or item.X) or 1,tonumber(item.y or item.Y) or 1,tonumber(item.z or item.Z) or 1)
-						end
-					end
+					applyOwnedPreset(preset,editor)
 					requestRefresh()
 				end)
 
 				deleteBtn.MouseButton1Click:Connect(function()
-					table.remove(OWNED_PRESETS,presetIndex)
-					expandedOwned[code]=nil
-					requestRefresh()
+					if deleteOwnedPreset(code,presetIndex) then
+						requestRefresh()
+					end
 				end)
 			end
 		end
@@ -144,11 +204,33 @@ function HitboxPreset.new(ctx,ownedSection)
 			return false,"Could not collect preset: "..tostring(editor)
 		end
 
+		if ctx.createOwnedPreset then
+			local callOk,success,result=pcall(ctx.createOwnedPreset,cleanName,editor)
+			if not callOk then
+				return false,tostring(success)
+			end
+
+			if not success then
+				return false,tostring(result)
+			end
+
+			local code=tostring(result.Code or result.code or "")
+			if code~="" then
+				expandedOwned[code]=true
+			end
+
+			requestRefresh()
+			return true,result
+		end
+
 		local code=makeCode(cleanName)
 		local preset={Code=code,Name=cleanName,Data={PresetEditor=editor}}
 
 		table.insert(OWNED_PRESETS,preset)
 		expandedOwned[code]=true
+		if ctx.requestPlayerAutosave then
+			ctx.requestPlayerAutosave()
+		end
 		requestRefresh()
 
 		return true,preset
@@ -222,7 +304,7 @@ function HitboxPreset.new(ctx,ownedSection)
 
 		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="Save current preset?",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
 
-		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,44),Size=UDim2.new(1,-32,0,42),Text="This saves the preset locally for the current session.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,ZIndex=101},box)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,44),Size=UDim2.new(1,-32,0,42),Text="This saves the preset to your owned preset list.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,ZIndex=101},box)
 
 		local no=modalButton(box,"NO",146)
 		local yes=modalButton(box,"YES",248)
