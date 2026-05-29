@@ -388,7 +388,7 @@ function DataSave.new(ctx)
 				y=getValue(ctx,"sizeY",5.4),
 				z=getValue(ctx,"sizeZ",1.41),
 				transparency=getValue(ctx,"targetTransparency",0.7),
-				enabled=getValue(ctx,"hitboxOn",false),
+				enabled=false,
 			},
 
 			gravity=getValue(ctx,"gravityValue",196.2),
@@ -491,8 +491,10 @@ function DataSave.new(ctx)
 			if ctx.setTransparency then pcall(ctx.setTransparency,tv) else setValue(ctx,"targetTransparency",tv) end
 		end
 
-		if hitbox.enabled~=nil then
-			if ctx.setHitboxLock then pcall(ctx.setHitboxLock,hitbox.enabled) else setValue(ctx,"hitboxOn",hitbox.enabled and true or false) end
+		if ctx.setHitboxLock then
+			pcall(ctx.setHitboxLock,false)
+		else
+			setValue(ctx,"hitboxOn",false)
 		end
 
 		if settings.gravity~=nil then

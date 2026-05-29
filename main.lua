@@ -259,6 +259,7 @@ local AUTO_REFRESH_INTERVAL=2.5
 local AUTO_REFRESH_RELOAD_PATH="main.lua"
 
 local MODULE_PATHS={
+	Announcement="announcement.lua",
 	GuiLogic="gui/gui-logic.lua",
 	MainFrame="gui/mainframe.lua",
 	HitboxPreset="page-2/hitbox-preset.lua",
@@ -329,6 +330,7 @@ end
 
 local GuiLogicModule=loadRemoteModule(MODULE_PATHS.GuiLogic)
 local MainFrameModule=loadRemoteModule(MODULE_PATHS.MainFrame)
+local AnnouncementModule=loadRemoteModule(MODULE_PATHS.Announcement)
 local HitboxPresetModule=loadRemoteModule(MODULE_PATHS.HitboxPreset)
 local KeybindSettingsModule=loadRemoteModule(MODULE_PATHS.KeybindSettings)
 local PresetEditorModule=loadRemoteModule(MODULE_PATHS.PresetEditor)
@@ -436,7 +438,7 @@ local function requestAutoRefresh(changedPath,changedSource)
 		return
 	end
 
-	if changedPath==MODULE_PATHS.GuiLogic or changedPath==MODULE_PATHS.MainFrame then
+	if changedPath==MODULE_PATHS.GuiLogic or changedPath==MODULE_PATHS.MainFrame or changedPath==MODULE_PATHS.Announcement then
 		local source,sourceErr=getRemoteSource(AUTO_REFRESH_RELOAD_PATH)
 		if not source then
 			warn("Auto-refresh detected a GUI module change in "..changedPath..", but "..AUTO_REFRESH_RELOAD_PATH.." could not be fetched:",sourceErr)
@@ -798,6 +800,7 @@ local refreshFooterResetButton=function()
 	end
 end
 
+local AnnouncementAPI=nil
 local resetKeybindPresetPageDefaults=function() end
 
 local DataSaveAPI=nil
@@ -1676,6 +1679,12 @@ local function shutdownTool()
 	if not toolAlive then return end
 	toolAlive=false
 
+	if AnnouncementAPI and AnnouncementAPI.Destroy then
+		pcall(function()
+			AnnouncementAPI.Destroy()
+		end)
+	end
+
 	if SG and SG.Parent then
 		SG:Destroy()
 	end
@@ -1864,6 +1873,28 @@ if DataSaveAPI then
 		DataSaveAPI.LoadOwnedPresets()
 	end)
 	refreshAllUI()
+end
+
+if AnnouncementModule and AnnouncementModule.new then
+	local ok,result=pcall(function()
+		return AnnouncementModule.new({
+			New=New,
+			THEME=THEME,
+			SG=SG,
+			BOT_API=BOT_API,
+			playerId=tostring(me.UserId),
+			wrapTextButton=wrapTextButton,
+			safeDisconnect=safeDisconnect,
+		})
+	end)
+
+	if ok then
+		AnnouncementAPI=result
+	else
+		warn("Announcement module failed:",result)
+	end
+else
+	warn("Missing remote module: announcement.lua")
 end
 
 setActivePage("main")

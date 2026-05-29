@@ -10,7 +10,7 @@ function GuiLogic.new(ctx)
 	local BUTTON_WRAPPERS=ctx.BUTTON_WRAPPERS or setmetatable({}, {__mode="k"})
 
 	local api={}
-	local WRAP_INSET=1
+	local WRAP_INSET=0
 
 	local function insetSize(size)
 		return UDim2.new(size.X.Scale,size.X.Offset-(WRAP_INSET*2),size.Y.Scale,size.Y.Offset-(WRAP_INSET*2))
@@ -139,6 +139,7 @@ function GuiLogic.new(ctx)
 		end
 
 		local body=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=5,LayoutOrder=3,ClipsDescendants=true},sec)
+		New("UIPadding",{PaddingTop=UDim.new(0,2),PaddingLeft=UDim.new(0,2),PaddingRight=UDim.new(0,2),PaddingBottom=UDim.new(0,2)},body)
 		local bodyLayout=New("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},body)
 		local bodyTween=nil
 		local lastBodyHeight=0
@@ -216,7 +217,7 @@ function GuiLogic.new(ctx)
 			setSubtitleVisible(true,animate)
 
 			local function playExpand()
-				local target=math.max(bodyLayout.AbsoluteContentSize.Y,lastBodyHeight)
+				local target=math.max(bodyLayout.AbsoluteContentSize.Y+4,lastBodyHeight)
 				target=math.max(0,math.floor(target+0.5))
 				lastBodyHeight=target
 
@@ -375,10 +376,10 @@ function GuiLogic.new(ctx)
 		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},parent)
 		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-64,1,0),Text=labelText,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
 
-		local wrap=New("Frame",{Size=UDim2.fromOffset(46,18),Position=UDim2.new(1,-47,0.5,-9),BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0,ClipsDescendants=false,ZIndex=6},row)
+		local wrap=New("Frame",{Size=UDim2.fromOffset(48,20),Position=UDim2.new(1,-48,0.5,-10),BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0,ClipsDescendants=false,ZIndex=6},row)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},wrap)
 
-		local knob=New("Frame",{Size=UDim2.fromOffset(14,14),Position=UDim2.fromOffset(2,2),BackgroundColor3=THEME.TEXT,BorderSizePixel=0,ClipsDescendants=false,ZIndex=7},wrap)
+		local knob=New("Frame",{Size=UDim2.fromOffset(16,16),Position=UDim2.fromOffset(2,2),BackgroundColor3=THEME.TEXT,BorderSizePixel=0,ClipsDescendants=false,ZIndex=7},wrap)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},knob)
 
 		local state=startState and true or false
@@ -386,7 +387,7 @@ function GuiLogic.new(ctx)
 		local function paint()
 			local ti=TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out)
 			local bg=state and THEME.GREEN or THEME.CARD
-			local pos=state and UDim2.new(1,-16,0,2) or UDim2.fromOffset(2,2)
+			local pos=state and UDim2.new(1,-18,0,2) or UDim2.fromOffset(2,2)
 
 			TweenService:Create(wrap,ti,{BackgroundColor3=bg}):Play()
 			TweenService:Create(knob,ti,{Position=pos,BackgroundColor3=THEME.TEXT}):Play()
