@@ -23,69 +23,6 @@ local DEFAULTS={
 	CornerRadius=0,
 }
 
-local THEME_PRESETS={
-	{
-		Name="CLEAN",
-		Main=Color3.fromRGB(76,76,76),
-		Second=Color3.fromRGB(45,45,45),
-		Gradient=false,
-		Pulse=false,
-		Speed=0,
-		Thickness=1,
-		Transparency=0.25,
-	},
-	{
-		Name="FOCUS",
-		Main=Color3.fromRGB(32,202,106),
-		Second=Color3.fromRGB(21,103,251),
-		Gradient=true,
-		Pulse=false,
-		Speed=0,
-		Thickness=2,
-		Transparency=0.05,
-	},
-	{
-		Name="CALM",
-		Main=Color3.fromRGB(120,170,255),
-		Second=Color3.fromRGB(195,195,195),
-		Gradient=true,
-		Pulse=true,
-		Speed=0.45,
-		Thickness=2,
-		Transparency=0.1,
-	},
-	{
-		Name="SHARP",
-		Main=Color3.fromRGB(240,240,240),
-		Second=Color3.fromRGB(240,240,240),
-		Gradient=false,
-		Pulse=false,
-		Speed=0,
-		Thickness=2.5,
-		Transparency=0,
-	},
-	{
-		Name="DIM",
-		Main=Color3.fromRGB(95,95,95),
-		Second=Color3.fromRGB(150,150,150),
-		Gradient=false,
-		Pulse=false,
-		Speed=0,
-		Thickness=1,
-		Transparency=0.45,
-	},
-	{
-		Name="ALERT",
-		Main=Color3.fromRGB(254,94,86),
-		Second=Color3.fromRGB(255,190,80),
-		Gradient=true,
-		Pulse=true,
-		Speed=0.65,
-		Thickness=2,
-		Transparency=0.08,
-	},
-}
-
 local function clampByte(v)
 	return math.clamp(math.floor((tonumber(v) or 0)+0.5),0,255)
 end
@@ -326,7 +263,11 @@ function StrokeColour.new(ctx,page)
 							if gradient then
 								gradient:Destroy()
 							end
-							obj.Color=Color3.fromRGB(76,76,76)
+							if tostring(obj.Parent.Text or "")~="" then
+								obj.Transparency=1
+							else
+								obj.Color=Color3.fromRGB(76,76,76)
+							end
 						else
 							obj.Color=UI_STYLE.LiquidStroke and getPulseColor() or color
 							obj.Thickness=UI_STYLE.StrokeThickness
@@ -489,18 +430,6 @@ function StrokeColour.new(ctx,page)
 		t2:Play()
 	end
 
-	local function applyThemePreset(preset)
-		UI_STYLE.StrokeGradient=preset.Gradient and true or false
-		UI_STYLE.LiquidStroke=preset.Pulse and true or false
-		UI_STYLE.LiquidStrokeSpeed=math.clamp(tonumber(preset.Speed) or 0,0,2)
-		UI_STYLE.LiquidStrokeDirection="Right"
-		UI_STYLE.StrokeThickness=math.clamp(tonumber(preset.Thickness) or 2,0,8)
-		UI_STYLE.StrokeTransparency=math.clamp(tonumber(preset.Transparency) or 0,0,1)
-
-		syncColourControls()
-		tweenStyleTo(preset.Main,preset.Second or preset.Main,UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke)
-	end
-
 	function api.Refresh()
 		colourTweenToken=colourTweenToken+1
 		ensureStyleDefaults(UI_STYLE)
@@ -563,13 +492,6 @@ function StrokeColour.new(ctx,page)
 		end
 
 		tweenStyleTo(c1,c2,true)
-	end
-
-	function api.ApplyThemePreset(index)
-		local preset=THEME_PRESETS[index]
-		if preset then
-			applyThemePreset(preset)
-		end
 	end
 
 	local function buildPage3Slider(parent,titleText,shortLabel,minVal,maxVal,startVal,decimals,onChange)
@@ -653,102 +575,19 @@ function StrokeColour.new(ctx,page)
 	New("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,16),
-		Text="Theme presets",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},presetSection)
-
-	local themeRow=New("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,30),
-		ZIndex=5,
-	},presetSection)
-
-	New("UIListLayout",{
-		FillDirection=Enum.FillDirection.Horizontal,
-		Padding=UDim.new(0,6),
-		SortOrder=Enum.SortOrder.LayoutOrder,
-	},themeRow)
-
-	for i,preset in ipairs(THEME_PRESETS) do
-		local btn=New("TextButton",{
-			Size=UDim2.fromOffset(58,24),
-			BackgroundColor3=preset.Main,
-			BorderSizePixel=0,
-			Text=preset.Name,
-			Font=Enum.Font.GothamMedium,
-			TextSize=9,
-			TextColor3=Color3.fromRGB(0,0,0),
-			AutoButtonColor=false,
-			ZIndex=6,
-		},themeRow)
-
-		New("UIStroke",{
-			Color=THEME.STROKE,
-			Thickness=1,
-			Transparency=0,
-		},btn)
-
-		local grad=Instance.new("UIGradient")
-		grad.Color=ColorSequence.new({
-			ColorSequenceKeypoint.new(0,preset.Main),
-			ColorSequenceKeypoint.new(1,preset.Second or preset.Main),
-		})
-		grad.Parent=btn
-
-		btn.MouseButton1Click:Connect(function()
-			applyThemePreset(preset)
-		end)
-	end
-
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,16),
-		Text="Main stroke colour",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},colourSection)
-
-	rSlider=buildPage3Slider(colourSection,"Main red","R",0,255,UI_STYLE.StrokeR,0,function(v)
-		UI_STYLE.StrokeR=v
-		tintSlider(rSlider,Color3.fromRGB(v,0,0))
-		updateEverything()
-	end)
-
-	gSlider=buildPage3Slider(colourSection,"Main green","G",0,255,UI_STYLE.StrokeG,0,function(v)
-		UI_STYLE.StrokeG=v
-		tintSlider(gSlider,Color3.fromRGB(0,v,0))
-		updateEverything()
-	end)
-
-	bSlider=buildPage3Slider(colourSection,"Main blue","B",0,255,UI_STYLE.StrokeB,0,function(v)
-		UI_STYLE.StrokeB=v
-		tintSlider(bSlider,Color3.fromRGB(0,0,v))
-		updateEverything()
-	end)
-
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,16),
 		Text="Quick colours",
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
 		TextColor3=THEME.TEXT,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
-	},colourSection)
+	},presetSection)
 
 	local paletteRow=New("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,30),
 		ZIndex=5,
-	},colourSection)
+	},presetSection)
 
 	New("UIListLayout",{
 		FillDirection=Enum.FillDirection.Horizontal,
@@ -785,6 +624,35 @@ function StrokeColour.new(ctx,page)
 			api.ApplyMainColour(c)
 		end)
 	end
+
+	New("TextLabel",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,16),
+		Text="Main stroke colour",
+		Font=Enum.Font.GothamMedium,
+		TextSize=12,
+		TextColor3=THEME.TEXT,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		ZIndex=6,
+	},colourSection)
+
+	rSlider=buildPage3Slider(colourSection,"Main red","R",0,255,UI_STYLE.StrokeR,0,function(v)
+		UI_STYLE.StrokeR=v
+		tintSlider(rSlider,Color3.fromRGB(v,0,0))
+		updateEverything()
+	end)
+
+	gSlider=buildPage3Slider(colourSection,"Main green","G",0,255,UI_STYLE.StrokeG,0,function(v)
+		UI_STYLE.StrokeG=v
+		tintSlider(gSlider,Color3.fromRGB(0,v,0))
+		updateEverything()
+	end)
+
+	bSlider=buildPage3Slider(colourSection,"Main blue","B",0,255,UI_STYLE.StrokeB,0,function(v)
+		UI_STYLE.StrokeB=v
+		tintSlider(bSlider,Color3.fromRGB(0,0,v))
+		updateEverything()
+	end)
 
 	New("TextLabel",{
 		BackgroundTransparency=1,
@@ -839,12 +707,14 @@ function StrokeColour.new(ctx,page)
 	},presetRow)
 
 	for _,pair in ipairs({
-		{Color3.fromRGB(0,255,255),Color3.fromRGB(170,70,255)},
-		{Color3.fromRGB(255,70,180),Color3.fromRGB(80,120,255)},
-		{Color3.fromRGB(0,255,120),Color3.fromRGB(0,160,255)},
-		{Color3.fromRGB(255,150,0),Color3.fromRGB(0,230,255)},
-		{Color3.fromRGB(120,70,255),Color3.fromRGB(255,80,200)},
-		{Color3.fromRGB(255,255,255),Color3.fromRGB(0,255,255)},
+		{Color3.fromRGB(32,202,106),Color3.fromRGB(21,103,251)},
+		{Color3.fromRGB(254,94,86),Color3.fromRGB(255,210,80)},
+		{Color3.fromRGB(195,195,195),Color3.fromRGB(76,76,76)},
+		{Color3.fromRGB(0,255,255),Color3.fromRGB(255,0,190)},
+		{Color3.fromRGB(150,255,80),Color3.fromRGB(80,70,255)},
+		{Color3.fromRGB(255,255,255),Color3.fromRGB(45,45,45)},
+		{Color3.fromRGB(255,130,0),Color3.fromRGB(0,230,255)},
+		{Color3.fromRGB(200,90,255),Color3.fromRGB(255,70,80)},
 	}) do
 		local btn=New("TextButton",{
 			Size=UDim2.fromOffset(38,24),
