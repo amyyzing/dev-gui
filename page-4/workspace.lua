@@ -15,8 +15,8 @@ local function ensureWorldSettings(ctx)
 		ws.SmoothPlastic=false
 	end
 
-	if type(ws.OriginalMaterials)~="table" then
-		ws.OriginalMaterials=setmetatable({},{__mode="k"})
+	if type(ws.OriginalMaterials)~="table" or getmetatable(ws.OriginalMaterials)~=nil then
+		ws.OriginalMaterials={}
 	end
 
 	ctx.WORLD_SETTINGS=ws
@@ -42,26 +42,8 @@ function WorkspaceModule.new(ctx,page)
 	local worldSettings=ensureWorldSettings(ctx)
 	local api={}
 	local materialToggle=nil
-	local statusLabel=nil
-	local statusBadge=nil
-	local statusBadgeText=nil
 
-	local function setStatus(text,enabled)
-		if statusLabel then
-			statusLabel.Text=text
-		end
-
-		if statusBadge then
-			statusBadge.BackgroundColor3=enabled and THEME.GREEN or THEME.BG
-		end
-
-		if statusBadgeText then
-			statusBadgeText.Text=enabled and "ON" or "OFF"
-			statusBadgeText.TextColor3=enabled and Color3.fromRGB(0,0,0) or THEME.MUTED
-		end
-	end
-
-	function api.SetEnabled(state)
+	function api.SetEnabled(state,fire)
 		worldSettings.SmoothPlastic=state and true or false
 
 		safeDisconnect(worldSettings.Conn)
@@ -78,7 +60,6 @@ function WorkspaceModule.new(ctx,page)
 				end
 			end)
 
-			setStatus("Workspace materials are being forced to SmoothPlastic.",true)
 		else
 			for part,material in pairs(worldSettings.OriginalMaterials) do
 				if part and part.Parent and part:IsA("BasePart") then
@@ -86,15 +67,14 @@ function WorkspaceModule.new(ctx,page)
 				end
 			end
 
-			worldSettings.OriginalMaterials=setmetatable({},{__mode="k"})
-			setStatus("Original workspace materials are being used.",false)
+			worldSettings.OriginalMaterials={}
 		end
 
 		if materialToggle then
 			materialToggle.set(worldSettings.SmoothPlastic)
 		end
 
-		if ctx.onChanged then
+		if fire~=false and ctx.onChanged then
 			pcall(ctx.onChanged,worldSettings.SmoothPlastic)
 		end
 	end
@@ -108,69 +88,20 @@ function WorkspaceModule.new(ctx,page)
 			materialToggle.set(worldSettings.SmoothPlastic)
 		end
 
-		setStatus(worldSettings.SmoothPlastic and "Workspace materials are being forced to SmoothPlastic." or "Original workspace materials are being used.",worldSettings.SmoothPlastic)
+		if worldSettings.SmoothPlastic then
+			api.SetEnabled(true,false)
+		end
 	end
 
 	function api.Destroy()
-		api.SetEnabled(false)
+		api.SetEnabled(false,false)
 	end
 
-	local section=makeSection(page,1,"Workspace","Performance")
-
-	local statusRow=New("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,34),
-		ZIndex=5,
-	},section)
-
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,-60,1,0),
-		Text="Material Override",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},statusRow)
-
-	statusBadge=New("Frame",{
-		Size=UDim2.fromOffset(48,22),
-		Position=UDim2.new(1,-48,0.5,-11),
-		BackgroundColor3=THEME.BG,
-		BorderSizePixel=0,
-		ZIndex=6,
-	},statusRow)
-
-	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},statusBadge)
-
-	statusBadgeText=New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,1,0),
-		Text="OFF",
-		Font=Enum.Font.GothamMedium,
-		TextSize=11,
-		TextColor3=THEME.MUTED,
-		TextXAlignment=Enum.TextXAlignment.Center,
-		ZIndex=7,
-	},statusBadge)
+	local section=makeSection(page,1,"Workspace","")
 
 	materialToggle=buildToggleRow(section,"SmoothPlastic",worldSettings.SmoothPlastic,function(state)
 		api.SetEnabled(state)
 	end)
-
-	statusLabel=New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,30),
-		Text="Original workspace materials are being used.",
-		Font=Enum.Font.Gotham,
-		TextSize=11,
-		TextColor3=THEME.MUTED,
-		TextWrapped=true,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		TextYAlignment=Enum.TextYAlignment.Top,
-		ZIndex=6,
-	},section)
 
 	api.Refresh()
 	return api
