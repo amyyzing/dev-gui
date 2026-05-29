@@ -498,7 +498,7 @@ function Hitbox.new(ctx,parent)
 		if not toggleWrap or not tKnob then return end
 		local ti=TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out)
 		local bg=state.hitboxOn and THEME.GREEN or THEME.CARD
-		local pos=state.hitboxOn and UDim2.new(1,-22,0,2) or UDim2.fromOffset(2,2)
+		local pos=state.hitboxOn and UDim2.new(1,-20,0,2) or UDim2.fromOffset(2,2)
 		TweenService:Create(toggleWrap,ti,{BackgroundColor3=bg}):Play()
 		TweenService:Create(tKnob,ti,{Position=pos,BackgroundColor3=THEME.TEXT}):Play()
 	end
@@ -590,10 +590,10 @@ function Hitbox.new(ctx,parent)
 	local hitboxToggleRow=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},section)
 	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-76,1,0),Text="Hitbox Toggle",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},hitboxToggleRow)
 
-	toggleWrap=New("Frame",{Size=UDim2.fromOffset(58,24),Position=UDim2.new(1,-58,0.5,-12),BackgroundColor3=THEME.CARD,BorderSizePixel=0,ZIndex=6},hitboxToggleRow)
+	toggleWrap=New("Frame",{Size=UDim2.fromOffset(56,22),Position=UDim2.new(1,-57,0.5,-11),BackgroundColor3=THEME.CARD,BorderSizePixel=0,ClipsDescendants=false,ZIndex=6},hitboxToggleRow)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},toggleWrap)
 
-	tKnob=New("Frame",{Size=UDim2.fromOffset(20,20),Position=UDim2.fromOffset(2,2),BackgroundColor3=THEME.TEXT,BorderSizePixel=0,ZIndex=7},toggleWrap)
+	tKnob=New("Frame",{Size=UDim2.fromOffset(18,18),Position=UDim2.fromOffset(2,2),BackgroundColor3=THEME.TEXT,BorderSizePixel=0,ClipsDescendants=false,ZIndex=7},toggleWrap)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},tKnob)
 
 	toggleWrap.InputBegan:Connect(function(input)
