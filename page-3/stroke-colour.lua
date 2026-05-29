@@ -193,6 +193,7 @@ function StrokeColour.new(ctx,page)
 	local buildSlider=ctx.buildSlider
 	local buildToggleRow=ctx.buildToggleRow
 	local wrapTextButton=ctx.wrapTextButton
+	local externalThemeApplier=ctx.applyUIStrokeTheme~=nil
 
 	ensureStyleDefaults(UI_STYLE)
 
@@ -317,11 +318,13 @@ function StrokeColour.new(ctx,page)
 				return
 			end
 
-			liquidClock+=dt*(tonumber(UI_STYLE.LiquidStrokeSpeed) or 1)
+			liquidClock=liquidClock+(dt*(tonumber(UI_STYLE.LiquidStrokeSpeed) or 1))
 
-			for _,obj in ipairs(SG:GetDescendants()) do
-				if obj:IsA("UIGradient") and obj.Name=="StrokeGradient" then
-					applyLiquidMotionToGradient(obj)
+			if not externalThemeApplier then
+				for _,obj in ipairs(SG:GetDescendants()) do
+					if obj:IsA("UIGradient") and obj.Name=="StrokeGradient" then
+						applyLiquidMotionToGradient(obj)
+					end
 				end
 			end
 
@@ -498,7 +501,7 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function tweenStyleTo(c1,c2,gradientEnabled)
-		colourTweenToken+=1
+		colourTweenToken=colourTweenToken+1
 
 		local token=colourTweenToken
 		local mainValue=Instance.new("Color3Value")
@@ -577,8 +580,6 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function applyThemePreset(preset)
-		colourTweenToken+=1
-
 		UI_STYLE.StrokeGradient=true
 		UI_STYLE.LiquidStroke=preset.Liquid and true or false
 		UI_STYLE.LiquidStrokeSpeed=math.clamp(tonumber(preset.Speed) or 1,0,5)
@@ -587,22 +588,26 @@ function StrokeColour.new(ctx,page)
 		UI_STYLE.StrokeTransparency=math.clamp(tonumber(preset.Transparency) or 0,0,1)
 		UI_STYLE.CornerRadius=math.clamp(tonumber(preset.Radius) or 0,0,24)
 
-		setMainColour(preset.Main)
-		setGradientColour(preset.Second or preset.Main)
+		local gradientEnabled=true
 
 		if not UI_STYLE.LiquidStroke and preset.Second==nil then
-			UI_STYLE.StrokeGradient=false
+			gradientEnabled=false
 		end
 
+		syncColourControls()
+		tweenStyleTo(preset.Main,preset.Second or preset.Main,gradientEnabled)
+	end
+
+	function api.Refresh()
+		colourTweenToken=colourTweenToken+1
+		ensureStyleDefaults(UI_STYLE)
 		syncColourControls()
 		updateEverything()
 	end
 
-	function api.Refresh()
-		colourTweenToken+=1
-		ensureStyleDefaults(UI_STYLE)
-		syncColourControls()
-		updateEverything()
+	function api.Destroy()
+		colourTweenToken=colourTweenToken+1
+		stopLiquidAnimation()
 	end
 
 	function api.Reset()
@@ -666,13 +671,16 @@ function StrokeColour.new(ctx,page)
 
 	clearPage()
 
-	local strokeSettings=makeSection(page,1,"Stroke Colour","Customise the interface border, gradient, liquid motion, thickness, and shape.")
+	local presetSection=makeSection(page,1,"Customisation","Live preview and quick styles.")
+	local colourSection=makeSection(page,2,"Colours","Tune the base stroke and gradient endpoint.")
+	local motionSection=makeSection(page,3,"Liquid Motion","Animate the gradient and choose its flow direction.")
+	local shapeSection=makeSection(page,4,"Border Shape","Control thickness, transparency, and corner radius.")
 
 	local previewRow=New("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,42),
 		ZIndex=5,
-	},strokeSettings)
+	},presetSection)
 
 	New("TextLabel",{
 		BackgroundTransparency=1,
@@ -720,13 +728,13 @@ function StrokeColour.new(ctx,page)
 		TextColor3=THEME.TEXT,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
-	},strokeSettings)
+	},presetSection)
 
 	local themeRow=New("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,30),
 		ZIndex=5,
-	},strokeSettings)
+	},presetSection)
 
 	New("UIListLayout",{
 		FillDirection=Enum.FillDirection.Horizontal,
@@ -774,21 +782,21 @@ function StrokeColour.new(ctx,page)
 		TextColor3=THEME.TEXT,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
-	},strokeSettings)
+	},colourSection)
 
-	rSlider=buildSlider(strokeSettings,"R",0,255,UI_STYLE.StrokeR,0,function(v)
+	rSlider=buildSlider(colourSection,"R",0,255,UI_STYLE.StrokeR,0,function(v)
 		UI_STYLE.StrokeR=v
 		tintSlider(rSlider,Color3.fromRGB(v,0,0))
 		updateEverything()
 	end)
 
-	gSlider=buildSlider(strokeSettings,"G",0,255,UI_STYLE.StrokeG,0,function(v)
+	gSlider=buildSlider(colourSection,"G",0,255,UI_STYLE.StrokeG,0,function(v)
 		UI_STYLE.StrokeG=v
 		tintSlider(gSlider,Color3.fromRGB(0,v,0))
 		updateEverything()
 	end)
 
-	bSlider=buildSlider(strokeSettings,"B",0,255,UI_STYLE.StrokeB,0,function(v)
+	bSlider=buildSlider(colourSection,"B",0,255,UI_STYLE.StrokeB,0,function(v)
 		UI_STYLE.StrokeB=v
 		tintSlider(bSlider,Color3.fromRGB(0,0,v))
 		updateEverything()
@@ -803,13 +811,13 @@ function StrokeColour.new(ctx,page)
 		TextColor3=THEME.TEXT,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
-	},strokeSettings)
+	},colourSection)
 
 	local paletteRow=New("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,30),
 		ZIndex=5,
-	},strokeSettings)
+	},colourSection)
 
 	New("UIListLayout",{
 		FillDirection=Enum.FillDirection.Horizontal,
@@ -856,21 +864,21 @@ function StrokeColour.new(ctx,page)
 		TextColor3=THEME.TEXT,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
-	},strokeSettings)
+	},colourSection)
 
-	grSlider=buildSlider(strokeSettings,"R2",0,255,UI_STYLE.GradientR,0,function(v)
+	grSlider=buildSlider(colourSection,"R2",0,255,UI_STYLE.GradientR,0,function(v)
 		UI_STYLE.GradientR=v
 		tintSlider(grSlider,Color3.fromRGB(v,0,0))
 		updateEverything()
 	end)
 
-	ggSlider=buildSlider(strokeSettings,"G2",0,255,UI_STYLE.GradientG,0,function(v)
+	ggSlider=buildSlider(colourSection,"G2",0,255,UI_STYLE.GradientG,0,function(v)
 		UI_STYLE.GradientG=v
 		tintSlider(ggSlider,Color3.fromRGB(0,v,0))
 		updateEverything()
 	end)
 
-	gbSlider=buildSlider(strokeSettings,"B2",0,255,UI_STYLE.GradientB,0,function(v)
+	gbSlider=buildSlider(colourSection,"B2",0,255,UI_STYLE.GradientB,0,function(v)
 		UI_STYLE.GradientB=v
 		tintSlider(gbSlider,Color3.fromRGB(0,0,v))
 		updateEverything()
@@ -885,13 +893,13 @@ function StrokeColour.new(ctx,page)
 		TextColor3=THEME.TEXT,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
-	},strokeSettings)
+	},colourSection)
 
 	local presetRow=New("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,30),
 		ZIndex=5,
-	},strokeSettings)
+	},colourSection)
 
 	New("UIListLayout",{
 		FillDirection=Enum.FillDirection.Horizontal,
@@ -934,7 +942,7 @@ function StrokeColour.new(ctx,page)
 		end)
 	end
 
-	gradientToggle=buildToggleRow(strokeSettings,"Gradient Stroke",UI_STYLE.StrokeGradient,function(state)
+	gradientToggle=buildToggleRow(colourSection,"Gradient Stroke",UI_STYLE.StrokeGradient,function(state)
 		UI_STYLE.StrokeGradient=state and true or false
 
 		if not UI_STYLE.StrokeGradient then
@@ -947,7 +955,7 @@ function StrokeColour.new(ctx,page)
 		updateEverything()
 	end)
 
-	liquidToggle=buildToggleRow(strokeSettings,"Liquid Stroke",UI_STYLE.LiquidStroke,function(state)
+	liquidToggle=buildToggleRow(motionSection,"Liquid Stroke",UI_STYLE.LiquidStroke,function(state)
 		UI_STYLE.LiquidStroke=state and true or false
 
 		if state then
@@ -960,7 +968,7 @@ function StrokeColour.new(ctx,page)
 		updateEverything()
 	end)
 
-	speedSlider=buildSlider(strokeSettings,"Liquid Speed",0,5,UI_STYLE.LiquidStrokeSpeed,2,function(v)
+	speedSlider=buildSlider(motionSection,"Liquid Speed",0,5,UI_STYLE.LiquidStrokeSpeed,2,function(v)
 		UI_STYLE.LiquidStrokeSpeed=math.clamp(tonumber(v) or 0,0,5)
 		updateEverything()
 	end)
@@ -974,13 +982,13 @@ function StrokeColour.new(ctx,page)
 		TextColor3=THEME.TEXT,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
-	},strokeSettings)
+	},motionSection)
 
 	local directionRow=New("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,30),
 		ZIndex=5,
-	},strokeSettings)
+	},motionSection)
 
 	New("UIListLayout",{
 		FillDirection=Enum.FillDirection.Horizontal,
@@ -1017,19 +1025,19 @@ function StrokeColour.new(ctx,page)
 		TextColor3=THEME.TEXT,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
-	},strokeSettings)
+	},shapeSection)
 
-	thicknessSlider=buildSlider(strokeSettings,"Stroke Thickness",0,8,UI_STYLE.StrokeThickness,1,function(v)
+	thicknessSlider=buildSlider(shapeSection,"Stroke Thickness",0,8,UI_STYLE.StrokeThickness,1,function(v)
 		UI_STYLE.StrokeThickness=math.clamp(tonumber(v) or 0,0,8)
 		updateEverything()
 	end)
 
-	transparencySlider=buildSlider(strokeSettings,"Stroke Transparency",0,1,UI_STYLE.StrokeTransparency,2,function(v)
+	transparencySlider=buildSlider(shapeSection,"Stroke Transparency",0,1,UI_STYLE.StrokeTransparency,2,function(v)
 		UI_STYLE.StrokeTransparency=math.clamp(tonumber(v) or 0,0,1)
 		updateEverything()
 	end)
 
-	radiusSlider=buildSlider(strokeSettings,"Corner Radius",0,24,UI_STYLE.CornerRadius,0,function(v)
+	radiusSlider=buildSlider(shapeSection,"Corner Radius",0,24,UI_STYLE.CornerRadius,0,function(v)
 		UI_STYLE.CornerRadius=math.clamp(tonumber(v) or 0,0,24)
 		updateEverything()
 	end)
@@ -1038,7 +1046,7 @@ function StrokeColour.new(ctx,page)
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,30),
 		ZIndex=5,
-	},strokeSettings)
+	},shapeSection)
 
 	local resetBtn=New("TextButton",{
 		Size=UDim2.fromOffset(120,28),
