@@ -29,7 +29,7 @@ end
 
 local function clampStaminaDeplete(value)
 	local n=tonumber(value)
-	if not n then return 8 end
+	if not n then return 10 end
 	return math.clamp(math.floor(math.abs(n)+0.5),0,50)
 end
 
@@ -59,7 +59,7 @@ function GameParams.new(ctx,parent)
 	end
 
 	local function normalizeState()
-		state.staminaRegenValue=clampNumber(state.staminaRegenValue,0,50,12)
+		state.staminaRegenValue=clampNumber(state.staminaRegenValue,0,50,10)
 		state.staminaDepleteValue=clampStaminaDeplete(state.staminaDepleteValue)
 		state.jumpPowerValue=clampNumber(state.jumpPowerValue,0,300,53.5)
 		state.divePowerValue=clampNumber(state.divePowerValue,0,15,1.9)
@@ -239,7 +239,7 @@ function GameParams.new(ctx,parent)
 	end
 
 	function api.SetStaminaRegenValue(value,fire)
-		state.staminaRegenValue=clampNumber(value,0,50,12)
+		state.staminaRegenValue=clampNumber(value,0,50,10)
 		applyGameParams()
 		syncControls()
 
@@ -306,8 +306,8 @@ function GameParams.new(ctx,parent)
 
 	function api.Reset()
 		state.athleticismOn=false
-		state.staminaRegenValue=12
-		state.staminaDepleteValue=8
+		state.staminaRegenValue=10
+		state.staminaDepleteValue=10
 		state.jumpPowerValue=53.5
 		state.divePowerValue=1.9
 		api.Refresh()

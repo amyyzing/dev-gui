@@ -155,6 +155,7 @@ function PlayerData.new(ctx,page,deps)
 
 		if ctx.resetMainPageDefaults then pcall(ctx.resetMainPageDefaults) end
 		if ctx.resetCustomizePageDefaults then pcall(ctx.resetCustomizePageDefaults) end
+		if ctx.resetKeybindPresetPageDefaults then pcall(ctx.resetKeybindPresetPageDefaults) end
 		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
 		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
 		if ctx.refreshSettingsPage then pcall(ctx.refreshSettingsPage) end

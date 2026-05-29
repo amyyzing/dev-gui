@@ -35,7 +35,7 @@ end
 
 local function clampStaminaDeplete(value)
 	local n=tonumber(value)
-	if not n then return 8 end
+	if not n then return 10 end
 	return math.clamp(math.floor(math.abs(n)+0.5),0,50)
 end
 
@@ -399,8 +399,8 @@ function DataSave.new(ctx)
 			},
 
 			gameParams={
-				staminaRegen=getValue(ctx,"staminaRegenValue",12),
-				staminaDeplete=getValue(ctx,"staminaDepleteValue",8),
+				staminaRegen=getValue(ctx,"staminaRegenValue",10),
+				staminaDeplete=getValue(ctx,"staminaDepleteValue",10),
 				jumpPower=getValue(ctx,"jumpPowerValue",53.5),
 				divePower=getValue(ctx,"divePowerValue",1.9),
 			},
@@ -514,7 +514,7 @@ function DataSave.new(ctx)
 		end
 
 		if gameParams.staminaRegen~=nil then
-			local sr=clampNumber(gameParams.staminaRegen,0,50,12)
+			local sr=clampNumber(gameParams.staminaRegen,0,50,10)
 			if ctx.setStaminaRegenValue then pcall(ctx.setStaminaRegenValue,sr) else setValue(ctx,"staminaRegenValue",sr) end
 		end
 

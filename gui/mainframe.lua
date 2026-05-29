@@ -10,6 +10,7 @@ function MainFrame.new(ctx)
 	local RunService=ctx.RunService
 	local safeDisconnect=ctx.safeDisconnect
 	local wrapTextButton=ctx.wrapTextButton
+	local attachHover=ctx.attachHover
 	local isAlive=ctx.isAlive or function() return true end
 	local getModeLabel=ctx.getModeLabel or function() return "Gameplay" end
 
@@ -86,25 +87,7 @@ function MainFrame.new(ctx)
 	local main=New("Frame",{Size=UDim2.new(1,0,1,0),AutomaticSize=Enum.AutomaticSize.None,BackgroundTransparency=1,ZIndex=3},root)
 	New("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},main)
 
-	local function attachHover(button,normalBg,hoverBg,normalText,hoverText)
-		button.MouseEnter:Connect(function()
-			if button.BackgroundTransparency<1 then
-				button.BackgroundColor3=hoverBg
-			end
-			if button:IsA("TextButton") or button:IsA("TextLabel") then
-				button.TextColor3=hoverText or normalText or THEME.TEXT
-			end
-		end)
-
-		button.MouseLeave:Connect(function()
-			if button.BackgroundTransparency<1 then
-				button.BackgroundColor3=normalBg
-			end
-			if button:IsA("TextButton") or button:IsA("TextLabel") then
-				button.TextColor3=normalText or THEME.TEXT
-			end
-		end)
-	end
+	attachHover=attachHover or function() end
 
 	local header=New("Frame",{Size=UDim2.new(1,0,0,52),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=4,LayoutOrder=1},main)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.25},header)
@@ -246,31 +229,8 @@ function MainFrame.new(ctx)
 	local footer=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,34),ZIndex=4,LayoutOrder=4},main)
 	New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder,HorizontalAlignment=Enum.HorizontalAlignment.Right,VerticalAlignment=Enum.VerticalAlignment.Center},footer)
 
-	local actionState=New("Frame",{Size=UDim2.fromOffset(148,30),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=6},footer)
-	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},actionState)
-
-	local actionTitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(8,2),Size=UDim2.new(1,-16,0,12),Text="ESP",Font=Enum.Font.Gotham,TextSize=10,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},actionState)
-	local actionValue=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(8,14),Size=UDim2.new(1,-16,0,14),Text="OFF",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},actionState)
-	local espAvailable=true
-	local espEnabled=false
-
-	local function syncESPStatus()
-		actionState.Visible=espAvailable and activePageName=="main"
-	end
-
-	function api.RefreshESPStatus(state,available)
-		espEnabled=state and true or false
-		espAvailable=available~=false
-		actionValue.Text=espEnabled and "ON" or "OFF"
-		actionState.BackgroundColor3=THEME.BG
-		actionValue.TextColor3=espEnabled and THEME.GREEN or THEME.TEXT
-		actionTitle.TextColor3=THEME.MUTED
-		syncESPStatus()
-	end
-
-	function api.RefreshActionStatus(state,available)
-		api.RefreshESPStatus(state,available)
-	end
+	function api.RefreshESPStatus() end
+	function api.RefreshActionStatus() end
 
 	local function makeFooterBtn(text,width)
 		local b=New("TextButton",{Size=UDim2.fromOffset(width or 96,30),BackgroundColor3=THEME.BG,Text=string.upper(text),TextColor3=THEME.TEXT,Font=Enum.Font.Gotham,TextSize=12,AutoButtonColor=false,BorderSizePixel=0,ZIndex=6},footer)
@@ -294,7 +254,6 @@ function MainFrame.new(ctx)
 		resetBtn.Visible=showReset
 		resetBtn.Text="RESET"
 		resetWrap.Visible=showReset
-		syncESPStatus()
 	end
 
 	refreshFooterResetButton()
@@ -489,9 +448,7 @@ function MainFrame.new(ctx)
 	api.leftCol=leftCol
 	api.rightCol=rightCol
 	api.footer=footer
-	api.actionState=actionState
 
-	api.RefreshESPStatus(false,true)
 	setActivePage("main")
 
 	return api
