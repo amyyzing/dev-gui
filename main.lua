@@ -267,13 +267,14 @@ local MODULE_PATHS={
 	Page1Speed="page-1/speed.lua",
 	Page1GameParams="page-1/game-params.lua",
 	Page1Boost="page-1/boost.lua",
+	Page1ESP="page-1/esp.lua",
 	StrokeColour="page-3/stroke-colour.lua",
 	Workspace="page-4/workspace.lua",
 	PlayerData="page-4/player-data.lua",
 	DataSave="data-save/data-save.lua",
 }
 
-local AUTO_REFRESH_WATCH_PATHS={}
+local AUTO_REFRESH_WATCH_PATHS={AUTO_REFRESH_RELOAD_PATH}
 for _,path in pairs(MODULE_PATHS) do
 	table.insert(AUTO_REFRESH_WATCH_PATHS,path)
 end
@@ -330,6 +331,7 @@ local Page1GravityModule=loadRemoteModule(MODULE_PATHS.Page1Gravity)
 local Page1SpeedModule=loadRemoteModule(MODULE_PATHS.Page1Speed)
 local Page1GameParamsModule=loadRemoteModule(MODULE_PATHS.Page1GameParams)
 local Page1BoostModule=loadRemoteModule(MODULE_PATHS.Page1Boost)
+local Page1ESPModule=loadRemoteModule(MODULE_PATHS.Page1ESP)
 local StrokeColourModule=loadRemoteModule(MODULE_PATHS.StrokeColour)
 local WorkspaceModule=loadRemoteModule(MODULE_PATHS.Workspace)
 local PlayerDataModule=loadRemoteModule(MODULE_PATHS.PlayerData)
@@ -341,6 +343,7 @@ local PAGE1_RELOAD_PATHS={
 	[MODULE_PATHS.Page1Speed]=function(module) Page1SpeedModule=module end,
 	[MODULE_PATHS.Page1GameParams]=function(module) Page1GameParamsModule=module end,
 	[MODULE_PATHS.Page1Boost]=function(module) Page1BoostModule=module end,
+	[MODULE_PATHS.Page1ESP]=function(module) Page1ESPModule=module end,
 }
 
 local function wrapTextBox(box, bgColor, strokeThickness)
@@ -1336,6 +1339,7 @@ local function syncPage1State()
 end
 
 local PAGE1_APIS={}
+local refreshActionStatus=function() end
 
 local function makePage1Ctx()
 	return{
@@ -1352,6 +1356,12 @@ local function makePage1Ctx()
 		getSpeedToggleKey=function() return TOGGLE_SPEED_KEY end,
 		getJumpBoostToggleKey=function() return TOGGLE_JB_KEY end,
 		getAlwaysBoostToggleKey=function() return TOGGLE_AB_KEY end,
+		getESPToggleKey=function() return TOGGLE_ACTION_KEY end,
+		refreshESPStatus=function(state,available)
+			PAGE1_STATE.actionStatusOn=state and available~=false
+			actionStatusOn=PAGE1_STATE.actionStatusOn
+			refreshActionStatus()
+		end,
 		setCurrentMode=function(key,label)
 			CURRENT_MODE_KEY=tostring(key or"mode1")
 			CURRENT_MODE_LABEL=tostring(label or"Gameplay")
@@ -1361,10 +1371,15 @@ local function makePage1Ctx()
 			if PAGE1_APIS.GameParams and PAGE1_APIS.GameParams.Refresh then
 				pcall(PAGE1_APIS.GameParams.Refresh)
 			end
+			if PAGE1_APIS.ESP and PAGE1_APIS.ESP.Refresh then
+				pcall(PAGE1_APIS.ESP.Refresh)
+			end
+			refreshActionStatus()
 		end,
 		onChanged=function()
 			syncPage1State()
 			requestPlayerAutosave()
+			refreshActionStatus()
 		end,
 	}
 end
@@ -1422,7 +1437,17 @@ local function buildPage1()
 		addPage1Error(rightCol,2,"Boost","page-1/boost.lua")
 	end
 
+	if Page1ESPModule and Page1ESPModule.new then
+		local ok,result=pcall(function()
+			return Page1ESPModule.new(ctx,rightCol)
+		end)
+		if ok then PAGE1_APIS.ESP=result else addPage1Error(rightCol,3,"ESP",tostring(result)) end
+	else
+		addPage1Error(rightCol,3,"ESP","page-1/esp.lua")
+	end
+
 	syncPage1State()
+	refreshActionStatus()
 end
 
 local function clearPage1Column(column)
@@ -1798,7 +1823,7 @@ local function buildPage2()
 			{label="Hitbox Toggle",get=function() return TOGGLE_HB_KEY end,set=function(v) TOGGLE_HB_KEY=v; requestPlayerAutosave() end},
 			{label="Jump Boost Toggle",get=function() return TOGGLE_JB_KEY end,set=function(v) TOGGLE_JB_KEY=v; requestPlayerAutosave() end},
 			{label="Always Boost Toggle",get=function() return TOGGLE_AB_KEY end,set=function(v) TOGGLE_AB_KEY=v; requestPlayerAutosave() end},
-			{label="Action Status Toggle",get=function() return TOGGLE_ACTION_KEY end,set=function(v) TOGGLE_ACTION_KEY=v; requestPlayerAutosave() end},
+			{label="ESP Toggle",get=function() return TOGGLE_ACTION_KEY end,set=function(v) TOGGLE_ACTION_KEY=v; requestPlayerAutosave() end},
 			{label="Speed Toggle",get=function() return TOGGLE_SPEED_KEY end,set=function(v) TOGGLE_SPEED_KEY=v; requestPlayerAutosave() end},
 		},
 	}
@@ -1877,15 +1902,24 @@ local actionState=New("Frame", {Size=UDim2.fromOffset(148, 30), BackgroundColor3
 
 New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0}, actionState)
 
-local actionTitle=New("TextLabel", {BackgroundTransparency=1, Position=UDim2.fromOffset(8, 2), Size=UDim2.new(1, -16, 0, 12), Text="ACTION STATUS", Font=Enum.Font.Gotham, TextSize=10, TextColor3=THEME.MUTED, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=7}, actionState)
+local actionTitle=New("TextLabel", {BackgroundTransparency=1, Position=UDim2.fromOffset(8, 2), Size=UDim2.new(1, -16, 0, 12), Text="ESP", Font=Enum.Font.Gotham, TextSize=10, TextColor3=THEME.MUTED, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=7}, actionState)
 
 local actionValue=New("TextLabel", {BackgroundTransparency=1, Position=UDim2.fromOffset(8, 14), Size=UDim2.new(1, -16, 0, 14), Text="OFF", Font=Enum.Font.Gotham, TextSize=12, TextColor3=THEME.TEXT, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=7}, actionState)
 
-local function refreshActionStatus()
+refreshActionStatus=function()
+	local espAvailable=CURRENT_MODE_KEY=="mode1"
+
+	if not espAvailable and PAGE1_STATE then
+		PAGE1_STATE.actionStatusOn=false
+	end
+
+	actionStatusOn=espAvailable and PAGE1_STATE and PAGE1_STATE.actionStatusOn or false
+	actionTitle.Text="ESP"
 	actionValue.Text=actionStatusOn and"ON" or"OFF"
 	actionState.BackgroundColor3=THEME.BG
-	actionValue.TextColor3=THEME.TEXT
+	actionValue.TextColor3=actionStatusOn and THEME.GREEN or THEME.TEXT
 	actionTitle.TextColor3=THEME.MUTED
+	actionState.Visible=espAvailable and activePageName=="main"
 end
 
 refreshActionStatus()
@@ -1918,7 +1952,7 @@ refreshFooterResetButton=function()
 		resetWrapEntry.wrap.Visible=showReset
 	end
 
-	actionState.Visible=activePageName=="main"
+	refreshActionStatus()
 end
 
 refreshFooterResetButton()
@@ -2179,6 +2213,21 @@ UIS.InputBegan:Connect(function(inp, processed)
 	local bind=inputToBinding(inp)
 	if bind~=nil and bind==TOGGLE_UI_KEY and TOGGLE_UI_KEY~=Enum.KeyCode.Unknown then
 		setUIVisible(not uiVisible)
+	end
+
+	if bind~=nil and bind==TOGGLE_ACTION_KEY and TOGGLE_ACTION_KEY~=Enum.KeyCode.Unknown then
+		if not(PAGE1_APIS.ESP and PAGE1_APIS.ESP.SetESPState) then
+			if CURRENT_MODE_KEY=="mode1" then
+				PAGE1_STATE.actionStatusOn=not PAGE1_STATE.actionStatusOn
+				syncPage1State()
+				refreshActionStatus()
+				requestPlayerAutosave()
+			else
+				PAGE1_STATE.actionStatusOn=false
+				syncPage1State()
+				refreshActionStatus()
+			end
+		end
 	end
 
 	if bind~=nil then

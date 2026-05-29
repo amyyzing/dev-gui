@@ -36,7 +36,7 @@ local function defaultBindingRows(ctx)
 		{label="Hitbox Toggle",key="TOGGLE_HB_KEY"},
 		{label="Jump Boost Toggle",key="TOGGLE_JB_KEY"},
 		{label="Always Boost Toggle",key="TOGGLE_AB_KEY"},
-		{label="Action Status Toggle",key="TOGGLE_ACTION_KEY"},
+		{label="ESP Toggle",key="TOGGLE_ACTION_KEY"},
 		{label="Speed Toggle",key="TOGGLE_SPEED_KEY"},
 	}
 end
