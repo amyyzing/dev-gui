@@ -43,10 +43,21 @@ function WorkspaceModule.new(ctx,page)
 	local api={}
 	local materialToggle=nil
 	local statusLabel=nil
+	local statusBadge=nil
+	local statusBadgeText=nil
 
-	local function setStatus(text)
+	local function setStatus(text,enabled)
 		if statusLabel then
 			statusLabel.Text=text
+		end
+
+		if statusBadge then
+			statusBadge.BackgroundColor3=enabled and THEME.GREEN or THEME.BG
+		end
+
+		if statusBadgeText then
+			statusBadgeText.Text=enabled and "ON" or "OFF"
+			statusBadgeText.TextColor3=enabled and Color3.fromRGB(0,0,0) or THEME.MUTED
 		end
 	end
 
@@ -67,7 +78,7 @@ function WorkspaceModule.new(ctx,page)
 				end
 			end)
 
-			setStatus("Potato PC mode is enabled. Workspace materials are SmoothPlastic.")
+			setStatus("Workspace materials are being forced to SmoothPlastic.",true)
 		else
 			for part,material in pairs(worldSettings.OriginalMaterials) do
 				if part and part.Parent and part:IsA("BasePart") then
@@ -76,7 +87,7 @@ function WorkspaceModule.new(ctx,page)
 			end
 
 			worldSettings.OriginalMaterials=setmetatable({},{__mode="k"})
-			setStatus("Potato PC mode is disabled. Original materials restored.")
+			setStatus("Original workspace materials are being used.",false)
 		end
 
 		if materialToggle then
@@ -97,23 +108,61 @@ function WorkspaceModule.new(ctx,page)
 			materialToggle.set(worldSettings.SmoothPlastic)
 		end
 
-		setStatus(worldSettings.SmoothPlastic and "Potato PC mode is enabled. Workspace materials are SmoothPlastic." or "Potato PC mode is disabled. Original materials restored.")
+		setStatus(worldSettings.SmoothPlastic and "Workspace materials are being forced to SmoothPlastic." or "Original workspace materials are being used.",worldSettings.SmoothPlastic)
 	end
 
 	function api.Destroy()
 		api.SetEnabled(false)
 	end
 
-	local section=makeSection(page,1,"Workspace","for potato pc players")
+	local section=makeSection(page,1,"Workspace","Performance")
 
-	materialToggle=buildToggleRow(section,"Potato PC mode",worldSettings.SmoothPlastic,function(state)
+	local statusRow=New("Frame",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,34),
+		ZIndex=5,
+	},section)
+
+	New("TextLabel",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,-60,1,0),
+		Text="Material Override",
+		Font=Enum.Font.GothamMedium,
+		TextSize=12,
+		TextColor3=THEME.TEXT,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		ZIndex=6,
+	},statusRow)
+
+	statusBadge=New("Frame",{
+		Size=UDim2.fromOffset(48,22),
+		Position=UDim2.new(1,-48,0.5,-11),
+		BackgroundColor3=THEME.BG,
+		BorderSizePixel=0,
+		ZIndex=6,
+	},statusRow)
+
+	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},statusBadge)
+
+	statusBadgeText=New("TextLabel",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,1,0),
+		Text="OFF",
+		Font=Enum.Font.GothamMedium,
+		TextSize=11,
+		TextColor3=THEME.MUTED,
+		TextXAlignment=Enum.TextXAlignment.Center,
+		ZIndex=7,
+	},statusBadge)
+
+	materialToggle=buildToggleRow(section,"SmoothPlastic",worldSettings.SmoothPlastic,function(state)
 		api.SetEnabled(state)
 	end)
 
 	statusLabel=New("TextLabel",{
 		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,34),
-		Text="Potato PC mode is disabled. Original materials restored.",
+		Size=UDim2.new(1,0,0,30),
+		Text="Original workspace materials are being used.",
 		Font=Enum.Font.Gotham,
 		TextSize=11,
 		TextColor3=THEME.MUTED,
