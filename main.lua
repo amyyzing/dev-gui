@@ -1,0 +1,2301 @@
+local Players=game:GetService("Players")
+local UIS=game:GetService("UserInputService")
+local TweenService=game:GetService("TweenService")
+local RunService=game:GetService("RunService")
+local HttpService=game:GetService("HttpService")
+
+local me=Players.LocalPlayer
+local guiParent=me:WaitForChild("PlayerGui")
+
+local THEME={BG=Color3.fromRGB(28,28,28), PANEL=Color3.fromRGB(33,33,33), CARD=Color3.fromRGB(38,38,38), ACC=Color3.fromRGB(32,202,106), TEXT=Color3.fromRGB(195,195,195), MUTED=Color3.fromRGB(168,168,168), STROKE=Color3.fromRGB(76,76,76), RED=Color3.fromRGB(254,94,86), BLUE=Color3.fromRGB(21,103,251), GREEN=Color3.fromRGB(32,202,106),}
+
+local UI_STYLE={
+	StrokeR=76,
+	StrokeG=76,
+	StrokeB=76,
+
+	GradientR=45,
+	GradientG=45,
+	GradientB=45,
+
+	StrokeGradient=false,
+	LiquidStroke=false,
+
+	LiquidStrokeSpeed=1,
+	LiquidStrokeDirection="Right",
+
+	StrokeThickness=1,
+	StrokeTransparency=0.25,
+	CornerRadius=8,
+}
+
+local UI_WINDOW={W=880, H=540, MinW=560, MinH=360, MaxW=1220, MaxH=820,}
+
+local WORLD_SETTINGS={SmoothPlastic=false, OriginalMaterials=setmetatable({}, {__mode="k"})}
+
+local CURRENT_MODE_LABEL="Gameplay"
+local CURRENT_MODE_KEY="mode1"
+local uiVisible=true
+local toolAlive=true
+
+local hitboxOn=false
+local sizeX, sizeY, sizeZ=2.52, 5.4, 1.41
+local targetTransparency=0.7
+local gravityValue=196.2
+local speedEnabled=false
+local speedValue=18
+local athleticismOn=false
+local staminaRegenValue=12
+local staminaDepleteValue=8
+local jumpPowerValue=53.5
+local divePowerValue=1.9
+local jumpBoostOn=false
+local jumpBoostTradeMode=false
+local boostForceY=32
+local boostCooldown=5
+local boostChance=100
+local ballDetectionRadius=10
+local potatoMode=false
+local actionStatusOn=false
+
+local TOGGLE_UI_KEY=Enum.KeyCode.Unknown
+local TOGGLE_HB_KEY=Enum.KeyCode.Unknown
+local TOGGLE_JB_KEY=Enum.KeyCode.Unknown
+local TOGGLE_AB_KEY=Enum.KeyCode.Unknown
+local TOGGLE_ACTION_KEY=Enum.KeyCode.Unknown
+local TOGGLE_SPEED_KEY=Enum.KeyCode.Unknown
+
+local DEFAULT_PRESETS={{key=Enum.KeyCode.Unknown, size=Vector3.new(0.1, 0.1, 0.1)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.7, 5.8, 1.65)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(3.1, 5.8, 1.70)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.52, 5.4, 1.41)},}
+
+local PRESETS={{key=Enum.KeyCode.Unknown, size=Vector3.new(0.1, 0.1, 0.1)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.7, 5.8, 1.65)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(3.1, 5.8, 1.70)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.52, 5.4, 1.41)},}
+
+local OWNED_PRESETS={}
+local UI_MAIN={}
+
+local BOX_WRAPPERS=setmetatable({}, {__mode="k"})
+local BUTTON_WRAPPERS=setmetatable({}, {__mode="k"})
+
+local function New(class, props, parent)
+	props=props or {}
+
+	if class=="TextLabel" or class=="TextButton" or class=="TextBox" then
+		if props.TextColor3==nil then props.TextColor3=THEME.TEXT end
+		if props.Font==nil then props.Font=Enum.Font.Gotham end
+		props.TextStrokeTransparency=1
+		props.TextStrokeColor3=Color3.fromRGB(0, 0, 0)
+
+		if class=="TextBox" then
+			props.TextSize=props.TextSize or 13
+			props.TextScaled=false
+			props.TextWrapped=false
+			props.TextYAlignment=Enum.TextYAlignment.Center
+		end
+	end
+
+	local obj=Instance.new(class)
+	for k, v in pairs(props) do
+		obj[k]=v
+	end
+	obj.Parent=parent
+
+	if class=="TextBox" then
+		obj.Focused:Connect(function()
+			obj.TextSize=13
+			obj.TextScaled=false
+			obj.TextWrapped=false
+			obj.TextYAlignment=Enum.TextYAlignment.Center
+		end)
+
+		obj.FocusLost:Connect(function()
+			obj.TextSize=13
+			obj.TextScaled=false
+			obj.TextWrapped=false
+			obj.TextYAlignment=Enum.TextYAlignment.Center
+		end)
+	end
+
+	return obj
+end
+
+local function safeDisconnect(conn)
+	if conn and typeof(conn)=="RBXScriptConnection" then
+		pcall(function()
+			conn:Disconnect()
+		end)
+	end
+end
+
+local function fmtNumber(n, decimals)
+	decimals=decimals or 2
+	local s=string.format("%."..decimals.."f", tonumber(n) or 0)
+	s=s:gsub("(%..-)0+$", "%1"):gsub("%.$", "")
+	return s
+end
+
+local function keyCodeToLabel(keyCode)
+	if not keyCode or keyCode==Enum.KeyCode.Unknown then
+		return"NIL"
+	end
+
+	local raw=tostring(keyCode):gsub("Enum.KeyCode%.", "")
+	local map={RightControl="RCTRL", LeftControl="LCTRL", RightShift="RSHIFT", LeftShift="LSHIFT", RightAlt="RALT", LeftAlt="LALT", LeftMeta="LWIN", RightMeta="RWIN", PageDown="PGDN", PageUp="PGUP", BackQuote="`", Escape="ESC", Space="SPACE", Pause="PAUSE", Return="ENTER", Delete="DEL", Insert="INS", Up="UP", Down="DOWN", Left="LEFT", Right="RIGHT", KeypadZero="NUM0", KeypadOne="NUM1", KeypadTwo="NUM2", KeypadThree="NUM3", KeypadFour="NUM4", KeypadFive="NUM5", KeypadSix="NUM6", KeypadSeven="NUM7", KeypadEight="NUM8", KeypadNine="NUM9", ButtonA="PAD A", ButtonB="PAD B", ButtonX="PAD X", ButtonY="PAD Y", ButtonL1="LB", ButtonR1="RB", ButtonL2="LT", ButtonR2="RT", ButtonL3="LS", ButtonR3="RS", ButtonStart="START", ButtonSelect="SELECT", DPadUp="DPAD UP", DPadDown="DPAD DOWN", DPadLeft="DPAD LEFT", DPadRight="DPAD RIGHT", Thumbstick1="LSTICK", Thumbstick2="RSTICK",}
+
+	return map[raw] or string.upper(raw)
+end
+
+local function parseKeyCodeInput(raw)
+	if raw==nil then return nil end
+
+	local cleaned=tostring(raw):gsub("^%s+", ""):gsub("%s+$", "")
+	if cleaned=="" then return nil end
+
+	local compact=cleaned:gsub("[%s_%-%.]+", "")
+	local upper=compact:upper()
+
+	if upper=="NIL" or upper=="NONE" or upper=="UNBOUND" then
+		return Enum.KeyCode.Unknown
+	end
+
+	local map={RCTRL="RightControl", RIGHTCTRL="RightControl", RIGHTCONTROL="RightControl", LCTRL="LeftControl", LEFTCTRL="LeftControl", LEFTCONTROL="LeftControl", RSHIFT="RightShift", RIGHTSHIFT="RightShift", LSHIFT="LeftShift", LEFTSHIFT="LeftShift", ESC="Escape", ESCAPE="Escape", SPACE="Space", SPACEBAR="Space", ENTER="Return", RETURN="Return", PGDN="PageDown", PAGEDOWN="PageDown", PGUP="PageUp", PAGEUP="PageUp", PAUSE="Pause", BREAK="Pause", PAUSEBREAK="Pause", NUM0="KeypadZero", NUMPAD0="KeypadZero", NUM1="KeypadOne", NUMPAD1="KeypadOne", NUM2="KeypadTwo", NUMPAD2="KeypadTwo", NUM3="KeypadThree", NUMPAD3="KeypadThree", NUM4="KeypadFour", NUMPAD4="KeypadFour", NUM5="KeypadFive", NUMPAD5="KeypadFive", NUM6="KeypadSix", NUMPAD6="KeypadSix", NUM7="KeypadSeven", NUMPAD7="KeypadSeven", NUM8="KeypadEight", NUMPAD8="KeypadEight", NUM9="KeypadNine", NUMPAD9="KeypadNine", ["`"]="BackQuote",}
+
+	local enumName=map[upper] or compact
+	if #enumName==1 then enumName=enumName:upper() end
+
+	local ok, keyCode=pcall(function()
+		return Enum.KeyCode[enumName]
+	end)
+
+	if ok and keyCode then return keyCode end
+	return nil
+end
+
+local function inputToBinding(input)
+	local uiType=tostring(input.UserInputType)
+
+	local key=input.KeyCode
+	if key and key~=Enum.KeyCode.Unknown then return key end
+
+	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
+	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
+	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
+	if uiType=="Enum.UserInputType.MouseButton4" then return"MouseButton4" end
+	if uiType=="Enum.UserInputType.MouseButton5" then return"MouseButton5" end
+
+	local name=uiType:gsub("Enum.UserInputType%.", "")
+	if name:match("^Gamepad") then return name end
+
+	return nil
+end
+
+local function bindingToLabel(binding)
+	if binding==nil or binding==Enum.KeyCode.Unknown then
+		return"NIL"
+	end
+
+	if type(binding)=="string" then
+		local map={MouseButton1="LMB", MouseButton2="RMB", MouseButton3="MMB", MouseButton4="MB4", MouseButton5="MB5", Touch="TOUCH", Gamepad1="PAD1", Gamepad2="PAD2", Gamepad3="PAD3", Gamepad4="PAD4", Gamepad5="PAD5", Gamepad6="PAD6", Gamepad7="PAD7", Gamepad8="PAD8",}
+		return map[binding] or string.upper(binding)
+	end
+
+	return keyCodeToLabel(binding)
+end
+
+local BOT_API={
+	Url="https://lint-bot-production.up.railway.app",
+	Key="thekeytoheaven",
+}
+
+function BOT_API.GetRequestFunction()
+	if typeof(syn)=="table" and type(syn.request)=="function" then return syn.request end
+	if type(request)=="function" then return request end
+	if type(http_request)=="function" then return http_request end
+	if typeof(http)=="table" and type(http.request)=="function" then return http.request end
+	if typeof(fluxus)=="table" and type(fluxus.request)=="function" then return fluxus.request end
+	return nil
+end
+
+function BOT_API.Post(path,body)
+	local requestFn=BOT_API.GetRequestFunction()
+	if not requestFn then
+		return{ok=false,error="No client HTTP request function found."}
+	end
+
+	body=body or{}
+	body.apiKey=BOT_API.Key
+
+	local ok,response=pcall(function()
+		return requestFn({
+			Url=BOT_API.Url..path,
+			Method="POST",
+			Headers={
+				["Content-Type"]="application/json",
+			},
+			Body=HttpService:JSONEncode(body),
+		})
+	end)
+
+	if not ok then
+		return{ok=false,error=tostring(response)}
+	end
+
+	local raw=response and(response.Body or response.body)
+	if not raw then
+		return{ok=false,error="Empty response from API."}
+	end
+
+	local decodeOk,decoded=pcall(function()
+		return HttpService:JSONDecode(raw)
+	end)
+
+	if not decodeOk then
+		return{ok=false,error="Could not decode API response: "..tostring(raw)}
+	end
+
+	return decoded
+end
+
+local AUTO_REFRESH_ENABLED=true
+local AUTO_REFRESH_INTERVAL=2.5
+local AUTO_REFRESH_RELOAD_PATH="main.lua"
+
+local MODULE_PATHS={
+	HitboxPreset="page-2/hitbox-preset.lua",
+	KeybindSettings="page-2/keybind-settings.lua",
+	PresetEditor="page-2/preset-editor.lua",
+	Page1Hitbox="page-1/hitbox.lua",
+	Page1Gravity="page-1/gravity.lua",
+	Page1Speed="page-1/speed.lua",
+	Page1GameParams="page-1/game-params.lua",
+	Page1Boost="page-1/boost.lua",
+	StrokeColour="page-3/stroke-colour.lua",
+	Workspace="page-4/workspace.lua",
+	PlayerData="page-4/player-data.lua",
+	DataSave="data-save/data-save.lua",
+}
+
+local AUTO_REFRESH_WATCH_PATHS={}
+for _,path in pairs(MODULE_PATHS) do
+	table.insert(AUTO_REFRESH_WATCH_PATHS,path)
+end
+
+local REMOTE_MODULE_CACHE={}
+local REMOTE_MODULE_SOURCES={}
+local rebuildPage1FromModules=nil
+local rebuildCustomizeFromModules=nil
+
+local function loadModuleFromSource(modulePath,source)
+	local chunk,err=loadstring(source)
+	if not chunk then
+		REMOTE_MODULE_SOURCES[modulePath]=source
+		return nil,err
+	end
+
+	local ok,module=pcall(chunk)
+	if not ok then
+		REMOTE_MODULE_SOURCES[modulePath]=source
+		return nil,module
+	end
+
+	REMOTE_MODULE_SOURCES[modulePath]=source
+	REMOTE_MODULE_CACHE[modulePath]=module
+	return module,nil
+end
+
+local function loadRemoteModule(modulePath)
+	if REMOTE_MODULE_CACHE[modulePath] then
+		return REMOTE_MODULE_CACHE[modulePath]
+	end
+
+	local result=BOT_API.Post("/module/get",{path=modulePath})
+	if not result or not result.ok then
+		REMOTE_MODULE_SOURCES[modulePath]=false
+		warn("Failed to load remote module:",modulePath,result and result.error or"unknown")
+		return nil
+	end
+
+	local module,err=loadModuleFromSource(modulePath,result.source)
+	if not module then
+		warn("Remote module failed while loading:",modulePath,err)
+		return nil
+	end
+
+	return module
+end
+
+local HitboxPresetModule=loadRemoteModule(MODULE_PATHS.HitboxPreset)
+local KeybindSettingsModule=loadRemoteModule(MODULE_PATHS.KeybindSettings)
+local PresetEditorModule=loadRemoteModule(MODULE_PATHS.PresetEditor)
+local Page1HitboxModule=loadRemoteModule(MODULE_PATHS.Page1Hitbox)
+local Page1GravityModule=loadRemoteModule(MODULE_PATHS.Page1Gravity)
+local Page1SpeedModule=loadRemoteModule(MODULE_PATHS.Page1Speed)
+local Page1GameParamsModule=loadRemoteModule(MODULE_PATHS.Page1GameParams)
+local Page1BoostModule=loadRemoteModule(MODULE_PATHS.Page1Boost)
+local StrokeColourModule=loadRemoteModule(MODULE_PATHS.StrokeColour)
+local WorkspaceModule=loadRemoteModule(MODULE_PATHS.Workspace)
+local PlayerDataModule=loadRemoteModule(MODULE_PATHS.PlayerData)
+local DataSaveModule=loadRemoteModule(MODULE_PATHS.DataSave)
+
+local PAGE1_RELOAD_PATHS={
+	[MODULE_PATHS.Page1Hitbox]=function(module) Page1HitboxModule=module end,
+	[MODULE_PATHS.Page1Gravity]=function(module) Page1GravityModule=module end,
+	[MODULE_PATHS.Page1Speed]=function(module) Page1SpeedModule=module end,
+	[MODULE_PATHS.Page1GameParams]=function(module) Page1GameParamsModule=module end,
+	[MODULE_PATHS.Page1Boost]=function(module) Page1BoostModule=module end,
+}
+
+local function wrapTextBox(box, bgColor, strokeThickness)
+	local parent=box.Parent
+
+	local wrap=Instance.new("Frame")
+	wrap.Name=box.Name~="" and (box.Name.."_Wrap") or"TextBoxWrap"
+	wrap.BackgroundColor3=bgColor or THEME.PANEL
+	wrap.BorderSizePixel=0
+	wrap.Size=box.Size
+	wrap.Position=box.Position
+	wrap.AnchorPoint=box.AnchorPoint
+	wrap.Visible=box.Visible
+	wrap.ZIndex=math.max((box.ZIndex or 2)-1, 1)
+	wrap.Parent=parent
+
+	local stroke=New("UIStroke", {Color=THEME.STROKE, Thickness=strokeThickness or 2, Transparency=0}, wrap)
+
+	box.Parent=wrap
+	box.BackgroundTransparency=1
+	box.BorderSizePixel=0
+	box.Position=UDim2.new(0, 4, 0, 0)
+	box.Size=UDim2.new(1, -8, 1, 0)
+	box.AnchorPoint=Vector2.new(0, 0)
+	box.ZIndex=wrap.ZIndex+1
+
+	BOX_WRAPPERS[box]={wrap=wrap, stroke=stroke}
+	return wrap, stroke
+end
+
+local function placeWrappedBox(box, position, size)
+	local entry=BOX_WRAPPERS[box]
+	if not entry then return end
+	if size then entry.wrap.Size=size end
+	if position then entry.wrap.Position=position end
+end
+
+local function wrapTextButton(button, bgColor, strokeThickness)
+	local parent=button.Parent
+
+	local wrap=Instance.new("Frame")
+	wrap.Name=button.Name~="" and (button.Name.."_Wrap") or"ButtonWrap"
+	wrap.BackgroundColor3=bgColor or THEME.BG
+	wrap.BorderSizePixel=0
+	wrap.Size=button.Size
+	wrap.Position=button.Position
+	wrap.AnchorPoint=button.AnchorPoint
+	wrap.Visible=button.Visible
+	wrap.ZIndex=math.max((button.ZIndex or 2)-1, 1)
+	wrap.Parent=parent
+
+	local stroke=New("UIStroke", {Color=THEME.STROKE, Thickness=strokeThickness or 2, Transparency=0}, wrap)
+
+	button.Parent=wrap
+	button.BackgroundTransparency=1
+	button.BorderSizePixel=0
+	button.Position=UDim2.new(0, 0, 0, 0)
+	button.Size=UDim2.new(1, 0, 1, 0)
+	button.AnchorPoint=Vector2.new(0, 0)
+	button.ZIndex=wrap.ZIndex+1
+
+	BUTTON_WRAPPERS[button]={wrap=wrap, stroke=stroke}
+	return wrap, stroke
+end
+
+local function placeWrappedButton(button, position, size)
+	local entry=BUTTON_WRAPPERS[button]
+	if not entry then return end
+	if size then entry.wrap.Size=size end
+	if position then entry.wrap.Position=position end
+end
+
+local function setWrappedButtonBg(button, color)
+	local entry=BUTTON_WRAPPERS[button]
+	if entry then
+		entry.wrap.BackgroundColor3=color
+	else
+		button.BackgroundColor3=color
+	end
+end
+
+local function getUIStrokeColor()
+	return Color3.fromRGB(math.clamp(math.floor(UI_STYLE.StrokeR+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.StrokeG+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.StrokeB+0.5), 0, 255))
+end
+
+local function getUIStrokeGradientColor()
+	return Color3.fromRGB(math.clamp(math.floor(UI_STYLE.GradientR+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.GradientG+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.GradientB+0.5), 0, 255))
+end
+
+local SG_NAME="HitboxUI_DarkInfluenced_GUIOnly"
+local old=guiParent:FindFirstChild(SG_NAME)
+if old then old:Destroy() end
+
+local SG=New("ScreenGui", {Name=SG_NAME, ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, IgnoreGuiInset=false}, guiParent)
+local autoRefreshReloading=false
+local liquidStrokeConn=nil
+
+local function getRemoteSource(modulePath)
+	local result=BOT_API.Post("/module/get",{path=modulePath})
+	if not result or not result.ok or type(result.source)~="string" then
+		return nil,result and result.error or"unknown"
+	end
+
+	return result.source
+end
+
+local function reloadFromSource(sourcePath,source,changedPath,changedSource)
+	if autoRefreshReloading then return end
+
+	local chunk,err=loadstring(source)
+	if not chunk then
+		warn("Auto-refresh found bad source:",sourcePath,err)
+		REMOTE_MODULE_SOURCES[sourcePath]=source
+		if changedPath and changedPath~=sourcePath and changedSource then
+			REMOTE_MODULE_SOURCES[changedPath]=changedSource
+		end
+		return
+	end
+
+	autoRefreshReloading=true
+	toolAlive=false
+
+	task.defer(function()
+		local ok,reloadErr=pcall(chunk)
+		if not ok then
+			warn("Auto-refresh reload failed:",reloadErr)
+		end
+	end)
+end
+
+local function requestAutoRefresh(changedPath,changedSource)
+	if changedPath==AUTO_REFRESH_RELOAD_PATH then
+		warn("Auto-refreshing script after remote change:",changedPath)
+		reloadFromSource(changedPath,changedSource,changedPath,changedSource)
+		return
+	end
+
+	local module,err=loadModuleFromSource(changedPath,changedSource)
+	if not module then
+		warn("Auto-refresh found bad module source:",changedPath,err)
+		return
+	end
+
+	local applyPage1Module=PAGE1_RELOAD_PATHS[changedPath]
+	if applyPage1Module then
+		applyPage1Module(module)
+
+		if rebuildPage1FromModules then
+			warn("Auto-refreshing page module after remote change:",changedPath)
+			rebuildPage1FromModules()
+		else
+			warn("Auto-refresh cached page module, rebuild not ready:",changedPath)
+		end
+
+		return
+	end
+
+	if changedPath==MODULE_PATHS.StrokeColour then
+		StrokeColourModule=module
+
+		if rebuildCustomizeFromModules then
+			warn("Auto-refreshing customize module after remote change:",changedPath)
+			rebuildCustomizeFromModules()
+		else
+			warn("Auto-refresh cached customize module, rebuild not ready:",changedPath)
+		end
+
+		return
+	end
+
+	warn("Auto-refresh cached module after remote change:",changedPath)
+end
+
+local function startAutoRefresh()
+	if not AUTO_REFRESH_ENABLED then return end
+
+	task.spawn(function()
+		task.wait(AUTO_REFRESH_INTERVAL)
+
+		while toolAlive and SG and SG.Parent and guiParent:FindFirstChild(SG_NAME)==SG do
+			for _,path in ipairs(AUTO_REFRESH_WATCH_PATHS) do
+				if not toolAlive or not SG.Parent or guiParent:FindFirstChild(SG_NAME)~=SG then
+					return
+				end
+
+				local source=getRemoteSource(path)
+				if source then
+					local previous=REMOTE_MODULE_SOURCES[path]
+					if previous~=nil and previous~=source then
+						requestAutoRefresh(path,source)
+						return
+					end
+
+					if previous==nil then
+						REMOTE_MODULE_SOURCES[path]=source
+					end
+				end
+
+				task.wait(0.05)
+			end
+
+			task.wait(AUTO_REFRESH_INTERVAL)
+		end
+	end)
+end
+
+local function stopLiquidStrokeAnimation()
+	safeDisconnect(liquidStrokeConn)
+	liquidStrokeConn=nil
+end
+
+local function updateLiquidStrokeAnimation()
+	if not UI_STYLE.LiquidStroke then
+		stopLiquidStrokeAnimation()
+		return
+	end
+
+	local speed=tonumber(UI_STYLE.LiquidStrokeSpeed) or 1
+	if speed<=0 then
+		stopLiquidStrokeAnimation()
+		return
+	end
+
+	if liquidStrokeConn then
+		return
+	end
+
+	local t=0
+	local elapsed=0
+
+	liquidStrokeConn=RunService.RenderStepped:Connect(function(dt)
+		if not toolAlive or not SG or not SG.Parent or not UI_STYLE.LiquidStroke then
+			stopLiquidStrokeAnimation()
+			return
+		end
+
+		local currentSpeed=tonumber(UI_STYLE.LiquidStrokeSpeed) or 1
+		if currentSpeed<=0 then
+			stopLiquidStrokeAnimation()
+			return
+		end
+
+		t=(t+(dt*42*currentSpeed))%360
+		elapsed+=dt
+
+		if elapsed<0.03 then
+			return
+		end
+
+		elapsed=0
+
+		local direction=tostring(UI_STYLE.LiquidStrokeDirection or "Right")
+		local wave=math.sin(math.rad(t*2))*0.25
+
+		for _,obj in ipairs(SG:GetDescendants()) do
+			if obj:IsA("UIGradient") and obj.Name=="StrokeGradient" then
+				if direction=="Right" then
+					obj.Rotation=0
+					obj.Offset=Vector2.new(wave,0)
+
+				elseif direction=="Left" then
+					obj.Rotation=0
+					obj.Offset=Vector2.new(-wave,0)
+
+				elseif direction=="Down" then
+					obj.Rotation=90
+					obj.Offset=Vector2.new(0,wave)
+
+				elseif direction=="Up" then
+					obj.Rotation=90
+					obj.Offset=Vector2.new(0,-wave)
+
+				elseif direction=="SpinCW" then
+					obj.Offset=Vector2.new(0,0)
+					obj.Rotation=t
+
+				elseif direction=="SpinCCW" then
+					obj.Offset=Vector2.new(0,0)
+					obj.Rotation=-t
+
+				else
+					obj.Rotation=t
+					obj.Offset=Vector2.new(wave,0)
+				end
+			end
+		end
+	end)
+end
+
+local function applyUIStrokeTheme()
+	local color=getUIStrokeColor()
+	local color2=getUIStrokeGradientColor()
+	THEME.STROKE=color
+
+	if not SG then return end
+
+	for _,obj in ipairs(SG:GetDescendants()) do
+		if obj:IsA("UIStroke") then
+			obj.Color=color
+			obj.Thickness=math.clamp(tonumber(UI_STYLE.StrokeThickness) or obj.Thickness,0,8)
+			obj.Transparency=math.clamp(tonumber(UI_STYLE.StrokeTransparency) or obj.Transparency,0,1)
+
+			pcall(function()
+				obj.LineJoinMode=Enum.LineJoinMode.Round
+			end)
+
+			local gradient=obj:FindFirstChild("StrokeGradient")
+
+			if UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke then
+				if not gradient then
+					gradient=Instance.new("UIGradient")
+					gradient.Name="StrokeGradient"
+					gradient.Parent=obj
+				end
+
+				if UI_STYLE.LiquidStroke then
+					gradient.Color=ColorSequence.new({
+						ColorSequenceKeypoint.new(0,color),
+						ColorSequenceKeypoint.new(0.45,color2),
+						ColorSequenceKeypoint.new(0.55,color2),
+						ColorSequenceKeypoint.new(1,color),
+					})
+				else
+					gradient.Rotation=0
+					gradient.Offset=Vector2.new(0,0)
+					gradient.Color=ColorSequence.new({
+						ColorSequenceKeypoint.new(0,color),
+						ColorSequenceKeypoint.new(1,color2),
+					})
+				end
+			else
+				if gradient then
+					gradient:Destroy()
+				end
+			end
+
+		elseif obj:IsA("UICorner") then
+			obj.CornerRadius=UDim.new(0,math.clamp(tonumber(UI_STYLE.CornerRadius) or 8,0,24))
+		end
+	end
+
+	updateLiquidStrokeAnimation()
+end
+
+local function setUIVisible(state)
+	uiVisible=state and true or false
+	if SG and SG.Parent then
+		SG.Enabled=uiVisible
+	end
+end
+
+local rootShadow=New("ImageLabel", {Name="shadow", Image="rbxassetid://297774371", ImageColor3=Color3.fromRGB(15,15,15), ImageTransparency=0.3, ScaleType=Enum.ScaleType.Slice, SliceCenter=Rect.new(20,20,280,280), BackgroundTransparency=1, AnchorPoint=Vector2.new(0.5,0), Position=UDim2.new(0.5,0,0,60), Size=UDim2.fromOffset(UI_WINDOW.W+42,UI_WINDOW.H+42), ZIndex=1}, SG)
+
+local root=New("Frame", {AnchorPoint=Vector2.new(0.5, 0), Position=UDim2.new(0.5, 0, 0, 80), Size=UDim2.fromOffset(UI_WINDOW.W, UI_WINDOW.H), AutomaticSize=Enum.AutomaticSize.None, ClipsDescendants=true, BackgroundColor3=THEME.BG, BorderSizePixel=0, ZIndex=2, Visible=true}, SG)
+local uiMinimized=false
+local MINIMIZED_ROOT_H=68
+local rootSizeTween=nil
+local rootPositionTween=nil
+
+local function syncRootShadow()
+	if not rootShadow then return end
+	local sx=root.Size.X.Offset
+	local sy=root.Size.Y.Offset
+	if sx<=0 then sx=UI_WINDOW.W end
+	if sy<=0 then sy=uiMinimized and MINIMIZED_ROOT_H or UI_WINDOW.H end
+	rootShadow.Position=UDim2.new(root.Position.X.Scale, root.Position.X.Offset, root.Position.Y.Scale, root.Position.Y.Offset-20)
+	rootShadow.Size=UDim2.fromOffset(sx+42,sy+42)
+	rootShadow.Visible=root.Visible
+end
+
+root:GetPropertyChangedSignal("Position"):Connect(syncRootShadow)
+root:GetPropertyChangedSignal("Size"):Connect(syncRootShadow)
+
+local function tweenRootPosition(position,duration)
+	if rootPositionTween then
+		rootPositionTween:Cancel()
+	end
+
+	rootPositionTween=TweenService:Create(root,TweenInfo.new(duration or 0.08,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Position=position})
+	rootPositionTween:Play()
+end
+
+local function tweenRootSize(size,duration)
+	if rootSizeTween then
+		rootSizeTween:Cancel()
+	end
+
+	rootSizeTween=TweenService:Create(root,TweenInfo.new(duration or 0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=size})
+	rootSizeTween:Play()
+	return rootSizeTween
+end
+
+New("UICorner", {CornerRadius=UDim.new(0,8)}, root)
+New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0.15}, root)
+New("UIPadding", {PaddingTop=UDim.new(0, 8), PaddingLeft=UDim.new(0, 8), PaddingRight=UDim.new(0, 8), PaddingBottom=UDim.new(0, 8)}, root)
+
+local uiScale=New("UIScale", {Scale=1}, root)
+local updateResponsiveLayout
+
+local function updateScale()
+	local cam=workspace.CurrentCamera
+	local vp=cam and cam.ViewportSize or Vector2.new(1920, 1080)
+	local s=math.clamp(math.min(vp.X/1920, vp.Y/1080), 0.78, 1.08)
+	uiScale.Scale=s
+
+	if updateResponsiveLayout then
+		updateResponsiveLayout()
+	end
+end
+
+updateScale()
+
+task.defer(function()
+	local cam=workspace.CurrentCamera
+	if cam then
+		cam:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
+	end
+end)
+
+local main=New("Frame", {Size=UDim2.new(1, 0, 1, 0), AutomaticSize=Enum.AutomaticSize.None, BackgroundTransparency=1, ZIndex=3}, root)
+
+New("UIListLayout", {Padding=UDim.new(0, 8), SortOrder=Enum.SortOrder.LayoutOrder}, main)
+
+local function attachHover(button, normalBg, hoverBg, normalText, hoverText)
+	button.MouseEnter:Connect(function()
+		if button.BackgroundTransparency<1 then
+			button.BackgroundColor3=hoverBg
+		end
+		if button:IsA("TextButton") or button:IsA("TextLabel") then
+			button.TextColor3=hoverText or normalText or THEME.TEXT
+		end
+	end)
+
+	button.MouseLeave:Connect(function()
+		if button.BackgroundTransparency<1 then
+			button.BackgroundColor3=normalBg
+		end
+		if button:IsA("TextButton") or button:IsA("TextLabel") then
+			button.TextColor3=normalText or THEME.TEXT
+		end
+	end)
+end
+
+local header=New("Frame", {Size=UDim2.new(1, 0, 0, 52), BackgroundColor3=THEME.BG, BorderSizePixel=0, ZIndex=4, LayoutOrder=1}, main)
+
+New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0.25}, header)
+
+New("TextLabel", {BackgroundTransparency=1, Position=UDim2.fromOffset(16, 7), Size=UDim2.new(1, -180, 0, 18), Text="untitled gui", Font=Enum.Font.Gotham, TextSize=16, TextColor3=THEME.TEXT, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=5}, header)
+
+local modeSubtitle=New("TextLabel", {BackgroundTransparency=1, Position=UDim2.fromOffset(16, 26), Size=UDim2.new(1, -180, 0, 14), Text=CURRENT_MODE_LABEL.." loaded", Font=Enum.Font.Gotham, TextSize=11, TextColor3=THEME.MUTED, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=5}, header)
+
+local function makeTopButton(text, xOffset)
+	local b=New("TextButton", {Size=UDim2.fromOffset(28, 28), Position=UDim2.new(1, xOffset, 0.5, -14), BackgroundColor3=THEME.BG, BorderSizePixel=0, Text=text, Font=Enum.Font.Gotham, TextSize=17, TextColor3=THEME.TEXT, AutoButtonColor=false, ZIndex=6}, header)
+
+	local wrap=wrapTextButton(b, THEME.BG, 2)
+
+	b.MouseEnter:Connect(function()
+		wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+	end)
+
+	b.MouseLeave:Connect(function()
+		wrap.BackgroundColor3=THEME.PANEL
+	end)
+
+	return b
+end
+
+local miniBtn=makeTopButton("-", -72)
+local closeBtn=makeTopButton("×", -38)
+
+local toggleWrap=nil
+local tKnob=nil
+
+local function paintToggle()
+	if not toggleWrap or not tKnob then return end
+
+	local ti=TweenInfo.new(0.12, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+	local bg=hitboxOn and THEME.GREEN or THEME.CARD
+	local knobColor=THEME.TEXT
+	local pos=hitboxOn and UDim2.new(1, -22, 0, 2) or UDim2.fromOffset(2, 2)
+
+	TweenService:Create(toggleWrap, ti, {BackgroundColor3=bg}):Play()
+	TweenService:Create(tKnob, ti, {Position=pos, BackgroundColor3=knobColor}):Play()
+end
+
+local function setHitboxLock(state)
+	hitboxOn=state and true or false
+	paintToggle()
+end
+
+local pageBar=New("Frame", {Size=UDim2.new(1, 0, 0, 30), BackgroundTransparency=1, ZIndex=4, LayoutOrder=2}, main)
+
+local pageShell=New("Frame", {Size=UDim2.fromOffset(540, 30), BackgroundColor3=THEME.BG, BorderSizePixel=0, ZIndex=5}, pageBar)
+
+New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0.35}, pageShell)
+
+local pageSlider=New("Frame", {Size=UDim2.fromOffset(110, 28), Position=UDim2.fromOffset(1, 1), BackgroundColor3=THEME.CARD, BorderSizePixel=0, ZIndex=6}, pageShell)
+
+New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0.45}, pageSlider)
+
+local settingsTab=New("TextButton", {Size=UDim2.fromOffset(110, 28), Position=UDim2.fromOffset(1, 1), BackgroundTransparency=1, BorderSizePixel=0, Text="MAIN", Font=Enum.Font.Gotham, TextSize=11, TextColor3=THEME.TEXT, AutoButtonColor=false, ZIndex=7}, pageShell)
+
+local futureTab=New("TextButton", {Size=UDim2.fromOffset(208, 28), Position=UDim2.fromOffset(111, 1), BackgroundTransparency=1, BorderSizePixel=0, Text="KEYBINDS & PRESETS", Font=Enum.Font.Gotham, TextSize=10, TextColor3=THEME.TEXT, AutoButtonColor=false, ZIndex=7}, pageShell)
+
+local uiSettingsTab=New("TextButton", {Size=UDim2.fromOffset(110, 28), Position=UDim2.fromOffset(319, 1), BackgroundTransparency=1, BorderSizePixel=0, Text="CUSTOMIZE", Font=Enum.Font.Gotham, TextSize=11, TextColor3=THEME.TEXT, AutoButtonColor=false, ZIndex=7}, pageShell)
+
+local settingsPageTab=New("TextButton", {Size=UDim2.fromOffset(110, 28), Position=UDim2.fromOffset(429, 1), BackgroundTransparency=1, BorderSizePixel=0, Text="SETTINGS", Font=Enum.Font.Gotham, TextSize=11, TextColor3=THEME.TEXT, AutoButtonColor=false, ZIndex=7}, pageShell)
+
+local pageHost=New("ScrollingFrame", {Size=UDim2.new(1, 0, 0, 384), CanvasSize=UDim2.new(0, 0, 0, 0), AutomaticCanvasSize=Enum.AutomaticSize.Y, ScrollingDirection=Enum.ScrollingDirection.Y, ScrollBarThickness=4, BackgroundTransparency=1, BorderSizePixel=0, ZIndex=3, LayoutOrder=3}, main)
+
+New("UIListLayout", {Padding=UDim.new(0, 0), SortOrder=Enum.SortOrder.LayoutOrder}, pageHost)
+
+local settingsPage=New("Frame", {Size=UDim2.new(1, 0, 0, 0), AutomaticSize=Enum.AutomaticSize.Y, BackgroundTransparency=1, Visible=true, ZIndex=3, LayoutOrder=1}, pageHost)
+
+New("UIListLayout", {Padding=UDim.new(0, 0), SortOrder=Enum.SortOrder.LayoutOrder}, settingsPage)
+
+local futurePage=New("Frame", {Size=UDim2.new(1, 0, 0, 0), AutomaticSize=Enum.AutomaticSize.Y, BackgroundTransparency=1, Visible=false, ZIndex=3, LayoutOrder=2}, pageHost)
+
+New("UIListLayout", {Padding=UDim.new(0, 8), SortOrder=Enum.SortOrder.LayoutOrder}, futurePage)
+
+local uiSettingsPage=New("Frame", {Size=UDim2.new(1, 0, 0, 0), AutomaticSize=Enum.AutomaticSize.Y, BackgroundTransparency=1, Visible=false, ZIndex=3, LayoutOrder=3}, pageHost)
+
+New("UIListLayout", {Padding=UDim.new(0, 8), SortOrder=Enum.SortOrder.LayoutOrder}, uiSettingsPage)
+
+local actualSettingsPage=New("Frame", {Size=UDim2.new(1, 0, 0, 0), AutomaticSize=Enum.AutomaticSize.Y, BackgroundTransparency=1, Visible=false, ZIndex=3, LayoutOrder=4}, pageHost)
+
+New("UIListLayout", {Padding=UDim.new(0, 8), SortOrder=Enum.SortOrder.LayoutOrder}, actualSettingsPage)
+
+local activePageName="main"
+local refreshFooterResetButton=function() end
+
+local function paintPageTabs()
+	settingsTab.TextColor3=activePageName=="main" and THEME.TEXT or THEME.MUTED
+	futureTab.TextColor3=activePageName=="page2" and THEME.TEXT or THEME.MUTED
+	uiSettingsTab.TextColor3=activePageName=="customize" and THEME.TEXT or THEME.MUTED
+	settingsPageTab.TextColor3=activePageName=="settings" and THEME.TEXT or THEME.MUTED
+end
+
+local function setActivePage(name)
+	activePageName=name or"main"
+
+	settingsPage.Visible=activePageName=="main"
+	futurePage.Visible=activePageName=="page2"
+	uiSettingsPage.Visible=activePageName=="customize"
+	actualSettingsPage.Visible=activePageName=="settings"
+
+	local sliderPos=UDim2.fromOffset(1, 1)
+	local sliderSize=UDim2.fromOffset(110, 28)
+
+	if activePageName=="page2" then
+		sliderPos=UDim2.fromOffset(111, 1)
+		sliderSize=UDim2.fromOffset(208, 28)
+	elseif activePageName=="customize" then
+		sliderPos=UDim2.fromOffset(319, 1)
+		sliderSize=UDim2.fromOffset(110, 28)
+	elseif activePageName=="settings" then
+		sliderPos=UDim2.fromOffset(429, 1)
+		sliderSize=UDim2.fromOffset(110, 28)
+	end
+
+	TweenService:Create(pageSlider, TweenInfo.new(0.12, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {Position=sliderPos, Size=sliderSize}):Play()
+
+	paintPageTabs()
+	refreshFooterResetButton()
+end
+
+settingsTab.MouseButton1Click:Connect(function() setActivePage("main") end)
+futureTab.MouseButton1Click:Connect(function() setActivePage("page2") end)
+uiSettingsTab.MouseButton1Click:Connect(function() setActivePage("customize") end)
+settingsPageTab.MouseButton1Click:Connect(function() setActivePage("settings") end)
+
+settingsTab.MouseEnter:Connect(paintPageTabs)
+settingsTab.MouseLeave:Connect(paintPageTabs)
+futureTab.MouseEnter:Connect(paintPageTabs)
+futureTab.MouseLeave:Connect(paintPageTabs)
+uiSettingsTab.MouseEnter:Connect(paintPageTabs)
+uiSettingsTab.MouseLeave:Connect(paintPageTabs)
+settingsPageTab.MouseEnter:Connect(paintPageTabs)
+settingsPageTab.MouseLeave:Connect(paintPageTabs)
+
+local contentWrap=New("Frame", {Size=UDim2.new(1, 0, 0, 0), AutomaticSize=Enum.AutomaticSize.Y, BackgroundTransparency=1, ZIndex=3, LayoutOrder=1}, settingsPage)
+
+local contentLayout=New("UIListLayout", {Padding=UDim.new(0, 8), SortOrder=Enum.SortOrder.LayoutOrder, FillDirection=Enum.FillDirection.Horizontal}, contentWrap)
+
+local leftCol=New("Frame", {Size=UDim2.new(0.5, -4, 0, 0), AutomaticSize=Enum.AutomaticSize.Y, BackgroundTransparency=1, ZIndex=3, LayoutOrder=1}, contentWrap)
+
+New("UIListLayout", {Padding=UDim.new(0, 8), SortOrder=Enum.SortOrder.LayoutOrder}, leftCol)
+
+local rightCol=New("Frame", {Size=UDim2.new(0.5, -4, 0, 0), AutomaticSize=Enum.AutomaticSize.Y, BackgroundTransparency=1, ZIndex=3, LayoutOrder=2}, contentWrap)
+
+New("UIListLayout", {Padding=UDim.new(0, 8), SortOrder=Enum.SortOrder.LayoutOrder}, rightCol)
+
+updateResponsiveLayout=function()
+	local cam=workspace.CurrentCamera
+	local vp=cam and cam.ViewportSize or Vector2.new(1920, 1080)
+
+	UI_WINDOW.W=math.clamp(UI_WINDOW.W, UI_WINDOW.MinW, math.min(UI_WINDOW.MaxW, math.max(560, vp.X-40)))
+	UI_WINDOW.H=math.clamp(UI_WINDOW.H, UI_WINDOW.MinH, math.min(UI_WINDOW.MaxH, math.max(360, vp.Y-120)))
+	root.Size=UDim2.fromOffset(UI_WINDOW.W,uiMinimized and MINIMIZED_ROOT_H or UI_WINDOW.H)
+	syncRootShadow()
+
+	local pageHeight=math.max(170, UI_WINDOW.H-156)
+	pageHost.Size=UDim2.new(1, 0, 0, pageHeight)
+
+	local compact=UI_WINDOW.W<720 or vp.X<1100
+	if compact then
+		contentLayout.FillDirection=Enum.FillDirection.Vertical
+		leftCol.Size=UDim2.new(1, 0, 0, 0)
+		rightCol.Size=UDim2.new(1, 0, 0, 0)
+	else
+		contentLayout.FillDirection=Enum.FillDirection.Horizontal
+		leftCol.Size=UDim2.new(0.5, -4, 0, 0)
+		rightCol.Size=UDim2.new(0.5, -4, 0, 0)
+	end
+end
+
+updateResponsiveLayout()
+
+local function makeSection(parent, order, titleText, subtitleText)
+	local sec=New("Frame", {BackgroundColor3=THEME.CARD, BorderSizePixel=0, Size=UDim2.new(1, 0, 0, 0), AutomaticSize=Enum.AutomaticSize.Y, ZIndex=4, LayoutOrder=order}, parent)
+
+	New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0}, sec)
+	New("UIPadding", {PaddingTop=UDim.new(0, 10), PaddingLeft=UDim.new(0, 12), PaddingRight=UDim.new(0, 12), PaddingBottom=UDim.new(0, 10)}, sec)
+
+	New("UIListLayout", {Padding=UDim.new(0, 6), SortOrder=Enum.SortOrder.LayoutOrder}, sec)
+
+	local collapsed=false
+
+	local titleButton=New("TextButton", {BackgroundTransparency=1, Size=UDim2.new(1, 0, 0, 20), Text="[-] "..titleText, Font=Enum.Font.GothamMedium, TextSize=14, TextColor3=THEME.TEXT, TextXAlignment=Enum.TextXAlignment.Left, AutoButtonColor=false, ZIndex=5, LayoutOrder=1}, sec)
+
+	local subtitleLabel=nil
+	if subtitleText and subtitleText~="" then
+		subtitleLabel=New("TextLabel", {BackgroundTransparency=1, Size=UDim2.new(1, 0, 0, 14), Text=subtitleText, Font=Enum.Font.Gotham, TextSize=11, TextColor3=THEME.MUTED, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=5, LayoutOrder=2}, sec)
+	end
+
+	local body=New("Frame", {BackgroundTransparency=1, Size=UDim2.new(1, 0, 0, 0), AutomaticSize=Enum.AutomaticSize.Y, ZIndex=5, LayoutOrder=3}, sec)
+
+	New("UIListLayout", {Padding=UDim.new(0, 6), SortOrder=Enum.SortOrder.LayoutOrder}, body)
+
+	local function paint()
+		body.Visible=not collapsed
+		body.AutomaticSize=collapsed and Enum.AutomaticSize.None or Enum.AutomaticSize.Y
+
+		if subtitleLabel then
+			subtitleLabel.Visible=not collapsed
+		end
+
+		titleButton.Text=(collapsed and"[+] " or"[-] ")..titleText
+	end
+
+	titleButton.MouseButton1Click:Connect(function()
+		collapsed=not collapsed
+		paint()
+	end)
+
+	paint()
+	return body
+end
+
+local function makeBox(parent, w, txt, placeholder)
+	local b=New("TextBox", {Size=UDim2.fromOffset(w, 28), BackgroundColor3=THEME.PANEL, BorderSizePixel=0, ClearTextOnFocus=false, Text=txt, PlaceholderText=placeholder or"", Font=Enum.Font.Gotham, TextSize=13, TextColor3=THEME.TEXT, PlaceholderColor3=THEME.MUTED, ZIndex=6}, parent)
+
+	local wrap, stroke=wrapTextBox(b, THEME.PANEL, 2)
+
+	b.Focused:Connect(function()
+		wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+		stroke.Thickness=2
+	end)
+
+	b.FocusLost:Connect(function()
+		wrap.BackgroundColor3=THEME.PANEL
+		stroke.Thickness=2
+	end)
+
+	return b
+end
+
+local function buildSlider(parent, labelText, minVal, maxVal, startVal, decimals, onChange)
+	local container=New("Frame", {BackgroundTransparency=1, Size=UDim2.new(1, 0, 0, 32), ZIndex=5}, parent)
+
+	New("TextLabel", {BackgroundTransparency=1, Size=UDim2.fromOffset(28, 32), Text=labelText, Font=Enum.Font.Gotham, TextSize=12, TextColor3=THEME.MUTED, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=6}, container)
+
+	local valueLabel=New("TextBox", {BackgroundColor3=THEME.BG, BorderSizePixel=0, ClearTextOnFocus=true, Size=UDim2.fromOffset(72, 28), Position=UDim2.new(1, -72, 0.5, -14), Text=fmtNumber(startVal, decimals), Font=Enum.Font.Gotham, TextSize=13, TextColor3=THEME.TEXT, TextXAlignment=Enum.TextXAlignment.Center, ZIndex=6}, container)
+
+	local valueWrap, valueStroke=wrapTextBox(valueLabel, THEME.BG, 2)
+
+	local track=New("Frame", {Size=UDim2.new(1, -118, 0, 8), Position=UDim2.new(0, 34, 0.5, -4), BackgroundColor3=THEME.BG, BorderSizePixel=0, ZIndex=6}, container)
+
+	New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0}, track)
+
+	local fill=New("Frame", {Size=UDim2.new(0, 0, 1, 0), BackgroundColor3=Color3.fromRGB(45,45,45), BorderSizePixel=0, ZIndex=7}, track)
+
+	local knob=New("Frame", {AnchorPoint=Vector2.new(0.5,0.5), Size=UDim2.fromOffset(14,14), Position=UDim2.new(0,0,0.5,0), BackgroundColor3=THEME.MUTED, BorderSizePixel=0, ZIndex=8}, track)
+
+	New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0}, knob)
+
+	local hit=New("TextButton", {BackgroundTransparency=1, Text="", Size=UDim2.new(1, 0, 1, 8), Position=UDim2.new(0, 0, -0.5, -4), ZIndex=9, AutoButtonColor=false}, track)
+
+	local value=startVal
+	local dragging=false
+
+	local function roundTo(v, d)
+		local m=10^d
+		return math.floor(v*m+0.5)/m
+	end
+
+	local function setVisual(v)
+		local pct=math.clamp((v-minVal)/(maxVal-minVal), 0, 1)
+		fill.Size=UDim2.new(pct, 0, 1, 0)
+		knob.Position=UDim2.new(pct, 0, 0.5, 0)
+		valueLabel.Text=fmtNumber(v, decimals)
+	end
+
+	local function valueFromMouseX(mx)
+		local absPos=track.AbsolutePosition.X
+		local absSize=track.AbsoluteSize.X
+		if absSize<=0 then return value end
+
+		local pct=math.clamp((mx-absPos)/absSize, 0, 1)
+		return roundTo(minVal+(maxVal-minVal)*pct, decimals)
+	end
+
+	local function setValue(v, fire)
+		v=roundTo(math.clamp(tonumber(v) or value, minVal, maxVal), decimals)
+		value=v
+		setVisual(v)
+
+		if fire and onChange then
+			onChange(v)
+		end
+	end
+
+	hit.InputBegan:Connect(function(i)
+		if i.UserInputType==Enum.UserInputType.MouseButton1 then
+			dragging=true
+			setValue(valueFromMouseX(UIS:GetMouseLocation().X), true)
+		end
+	end)
+
+	UIS.InputChanged:Connect(function(i)
+		if dragging and i.UserInputType==Enum.UserInputType.MouseMovement then
+			setValue(valueFromMouseX(UIS:GetMouseLocation().X), true)
+		end
+	end)
+
+	UIS.InputEnded:Connect(function(i)
+		if i.UserInputType==Enum.UserInputType.MouseButton1 then
+			dragging=false
+		end
+	end)
+
+	valueLabel.Focused:Connect(function()
+		valueWrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+		valueStroke.Thickness=2
+	end)
+
+	valueLabel.FocusLost:Connect(function()
+		valueWrap.BackgroundColor3=THEME.BG
+		valueStroke.Thickness=2
+
+		local n=tonumber(valueLabel.Text)
+		if n then
+			setValue(n, true)
+		else
+			valueLabel.Text=fmtNumber(value, decimals)
+		end
+	end)
+
+	setValue(startVal, false)
+
+	return {set=function(v) setValue(v, false) end, get=function() return value end, box=valueLabel, fill=fill, knob=knob, track=track,}
+end
+
+local function buildToggleRow(parent, labelText, startState, onChange)
+	local row=New("Frame", {BackgroundTransparency=1, Size=UDim2.new(1, 0, 0, 30), ZIndex=5}, parent)
+
+	New("TextLabel", {BackgroundTransparency=1, Size=UDim2.new(1, -64, 1, 0), Text=labelText, Font=Enum.Font.Gotham, TextSize=12, TextColor3=THEME.MUTED, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=6}, row)
+
+	local wrap=New("Frame", {Size=UDim2.fromOffset(48, 20), Position=UDim2.new(1, -48, 0.5, -10), BackgroundColor3=Color3.fromRGB(0, 0, 0), BorderSizePixel=0, ZIndex=6}, row)
+
+	New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0}, wrap)
+
+	local knob=New("Frame", {Size=UDim2.fromOffset(16, 16), Position=UDim2.fromOffset(2, 2), BackgroundColor3=THEME.TEXT, BorderSizePixel=0, ZIndex=7}, wrap)
+
+	New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0}, knob)
+
+	local state=startState and true or false
+
+	local function paint()
+		local ti=TweenInfo.new(0.12, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+		local bg=state and THEME.GREEN or THEME.CARD
+		local knobColor=THEME.TEXT
+		local pos=state and UDim2.new(1, -18, 0, 2) or UDim2.fromOffset(2, 2)
+
+		TweenService:Create(wrap, ti, {BackgroundColor3=bg}):Play()
+		TweenService:Create(knob, ti, {Position=pos, BackgroundColor3=knobColor}):Play()
+	end
+
+	local function setState(v, fire)
+		state=v and true or false
+		paint()
+
+		if fire and onChange then
+			onChange(state)
+		end
+	end
+
+	wrap.InputBegan:Connect(function(i)
+		if i.UserInputType==Enum.UserInputType.MouseButton1 then
+			setState(not state, true)
+		end
+	end)
+
+	knob.InputBegan:Connect(function(i)
+		if i.UserInputType==Enum.UserInputType.MouseButton1 then
+			setState(not state, true)
+		end
+	end)
+
+	setState(state, false)
+
+	return {set=function(v) setState(v, false) end, get=function() return state end,}
+end
+
+local DataSaveAPI=nil
+local requestPlayerAutosave=function()
+	if DataSaveAPI and DataSaveAPI.Schedule then
+		DataSaveAPI.Schedule()
+	end
+end
+
+local function makeLocalPresetCode(name)
+	local base=string.upper(string.sub(string.gsub(tostring(name or ""),"[^%w]",""),1,3))
+	if base=="" then base="GUI" end
+	return base..tostring(math.random(100,999))
+end
+
+local function setPresetSizeFromDataSave(index,x,y,z)
+	if DataSaveAPI and DataSaveAPI.SetPresetSize then
+		return DataSaveAPI.SetPresetSize(index,x,y,z)
+	end
+
+	local preset=PRESETS[index]
+	if not preset then return false,"missing preset" end
+
+	local oldSize=preset.size or Vector3.new(1,1,1)
+	preset.size=Vector3.new(
+		math.clamp(tonumber(x) or oldSize.X,0.1,50),
+		math.clamp(tonumber(y) or oldSize.Y,0.1,50),
+		math.clamp(tonumber(z) or oldSize.Z,0.1,50)
+	)
+
+	requestPlayerAutosave()
+	return true,preset.size
+end
+
+local function setPresetKeyFromDataSave(index,binding)
+	if DataSaveAPI and DataSaveAPI.SetPresetKey then
+		return DataSaveAPI.SetPresetKey(index,binding)
+	end
+
+	local preset=PRESETS[index]
+	if not preset then return false,"missing preset" end
+
+	preset.key=binding or Enum.KeyCode.Unknown
+	requestPlayerAutosave()
+	return true,preset.key
+end
+
+local function resetPresetFromDataSave(index)
+	if DataSaveAPI and DataSaveAPI.ResetPreset then
+		return DataSaveAPI.ResetPreset(index)
+	end
+
+	local preset=PRESETS[index]
+	local default=DEFAULT_PRESETS[index]
+	if not preset or not default then return false,"missing preset" end
+
+	preset.key=default.key
+	preset.size=default.size
+	requestPlayerAutosave()
+	return true,preset
+end
+
+local function applyPresetEditorFromDataSave(editor)
+	if DataSaveAPI and DataSaveAPI.ApplyPresetEditor then
+		return DataSaveAPI.ApplyPresetEditor(editor)
+	end
+
+	for i=1,4 do
+		local item=editor and editor[i]
+		if item and PRESETS[i] then
+			PRESETS[i].key=item.key or item.Key or item.binding or item.Binding or Enum.KeyCode.Unknown
+			PRESETS[i].size=Vector3.new(tonumber(item.x or item.X) or 1,tonumber(item.y or item.Y) or 1,tonumber(item.z or item.Z) or 1)
+		end
+	end
+
+	requestPlayerAutosave()
+	return true
+end
+
+local function createOwnedPresetFromDataSave(name,editor)
+	if DataSaveAPI and DataSaveAPI.CreateOwnedPreset then
+		return DataSaveAPI.CreateOwnedPreset(name,editor)
+	end
+
+	local cleanName=tostring(name or ""):gsub("^%s*(.-)%s*$","%1")
+	if cleanName=="" then return false,"Name cannot be empty." end
+
+	local preset={Code=makeLocalPresetCode(cleanName),Name=cleanName,Data={PresetEditor=editor or {}}}
+	table.insert(OWNED_PRESETS,preset)
+	requestPlayerAutosave()
+	return true,preset
+end
+
+local function equipOwnedPresetFromDataSave(preset)
+	if DataSaveAPI and DataSaveAPI.EquipOwnedPreset then
+		return DataSaveAPI.EquipOwnedPreset(preset)
+	end
+
+	local data=preset and (preset.Data or preset.data) or {}
+	local editor=data.PresetEditor or data.presetEditor
+	if not editor and preset then
+		editor=preset.presetEditor or preset.PresetEditor
+	end
+
+	return applyPresetEditorFromDataSave(editor or {})
+end
+
+local function deleteOwnedPresetFromDataSave(code,index)
+	if DataSaveAPI and DataSaveAPI.DeleteOwnedPreset then
+		return DataSaveAPI.DeleteOwnedPreset(code,index)
+	end
+
+	for i=#OWNED_PRESETS,1,-1 do
+		if tostring(OWNED_PRESETS[i].Code or OWNED_PRESETS[i].code or "")==tostring(code or "") then
+			table.remove(OWNED_PRESETS,i)
+			return true
+		end
+	end
+
+	if index and OWNED_PRESETS[index] then
+		table.remove(OWNED_PRESETS,index)
+	end
+
+	return true
+end
+
+local PAGE1_STATE={
+	hitboxOn=hitboxOn,
+	sizeX=sizeX,
+	sizeY=sizeY,
+	sizeZ=sizeZ,
+	targetTransparency=targetTransparency,
+	gravityValue=gravityValue,
+	speedEnabled=speedEnabled,
+	speedValue=speedValue,
+	athleticismOn=athleticismOn,
+	staminaRegenValue=staminaRegenValue,
+	staminaDepleteValue=staminaDepleteValue,
+	jumpPowerValue=jumpPowerValue,
+	divePowerValue=divePowerValue,
+	jumpBoostOn=jumpBoostOn,
+	jumpBoostTradeMode=jumpBoostTradeMode,
+	boostForceY=boostForceY,
+	boostCooldown=boostCooldown,
+	boostChance=boostChance,
+	ballDetectionRadius=ballDetectionRadius,
+	actionStatusOn=actionStatusOn,
+}
+
+local function syncPage1State()
+	hitboxOn=PAGE1_STATE.hitboxOn
+	sizeX=PAGE1_STATE.sizeX
+	sizeY=PAGE1_STATE.sizeY
+	sizeZ=PAGE1_STATE.sizeZ
+	targetTransparency=PAGE1_STATE.targetTransparency
+	gravityValue=PAGE1_STATE.gravityValue
+	speedEnabled=PAGE1_STATE.speedEnabled
+	speedValue=PAGE1_STATE.speedValue
+	athleticismOn=PAGE1_STATE.athleticismOn
+	staminaRegenValue=PAGE1_STATE.staminaRegenValue
+	staminaDepleteValue=PAGE1_STATE.staminaDepleteValue
+	jumpPowerValue=PAGE1_STATE.jumpPowerValue
+	divePowerValue=PAGE1_STATE.divePowerValue
+	jumpBoostOn=PAGE1_STATE.jumpBoostOn
+	jumpBoostTradeMode=PAGE1_STATE.jumpBoostTradeMode
+	boostForceY=PAGE1_STATE.boostForceY
+	boostCooldown=PAGE1_STATE.boostCooldown
+	boostChance=PAGE1_STATE.boostChance
+	ballDetectionRadius=PAGE1_STATE.ballDetectionRadius
+	actionStatusOn=PAGE1_STATE.actionStatusOn
+end
+
+local PAGE1_APIS={}
+
+local function makePage1Ctx()
+	return{
+		New=New,
+		THEME=THEME,
+		State=PAGE1_STATE,
+		makeSection=makeSection,
+		buildSlider=buildSlider,
+		buildToggleRow=buildToggleRow,
+		fmtNumber=fmtNumber,
+		inputToBinding=inputToBinding,
+		getCurrentModeKey=function() return CURRENT_MODE_KEY end,
+		getHitboxToggleKey=function() return TOGGLE_HB_KEY end,
+		getSpeedToggleKey=function() return TOGGLE_SPEED_KEY end,
+		getJumpBoostToggleKey=function() return TOGGLE_JB_KEY end,
+		getAlwaysBoostToggleKey=function() return TOGGLE_AB_KEY end,
+		setCurrentMode=function(key,label)
+			CURRENT_MODE_KEY=tostring(key or"mode1")
+			CURRENT_MODE_LABEL=tostring(label or"Gameplay")
+			if modeSubtitle then
+				modeSubtitle.Text=CURRENT_MODE_LABEL.." loaded"
+			end
+			if PAGE1_APIS.GameParams and PAGE1_APIS.GameParams.Refresh then
+				pcall(PAGE1_APIS.GameParams.Refresh)
+			end
+		end,
+		onChanged=function()
+			syncPage1State()
+			requestPlayerAutosave()
+		end,
+	}
+end
+
+local function addPage1Error(parent,order,title,path)
+	local section=makeSection(parent,order,title,"module failed to load")
+	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),Text=path.." could not be loaded.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+end
+
+local function buildPage1()
+	local ctx=makePage1Ctx()
+
+	if Page1HitboxModule and Page1HitboxModule.new then
+		local ok,result=pcall(function()
+			return Page1HitboxModule.new(ctx,leftCol)
+		end)
+		if ok then PAGE1_APIS.Hitbox=result else addPage1Error(leftCol,1,"Hitbox",tostring(result)) end
+	else
+		addPage1Error(leftCol,1,"Hitbox","page-1/hitbox.lua")
+	end
+
+	if Page1GravityModule and Page1GravityModule.new then
+		local ok,result=pcall(function()
+			return Page1GravityModule.new(ctx,leftCol)
+		end)
+		if ok then PAGE1_APIS.Gravity=result else addPage1Error(leftCol,2,"Gravity",tostring(result)) end
+	else
+		addPage1Error(leftCol,2,"Gravity","page-1/gravity.lua")
+	end
+
+	if Page1SpeedModule and Page1SpeedModule.new then
+		local ok,result=pcall(function()
+			return Page1SpeedModule.new(ctx,leftCol)
+		end)
+		if ok then PAGE1_APIS.Speed=result else addPage1Error(leftCol,3,"Speed",tostring(result)) end
+	else
+		addPage1Error(leftCol,3,"Speed","page-1/speed.lua")
+	end
+
+	if Page1GameParamsModule and Page1GameParamsModule.new then
+		local ok,result=pcall(function()
+			return Page1GameParamsModule.new(ctx,rightCol)
+		end)
+		if ok then PAGE1_APIS.GameParams=result else addPage1Error(rightCol,1,"Game Params",tostring(result)) end
+	else
+		addPage1Error(rightCol,1,"Game Params","page-1/game-params.lua")
+	end
+
+	if Page1BoostModule and Page1BoostModule.new then
+		local ok,result=pcall(function()
+			return Page1BoostModule.new(ctx,rightCol)
+		end)
+		if ok then PAGE1_APIS.Boost=result else addPage1Error(rightCol,2,"Boost",tostring(result)) end
+	else
+		addPage1Error(rightCol,2,"Boost","page-1/boost.lua")
+	end
+
+	syncPage1State()
+end
+
+local function clearPage1Column(column)
+	if not column then return end
+
+	for _,child in ipairs(column:GetChildren()) do
+		if not child:IsA("UIListLayout") then
+			child:Destroy()
+		end
+	end
+end
+
+rebuildPage1FromModules=function()
+	for _,api in pairs(PAGE1_APIS) do
+		if api and api.Destroy then
+			pcall(api.Destroy)
+		end
+	end
+
+	PAGE1_APIS={}
+	clearPage1Column(leftCol)
+	clearPage1Column(rightCol)
+	buildPage1()
+
+	if updateResponsiveLayout then
+		pcall(updateResponsiveLayout)
+	end
+end
+
+buildPage1()
+
+local function resetMainPageDefaults()
+	PAGE1_STATE.hitboxOn=false
+	PAGE1_STATE.sizeX=2.52
+	PAGE1_STATE.sizeY=5.4
+	PAGE1_STATE.sizeZ=1.41
+	PAGE1_STATE.targetTransparency=0.7
+	PAGE1_STATE.gravityValue=196.2
+	PAGE1_STATE.speedEnabled=false
+	PAGE1_STATE.speedValue=18
+	PAGE1_STATE.athleticismOn=false
+	PAGE1_STATE.staminaRegenValue=12
+	PAGE1_STATE.staminaDepleteValue=8
+	PAGE1_STATE.jumpPowerValue=53.5
+	PAGE1_STATE.divePowerValue=1.9
+	PAGE1_STATE.jumpBoostOn=false
+	PAGE1_STATE.jumpBoostTradeMode=false
+	PAGE1_STATE.boostForceY=32
+	PAGE1_STATE.boostCooldown=5
+	PAGE1_STATE.boostChance=100
+	PAGE1_STATE.ballDetectionRadius=10
+	PAGE1_STATE.actionStatusOn=false
+
+	for _,api in pairs(PAGE1_APIS) do
+		if api and api.Refresh then
+			pcall(api.Refresh)
+		end
+	end
+
+	syncPage1State()
+	requestPlayerAutosave()
+end
+
+local function tintSlider(slider, color)
+	if slider.fill then slider.fill.BackgroundColor3=color end
+	if slider.knob then slider.knob.BackgroundColor3=color end
+end
+
+local StrokeColourAPI=nil
+local resetCustomizePageDefaults=function() end
+
+local function clearCustomizePage()
+	if not uiSettingsPage then return end
+
+	for _,child in ipairs(uiSettingsPage:GetChildren()) do
+		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+			child:Destroy()
+		end
+	end
+end
+
+local function buildCustomizePage()
+	if StrokeColourAPI and StrokeColourAPI.Destroy then
+		pcall(function()
+			StrokeColourAPI.Destroy()
+		end)
+	end
+
+	StrokeColourAPI=nil
+	resetCustomizePageDefaults=function() end
+
+	clearCustomizePage()
+
+	if StrokeColourModule and StrokeColourModule.new then
+		local ok,result=pcall(function()
+			return StrokeColourModule.new({
+				New=New,
+				THEME=THEME,
+				UI_STYLE=UI_STYLE,
+
+				DEFAULT_UI_STYLE={
+					StrokeR=76,
+					StrokeG=76,
+					StrokeB=76,
+
+					GradientR=45,
+					GradientG=45,
+					GradientB=45,
+
+					StrokeGradient=false,
+					LiquidStroke=false,
+
+					LiquidStrokeSpeed=1,
+					LiquidStrokeDirection="Right",
+
+					StrokeThickness=1,
+					StrokeTransparency=0.25,
+					CornerRadius=8,
+				},
+
+				SG=SG,
+
+				makeSection=makeSection,
+				buildSlider=buildSlider,
+				buildToggleRow=buildToggleRow,
+				wrapTextButton=wrapTextButton,
+
+				getUIStrokeColor=getUIStrokeColor,
+				getUIStrokeGradientColor=getUIStrokeGradientColor,
+				applyUIStrokeTheme=applyUIStrokeTheme,
+				tintSlider=tintSlider,
+
+				onChanged=function()
+					applyUIStrokeTheme()
+					requestPlayerAutosave()
+				end,
+			},uiSettingsPage)
+		end)
+
+		if ok then
+			StrokeColourAPI=result
+
+			resetCustomizePageDefaults=function()
+				if StrokeColourAPI and StrokeColourAPI.Reset then
+					StrokeColourAPI.Reset()
+				end
+			end
+		else
+			warn("Stroke colour module failed:",result)
+
+			local fallbackSection=makeSection(uiSettingsPage,1,"Stroke Colour","Remote module failed to load.")
+			New("TextLabel",{
+				BackgroundTransparency=1,
+				Size=UDim2.new(1,0,0,22),
+				Text="page-3/stroke-colour.lua failed: "..tostring(result),
+				Font=Enum.Font.Gotham,
+				TextSize=12,
+				TextColor3=THEME.RED,
+				TextXAlignment=Enum.TextXAlignment.Left,
+				ZIndex=6,
+			},fallbackSection)
+		end
+	else
+		warn("Missing remote module: page-3/stroke-colour.lua")
+
+		local fallbackSection=makeSection(uiSettingsPage,1,"Stroke Colour","Remote module failed to load.")
+		New("TextLabel",{
+			BackgroundTransparency=1,
+			Size=UDim2.new(1,0,0,22),
+			Text="Missing page-3/stroke-colour.lua",
+			Font=Enum.Font.Gotham,
+			TextSize=12,
+			TextColor3=THEME.RED,
+			TextXAlignment=Enum.TextXAlignment.Left,
+			ZIndex=6,
+		},fallbackSection)
+	end
+
+	applyUIStrokeTheme()
+
+	if updateResponsiveLayout then
+		pcall(updateResponsiveLayout)
+	end
+end
+
+rebuildCustomizeFromModules=function()
+	buildCustomizePage()
+end
+
+buildCustomizePage()
+local refreshPage2UI=function() end
+local PAGE2_EXPANDED_OWNED={}
+local WorkspaceAPI=nil
+local PlayerDataAPI=nil
+
+local function showConfirmModal(titleText, bodyText, yesText, onYes)
+	local modal=New("Frame", {BackgroundColor3=Color3.fromRGB(0, 0, 0), BackgroundTransparency=0.25, BorderSizePixel=0, Size=UDim2.new(1, 0, 1, 0), ZIndex=100}, SG)
+
+	local box=New("Frame", {AnchorPoint=Vector2.new(0.5, 0.5), Position=UDim2.new(0.5, 0, 0.5, 0), Size=UDim2.fromOffset(390, 170), BackgroundColor3=THEME.BG, BorderSizePixel=0, ZIndex=101}, modal)
+
+	New("UIStroke", {Color=THEME.STROKE, Thickness=2, Transparency=0}, box)
+
+	New("TextLabel", {BackgroundTransparency=1, Position=UDim2.fromOffset(16, 14), Size=UDim2.new(1, -32, 0, 24), Text=titleText, Font=Enum.Font.GothamMedium, TextSize=14, TextColor3=THEME.TEXT, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=102}, box)
+
+	New("TextLabel", {BackgroundTransparency=1, Position=UDim2.fromOffset(16, 48), Size=UDim2.new(1, -32, 0, 54), Text=bodyText, Font=Enum.Font.Gotham, TextSize=12, TextWrapped=true, TextColor3=THEME.MUTED, TextXAlignment=Enum.TextXAlignment.Left, TextYAlignment=Enum.TextYAlignment.Top, ZIndex=102}, box)
+
+	local function modalButton(text, x)
+		local b=New("TextButton", {Position=UDim2.fromOffset(x, 120), Size=UDim2.fromOffset(104, 30), BackgroundColor3=THEME.BG, BorderSizePixel=0, Text=text, Font=Enum.Font.Gotham, TextSize=12, TextColor3=THEME.TEXT, AutoButtonColor=false, ZIndex=102}, box)
+
+		local wrap=wrapTextButton(b, THEME.BG, 2)
+
+		b.MouseEnter:Connect(function()
+			wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+		end)
+
+		b.MouseLeave:Connect(function()
+			wrap.BackgroundColor3=THEME.PANEL
+		end)
+
+		return b
+	end
+
+	local no=modalButton("CANCEL", 160)
+	local yes=modalButton(yesText or"YES", 274)
+
+	no.MouseButton1Click:Connect(function()
+		modal:Destroy()
+	end)
+
+	yes.MouseButton1Click:Connect(function()
+		modal:Destroy()
+		if onYes then onYes() end
+	end)
+end
+
+local function refreshSettingsPage()
+	if WorkspaceAPI and WorkspaceAPI.Refresh then
+		pcall(function()
+			WorkspaceAPI.Refresh()
+		end)
+	end
+end
+
+local function buildActualSettingsPage()
+	if WORLD_SETTINGS.SmoothPlastic==nil then
+		WORLD_SETTINGS.SmoothPlastic=false
+	end
+
+	if type(WORLD_SETTINGS.OriginalMaterials)~="table" then
+		WORLD_SETTINGS.OriginalMaterials=setmetatable({}, {__mode="k"})
+	end
+
+	if WorkspaceModule and WorkspaceModule.new then
+		local ok,result=pcall(function()
+			return WorkspaceModule.new({
+				New=New,
+				THEME=THEME,
+				WORLD_SETTINGS=WORLD_SETTINGS,
+
+				makeSection=makeSection,
+				buildToggleRow=buildToggleRow,
+
+				onChanged=function(state)
+					potatoMode=state and true or false
+				end,
+			},actualSettingsPage)
+		end)
+
+		if ok then
+			WorkspaceAPI=result
+		else
+			local section=makeSection(actualSettingsPage,1,"Workspace","Remote module failed to load.")
+			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Workspace module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		end
+	else
+		local section=makeSection(actualSettingsPage,1,"Workspace","Remote module failed to load.")
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-4/workspace.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	end
+
+	if PlayerDataModule and PlayerDataModule.new then
+		local ok,result=pcall(function()
+			return PlayerDataModule.new({
+				New=New,
+				THEME=THEME,
+				SG=SG,
+				BOT_API=BOT_API,
+				playerId=tostring(me.UserId),
+				me=me,
+
+				makeSection=makeSection,
+				wrapTextButton=wrapTextButton,
+				showConfirmModal=showConfirmModal,
+
+				OWNED_PRESETS=OWNED_PRESETS,
+				expandedOwned=PAGE2_EXPANDED_OWNED,
+
+				resetMainPageDefaults=resetMainPageDefaults,
+				resetCustomizePageDefaults=resetCustomizePageDefaults,
+				refreshPage2UI=function()
+					if refreshPage2UI then refreshPage2UI() end
+				end,
+				rebuildOwnedList=function()
+					if refreshPage2UI then refreshPage2UI() end
+				end,
+				refreshSettingsPage=refreshSettingsPage,
+			},actualSettingsPage,{
+				Workspace=WorkspaceAPI,
+			})
+		end)
+
+		if ok then
+			PlayerDataAPI=result
+		else
+			local section=makeSection(actualSettingsPage,2,"Player Data","Remote module failed to load.")
+			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Player Data module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		end
+	else
+		local section=makeSection(actualSettingsPage,2,"Player Data","Remote module failed to load.")
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-4/player-data.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	end
+
+	refreshSettingsPage()
+end
+
+buildActualSettingsPage()
+
+local activeCapture=nil
+
+local function addPage2Error(parent,text)
+	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},parent)
+end
+
+local function buildPage2()
+	local page2Wrap=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=4,LayoutOrder=1},futurePage)
+
+	New("UIListLayout",{FillDirection=Enum.FillDirection.Vertical,Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},page2Wrap)
+
+	local ownedSection=makeSection(page2Wrap,1,"Hitbox Presets","Your saved presets")
+	local editorSection=makeSection(page2Wrap,2,"Preset Editor","edit hotkeys and hitbox sizes and save (maybe?)")
+	local bindSection=makeSection(page2Wrap,3,"Keybind Settings","click a bind, then press the next input")
+
+	local page2Ctx={
+		New=New,
+		THEME=THEME,
+		SG=SG,
+		PRESETS=PRESETS,
+		DEFAULT_PRESETS=DEFAULT_PRESETS,
+		OWNED_PRESETS=OWNED_PRESETS,
+		expandedOwned=PAGE2_EXPANDED_OWNED,
+		fmtNumber=fmtNumber,
+		bindingToLabel=bindingToLabel,
+		parseKeyCodeInput=parseKeyCodeInput,
+		inputToBinding=inputToBinding,
+		wrapTextButton=wrapTextButton,
+		wrapTextBox=wrapTextBox,
+		placeWrappedBox=placeWrappedBox,
+		placeWrappedButton=placeWrappedButton,
+		setWrappedButtonBg=setWrappedButtonBg,
+		makeBox=makeBox,
+		BOT_API=BOT_API,
+		playerId=tostring(me.UserId),
+		requestPlayerAutosave=requestPlayerAutosave,
+		setPresetSize=setPresetSizeFromDataSave,
+		setPresetKey=setPresetKeyFromDataSave,
+		resetPreset=resetPresetFromDataSave,
+		applyPresetEditor=applyPresetEditorFromDataSave,
+		createOwnedPreset=createOwnedPresetFromDataSave,
+		equipOwnedPreset=equipOwnedPresetFromDataSave,
+		deleteOwnedPreset=deleteOwnedPresetFromDataSave,
+		State={},
+		Bindings={
+			{label="Toggle open / hide GUI",get=function() return TOGGLE_UI_KEY end,set=function(v) TOGGLE_UI_KEY=v; requestPlayerAutosave() end},
+			{label="Hitbox Toggle",get=function() return TOGGLE_HB_KEY end,set=function(v) TOGGLE_HB_KEY=v; requestPlayerAutosave() end},
+			{label="Jump Boost Toggle",get=function() return TOGGLE_JB_KEY end,set=function(v) TOGGLE_JB_KEY=v; requestPlayerAutosave() end},
+			{label="Always Boost Toggle",get=function() return TOGGLE_AB_KEY end,set=function(v) TOGGLE_AB_KEY=v; requestPlayerAutosave() end},
+			{label="Action Status Toggle",get=function() return TOGGLE_ACTION_KEY end,set=function(v) TOGGLE_ACTION_KEY=v; requestPlayerAutosave() end},
+			{label="Speed Toggle",get=function() return TOGGLE_SPEED_KEY end,set=function(v) TOGGLE_SPEED_KEY=v; requestPlayerAutosave() end},
+		},
+	}
+
+	local hitboxPresets=nil
+	local keybindSettings=nil
+	local presetEditor=nil
+
+	if HitboxPresetModule and type(HitboxPresetModule.new)=="function" then
+		local ok,result=pcall(function()
+			return HitboxPresetModule.new(page2Ctx,ownedSection)
+		end)
+		if ok then
+			hitboxPresets=result
+		else
+			addPage2Error(ownedSection,"Hitbox Presets failed: "..tostring(result))
+		end
+	else
+		addPage2Error(ownedSection,"Missing remote module: page-2/hitbox-preset.lua")
+	end
+
+	if KeybindSettingsModule and type(KeybindSettingsModule.new)=="function" then
+		local ok,result=pcall(function()
+			return KeybindSettingsModule.new(page2Ctx,bindSection)
+		end)
+		if ok then
+			keybindSettings=result
+		else
+			addPage2Error(bindSection,"Keybind Settings failed: "..tostring(result))
+		end
+	else
+		addPage2Error(bindSection,"Missing remote module: page-2/keybind-settings.lua")
+	end
+
+	if PresetEditorModule and type(PresetEditorModule.new)=="function" then
+		if not keybindSettings then
+			addPage2Error(editorSection,"Preset Editor needs keybind-settings.lua to load first.")
+		else
+			local ok,result=pcall(function()
+				return PresetEditorModule.new(page2Ctx,editorSection,keybindSettings,hitboxPresets)
+			end)
+			if ok then
+				presetEditor=result
+			else
+				addPage2Error(editorSection,"Preset Editor failed: "..tostring(result))
+			end
+		end
+	else
+		addPage2Error(editorSection,"Missing remote module: page-2/preset-editor.lua")
+	end
+
+	refreshPage2UI=function()
+		if hitboxPresets and hitboxPresets.Refresh then pcall(hitboxPresets.Refresh) end
+		if keybindSettings and keybindSettings.Refresh then pcall(keybindSettings.Refresh) end
+		if presetEditor and presetEditor.Refresh then pcall(presetEditor.Refresh) end
+	end
+
+	local function refreshAll()
+		refreshPage2UI()
+	end
+
+	if hitboxPresets and hitboxPresets.SetRefreshAll then hitboxPresets.SetRefreshAll(refreshAll) end
+	if keybindSettings and keybindSettings.SetRefreshAll then keybindSettings.SetRefreshAll(refreshAll) end
+	if presetEditor and presetEditor.SetRefreshAll then presetEditor.SetRefreshAll(refreshAll) end
+
+	refreshPage2UI()
+end
+
+buildPage2()
+
+local footer=New("Frame", {BackgroundTransparency=1, Size=UDim2.new(1, 0, 0, 34), ZIndex=4, LayoutOrder=4}, main)
+
+New("UIListLayout", {FillDirection=Enum.FillDirection.Horizontal, Padding=UDim.new(0, 8), SortOrder=Enum.SortOrder.LayoutOrder, HorizontalAlignment=Enum.HorizontalAlignment.Right, VerticalAlignment=Enum.VerticalAlignment.Center}, footer)
+
+local actionState=New("Frame", {Size=UDim2.fromOffset(148, 30), BackgroundColor3=THEME.BG, BorderSizePixel=0, ZIndex=6}, footer)
+
+New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0}, actionState)
+
+local actionTitle=New("TextLabel", {BackgroundTransparency=1, Position=UDim2.fromOffset(8, 2), Size=UDim2.new(1, -16, 0, 12), Text="ACTION STATUS", Font=Enum.Font.Gotham, TextSize=10, TextColor3=THEME.MUTED, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=7}, actionState)
+
+local actionValue=New("TextLabel", {BackgroundTransparency=1, Position=UDim2.fromOffset(8, 14), Size=UDim2.new(1, -16, 0, 14), Text="OFF", Font=Enum.Font.Gotham, TextSize=12, TextColor3=THEME.TEXT, TextXAlignment=Enum.TextXAlignment.Left, ZIndex=7}, actionState)
+
+local function refreshActionStatus()
+	actionValue.Text=actionStatusOn and"ON" or"OFF"
+	actionState.BackgroundColor3=THEME.BG
+	actionValue.TextColor3=THEME.TEXT
+	actionTitle.TextColor3=THEME.MUTED
+end
+
+refreshActionStatus()
+
+local function makeFooterBtn(text, width)
+	local b=New("TextButton", {Size=UDim2.fromOffset(width or 96, 30), BackgroundColor3=THEME.BG, Text=string.upper(text), TextColor3=THEME.TEXT, Font=Enum.Font.Gotham, TextSize=12, AutoButtonColor=false, BorderSizePixel=0, ZIndex=6}, footer)
+
+	local wrap=wrapTextButton(b, THEME.BG, 2)
+
+	b.MouseEnter:Connect(function()
+		wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+	end)
+
+	b.MouseLeave:Connect(function()
+		wrap.BackgroundColor3=THEME.PANEL
+	end)
+
+	return b
+end
+
+local resetBtn=makeFooterBtn("Reset", 94)
+
+refreshFooterResetButton=function()
+	local showReset=activePageName~="settings"
+	resetBtn.Visible=showReset
+	resetBtn.Text="RESET"
+
+	local resetWrapEntry=BUTTON_WRAPPERS[resetBtn]
+	if resetWrapEntry and resetWrapEntry.wrap then
+		resetWrapEntry.wrap.Visible=showReset
+	end
+
+	actionState.Visible=activePageName=="main"
+end
+
+refreshFooterResetButton()
+
+local function resetKeybindPresetPageDefaults()
+	TOGGLE_UI_KEY=Enum.KeyCode.Unknown
+	TOGGLE_HB_KEY=Enum.KeyCode.Unknown
+	TOGGLE_JB_KEY=Enum.KeyCode.Unknown
+	TOGGLE_AB_KEY=Enum.KeyCode.Unknown
+	TOGGLE_ACTION_KEY=Enum.KeyCode.Unknown
+	TOGGLE_SPEED_KEY=Enum.KeyCode.Unknown
+
+	if DataSaveAPI and DataSaveAPI.ResetPresetEditor then
+		DataSaveAPI.ResetPresetEditor(true)
+	else
+		for i=1, 4 do
+			PRESETS[i].key=DEFAULT_PRESETS[i].key
+			PRESETS[i].size=DEFAULT_PRESETS[i].size
+		end
+	end
+
+	activeCapture=nil
+
+	if refreshPage2UI then
+		refreshPage2UI()
+	end
+
+	requestPlayerAutosave()
+end
+
+resetBtn.MouseButton1Click:Connect(function()
+	if activePageName=="main" then
+		resetMainPageDefaults()
+	elseif activePageName=="page2" then
+		resetKeybindPresetPageDefaults()
+	elseif activePageName=="customize" then
+		resetCustomizePageDefaults()
+	end
+
+	refreshActionStatus()
+	requestPlayerAutosave()
+end)
+
+local function shutdownTool()
+	if not toolAlive then return end
+	toolAlive=false
+
+	if SG and SG.Parent then
+		SG:Destroy()
+	end
+end
+
+closeBtn.MouseButton1Click:Connect(shutdownTool)
+
+local fab=New("TextButton", {Name="FAB", Visible=false, AutoButtonColor=false, Size=UDim2.fromOffset(42, 42), AnchorPoint=Vector2.new(1, 1), Position=UDim2.new(1, -16, 1, -16), BackgroundColor3=THEME.BG, BorderSizePixel=0, Text="□", TextColor3=THEME.TEXT, Font=Enum.Font.Gotham, TextSize=16, ZIndex=20}, SG)
+
+New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0}, fab)
+attachHover(fab, THEME.BG, THEME.TEXT, THEME.TEXT, Color3.fromRGB(0, 0, 0))
+
+local resizeHandle=New("TextButton", {Name="ResizeHandle", AutoButtonColor=false, Size=UDim2.fromOffset(10, 10), AnchorPoint=Vector2.new(0, 1), Position=UDim2.new(0, 3, 1, -3), BackgroundColor3=THEME.BG, BorderSizePixel=0, Text="◣", TextColor3=THEME.TEXT, Font=Enum.Font.Gotham, TextSize=8, ZIndex=30}, root)
+
+New("UIStroke", {Color=THEME.STROKE, Thickness=1, Transparency=0}, resizeHandle)
+
+do
+	local resizing=false
+	local startMouse=nil
+	local startW, startH=0, 0
+	local startPos=nil
+	local resizeMoveConn=nil
+
+	local function stopResize()
+		resizing=false
+		safeDisconnect(resizeMoveConn)
+		resizeMoveConn=nil
+	end
+
+	resizeHandle.InputBegan:Connect(function(input)
+		if input.UserInputType~=Enum.UserInputType.MouseButton1 then return end
+
+		resizing=true
+		startMouse=UIS:GetMouseLocation()
+		startW, startH=UI_WINDOW.W, UI_WINDOW.H
+		startPos=root.Position
+
+		safeDisconnect(resizeMoveConn)
+
+		resizeMoveConn=UIS.InputChanged:Connect(function(changed)
+			if not resizing or not toolAlive then return end
+			if changed.UserInputType~=Enum.UserInputType.MouseMovement then return end
+
+			local cur=UIS:GetMouseLocation()
+			local scale=uiScale.Scale
+			if scale<=0 then scale=1 end
+
+			local dx=(cur.X-startMouse.X)/scale
+			local dy=(cur.Y-startMouse.Y)/scale
+
+			UI_WINDOW.W=math.clamp(startW-dx, UI_WINDOW.MinW, UI_WINDOW.MaxW)
+			UI_WINDOW.H=math.clamp(startH+dy, UI_WINDOW.MinH, UI_WINDOW.MaxH)
+
+			local usedDx=startW-UI_WINDOW.W
+			root.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+(usedDx*0.5),startPos.Y.Scale,startPos.Y.Offset)
+			syncRootShadow()
+
+			if updateResponsiveLayout then
+				updateResponsiveLayout()
+			end
+		end)
+	end)
+
+	UIS.InputEnded:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseButton1 then
+			stopResize()
+		end
+	end)
+end
+
+local function setBodyVisible(visible)
+	pageBar.Visible=visible
+	pageHost.Visible=visible
+	footer.Visible=visible
+	resizeHandle.Visible=visible
+end
+
+local function minimize()
+	if uiMinimized then return end
+	uiMinimized=true
+	fab.Visible=false
+	miniBtn.Text="+"
+	root.Visible=true
+	setBodyVisible(true)
+
+	local tween=tweenRootSize(UDim2.fromOffset(UI_WINDOW.W,MINIMIZED_ROOT_H),0.22)
+	tween.Completed:Connect(function()
+		if uiMinimized then
+			setBodyVisible(false)
+			syncRootShadow()
+		end
+	end)
+end
+
+local function restore()
+	if not uiMinimized then return end
+	uiMinimized=false
+	fab.Visible=false
+	miniBtn.Text="-"
+	root.Visible=true
+	setBodyVisible(true)
+	tweenRootSize(UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),0.22)
+	syncRootShadow()
+end
+
+miniBtn.MouseButton1Click:Connect(function()
+	if uiMinimized then
+		restore()
+	else
+		minimize()
+	end
+end)
+fab.MouseButton1Click:Connect(restore)
+
+do
+	local dragging=false
+	local startMouse, startPos
+	local lastDragTween=0
+	local lastDragTarget=nil
+
+	header.InputBegan:Connect(function(i)
+		if i.UserInputType==Enum.UserInputType.MouseButton1 then
+			dragging=true
+			startMouse=UIS:GetMouseLocation()
+			startPos=root.Position
+			lastDragTween=0
+			lastDragTarget=nil
+			if rootPositionTween then
+				rootPositionTween:Cancel()
+				rootPositionTween=nil
+			end
+		end
+	end)
+
+	UIS.InputEnded:Connect(function(i)
+		if i.UserInputType==Enum.UserInputType.MouseButton1 then
+			dragging=false
+		end
+	end)
+
+	RunService.RenderStepped:Connect(function()
+		if not toolAlive or not dragging then return end
+
+		local cur=UIS:GetMouseLocation()
+		local scale=uiScale.Scale
+		if scale<=0 then scale=1 end
+
+		local delta=(cur-startMouse)/scale
+		local target=UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,startPos.Y.Scale,startPos.Y.Offset+delta.Y)
+		local now=os.clock()
+
+		if not lastDragTarget or math.abs(target.X.Offset-lastDragTarget.X.Offset)>1 or math.abs(target.Y.Offset-lastDragTarget.Y.Offset)>1 then
+			if now-lastDragTween>=0.025 then
+				lastDragTween=now
+				lastDragTarget=target
+				tweenRootPosition(target,0.075)
+			end
+		end
+	end)
+end
+
+local function applyHitboxPreset(index)
+	local preset=PRESETS[index]
+	if not preset or not preset.size then return end
+
+	local size=preset.size
+	PAGE1_STATE.sizeX=size.X
+	PAGE1_STATE.sizeY=size.Y
+	PAGE1_STATE.sizeZ=size.Z
+
+	if PAGE1_APIS.Hitbox and PAGE1_APIS.Hitbox.SetHitboxSize then
+		pcall(function()
+			PAGE1_APIS.Hitbox.SetHitboxSize(size.X,size.Y,size.Z,true)
+		end)
+	elseif PAGE1_APIS.Hitbox and PAGE1_APIS.Hitbox.Refresh then
+		syncPage1State()
+		pcall(PAGE1_APIS.Hitbox.Refresh)
+		requestPlayerAutosave()
+	else
+		syncPage1State()
+		requestPlayerAutosave()
+	end
+end
+
+UIS.InputBegan:Connect(function(inp, processed)
+	if activeCapture then
+		local cap=activeCapture
+
+		if inp.KeyCode==Enum.KeyCode.Escape then
+			activeCapture=nil
+			if refreshPage2UI then refreshPage2UI() end
+			return
+		end
+
+		local binding=inputToBinding(inp)
+		if binding~=nil then
+			cap.setter(binding)
+		end
+
+		activeCapture=nil
+
+		if refreshPage2UI then
+			refreshPage2UI()
+		end
+
+		return
+	end
+
+	if processed then return end
+
+	local bind=inputToBinding(inp)
+	if bind~=nil and bind==TOGGLE_UI_KEY and TOGGLE_UI_KEY~=Enum.KeyCode.Unknown then
+		setUIVisible(not uiVisible)
+	end
+
+	if bind~=nil then
+		for i,preset in ipairs(PRESETS) do
+			if preset.key and preset.key~=Enum.KeyCode.Unknown and bind==preset.key then
+				applyHitboxPreset(i)
+				break
+			end
+		end
+	end
+end)
+
+local function getPersistentValue(name,default)
+	if name=="CURRENT_MODE_KEY" then return CURRENT_MODE_KEY end
+	if name=="CURRENT_MODE_LABEL" then return CURRENT_MODE_LABEL end
+	if PAGE1_STATE[name]~=nil then return PAGE1_STATE[name] end
+	if name=="TOGGLE_UI_KEY" then return TOGGLE_UI_KEY end
+	if name=="TOGGLE_HB_KEY" then return TOGGLE_HB_KEY end
+	if name=="TOGGLE_JB_KEY" then return TOGGLE_JB_KEY end
+	if name=="TOGGLE_AB_KEY" then return TOGGLE_AB_KEY end
+	if name=="TOGGLE_ACTION_KEY" then return TOGGLE_ACTION_KEY end
+	if name=="TOGGLE_SPEED_KEY" then return TOGGLE_SPEED_KEY end
+	return default
+end
+
+local function setPersistentValue(name,value)
+	if name=="CURRENT_MODE_KEY" then CURRENT_MODE_KEY=tostring(value or "mode1") return end
+	if name=="CURRENT_MODE_LABEL" then CURRENT_MODE_LABEL=tostring(value or "Gameplay") return end
+	if PAGE1_STATE[name]~=nil then PAGE1_STATE[name]=value; syncPage1State(); return end
+	if name=="TOGGLE_UI_KEY" then TOGGLE_UI_KEY=value return end
+	if name=="TOGGLE_HB_KEY" then TOGGLE_HB_KEY=value return end
+	if name=="TOGGLE_JB_KEY" then TOGGLE_JB_KEY=value return end
+	if name=="TOGGLE_AB_KEY" then TOGGLE_AB_KEY=value return end
+	if name=="TOGGLE_ACTION_KEY" then TOGGLE_ACTION_KEY=value return end
+	if name=="TOGGLE_SPEED_KEY" then TOGGLE_SPEED_KEY=value return end
+end
+
+local function refreshAllUI()
+	for _,api in pairs(PAGE1_APIS) do
+		if api and api.Refresh then pcall(api.Refresh) end
+	end
+
+	syncPage1State()
+
+	if StrokeColourAPI and StrokeColourAPI.Refresh then pcall(StrokeColourAPI.Refresh) end
+	if WorkspaceAPI and WorkspaceAPI.Refresh then pcall(WorkspaceAPI.Refresh) end
+	if refreshPage2UI then pcall(refreshPage2UI) end
+	if applyUIStrokeTheme then pcall(applyUIStrokeTheme) end
+	if updateResponsiveLayout then pcall(updateResponsiveLayout) end
+	if refreshActionStatus then pcall(refreshActionStatus) end
+end
+
+if DataSaveModule and DataSaveModule.new then
+	local ok,result=pcall(function()
+		return DataSaveModule.new({
+			BOT_API=BOT_API,
+			me=me,
+			playerId=tostring(me.UserId),
+			toolAlive=toolAlive,
+
+			State=PAGE1_STATE,
+			Get=getPersistentValue,
+			Set=setPersistentValue,
+
+			PRESETS=PRESETS,
+			DEFAULT_PRESETS=DEFAULT_PRESETS,
+			OWNED_PRESETS=OWNED_PRESETS,
+			expandedOwned=PAGE2_EXPANDED_OWNED,
+
+			UI_STYLE=UI_STYLE,
+			UI_WINDOW=UI_WINDOW,
+			WORLD_SETTINGS=WORLD_SETTINGS,
+			root=root,
+
+			RefreshAll=refreshAllUI,
+			refreshPage2UI=function() if refreshPage2UI then refreshPage2UI() end end,
+			rebuildOwnedList=function() if refreshPage2UI then refreshPage2UI() end end,
+			refreshSettingsPage=refreshSettingsPage,
+			applyUIStrokeTheme=applyUIStrokeTheme,
+			updateResponsiveLayout=updateResponsiveLayout,
+			refreshActionStatus=refreshActionStatus,
+
+			setHitboxSize=function(x,y,z) PAGE1_STATE.sizeX=x; PAGE1_STATE.sizeY=y; PAGE1_STATE.sizeZ=z; syncPage1State() end,
+			setTransparency=function(v) PAGE1_STATE.targetTransparency=v; syncPage1State() end,
+			setGravity=function(v) PAGE1_STATE.gravityValue=v; syncPage1State() end,
+			setHitboxLock=function(v) PAGE1_STATE.hitboxOn=v and true or false; syncPage1State() end,
+			setSpeedValue=function(v) PAGE1_STATE.speedValue=v; syncPage1State() end,
+			setSpeedState=function(v) PAGE1_STATE.speedEnabled=v and true or false; syncPage1State() end,
+			setAthleticism=function(v) PAGE1_STATE.athleticismOn=v and true or false; syncPage1State() end,
+			setStaminaRegenValue=function(v) PAGE1_STATE.staminaRegenValue=v; syncPage1State() end,
+			setStaminaDepleteValue=function(v) PAGE1_STATE.staminaDepleteValue=v; syncPage1State() end,
+			setJumpPowerValue=function(v) PAGE1_STATE.jumpPowerValue=v; syncPage1State() end,
+			setDivePowerValue=function(v) PAGE1_STATE.divePowerValue=v; syncPage1State() end,
+			setJumpBoostState=function(v) PAGE1_STATE.jumpBoostOn=v and true or false; syncPage1State() end,
+		})
+	end)
+
+	if ok then
+		DataSaveAPI=result
+	else
+		warn("DataSave module failed:",result)
+	end
+else
+	warn("Missing remote module: data-save/data-save.lua")
+end
+
+if DataSaveAPI then
+	pcall(function()
+		DataSaveAPI.Load()
+		DataSaveAPI.LoadOwnedPresets()
+	end)
+	refreshAllUI()
+end
+
+setActivePage("main")
+applyUIStrokeTheme()
+refreshAllUI()
+refreshActionStatus()
+modeSubtitle.Text=CURRENT_MODE_LABEL.." loaded"
+startAutoRefresh()
