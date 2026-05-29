@@ -23,81 +23,66 @@ local DEFAULTS={
 	CornerRadius=0,
 }
 
-local LIQUID_DIRECTIONS={
-	{Key="Right",Label="RIGHT"},
-	{Key="Left",Label="LEFT"},
-	{Key="Down",Label="DOWN"},
-	{Key="Up",Label="UP"},
-	{Key="SpinCW",Label="SPIN"},
-	{Key="SpinCCW",Label="REV"},
-}
-
 local THEME_PRESETS={
 	{
-		Name="ICE",
-		Main=Color3.fromRGB(0,255,255),
-		Second=Color3.fromRGB(255,255,255),
-		Liquid=true,
-		Speed=1.2,
-		Direction="Right",
-		Thickness=2,
-		Transparency=0,
-		Radius=0,
-	},
-	{
-		Name="VOID",
-		Main=Color3.fromRGB(180,80,255),
-		Second=Color3.fromRGB(0,255,255),
-		Liquid=true,
-		Speed=1.6,
-		Direction="SpinCW",
-		Thickness=2,
-		Transparency=0,
-		Radius=4,
-	},
-	{
-		Name="RUBY",
-		Main=Color3.fromRGB(255,45,75),
-		Second=Color3.fromRGB(255,170,0),
-		Liquid=true,
-		Speed=1.1,
-		Direction="Right",
-		Thickness=2,
-		Transparency=0,
-		Radius=0,
-	},
-	{
-		Name="EMERALD",
-		Main=Color3.fromRGB(0,255,130),
-		Second=Color3.fromRGB(0,150,255),
-		Liquid=true,
-		Speed=1,
-		Direction="Down",
-		Thickness=2,
-		Transparency=0,
-		Radius=4,
-	},
-	{
-		Name="GOLD",
-		Main=Color3.fromRGB(255,220,80),
-		Second=Color3.fromRGB(255,120,0),
-		Liquid=true,
-		Speed=0.8,
-		Direction="Left",
-		Thickness=2,
-		Transparency=0,
-		Radius=0,
-	},
-	{
 		Name="CLEAN",
-		Main=Color3.fromRGB(255,255,255),
-		Second=Color3.fromRGB(130,130,130),
-		Liquid=false,
+		Main=Color3.fromRGB(76,76,76),
+		Second=Color3.fromRGB(45,45,45),
+		Gradient=false,
+		Pulse=false,
 		Speed=0,
-		Direction="Right",
 		Thickness=1,
+		Transparency=0.25,
+	},
+	{
+		Name="FOCUS",
+		Main=Color3.fromRGB(32,202,106),
+		Second=Color3.fromRGB(21,103,251),
+		Gradient=true,
+		Pulse=false,
+		Speed=0,
+		Thickness=2,
+		Transparency=0.05,
+	},
+	{
+		Name="CALM",
+		Main=Color3.fromRGB(120,170,255),
+		Second=Color3.fromRGB(195,195,195),
+		Gradient=true,
+		Pulse=true,
+		Speed=0.45,
+		Thickness=2,
+		Transparency=0.1,
+	},
+	{
+		Name="SHARP",
+		Main=Color3.fromRGB(240,240,240),
+		Second=Color3.fromRGB(240,240,240),
+		Gradient=false,
+		Pulse=false,
+		Speed=0,
+		Thickness=2.5,
 		Transparency=0,
-		Radius=0,
+	},
+	{
+		Name="DIM",
+		Main=Color3.fromRGB(95,95,95),
+		Second=Color3.fromRGB(150,150,150),
+		Gradient=false,
+		Pulse=false,
+		Speed=0,
+		Thickness=1,
+		Transparency=0.45,
+	},
+	{
+		Name="ALERT",
+		Main=Color3.fromRGB(254,94,86),
+		Second=Color3.fromRGB(255,190,80),
+		Gradient=true,
+		Pulse=true,
+		Speed=0.65,
+		Thickness=2,
+		Transparency=0.08,
 	},
 }
 
@@ -132,7 +117,7 @@ local function ensureStyleDefaults(style)
 	style.StrokeGradient=boolOrDefault(style.StrokeGradient,DEFAULTS.StrokeGradient)
 	style.LiquidStroke=boolOrDefault(style.LiquidStroke,DEFAULTS.LiquidStroke)
 
-	style.LiquidStrokeSpeed=math.clamp(numberOrDefault(style.LiquidStrokeSpeed,DEFAULTS.LiquidStrokeSpeed),0,5)
+	style.LiquidStrokeSpeed=math.clamp(numberOrDefault(style.LiquidStrokeSpeed,DEFAULTS.LiquidStrokeSpeed),0,2)
 	style.LiquidStrokeDirection=tostring(style.LiquidStrokeDirection or DEFAULTS.LiquidStrokeDirection)
 
 	style.StrokeThickness=math.clamp(numberOrDefault(style.StrokeThickness,DEFAULTS.StrokeThickness),0,8)
@@ -155,7 +140,7 @@ local function copyDefaultStyle(style)
 		StrokeGradient=boolOrDefault(style.StrokeGradient,DEFAULTS.StrokeGradient),
 		LiquidStroke=boolOrDefault(style.LiquidStroke,DEFAULTS.LiquidStroke),
 
-		LiquidStrokeSpeed=math.clamp(numberOrDefault(style.LiquidStrokeSpeed,DEFAULTS.LiquidStrokeSpeed),0,5),
+		LiquidStrokeSpeed=math.clamp(numberOrDefault(style.LiquidStrokeSpeed,DEFAULTS.LiquidStrokeSpeed),0,2),
 		LiquidStrokeDirection=tostring(style.LiquidStrokeDirection or DEFAULTS.LiquidStrokeDirection),
 
 		StrokeThickness=math.clamp(numberOrDefault(style.StrokeThickness,DEFAULTS.StrokeThickness),0,8),
@@ -202,13 +187,13 @@ function StrokeColour.new(ctx,page)
 	local api={}
 	local rSlider,gSlider,bSlider
 	local grSlider,ggSlider,gbSlider
-	local speedSlider,thicknessSlider,transparencySlider,radiusSlider
+	local speedSlider,thicknessSlider,transparencySlider
 	local gradientToggle,liquidToggle
 	local previewBox,previewStroke
 	local colourTweenToken=0
 	local liquidConn=nil
 	local liquidClock=0
-	local directionButtons={}
+	local updatePreview=nil
 
 	local function getUIStrokeColor()
 		if ctx.getUIStrokeColor then
@@ -237,61 +222,35 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function setGradientColors(grad,c1,c2)
-		if UI_STYLE.LiquidStroke then
-			grad.Color=ColorSequence.new({
-				ColorSequenceKeypoint.new(0,c1),
-				ColorSequenceKeypoint.new(0.45,c2),
-				ColorSequenceKeypoint.new(0.55,c2),
-				ColorSequenceKeypoint.new(1,c1),
-			})
-		else
-			grad.Color=ColorSequence.new({
-				ColorSequenceKeypoint.new(0,c1),
-				ColorSequenceKeypoint.new(1,c2),
-			})
-		end
+		grad.Offset=Vector2.new(0,0)
+		grad.Rotation=0
+		grad.Color=ColorSequence.new({
+			ColorSequenceKeypoint.new(0,c1),
+			ColorSequenceKeypoint.new(1,c2),
+		})
 	end
 
-	local function applyLiquidMotionToGradient(grad)
-		if not grad then return end
+	local function getPulseAlpha()
+		if not UI_STYLE.LiquidStroke then
+			return 0
+		end
+
+		return (math.sin(liquidClock*math.pi*2)+1)*0.5
+	end
+
+	local function getPulseColor()
+		local c1=getUIStrokeColor()
+		local c2=getUIStrokeGradientColor()
 
 		if not UI_STYLE.LiquidStroke then
-			grad.Offset=Vector2.new(0,0)
-			grad.Rotation=0
-			return
+			return c1
 		end
 
-		local direction=tostring(UI_STYLE.LiquidStrokeDirection or "Right")
-		local wave=(liquidClock%2)-1
+		return c1:Lerp(c2,0.18+(getPulseAlpha()*0.26))
+	end
 
-		if direction=="Right" then
-			grad.Rotation=0
-			grad.Offset=Vector2.new(wave,0)
-
-		elseif direction=="Left" then
-			grad.Rotation=0
-			grad.Offset=Vector2.new(-wave,0)
-
-		elseif direction=="Down" then
-			grad.Rotation=90
-			grad.Offset=Vector2.new(0,wave)
-
-		elseif direction=="Up" then
-			grad.Rotation=90
-			grad.Offset=Vector2.new(0,-wave)
-
-		elseif direction=="SpinCW" then
-			grad.Offset=Vector2.new(0,0)
-			grad.Rotation=(liquidClock*180)%360
-
-		elseif direction=="SpinCCW" then
-			grad.Offset=Vector2.new(0,0)
-			grad.Rotation=(-liquidClock*180)%360
-
-		else
-			grad.Rotation=0
-			grad.Offset=Vector2.new(wave,0)
-		end
+	local function isTextObject(obj)
+		return obj and (obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox"))
 	end
 
 	local function stopLiquidAnimation()
@@ -321,18 +280,19 @@ function StrokeColour.new(ctx,page)
 			liquidClock=liquidClock+(dt*(tonumber(UI_STYLE.LiquidStrokeSpeed) or 1))
 
 			if not externalThemeApplier then
+				local pulseColor=getPulseColor()
+				local pulseTransparency=math.clamp(UI_STYLE.StrokeTransparency+(getPulseAlpha()*0.08),0,1)
+
 				for _,obj in ipairs(SG:GetDescendants()) do
-					if obj:IsA("UIGradient") and obj.Name=="StrokeGradient" then
-						applyLiquidMotionToGradient(obj)
+					if obj:IsA("UIStroke") and not isTextObject(obj.Parent) then
+						obj.Color=pulseColor
+						obj.Transparency=pulseTransparency
 					end
 				end
 			end
 
-			if previewBox then
-				local grad=previewBox:FindFirstChild("PreviewGradient")
-				if grad then
-					applyLiquidMotionToGradient(grad)
-				end
+			if updatePreview then
+				updatePreview()
 			end
 		end)
 	end
@@ -355,34 +315,41 @@ function StrokeColour.new(ctx,page)
 
 			if SG then
 				for _,obj in ipairs(SG:GetDescendants()) do
-					if obj:IsA("UIStroke") then
-						obj.Color=color
-						obj.Thickness=UI_STYLE.StrokeThickness
-						obj.Transparency=UI_STYLE.StrokeTransparency
+					if isTextObject(obj) then
+						obj.TextStrokeTransparency=1
 
-						pcall(function()
-							obj.LineJoinMode=Enum.LineJoinMode.Round
-						end)
-
+					elseif obj:IsA("UIStroke") then
+						local textParent=isTextObject(obj.Parent)
 						local gradient=obj:FindFirstChild("StrokeGradient")
 
-						if UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke then
-							if not gradient then
-								gradient=Instance.new("UIGradient")
-								gradient.Name="StrokeGradient"
-								gradient.Parent=obj
-							end
-
-							setGradientColors(gradient,color,color2)
-							applyLiquidMotionToGradient(gradient)
-						else
+						if textParent then
 							if gradient then
 								gradient:Destroy()
 							end
-						end
+							obj.Color=Color3.fromRGB(76,76,76)
+						else
+							obj.Color=UI_STYLE.LiquidStroke and getPulseColor() or color
+							obj.Thickness=UI_STYLE.StrokeThickness
+							obj.Transparency=UI_STYLE.StrokeTransparency
 
-					elseif obj:IsA("UICorner") then
-						obj.CornerRadius=UDim.new(0,UI_STYLE.CornerRadius)
+							pcall(function()
+								obj.LineJoinMode=Enum.LineJoinMode.Round
+							end)
+
+							if UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke then
+								if not gradient then
+									gradient=Instance.new("UIGradient")
+									gradient.Name="StrokeGradient"
+									gradient.Parent=obj
+								end
+
+								setGradientColors(gradient,color,color2)
+							else
+								if gradient then
+									gradient:Destroy()
+								end
+							end
+						end
 					end
 				end
 			end
@@ -399,7 +366,7 @@ function StrokeColour.new(ctx,page)
 		end
 	end
 
-	local function updatePreview()
+	updatePreview=function()
 		if not previewBox then return end
 
 		local c1=getUIStrokeColor()
@@ -408,14 +375,9 @@ function StrokeColour.new(ctx,page)
 		previewBox.BackgroundColor3=c1
 
 		if previewStroke then
-			previewStroke.Color=c1
+			previewStroke.Color=getPulseColor()
 			previewStroke.Thickness=UI_STYLE.StrokeThickness
-			previewStroke.Transparency=UI_STYLE.StrokeTransparency
-		end
-
-		local corner=previewBox:FindFirstChildOfClass("UICorner")
-		if corner then
-			corner.CornerRadius=UDim.new(0,UI_STYLE.CornerRadius)
+			previewStroke.Transparency=math.clamp(UI_STYLE.StrokeTransparency+(getPulseAlpha()*0.08),0,1)
 		end
 
 		local grad=previewBox:FindFirstChild("PreviewGradient")
@@ -428,7 +390,6 @@ function StrokeColour.new(ctx,page)
 			end
 
 			setGradientColors(grad,c1,c2)
-			applyLiquidMotionToGradient(grad)
 		else
 			if grad then
 				grad:Destroy()
@@ -453,20 +414,6 @@ function StrokeColour.new(ctx,page)
 		writeColorToStyle(UI_STYLE,"Gradient",c)
 	end
 
-	local function refreshDirectionButtons()
-		for _,entry in ipairs(directionButtons) do
-			local selected=entry.Key==UI_STYLE.LiquidStrokeDirection
-
-			if entry.Wrap then
-				entry.Wrap.BackgroundColor3=selected and THEME.TEXT or THEME.BG
-			end
-
-			if entry.Button then
-				entry.Button.TextColor3=selected and THEME.BG or THEME.TEXT
-			end
-		end
-	end
-
 	local function syncColourControls()
 		if rSlider then rSlider.set(UI_STYLE.StrokeR) end
 		if gSlider then gSlider.set(UI_STYLE.StrokeG) end
@@ -479,7 +426,6 @@ function StrokeColour.new(ctx,page)
 		if speedSlider then speedSlider.set(UI_STYLE.LiquidStrokeSpeed) end
 		if thicknessSlider then thicknessSlider.set(UI_STYLE.StrokeThickness) end
 		if transparencySlider then transparencySlider.set(UI_STYLE.StrokeTransparency) end
-		if radiusSlider then radiusSlider.set(UI_STYLE.CornerRadius) end
 
 		if gradientToggle then gradientToggle.set(UI_STYLE.StrokeGradient) end
 		if liquidToggle then liquidToggle.set(UI_STYLE.LiquidStroke) end
@@ -495,9 +441,6 @@ function StrokeColour.new(ctx,page)
 		tintSlider(speedSlider,THEME.TEXT)
 		tintSlider(thicknessSlider,THEME.TEXT)
 		tintSlider(transparencySlider,THEME.TEXT)
-		tintSlider(radiusSlider,THEME.TEXT)
-
-		refreshDirectionButtons()
 	end
 
 	local function tweenStyleTo(c1,c2,gradientEnabled)
@@ -546,56 +489,16 @@ function StrokeColour.new(ctx,page)
 		t2:Play()
 	end
 
-	local function makeSmallButton(parent,text,width,onClick)
-		local btn=New("TextButton",{
-			Size=UDim2.fromOffset(width or 54,24),
-			BackgroundColor3=THEME.BG,
-			BorderSizePixel=0,
-			Text=text,
-			Font=Enum.Font.Gotham,
-			TextSize=10,
-			TextColor3=THEME.TEXT,
-			AutoButtonColor=false,
-			ZIndex=6,
-		},parent)
-
-		local wrap=wrapTextButton(btn,THEME.BG,1)
-
-		btn.MouseEnter:Connect(function()
-			if wrap.BackgroundColor3~=THEME.TEXT then
-				wrap.BackgroundColor3=Color3.fromRGB(35,35,35)
-			end
-		end)
-
-		btn.MouseLeave:Connect(function()
-			refreshDirectionButtons()
-			if wrap.BackgroundColor3~=THEME.TEXT then
-				wrap.BackgroundColor3=THEME.BG
-			end
-		end)
-
-		btn.MouseButton1Click:Connect(onClick)
-
-		return btn,wrap
-	end
-
 	local function applyThemePreset(preset)
-		UI_STYLE.StrokeGradient=true
-		UI_STYLE.LiquidStroke=preset.Liquid and true or false
-		UI_STYLE.LiquidStrokeSpeed=math.clamp(tonumber(preset.Speed) or 1,0,5)
-		UI_STYLE.LiquidStrokeDirection=tostring(preset.Direction or "Right")
+		UI_STYLE.StrokeGradient=preset.Gradient and true or false
+		UI_STYLE.LiquidStroke=preset.Pulse and true or false
+		UI_STYLE.LiquidStrokeSpeed=math.clamp(tonumber(preset.Speed) or 0,0,2)
+		UI_STYLE.LiquidStrokeDirection="Right"
 		UI_STYLE.StrokeThickness=math.clamp(tonumber(preset.Thickness) or 2,0,8)
 		UI_STYLE.StrokeTransparency=math.clamp(tonumber(preset.Transparency) or 0,0,1)
-		UI_STYLE.CornerRadius=math.clamp(tonumber(preset.Radius) or 0,0,24)
-
-		local gradientEnabled=true
-
-		if not UI_STYLE.LiquidStroke and preset.Second==nil then
-			gradientEnabled=false
-		end
 
 		syncColourControls()
-		tweenStyleTo(preset.Main,preset.Second or preset.Main,gradientEnabled)
+		tweenStyleTo(preset.Main,preset.Second or preset.Main,UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke)
 	end
 
 	function api.Refresh()
@@ -669,12 +572,40 @@ function StrokeColour.new(ctx,page)
 		end
 	end
 
+	local function buildPage3Slider(parent,titleText,shortLabel,minVal,maxVal,startVal,decimals,onChange)
+		local row=New("Frame",{
+			BackgroundTransparency=1,
+			Size=UDim2.new(1,0,0,54),
+			ZIndex=5,
+		},parent)
+
+		New("TextLabel",{
+			BackgroundTransparency=1,
+			Size=UDim2.new(1,0,0,18),
+			Text=titleText,
+			Font=Enum.Font.GothamMedium,
+			TextSize=12,
+			TextColor3=THEME.MUTED,
+			TextXAlignment=Enum.TextXAlignment.Left,
+			ZIndex=6,
+		},row)
+
+		local sliderHost=New("Frame",{
+			BackgroundTransparency=1,
+			Position=UDim2.fromOffset(0,20),
+			Size=UDim2.new(1,0,0,32),
+			ZIndex=5,
+		},row)
+
+		return buildSlider(sliderHost,shortLabel,minVal,maxVal,startVal,decimals,onChange)
+	end
+
 	clearPage()
 
 	local presetSection=makeSection(page,1,"Customisation","Live preview and quick styles.")
 	local colourSection=makeSection(page,2,"Colours","Tune the base stroke and gradient endpoint.")
-	local motionSection=makeSection(page,3,"Liquid Motion","Animate the gradient and choose its flow direction.")
-	local shapeSection=makeSection(page,4,"Border Shape","Control thickness, transparency, and corner radius.")
+	local motionSection=makeSection(page,3,"Pulse Accent","A slow accent pulse. No moving stroke effects.")
+	local shapeSection=makeSection(page,4,"Border Shape","Control border weight and opacity.")
 
 	local previewRow=New("Frame",{
 		BackgroundTransparency=1,
@@ -701,7 +632,7 @@ function StrokeColour.new(ctx,page)
 		ZIndex=6,
 	},previewRow)
 
-	New("UICorner",{CornerRadius=UDim.new(0,UI_STYLE.CornerRadius)},previewBox)
+	New("UICorner",{CornerRadius=UDim.new(0,4)},previewBox)
 
 	previewStroke=New("UIStroke",{
 		Color=getUIStrokeColor(),
@@ -784,19 +715,19 @@ function StrokeColour.new(ctx,page)
 		ZIndex=6,
 	},colourSection)
 
-	rSlider=buildSlider(colourSection,"R",0,255,UI_STYLE.StrokeR,0,function(v)
+	rSlider=buildPage3Slider(colourSection,"Main red","R",0,255,UI_STYLE.StrokeR,0,function(v)
 		UI_STYLE.StrokeR=v
 		tintSlider(rSlider,Color3.fromRGB(v,0,0))
 		updateEverything()
 	end)
 
-	gSlider=buildSlider(colourSection,"G",0,255,UI_STYLE.StrokeG,0,function(v)
+	gSlider=buildPage3Slider(colourSection,"Main green","G",0,255,UI_STYLE.StrokeG,0,function(v)
 		UI_STYLE.StrokeG=v
 		tintSlider(gSlider,Color3.fromRGB(0,v,0))
 		updateEverything()
 	end)
 
-	bSlider=buildSlider(colourSection,"B",0,255,UI_STYLE.StrokeB,0,function(v)
+	bSlider=buildPage3Slider(colourSection,"Main blue","B",0,255,UI_STYLE.StrokeB,0,function(v)
 		UI_STYLE.StrokeB=v
 		tintSlider(bSlider,Color3.fromRGB(0,0,v))
 		updateEverything()
@@ -866,19 +797,19 @@ function StrokeColour.new(ctx,page)
 		ZIndex=6,
 	},colourSection)
 
-	grSlider=buildSlider(colourSection,"R2",0,255,UI_STYLE.GradientR,0,function(v)
+	grSlider=buildPage3Slider(colourSection,"Gradient red","R2",0,255,UI_STYLE.GradientR,0,function(v)
 		UI_STYLE.GradientR=v
 		tintSlider(grSlider,Color3.fromRGB(v,0,0))
 		updateEverything()
 	end)
 
-	ggSlider=buildSlider(colourSection,"G2",0,255,UI_STYLE.GradientG,0,function(v)
+	ggSlider=buildPage3Slider(colourSection,"Gradient green","G2",0,255,UI_STYLE.GradientG,0,function(v)
 		UI_STYLE.GradientG=v
 		tintSlider(ggSlider,Color3.fromRGB(0,v,0))
 		updateEverything()
 	end)
 
-	gbSlider=buildSlider(colourSection,"B2",0,255,UI_STYLE.GradientB,0,function(v)
+	gbSlider=buildPage3Slider(colourSection,"Gradient blue","B2",0,255,UI_STYLE.GradientB,0,function(v)
 		UI_STYLE.GradientB=v
 		tintSlider(gbSlider,Color3.fromRGB(0,0,v))
 		updateEverything()
@@ -955,7 +886,7 @@ function StrokeColour.new(ctx,page)
 		updateEverything()
 	end)
 
-	liquidToggle=buildToggleRow(motionSection,"Liquid Stroke",UI_STYLE.LiquidStroke,function(state)
+	liquidToggle=buildToggleRow(motionSection,"Pulse Accent",UI_STYLE.LiquidStroke,function(state)
 		UI_STYLE.LiquidStroke=state and true or false
 
 		if state then
@@ -968,58 +899,15 @@ function StrokeColour.new(ctx,page)
 		updateEverything()
 	end)
 
-	speedSlider=buildSlider(motionSection,"Liquid Speed",0,5,UI_STYLE.LiquidStrokeSpeed,2,function(v)
-		UI_STYLE.LiquidStrokeSpeed=math.clamp(tonumber(v) or 0,0,5)
+	speedSlider=buildPage3Slider(motionSection,"Pulse speed","SPD",0,2,math.clamp(UI_STYLE.LiquidStrokeSpeed,0,2),2,function(v)
+		UI_STYLE.LiquidStrokeSpeed=math.clamp(tonumber(v) or 0,0,2)
 		updateEverything()
 	end)
 
 	New("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,16),
-		Text="Liquid direction",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},motionSection)
-
-	local directionRow=New("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,30),
-		ZIndex=5,
-	},motionSection)
-
-	New("UIListLayout",{
-		FillDirection=Enum.FillDirection.Horizontal,
-		Padding=UDim.new(0,6),
-		SortOrder=Enum.SortOrder.LayoutOrder,
-	},directionRow)
-
-	for _,item in ipairs(LIQUID_DIRECTIONS) do
-		local btn,wrap=makeSmallButton(directionRow,item.Label,54,function()
-			UI_STYLE.LiquidStrokeDirection=item.Key
-			UI_STYLE.LiquidStroke=true
-			UI_STYLE.StrokeGradient=true
-
-			if liquidToggle then liquidToggle.set(true) end
-			if gradientToggle then gradientToggle.set(true) end
-
-			refreshDirectionButtons()
-			updateEverything()
-		end)
-
-		table.insert(directionButtons,{
-			Key=item.Key,
-			Button=btn,
-			Wrap=wrap,
-		})
-	end
-
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,16),
-		Text="Shape and visibility",
+		Text="Weight and opacity",
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
 		TextColor3=THEME.TEXT,
@@ -1027,18 +915,13 @@ function StrokeColour.new(ctx,page)
 		ZIndex=6,
 	},shapeSection)
 
-	thicknessSlider=buildSlider(shapeSection,"Stroke Thickness",0,8,UI_STYLE.StrokeThickness,1,function(v)
+	thicknessSlider=buildPage3Slider(shapeSection,"Stroke thickness","W",0,6,math.clamp(UI_STYLE.StrokeThickness,0,6),1,function(v)
 		UI_STYLE.StrokeThickness=math.clamp(tonumber(v) or 0,0,8)
 		updateEverything()
 	end)
 
-	transparencySlider=buildSlider(shapeSection,"Stroke Transparency",0,1,UI_STYLE.StrokeTransparency,2,function(v)
+	transparencySlider=buildPage3Slider(shapeSection,"Stroke transparency","A",0,1,UI_STYLE.StrokeTransparency,2,function(v)
 		UI_STYLE.StrokeTransparency=math.clamp(tonumber(v) or 0,0,1)
-		updateEverything()
-	end)
-
-	radiusSlider=buildSlider(shapeSection,"Corner Radius",0,24,UI_STYLE.CornerRadius,0,function(v)
-		UI_STYLE.CornerRadius=math.clamp(tonumber(v) or 0,0,24)
 		updateEverything()
 	end)
 
