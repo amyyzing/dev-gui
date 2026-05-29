@@ -12,7 +12,7 @@ local KEYBIND_FIELDS={
 	{"toggleHitbox","TOGGLE_HB_KEY"},
 	{"toggleJumpBoost","TOGGLE_JB_KEY"},
 	{"toggleAlwaysBoost","TOGGLE_AB_KEY"},
-	{"toggleActionStatus","TOGGLE_ACTION_KEY"},
+	{"toggleESP","TOGGLE_ACTION_KEY"},
 	{"toggleSpeed","TOGGLE_SPEED_KEY"},
 }
 
@@ -419,6 +419,7 @@ function DataSave.new(ctx)
 				toggleHitbox=encodeBinding(getValue(ctx,"TOGGLE_HB_KEY",Enum.KeyCode.Unknown)),
 				toggleJumpBoost=encodeBinding(getValue(ctx,"TOGGLE_JB_KEY",Enum.KeyCode.Unknown)),
 				toggleAlwaysBoost=encodeBinding(getValue(ctx,"TOGGLE_AB_KEY",Enum.KeyCode.Unknown)),
+				toggleESP=encodeBinding(getValue(ctx,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
 				toggleActionStatus=encodeBinding(getValue(ctx,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
 				toggleSpeed=encodeBinding(getValue(ctx,"TOGGLE_SPEED_KEY",Enum.KeyCode.Unknown)),
 			},
@@ -549,7 +550,6 @@ function DataSave.new(ctx)
 			toggleHitbox="TOGGLE_HB_KEY",
 			toggleJumpBoost="TOGGLE_JB_KEY",
 			toggleAlwaysBoost="TOGGLE_AB_KEY",
-			toggleActionStatus="TOGGLE_ACTION_KEY",
 			toggleSpeed="TOGGLE_SPEED_KEY",
 		}
 
@@ -557,6 +557,12 @@ function DataSave.new(ctx)
 			if keybinds[savedName]~=nil then
 				setValue(ctx,stateName,decodeBinding(keybinds[savedName]))
 			end
+		end
+
+		if keybinds.toggleESP~=nil then
+			setValue(ctx,"TOGGLE_ACTION_KEY",decodeBinding(keybinds.toggleESP))
+		elseif keybinds.toggleActionStatus~=nil then
+			setValue(ctx,"TOGGLE_ACTION_KEY",decodeBinding(keybinds.toggleActionStatus))
 		end
 
 		applyPresetEditor(ctx,settings.presetEditor or settings.PresetEditor)
