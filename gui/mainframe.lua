@@ -15,12 +15,14 @@ function MainFrame.new(ctx)
 	local getModeLabel=ctx.getModeLabel or function() return "Gameplay" end
 
 	local api={}
+	local MINIMIZED_ROOT_H=68
 
-	local rootShadow=New("ImageLabel",{Name="shadow",Image="rbxassetid://297774371",ImageColor3=Color3.fromRGB(15,15,15),ImageTransparency=0.3,ScaleType=Enum.ScaleType.Slice,SliceCenter=Rect.new(20,20,280,280),BackgroundTransparency=1,AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,60),Size=UDim2.fromOffset(UI_WINDOW.W+42,UI_WINDOW.H+42),ZIndex=1},SG)
+	local rootShadow=New("ImageLabel",{Name="shadow",Image="rbxassetid://297774371",ImageColor3=Color3.fromRGB(15,15,15),ImageTransparency=0.3,ScaleType=Enum.ScaleType.Slice,SliceCenter=Rect.new(20,20,280,280),BackgroundTransparency=1,AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,59),Size=UDim2.fromOffset(UI_WINDOW.W+42,UI_WINDOW.H+42),ZIndex=1},SG)
+	local shadowScale=New("UIScale",{Scale=1},rootShadow)
+	New("UISizeConstraint",{MinSize=Vector2.new(UI_WINDOW.MinW+42,MINIMIZED_ROOT_H+42),MaxSize=Vector2.new(UI_WINDOW.MaxW+42,UI_WINDOW.MaxH+42)},rootShadow)
 
 	local root=New("Frame",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,80),Size=UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),AutomaticSize=Enum.AutomaticSize.None,ClipsDescendants=true,BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=2,Visible=true},SG)
 	local uiMinimized=false
-	local MINIMIZED_ROOT_H=68
 	local rootSizeTween=nil
 	local rootPositionTween=nil
 
@@ -30,7 +32,8 @@ function MainFrame.new(ctx)
 		local sy=root.Size.Y.Offset
 		if sx<=0 then sx=UI_WINDOW.W end
 		if sy<=0 then sy=uiMinimized and MINIMIZED_ROOT_H or UI_WINDOW.H end
-		rootShadow.Position=UDim2.new(root.Position.X.Scale,root.Position.X.Offset,root.Position.Y.Scale,root.Position.Y.Offset-20)
+		rootShadow.AnchorPoint=root.AnchorPoint
+		rootShadow.Position=UDim2.new(root.Position.X.Scale,root.Position.X.Offset,root.Position.Y.Scale,root.Position.Y.Offset-21)
 		rootShadow.Size=UDim2.fromOffset(sx+42,sy+42)
 		rootShadow.Visible=root.Visible
 	end
@@ -69,6 +72,7 @@ function MainFrame.new(ctx)
 		local vp=cam and cam.ViewportSize or Vector2.new(1920,1080)
 		local s=math.clamp(math.min(vp.X/1920,vp.Y/1080),0.78,1.08)
 		uiScale.Scale=s
+		shadowScale.Scale=s
 
 		if updateResponsiveLayout then
 			updateResponsiveLayout()
@@ -114,19 +118,22 @@ function MainFrame.new(ctx)
 	local closeBtn=makeTopButton("x", -38)
 
 	local pageBar=New("Frame",{Size=UDim2.new(1,0,0,30),BackgroundTransparency=1,ZIndex=4,LayoutOrder=2},main)
-	local pageShell=New("Frame",{Size=UDim2.fromOffset(540,30),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=5},pageBar)
+	local pageShell=New("Frame",{Size=UDim2.fromOffset(644,30),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=5},pageBar)
+	local pageShellScale=New("UIScale",{Scale=1},pageShell)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.35},pageShell)
 
-	local pageSlider=New("Frame",{Size=UDim2.fromOffset(110,28),Position=UDim2.fromOffset(1,1),BackgroundColor3=THEME.CARD,BorderSizePixel=0,ZIndex=6},pageShell)
+	local pageSlider=New("Frame",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(1,1),BackgroundColor3=THEME.CARD,BorderSizePixel=0,ZIndex=6},pageShell)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.45},pageSlider)
 
-	local settingsTab=New("TextButton",{Size=UDim2.fromOffset(110,28),Position=UDim2.fromOffset(1,1),BackgroundTransparency=1,BorderSizePixel=0,Text="MAIN",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local futureTab=New("TextButton",{Size=UDim2.fromOffset(208,28),Position=UDim2.fromOffset(111,1),BackgroundTransparency=1,BorderSizePixel=0,Text="KEYBINDS & PRESETS",Font=Enum.Font.Gotham,TextSize=10,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local uiSettingsTab=New("TextButton",{Size=UDim2.fromOffset(110,28),Position=UDim2.fromOffset(319,1),BackgroundTransparency=1,BorderSizePixel=0,Text="CUSTOMIZE",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local settingsPageTab=New("TextButton",{Size=UDim2.fromOffset(110,28),Position=UDim2.fromOffset(429,1),BackgroundTransparency=1,BorderSizePixel=0,Text="SETTINGS",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
+	local settingsTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(1,1),BackgroundTransparency=1,BorderSizePixel=0,Text="MAIN",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
+	local futureTab=New("TextButton",{Size=UDim2.fromOffset(204,28),Position=UDim2.fromOffset(107,1),BackgroundTransparency=1,BorderSizePixel=0,Text="KEYBINDS & PRESETS",Font=Enum.Font.Gotham,TextSize=10,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
+	local uiSettingsTab=New("TextButton",{Size=UDim2.fromOffset(112,28),Position=UDim2.fromOffset(311,1),BackgroundTransparency=1,BorderSizePixel=0,Text="CUSTOMIZE",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
+	local mapsPageTab=New("TextButton",{Size=UDim2.fromOffset(88,28),Position=UDim2.fromOffset(423,1),BackgroundTransparency=1,BorderSizePixel=0,Text="MAPS",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
+	local settingsPageTab=New("TextButton",{Size=UDim2.fromOffset(132,28),Position=UDim2.fromOffset(511,1),BackgroundTransparency=1,BorderSizePixel=0,Text="SETTINGS",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
 
 	local pageHost=New("ScrollingFrame",{Size=UDim2.new(1,0,0,384),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=3,LayoutOrder=3},main)
 	New("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},pageHost)
+	New("UIPadding",{PaddingTop=UDim.new(0,2),PaddingLeft=UDim.new(0,3),PaddingRight=UDim.new(0,7),PaddingBottom=UDim.new(0,2)},pageHost)
 
 	local settingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Visible=true,ZIndex=3,LayoutOrder=1},pageHost)
 	New("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},settingsPage)
@@ -137,7 +144,10 @@ function MainFrame.new(ctx)
 	local uiSettingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Visible=false,ZIndex=3,LayoutOrder=3},pageHost)
 	New("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},uiSettingsPage)
 
-	local actualSettingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Visible=false,ZIndex=3,LayoutOrder=4},pageHost)
+	local mapPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Visible=false,ZIndex=3,LayoutOrder=4},pageHost)
+	New("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},mapPage)
+
+	local actualSettingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Visible=false,ZIndex=3,LayoutOrder=5},pageHost)
 	New("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},actualSettingsPage)
 
 	local activePageName="main"
@@ -146,6 +156,7 @@ function MainFrame.new(ctx)
 		settingsTab.TextColor3=activePageName=="main" and THEME.TEXT or THEME.MUTED
 		futureTab.TextColor3=activePageName=="page2" and THEME.TEXT or THEME.MUTED
 		uiSettingsTab.TextColor3=activePageName=="customize" and THEME.TEXT or THEME.MUTED
+		mapsPageTab.TextColor3=activePageName=="maps" and THEME.TEXT or THEME.MUTED
 		settingsPageTab.TextColor3=activePageName=="settings" and THEME.TEXT or THEME.MUTED
 	end
 
@@ -156,20 +167,24 @@ function MainFrame.new(ctx)
 		settingsPage.Visible=activePageName=="main"
 		futurePage.Visible=activePageName=="page2"
 		uiSettingsPage.Visible=activePageName=="customize"
+		mapPage.Visible=activePageName=="maps"
 		actualSettingsPage.Visible=activePageName=="settings"
 
 		local sliderPos=UDim2.fromOffset(1,1)
-		local sliderSize=UDim2.fromOffset(110,28)
+		local sliderSize=UDim2.fromOffset(106,28)
 
 		if activePageName=="page2" then
-			sliderPos=UDim2.fromOffset(111,1)
-			sliderSize=UDim2.fromOffset(208,28)
+			sliderPos=UDim2.fromOffset(107,1)
+			sliderSize=UDim2.fromOffset(204,28)
 		elseif activePageName=="customize" then
-			sliderPos=UDim2.fromOffset(319,1)
-			sliderSize=UDim2.fromOffset(110,28)
+			sliderPos=UDim2.fromOffset(311,1)
+			sliderSize=UDim2.fromOffset(112,28)
+		elseif activePageName=="maps" then
+			sliderPos=UDim2.fromOffset(423,1)
+			sliderSize=UDim2.fromOffset(88,28)
 		elseif activePageName=="settings" then
-			sliderPos=UDim2.fromOffset(429,1)
-			sliderSize=UDim2.fromOffset(110,28)
+			sliderPos=UDim2.fromOffset(511,1)
+			sliderSize=UDim2.fromOffset(132,28)
 		end
 
 		TweenService:Create(pageSlider,TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out),{Position=sliderPos,Size=sliderSize}):Play()
@@ -180,6 +195,7 @@ function MainFrame.new(ctx)
 	settingsTab.MouseButton1Click:Connect(function() setActivePage("main") end)
 	futureTab.MouseButton1Click:Connect(function() setActivePage("page2") end)
 	uiSettingsTab.MouseButton1Click:Connect(function() setActivePage("customize") end)
+	mapsPageTab.MouseButton1Click:Connect(function() setActivePage("maps") end)
 	settingsPageTab.MouseButton1Click:Connect(function() setActivePage("settings") end)
 
 	settingsTab.MouseEnter:Connect(paintPageTabs)
@@ -188,6 +204,8 @@ function MainFrame.new(ctx)
 	futureTab.MouseLeave:Connect(paintPageTabs)
 	uiSettingsTab.MouseEnter:Connect(paintPageTabs)
 	uiSettingsTab.MouseLeave:Connect(paintPageTabs)
+	mapsPageTab.MouseEnter:Connect(paintPageTabs)
+	mapsPageTab.MouseLeave:Connect(paintPageTabs)
 	settingsPageTab.MouseEnter:Connect(paintPageTabs)
 	settingsPageTab.MouseLeave:Connect(paintPageTabs)
 
@@ -211,6 +229,7 @@ function MainFrame.new(ctx)
 
 		local pageHeight=math.max(170,UI_WINDOW.H-156)
 		pageHost.Size=UDim2.new(1,0,0,pageHeight)
+		pageShellScale.Scale=math.min(1,math.max(0.82,(UI_WINDOW.W-16)/644))
 
 		local compact=UI_WINDOW.W<720 or vp.X<1100
 		if compact then
@@ -250,7 +269,7 @@ function MainFrame.new(ctx)
 	local resetBtn,resetWrap=makeFooterBtn("Reset",94)
 
 	refreshFooterResetButton=function()
-		local showReset=activePageName~="settings"
+		local showReset=activePageName~="settings" and activePageName~="maps"
 		resetBtn.Visible=showReset
 		resetBtn.Text="RESET"
 		resetWrap.Visible=showReset
@@ -262,11 +281,46 @@ function MainFrame.new(ctx)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},fab)
 	attachHover(fab,THEME.BG,THEME.TEXT,THEME.TEXT,Color3.fromRGB(0,0,0))
 
-	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(10,10),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,3,1,-3),BackgroundColor3=THEME.BG,BorderSizePixel=0,Text="<",TextColor3=THEME.TEXT,Font=Enum.Font.Gotham,TextSize=8,ZIndex=30},root)
-	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},resizeHandle)
+	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=THEME.MUTED,BackgroundTransparency=0.05,BorderSizePixel=0,Text="",ZIndex=30},root)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},resizeHandle)
+	local resizeStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.1},resizeHandle)
+	local resizeGlow=New("UIGradient",{Rotation=45,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,THEME.TEXT),ColorSequenceKeypoint.new(1,THEME.GREEN)})},resizeHandle)
+
+	local resizeHovering=false
+	local resizing=false
+
+	local function paintResizeHandle(held)
+		local targetSize=held and 18 or (resizeHovering and 16 or 14)
+		local targetColor=(held or resizeHovering) and THEME.GREEN or THEME.MUTED
+		local targetTransparency=held and 0 or (resizeHovering and 0.02 or 0.05)
+
+		TweenService:Create(resizeHandle,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+			Size=UDim2.fromOffset(targetSize,targetSize),
+			BackgroundColor3=targetColor,
+			BackgroundTransparency=targetTransparency,
+		}):Play()
+
+		TweenService:Create(resizeStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+			Thickness=held and 2 or 1,
+			Transparency=(held or resizeHovering) and 0 or 0.1,
+		}):Play()
+
+		TweenService:Create(resizeGlow,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+			Rotation=held and 180 or (resizeHovering and 90 or 45),
+		}):Play()
+	end
+
+	resizeHandle.MouseEnter:Connect(function()
+		resizeHovering=true
+		paintResizeHandle(resizing)
+	end)
+
+	resizeHandle.MouseLeave:Connect(function()
+		resizeHovering=false
+		paintResizeHandle(resizing)
+	end)
 
 	do
-		local resizing=false
 		local startMouse=nil
 		local startW,startH=0,0
 		local startPos=nil
@@ -274,6 +328,7 @@ function MainFrame.new(ctx)
 
 		local function stopResize()
 			resizing=false
+			paintResizeHandle(false)
 			safeDisconnect(resizeMoveConn)
 			resizeMoveConn=nil
 		end
@@ -282,6 +337,7 @@ function MainFrame.new(ctx)
 			if input.UserInputType~=Enum.UserInputType.MouseButton1 then return end
 
 			resizing=true
+			paintResizeHandle(true)
 			startMouse=UIS:GetMouseLocation()
 			startW,startH=UI_WINDOW.W,UI_WINDOW.H
 			startPos=root.Position
@@ -444,6 +500,7 @@ function MainFrame.new(ctx)
 	api.settingsPage=settingsPage
 	api.futurePage=futurePage
 	api.uiSettingsPage=uiSettingsPage
+	api.mapPage=mapPage
 	api.actualSettingsPage=actualSettingsPage
 	api.leftCol=leftCol
 	api.rightCol=rightCol

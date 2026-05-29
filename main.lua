@@ -271,8 +271,9 @@ local MODULE_PATHS={
 	Page1Boost="page-1/boost.lua",
 	Page1ESP="page-1/esp.lua",
 	StrokeColour="page-3/stroke-colour.lua",
-	Workspace="page-4/workspace.lua",
-	PlayerData="page-4/player-data.lua",
+	MapEditor="page-4/map-editor.lua",
+	Workspace="page-5/workspace.lua",
+	PlayerData="page-5/player-data.lua",
 	DataSave="data-save/data-save.lua",
 }
 local AUTO_REFRESH_WATCH_PATHS={AUTO_REFRESH_RELOAD_PATH}
@@ -284,6 +285,7 @@ local REMOTE_MODULE_CACHE={}
 local REMOTE_MODULE_SOURCES={}
 local rebuildPage1FromModules=nil
 local rebuildCustomizeFromModules=nil
+local rebuildMapFromModules=nil
 
 local function loadModuleFromSource(modulePath,source)
 	local chunk,err=loadstring(source)
@@ -336,6 +338,7 @@ local Page1GameParamsModule=loadRemoteModule(MODULE_PATHS.Page1GameParams)
 local Page1BoostModule=loadRemoteModule(MODULE_PATHS.Page1Boost)
 local Page1ESPModule=loadRemoteModule(MODULE_PATHS.Page1ESP)
 local StrokeColourModule=loadRemoteModule(MODULE_PATHS.StrokeColour)
+local MapEditorModule=loadRemoteModule(MODULE_PATHS.MapEditor)
 local WorkspaceModule=loadRemoteModule(MODULE_PATHS.Workspace)
 local PlayerDataModule=loadRemoteModule(MODULE_PATHS.PlayerData)
 local DataSaveModule=loadRemoteModule(MODULE_PATHS.DataSave)
@@ -464,6 +467,19 @@ local function requestAutoRefresh(changedPath,changedSource)
 			rebuildCustomizeFromModules()
 		else
 			warn("Auto-refresh cached customize module, rebuild not ready:",changedPath)
+		end
+
+		return
+	end
+
+	if changedPath==MODULE_PATHS.MapEditor then
+		MapEditorModule=module
+
+		if rebuildMapFromModules then
+			warn("Auto-refreshing map editor module after remote change:",changedPath)
+			rebuildMapFromModules()
+		else
+			warn("Auto-refresh cached map editor module, rebuild not ready:",changedPath)
 		end
 
 		return
@@ -714,6 +730,7 @@ local pageHost=MainFrame.pageHost
 local settingsPage=MainFrame.settingsPage
 local futurePage=MainFrame.futurePage
 local uiSettingsPage=MainFrame.uiSettingsPage
+local mapPage=MainFrame.mapPage
 local actualSettingsPage=MainFrame.actualSettingsPage
 local leftCol=MainFrame.leftCol
 local rightCol=MainFrame.rightCol
@@ -1223,6 +1240,55 @@ rebuildCustomizeFromModules=function()
 end
 
 buildCustomizePage()
+
+local MapEditorAPI=nil
+
+local function clearMapPage()
+	if not mapPage then return end
+
+	for _,child in ipairs(mapPage:GetChildren()) do
+		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+			child:Destroy()
+		end
+	end
+end
+
+local function buildMapPage()
+	if MapEditorAPI and MapEditorAPI.Destroy then
+		pcall(function()
+			MapEditorAPI.Destroy()
+		end)
+	end
+
+	MapEditorAPI=nil
+	clearMapPage()
+
+	if MapEditorModule and MapEditorModule.new then
+		local ok,result=pcall(function()
+			return MapEditorModule.new({
+				New=New,
+				THEME=THEME,
+				makeSection=makeSection,
+				buildSlider=buildSlider,
+				buildToggleRow=buildToggleRow,
+				wrapTextButton=wrapTextButton,
+			},mapPage)
+		end)
+
+		if ok then
+			MapEditorAPI=result
+		else
+			warn("Map editor module failed:",result)
+		end
+	end
+end
+
+rebuildMapFromModules=function()
+	buildMapPage()
+end
+
+buildMapPage()
+
 local refreshPage2UI=function() end
 local PAGE2_EXPANDED_OWNED={}
 local WorkspaceAPI=nil
@@ -1309,7 +1375,7 @@ local function buildActualSettingsPage()
 		end
 	else
 		local section=makeSection(actualSettingsPage,1,"Workspace","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-4/workspace.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-5/workspace.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 	end
 
 	if PlayerDataModule and PlayerDataModule.new then
@@ -1356,7 +1422,7 @@ local function buildActualSettingsPage()
 		end
 	else
 		local section=makeSection(actualSettingsPage,2,"Player Data","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-4/player-data.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-5/player-data.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 	end
 
 	refreshSettingsPage()
@@ -1649,6 +1715,7 @@ local function refreshAllUI()
 	syncPage1State()
 
 	if StrokeColourAPI and StrokeColourAPI.Refresh then pcall(StrokeColourAPI.Refresh) end
+	if MapEditorAPI and MapEditorAPI.Refresh then pcall(MapEditorAPI.Refresh) end
 	if WorkspaceAPI and WorkspaceAPI.Refresh then pcall(WorkspaceAPI.Refresh) end
 	if refreshPage2UI then pcall(refreshPage2UI) end
 	if applyUIStrokeTheme then pcall(applyUIStrokeTheme) end

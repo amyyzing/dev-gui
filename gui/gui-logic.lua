@@ -128,34 +128,126 @@ function GuiLogic.new(ctx)
 		end
 
 		local body=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=5,LayoutOrder=3,ClipsDescendants=true},sec)
-		New("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},body)
+		local bodyLayout=New("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},body)
+		local bodyTween=nil
+		local lastBodyHeight=0
 
-		local function tweenSection()
+		local function getBodyHeight()
+			local h=math.max(body.AbsoluteSize.Y,bodyLayout.AbsoluteContentSize.Y,lastBodyHeight)
+			return math.max(0,math.floor(h+0.5))
+		end
+
+		local function tweenTitle()
 			titleButton.TextTransparency=0.18
 			TweenService:Create(titleButton,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
 			TweenService:Create(sec,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundColor3=collapsed and THEME.PANEL or THEME.CARD}):Play()
 		end
 
-		local function paint(animate)
-			body.Visible=not collapsed
-			body.AutomaticSize=collapsed and Enum.AutomaticSize.None or Enum.AutomaticSize.Y
+		local function cancelBodyTween()
+			if bodyTween then
+				bodyTween:Cancel()
+				bodyTween=nil
+			end
+		end
 
-			if subtitleLabel then
-				subtitleLabel.Visible=not collapsed
+		local function setSubtitleVisible(visible,animate)
+			if not subtitleLabel then return end
+
+			if visible then
+				subtitleLabel.Visible=true
 			end
 
-			titleButton.Text=(collapsed and "[+] " or "[-] ")..titleText
-
 			if animate then
-				tweenSection()
+				local tween=TweenService:Create(subtitleLabel,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=visible and 0 or 1})
+				tween:Play()
+				tween.Completed:Connect(function()
+					if subtitleLabel and subtitleLabel.Parent and not visible then
+						subtitleLabel.Visible=false
+						subtitleLabel.TextTransparency=0
+					end
+				end)
 			else
-				sec.BackgroundColor3=collapsed and THEME.PANEL or THEME.CARD
+				subtitleLabel.Visible=visible
+				subtitleLabel.TextTransparency=0
+			end
+		end
+
+		local function collapseBody(animate)
+			cancelBodyTween()
+			lastBodyHeight=getBodyHeight()
+			body.Visible=true
+			body.AutomaticSize=Enum.AutomaticSize.None
+			body.Size=UDim2.new(1,0,0,lastBodyHeight)
+
+			if not animate then
+				body.Visible=false
+				body.Size=UDim2.new(1,0,0,0)
+				setSubtitleVisible(false,false)
+				return
+			end
+
+			setSubtitleVisible(false,true)
+			bodyTween=TweenService:Create(body,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Size=UDim2.new(1,0,0,0)})
+			bodyTween:Play()
+			bodyTween.Completed:Connect(function()
+				if collapsed and body and body.Parent then
+					body.Visible=false
+					body.Size=UDim2.new(1,0,0,0)
+				end
+			end)
+		end
+
+		local function expandBody(animate)
+			cancelBodyTween()
+			body.Visible=true
+			body.AutomaticSize=Enum.AutomaticSize.None
+			body.Size=UDim2.new(1,0,0,0)
+			setSubtitleVisible(true,animate)
+
+			local function playExpand()
+				local target=math.max(bodyLayout.AbsoluteContentSize.Y,lastBodyHeight)
+				target=math.max(0,math.floor(target+0.5))
+				lastBodyHeight=target
+
+				if not animate then
+					body.AutomaticSize=Enum.AutomaticSize.Y
+					body.Size=UDim2.new(1,0,0,0)
+					return
+				end
+
+				bodyTween=TweenService:Create(body,TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(1,0,0,target)})
+				bodyTween:Play()
+				bodyTween.Completed:Connect(function()
+					if not collapsed and body and body.Parent then
+						body.AutomaticSize=Enum.AutomaticSize.Y
+						body.Size=UDim2.new(1,0,0,0)
+					end
+				end)
+			end
+
+			task.defer(playExpand)
+		end
+
+		local function paint(animate)
+			titleButton.Text=(collapsed and "[+] " or "[-] ")..titleText
+			tweenTitle()
+
+			if collapsed then
+				collapseBody(animate)
+			else
+				expandBody(animate)
 			end
 		end
 
 		titleButton.MouseButton1Click:Connect(function()
 			collapsed=not collapsed
 			paint(true)
+		end)
+
+		sec:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			if not collapsed then
+				lastBodyHeight=getBodyHeight()
+			end
 		end)
 
 		paint(false)
