@@ -13,33 +13,16 @@ function MainFrame.new(ctx)
 	local attachHover=ctx.attachHover
 	local isAlive=ctx.isAlive or function() return true end
 	local getModeLabel=ctx.getModeLabel or function() return "Gameplay" end
+	local getUIStrokeColor=ctx.getUIStrokeColor or function() return THEME.STROKE end
+	local getUIStrokeGradientColor=ctx.getUIStrokeGradientColor or function() return THEME.GREEN or THEME.ACC or THEME.TEXT end
 
 	local api={}
 	local MINIMIZED_ROOT_H=68
-
-	local rootShadow=New("ImageLabel",{Name="shadow",Image="rbxassetid://297774371",ImageColor3=Color3.fromRGB(15,15,15),ImageTransparency=0.3,ScaleType=Enum.ScaleType.Slice,SliceCenter=Rect.new(20,20,280,280),BackgroundTransparency=1,AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,59),Size=UDim2.fromOffset(UI_WINDOW.W+42,UI_WINDOW.H+42),ZIndex=1},SG)
-	local shadowScale=New("UIScale",{Scale=1},rootShadow)
-	New("UISizeConstraint",{MinSize=Vector2.new(UI_WINDOW.MinW+42,MINIMIZED_ROOT_H+42),MaxSize=Vector2.new(UI_WINDOW.MaxW+42,UI_WINDOW.MaxH+42)},rootShadow)
 
 	local root=New("Frame",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,80),Size=UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),AutomaticSize=Enum.AutomaticSize.None,ClipsDescendants=true,BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=2,Visible=true},SG)
 	local uiMinimized=false
 	local rootSizeTween=nil
 	local rootPositionTween=nil
-
-	local function syncRootShadow()
-		if not rootShadow then return end
-		local sx=root.Size.X.Offset
-		local sy=root.Size.Y.Offset
-		if sx<=0 then sx=UI_WINDOW.W end
-		if sy<=0 then sy=uiMinimized and MINIMIZED_ROOT_H or UI_WINDOW.H end
-		rootShadow.AnchorPoint=root.AnchorPoint
-		rootShadow.Position=UDim2.new(root.Position.X.Scale,root.Position.X.Offset,root.Position.Y.Scale,root.Position.Y.Offset-21)
-		rootShadow.Size=UDim2.fromOffset(sx+42,sy+42)
-		rootShadow.Visible=root.Visible
-	end
-
-	root:GetPropertyChangedSignal("Position"):Connect(syncRootShadow)
-	root:GetPropertyChangedSignal("Size"):Connect(syncRootShadow)
 
 	local function tweenRootPosition(position,duration)
 		if rootPositionTween then
@@ -72,7 +55,6 @@ function MainFrame.new(ctx)
 		local vp=cam and cam.ViewportSize or Vector2.new(1920,1080)
 		local s=math.clamp(math.min(vp.X/1920,vp.Y/1080),0.78,1.08)
 		uiScale.Scale=s
-		shadowScale.Scale=s
 
 		if updateResponsiveLayout then
 			updateResponsiveLayout()
@@ -225,7 +207,6 @@ function MainFrame.new(ctx)
 		UI_WINDOW.W=math.clamp(UI_WINDOW.W,UI_WINDOW.MinW,math.min(UI_WINDOW.MaxW,math.max(560,vp.X-40)))
 		UI_WINDOW.H=math.clamp(UI_WINDOW.H,UI_WINDOW.MinH,math.min(UI_WINDOW.MaxH,math.max(360,vp.Y-120)))
 		root.Size=UDim2.fromOffset(UI_WINDOW.W,uiMinimized and MINIMIZED_ROOT_H or UI_WINDOW.H)
-		syncRootShadow()
 
 		local pageHeight=math.max(170,UI_WINDOW.H-156)
 		pageHost.Size=UDim2.new(1,0,0,pageHeight)
@@ -281,18 +262,47 @@ function MainFrame.new(ctx)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},fab)
 	attachHover(fab,THEME.BG,THEME.TEXT,THEME.TEXT,Color3.fromRGB(0,0,0))
 
-	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=THEME.MUTED,BackgroundTransparency=0.05,BorderSizePixel=0,Text="",ZIndex=30},root)
+	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=getUIStrokeColor():Lerp(THEME.TEXT,0.22),BackgroundTransparency=0.02,BorderSizePixel=0,Text="",ZIndex=30},root)
 	New("UICorner",{CornerRadius=UDim.new(1,0)},resizeHandle)
-	local resizeStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.1},resizeHandle)
-	local resizeGlow=New("UIGradient",{Rotation=45,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,THEME.TEXT),ColorSequenceKeypoint.new(1,THEME.GREEN)})},resizeHandle)
+	local resizeStroke=New("UIStroke",{Color=getUIStrokeColor(),Thickness=1,Transparency=0.05},resizeHandle)
+	local resizeGlow=New("UIGradient",{Rotation=45,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,getUIStrokeColor():Lerp(THEME.TEXT,0.45)),ColorSequenceKeypoint.new(1,getUIStrokeGradientColor():Lerp(THEME.TEXT,0.1))})},resizeHandle)
 
 	local resizeHovering=false
 	local resizing=false
 
+	local function resizeColorSet(held)
+		local stroke=getUIStrokeColor()
+		local accent=getUIStrokeGradientColor()
+		local base=stroke:Lerp(THEME.TEXT,0.22)
+
+		if held then
+			return accent:Lerp(THEME.TEXT,0.12),accent,ColorSequence.new({
+				ColorSequenceKeypoint.new(0,THEME.TEXT),
+				ColorSequenceKeypoint.new(0.5,accent:Lerp(THEME.TEXT,0.28)),
+				ColorSequenceKeypoint.new(1,stroke:Lerp(accent,0.55)),
+			})
+		end
+
+		if resizeHovering then
+			return accent:Lerp(THEME.TEXT,0.2),stroke:Lerp(accent,0.65),ColorSequence.new({
+				ColorSequenceKeypoint.new(0,stroke:Lerp(THEME.TEXT,0.5)),
+				ColorSequenceKeypoint.new(0.45,accent:Lerp(THEME.TEXT,0.35)),
+				ColorSequenceKeypoint.new(1,stroke:Lerp(accent,0.75)),
+			})
+		end
+
+		return base,stroke,ColorSequence.new({
+			ColorSequenceKeypoint.new(0,stroke:Lerp(THEME.TEXT,0.45)),
+			ColorSequenceKeypoint.new(1,accent:Lerp(THEME.TEXT,0.1)),
+		})
+	end
+
 	local function paintResizeHandle(held)
 		local targetSize=held and 18 or (resizeHovering and 16 or 14)
-		local targetColor=(held or resizeHovering) and THEME.GREEN or THEME.MUTED
-		local targetTransparency=held and 0 or (resizeHovering and 0.02 or 0.05)
+		local targetColor,targetStroke,targetGradient=resizeColorSet(held)
+		local targetTransparency=held and 0 or (resizeHovering and 0.01 or 0.02)
+
+		resizeGlow.Color=targetGradient
 
 		TweenService:Create(resizeHandle,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
 			Size=UDim2.fromOffset(targetSize,targetSize),
@@ -301,8 +311,9 @@ function MainFrame.new(ctx)
 		}):Play()
 
 		TweenService:Create(resizeStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+			Color=targetStroke,
 			Thickness=held and 2 or 1,
-			Transparency=(held or resizeHovering) and 0 or 0.1,
+			Transparency=(held or resizeHovering) and 0 or 0.05,
 		}):Play()
 
 		TweenService:Create(resizeGlow,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
@@ -359,7 +370,6 @@ function MainFrame.new(ctx)
 
 				local usedDx=startW-UI_WINDOW.W
 				root.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+(usedDx*0.5),startPos.Y.Scale,startPos.Y.Offset)
-				syncRootShadow()
 
 				if updateResponsiveLayout then
 					updateResponsiveLayout()
@@ -393,7 +403,6 @@ function MainFrame.new(ctx)
 		tween.Completed:Connect(function()
 			if uiMinimized then
 				setBodyVisible(false)
-				syncRootShadow()
 			end
 		end)
 	end
@@ -406,7 +415,6 @@ function MainFrame.new(ctx)
 		root.Visible=true
 		setBodyVisible(true)
 		tweenRootSize(UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),0.22)
-		syncRootShadow()
 	end
 
 	miniBtn.MouseButton1Click:Connect(function()
@@ -483,12 +491,11 @@ function MainFrame.new(ctx)
 		updateResponsiveLayout()
 	end
 
-	function api.SyncRootShadow()
-		syncRootShadow()
+	function api.RefreshTheme()
+		paintResizeHandle(resizing)
 	end
 
 	api.root=root
-	api.rootShadow=rootShadow
 	api.uiScale=uiScale
 	api.main=main
 	api.header=header

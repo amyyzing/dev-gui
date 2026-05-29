@@ -10,6 +10,15 @@ function GuiLogic.new(ctx)
 	local BUTTON_WRAPPERS=ctx.BUTTON_WRAPPERS or setmetatable({}, {__mode="k"})
 
 	local api={}
+	local WRAP_INSET=1
+
+	local function insetSize(size)
+		return UDim2.new(size.X.Scale,size.X.Offset-(WRAP_INSET*2),size.Y.Scale,size.Y.Offset-(WRAP_INSET*2))
+	end
+
+	local function insetPosition(position)
+		return UDim2.new(position.X.Scale,position.X.Offset+WRAP_INSET,position.Y.Scale,position.Y.Offset+WRAP_INSET)
+	end
 
 	function api.attachHover(button,normalBg,hoverBg,normalText,hoverText)
 		button.MouseEnter:Connect(function()
@@ -40,8 +49,9 @@ function GuiLogic.new(ctx)
 		wrap.Name=box.Name~="" and (box.Name.."_Wrap") or "TextBoxWrap"
 		wrap.BackgroundColor3=bgColor or THEME.PANEL
 		wrap.BorderSizePixel=0
-		wrap.Size=box.Size
-		wrap.Position=box.Position
+		wrap.ClipsDescendants=false
+		wrap.Size=insetSize(box.Size)
+		wrap.Position=insetPosition(box.Position)
 		wrap.AnchorPoint=box.AnchorPoint
 		wrap.Visible=box.Visible
 		wrap.ZIndex=math.max((box.ZIndex or 2)-1,1)
@@ -64,8 +74,8 @@ function GuiLogic.new(ctx)
 	function api.placeWrappedBox(box,position,size)
 		local entry=BOX_WRAPPERS[box]
 		if not entry then return end
-		if size then entry.wrap.Size=size end
-		if position then entry.wrap.Position=position end
+		if size then entry.wrap.Size=insetSize(size) end
+		if position then entry.wrap.Position=insetPosition(position) end
 	end
 
 	function api.wrapTextButton(button,bgColor,strokeThickness)
@@ -75,8 +85,9 @@ function GuiLogic.new(ctx)
 		wrap.Name=button.Name~="" and (button.Name.."_Wrap") or "ButtonWrap"
 		wrap.BackgroundColor3=bgColor or THEME.BG
 		wrap.BorderSizePixel=0
-		wrap.Size=button.Size
-		wrap.Position=button.Position
+		wrap.ClipsDescendants=false
+		wrap.Size=insetSize(button.Size)
+		wrap.Position=insetPosition(button.Position)
 		wrap.AnchorPoint=button.AnchorPoint
 		wrap.Visible=button.Visible
 		wrap.ZIndex=math.max((button.ZIndex or 2)-1,1)
@@ -99,8 +110,8 @@ function GuiLogic.new(ctx)
 	function api.placeWrappedButton(button,position,size)
 		local entry=BUTTON_WRAPPERS[button]
 		if not entry then return end
-		if size then entry.wrap.Size=size end
-		if position then entry.wrap.Position=position end
+		if size then entry.wrap.Size=insetSize(size) end
+		if position then entry.wrap.Position=insetPosition(position) end
 	end
 
 	function api.setWrappedButtonBg(button,color)
@@ -364,10 +375,10 @@ function GuiLogic.new(ctx)
 		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},parent)
 		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-64,1,0),Text=labelText,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
 
-		local wrap=New("Frame",{Size=UDim2.fromOffset(48,20),Position=UDim2.new(1,-48,0.5,-10),BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0,ZIndex=6},row)
+		local wrap=New("Frame",{Size=UDim2.fromOffset(46,18),Position=UDim2.new(1,-47,0.5,-9),BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0,ClipsDescendants=false,ZIndex=6},row)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},wrap)
 
-		local knob=New("Frame",{Size=UDim2.fromOffset(16,16),Position=UDim2.fromOffset(2,2),BackgroundColor3=THEME.TEXT,BorderSizePixel=0,ZIndex=7},wrap)
+		local knob=New("Frame",{Size=UDim2.fromOffset(14,14),Position=UDim2.fromOffset(2,2),BackgroundColor3=THEME.TEXT,BorderSizePixel=0,ClipsDescendants=false,ZIndex=7},wrap)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},knob)
 
 		local state=startState and true or false
@@ -375,7 +386,7 @@ function GuiLogic.new(ctx)
 		local function paint()
 			local ti=TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out)
 			local bg=state and THEME.GREEN or THEME.CARD
-			local pos=state and UDim2.new(1,-18,0,2) or UDim2.fromOffset(2,2)
+			local pos=state and UDim2.new(1,-16,0,2) or UDim2.fromOffset(2,2)
 
 			TweenService:Create(wrap,ti,{BackgroundColor3=bg}):Play()
 			TweenService:Create(knob,ti,{Position=pos,BackgroundColor3=THEME.TEXT}):Play()

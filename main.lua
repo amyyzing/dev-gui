@@ -272,7 +272,8 @@ local MODULE_PATHS={
 	Page1ESP="page-1/esp.lua",
 	StrokeColour="page-3/stroke-colour.lua",
 	MapEditor="page-4/map-editor.lua",
-	Workspace="page-5/workspace.lua",
+	Workspace="page-4/workspace.lua",
+	RemoveAds="page-4/remove-ads.lua",
 	PlayerData="page-5/player-data.lua",
 	DataSave="data-save/data-save.lua",
 }
@@ -340,6 +341,7 @@ local Page1ESPModule=loadRemoteModule(MODULE_PATHS.Page1ESP)
 local StrokeColourModule=loadRemoteModule(MODULE_PATHS.StrokeColour)
 local MapEditorModule=loadRemoteModule(MODULE_PATHS.MapEditor)
 local WorkspaceModule=loadRemoteModule(MODULE_PATHS.Workspace)
+local RemoveAdsModule=loadRemoteModule(MODULE_PATHS.RemoveAds)
 local PlayerDataModule=loadRemoteModule(MODULE_PATHS.PlayerData)
 local DataSaveModule=loadRemoteModule(MODULE_PATHS.DataSave)
 
@@ -386,6 +388,7 @@ if old then old:Destroy() end
 local SG=New("ScreenGui", {Name=SG_NAME, ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, IgnoreGuiInset=false}, guiParent)
 local autoRefreshReloading=false
 local liquidStrokeConn=nil
+local MainFrame=nil
 
 local function getRemoteSource(modulePath)
 	local result=BOT_API.Post("/module/get",{path=modulePath})
@@ -480,6 +483,32 @@ local function requestAutoRefresh(changedPath,changedSource)
 			rebuildMapFromModules()
 		else
 			warn("Auto-refresh cached map editor module, rebuild not ready:",changedPath)
+		end
+
+		return
+	end
+
+	if changedPath==MODULE_PATHS.Workspace then
+		WorkspaceModule=module
+
+		if rebuildMapFromModules then
+			warn("Auto-refreshing workspace module after remote change:",changedPath)
+			rebuildMapFromModules()
+		else
+			warn("Auto-refresh cached workspace module, rebuild not ready:",changedPath)
+		end
+
+		return
+	end
+
+	if changedPath==MODULE_PATHS.RemoveAds then
+		RemoveAdsModule=module
+
+		if rebuildMapFromModules then
+			warn("Auto-refreshing remove ads module after remote change:",changedPath)
+			rebuildMapFromModules()
+		else
+			warn("Auto-refresh cached remove ads module, rebuild not ready:",changedPath)
 		end
 
 		return
@@ -656,6 +685,12 @@ local function applyUIStrokeTheme()
 		end
 	end
 
+	if MainFrame and MainFrame.RefreshTheme then
+		pcall(function()
+			MainFrame.RefreshTheme()
+		end)
+	end
+
 	updateLiquidStrokeAnimation()
 end
 
@@ -698,7 +733,7 @@ local makeBox=GuiLogic.makeBox
 local buildSlider=GuiLogic.buildSlider
 local buildToggleRow=GuiLogic.buildToggleRow
 
-local MainFrame=MainFrameModule.new({
+MainFrame=MainFrameModule.new({
 	New=New,
 	THEME=THEME,
 	UI_WINDOW=UI_WINDOW,
@@ -709,6 +744,8 @@ local MainFrame=MainFrameModule.new({
 	safeDisconnect=safeDisconnect,
 	wrapTextButton=wrapTextButton,
 	attachHover=attachHover,
+	getUIStrokeColor=getUIStrokeColor,
+	getUIStrokeGradientColor=getUIStrokeGradientColor,
 	isAlive=function()
 		return toolAlive
 	end,
@@ -718,7 +755,6 @@ local MainFrame=MainFrameModule.new({
 })
 
 local root=MainFrame.root
-local rootShadow=MainFrame.rootShadow
 local uiScale=MainFrame.uiScale
 local main=MainFrame.main
 local header=MainFrame.header
@@ -735,12 +771,6 @@ local actualSettingsPage=MainFrame.actualSettingsPage
 local leftCol=MainFrame.leftCol
 local rightCol=MainFrame.rightCol
 local footer=MainFrame.footer
-
-local function syncRootShadow()
-	if MainFrame and MainFrame.SyncRootShadow then
-		MainFrame.SyncRootShadow()
-	end
-end
 
 local function setActivePage(name)
 	if MainFrame and MainFrame.SetActivePage then
@@ -1242,6 +1272,8 @@ end
 buildCustomizePage()
 
 local MapEditorAPI=nil
+local WorkspaceAPI=nil
+local RemoveAdsAPI=nil
 
 local function clearMapPage()
 	if not mapPage then return end
@@ -1260,8 +1292,30 @@ local function buildMapPage()
 		end)
 	end
 
+	if WorkspaceAPI and WorkspaceAPI.Destroy then
+		pcall(function()
+			WorkspaceAPI.Destroy()
+		end)
+	end
+
+	if RemoveAdsAPI and RemoveAdsAPI.Destroy then
+		pcall(function()
+			RemoveAdsAPI.Destroy()
+		end)
+	end
+
 	MapEditorAPI=nil
+	WorkspaceAPI=nil
+	RemoveAdsAPI=nil
 	clearMapPage()
+
+	if WORLD_SETTINGS.SmoothPlastic==nil then
+		WORLD_SETTINGS.SmoothPlastic=false
+	end
+
+	if type(WORLD_SETTINGS.OriginalMaterials)~="table" then
+		WORLD_SETTINGS.OriginalMaterials=setmetatable({}, {__mode="k"})
+	end
 
 	if MapEditorModule and MapEditorModule.new then
 		local ok,result=pcall(function()
@@ -1281,6 +1335,62 @@ local function buildMapPage()
 			warn("Map editor module failed:",result)
 		end
 	end
+
+	if WorkspaceModule and WorkspaceModule.new then
+		local ok,result=pcall(function()
+			return WorkspaceModule.new({
+				New=New,
+				THEME=THEME,
+				WORLD_SETTINGS=WORLD_SETTINGS,
+
+				makeSection=makeSection,
+				buildToggleRow=buildToggleRow,
+
+				onChanged=function(state)
+					potatoMode=state and true or false
+				end,
+			},mapPage)
+		end)
+
+		if ok then
+			WorkspaceAPI=result
+		else
+			local section=makeSection(mapPage,1,"Workspace","Remote module failed to load.")
+			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Workspace module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		end
+	else
+		local section=makeSection(mapPage,1,"Workspace","Remote module failed to load.")
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-4/workspace.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	end
+
+	if RemoveAdsModule and RemoveAdsModule.new then
+		local ok,result=pcall(function()
+			return RemoveAdsModule.new({
+				New=New,
+				THEME=THEME,
+				makeSection=makeSection,
+				buildToggleRow=buildToggleRow,
+				getCurrentModeKey=function()
+					return CURRENT_MODE_KEY
+				end,
+				onChanged=function()
+					requestPlayerAutosave()
+				end,
+			},mapPage)
+		end)
+
+		if ok then
+			RemoveAdsAPI=result
+		else
+			local section=makeSection(mapPage,2,"Remove Ads","Remote module failed to load.")
+			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Remove Ads module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		end
+	else
+		local section=makeSection(mapPage,2,"Remove Ads","Remote module failed to load.")
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-4/remove-ads.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	end
+
+	applyUIStrokeTheme()
 end
 
 rebuildMapFromModules=function()
@@ -1291,7 +1401,6 @@ buildMapPage()
 
 local refreshPage2UI=function() end
 local PAGE2_EXPANDED_OWNED={}
-local WorkspaceAPI=nil
 local PlayerDataAPI=nil
 
 local function showConfirmModal(titleText, bodyText, yesText, onYes)
@@ -1340,44 +1449,15 @@ local function refreshSettingsPage()
 			WorkspaceAPI.Refresh()
 		end)
 	end
+
+	if RemoveAdsAPI and RemoveAdsAPI.Refresh then
+		pcall(function()
+			RemoveAdsAPI.Refresh()
+		end)
+	end
 end
 
 local function buildActualSettingsPage()
-	if WORLD_SETTINGS.SmoothPlastic==nil then
-		WORLD_SETTINGS.SmoothPlastic=false
-	end
-
-	if type(WORLD_SETTINGS.OriginalMaterials)~="table" then
-		WORLD_SETTINGS.OriginalMaterials=setmetatable({}, {__mode="k"})
-	end
-
-	if WorkspaceModule and WorkspaceModule.new then
-		local ok,result=pcall(function()
-			return WorkspaceModule.new({
-				New=New,
-				THEME=THEME,
-				WORLD_SETTINGS=WORLD_SETTINGS,
-
-				makeSection=makeSection,
-				buildToggleRow=buildToggleRow,
-
-				onChanged=function(state)
-					potatoMode=state and true or false
-				end,
-			},actualSettingsPage)
-		end)
-
-		if ok then
-			WorkspaceAPI=result
-		else
-			local section=makeSection(actualSettingsPage,1,"Workspace","Remote module failed to load.")
-			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Workspace module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
-		end
-	else
-		local section=makeSection(actualSettingsPage,1,"Workspace","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-5/workspace.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
-	end
-
 	if PlayerDataModule and PlayerDataModule.new then
 		local ok,result=pcall(function()
 			return PlayerDataModule.new({
@@ -1417,11 +1497,11 @@ local function buildActualSettingsPage()
 		if ok then
 			PlayerDataAPI=result
 		else
-			local section=makeSection(actualSettingsPage,2,"Player Data","Remote module failed to load.")
+			local section=makeSection(actualSettingsPage,1,"Player Data","Remote module failed to load.")
 			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Player Data module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 		end
 	else
-		local section=makeSection(actualSettingsPage,2,"Player Data","Remote module failed to load.")
+		local section=makeSection(actualSettingsPage,1,"Player Data","Remote module failed to load.")
 		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-5/player-data.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 	end
 
@@ -1717,6 +1797,7 @@ local function refreshAllUI()
 	if StrokeColourAPI and StrokeColourAPI.Refresh then pcall(StrokeColourAPI.Refresh) end
 	if MapEditorAPI and MapEditorAPI.Refresh then pcall(MapEditorAPI.Refresh) end
 	if WorkspaceAPI and WorkspaceAPI.Refresh then pcall(WorkspaceAPI.Refresh) end
+	if RemoveAdsAPI and RemoveAdsAPI.Refresh then pcall(RemoveAdsAPI.Refresh) end
 	if refreshPage2UI then pcall(refreshPage2UI) end
 	if applyUIStrokeTheme then pcall(applyUIStrokeTheme) end
 	if updateResponsiveLayout then pcall(updateResponsiveLayout) end
