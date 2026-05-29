@@ -435,10 +435,8 @@ function DataSave.new(ctx)
 				strokeGradient=uiStyle.StrokeGradient and true or false,
 				liquidStroke=uiStyle.LiquidStroke and true or false,
 				liquidStrokeSpeed=uiStyle.LiquidStrokeSpeed,
-				liquidStrokeDirection=uiStyle.LiquidStrokeDirection,
 				strokeThickness=uiStyle.StrokeThickness,
 				strokeTransparency=uiStyle.StrokeTransparency,
-				cornerRadius=uiStyle.CornerRadius,
 			},
 
 			workspace={
@@ -573,11 +571,9 @@ function DataSave.new(ctx)
 			if uiStyle.gradientB~=nil then ctx.UI_STYLE.GradientB=clampNumber(uiStyle.gradientB,0,255,ctx.UI_STYLE.GradientB or 255) end
 			if uiStyle.strokeGradient~=nil then ctx.UI_STYLE.StrokeGradient=uiStyle.strokeGradient and true or false end
 			if uiStyle.liquidStroke~=nil then ctx.UI_STYLE.LiquidStroke=uiStyle.liquidStroke and true or false end
-			if uiStyle.liquidStrokeSpeed~=nil then ctx.UI_STYLE.LiquidStrokeSpeed=clampNumber(uiStyle.liquidStrokeSpeed,0,5,ctx.UI_STYLE.LiquidStrokeSpeed or 1) end
-			if uiStyle.liquidStrokeDirection~=nil then ctx.UI_STYLE.LiquidStrokeDirection=tostring(uiStyle.liquidStrokeDirection) end
+			if uiStyle.liquidStrokeSpeed~=nil then ctx.UI_STYLE.LiquidStrokeSpeed=clampNumber(uiStyle.liquidStrokeSpeed,0,2,ctx.UI_STYLE.LiquidStrokeSpeed or 1) end
 			if uiStyle.strokeThickness~=nil then ctx.UI_STYLE.StrokeThickness=clampNumber(uiStyle.strokeThickness,0,8,ctx.UI_STYLE.StrokeThickness or 1) end
 			if uiStyle.strokeTransparency~=nil then ctx.UI_STYLE.StrokeTransparency=clampNumber(uiStyle.strokeTransparency,0,1,ctx.UI_STYLE.StrokeTransparency or 0.25) end
-			if uiStyle.cornerRadius~=nil then ctx.UI_STYLE.CornerRadius=clampNumber(uiStyle.cornerRadius,0,24,ctx.UI_STYLE.CornerRadius or 8) end
 		end
 
 		local workspaceSettings=settings.workspace or {}
