@@ -249,14 +249,27 @@ function MainFrame.new(ctx)
 	local actionState=New("Frame",{Size=UDim2.fromOffset(148,30),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=6},footer)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},actionState)
 
-	local actionTitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(8,2),Size=UDim2.new(1,-16,0,12),Text="ACTION STATUS",Font=Enum.Font.Gotham,TextSize=10,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},actionState)
+	local actionTitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(8,2),Size=UDim2.new(1,-16,0,12),Text="ESP",Font=Enum.Font.Gotham,TextSize=10,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},actionState)
 	local actionValue=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(8,14),Size=UDim2.new(1,-16,0,14),Text="OFF",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},actionState)
+	local espAvailable=true
+	local espEnabled=false
 
-	function api.RefreshActionStatus(state)
-		actionValue.Text=state and "ON" or "OFF"
+	local function syncESPStatus()
+		actionState.Visible=espAvailable and activePageName=="main"
+	end
+
+	function api.RefreshESPStatus(state,available)
+		espEnabled=state and true or false
+		espAvailable=available~=false
+		actionValue.Text=espEnabled and "ON" or "OFF"
 		actionState.BackgroundColor3=THEME.BG
-		actionValue.TextColor3=THEME.TEXT
+		actionValue.TextColor3=espEnabled and THEME.GREEN or THEME.TEXT
 		actionTitle.TextColor3=THEME.MUTED
+		syncESPStatus()
+	end
+
+	function api.RefreshActionStatus(state,available)
+		api.RefreshESPStatus(state,available)
 	end
 
 	local function makeFooterBtn(text,width)
@@ -281,7 +294,7 @@ function MainFrame.new(ctx)
 		resetBtn.Visible=showReset
 		resetBtn.Text="RESET"
 		resetWrap.Visible=showReset
-		actionState.Visible=activePageName=="main"
+		syncESPStatus()
 	end
 
 	refreshFooterResetButton()
@@ -478,7 +491,7 @@ function MainFrame.new(ctx)
 	api.footer=footer
 	api.actionState=actionState
 
-	api.RefreshActionStatus(false)
+	api.RefreshESPStatus(false,true)
 	setActivePage("main")
 
 	return api
