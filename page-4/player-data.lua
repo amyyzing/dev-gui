@@ -17,12 +17,23 @@ function PlayerData.new(ctx,page,deps)
 
 	local api={}
 	local statusLabel=nil
+	local statusPill=nil
+	local statusPillText=nil
 	local busy=false
 
 	local function setStatus(text,color)
 		if statusLabel then
 			statusLabel.Text=text or ""
 			statusLabel.TextColor3=color or THEME.MUTED
+		end
+
+		if statusPill then
+			statusPill.BackgroundColor3=(color==THEME.GREEN or color==THEME.RED) and color or THEME.BG
+		end
+
+		if statusPillText then
+			statusPillText.Text=busy and "BUSY" or "READY"
+			statusPillText.TextColor3=(color==THEME.GREEN or color==THEME.RED) and Color3.fromRGB(0,0,0) or THEME.MUTED
 		end
 	end
 
@@ -190,43 +201,50 @@ function PlayerData.new(ctx,page,deps)
 		)
 	end
 
-	local dataSection=makeSection(page,2,"Player Data","Delete data")
+	local dataSection=makeSection(page,2,"Player Data","Saved settings")
 
-	local wipeRow=New("Frame",{
+	local statusRow=New("Frame",{
 		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,30),
+		Size=UDim2.new(1,0,0,34),
 		ZIndex=5,
 	},dataSection)
 
-	local wipeBtn=New("TextButton",{
-		Size=UDim2.fromOffset(150,28),
-		Position=UDim2.new(1,-150,0,0),
-		BackgroundColor3=THEME.BG,
-		BorderSizePixel=0,
-		Text="WIPE DATA",
-		Font=Enum.Font.Gotham,
+	New("TextLabel",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,-76,1,0),
+		Text="Cloud Profile",
+		Font=Enum.Font.GothamMedium,
 		TextSize=12,
 		TextColor3=THEME.TEXT,
-		AutoButtonColor=false,
+		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
-	},wipeRow)
+	},statusRow)
 
-	local wipeWrap=wrapTextButton(wipeBtn,THEME.BG,2)
+	statusPill=New("Frame",{
+		Size=UDim2.fromOffset(64,22),
+		Position=UDim2.new(1,-64,0.5,-11),
+		BackgroundColor3=THEME.BG,
+		BorderSizePixel=0,
+		ZIndex=6,
+	},statusRow)
 
-	wipeBtn.MouseEnter:Connect(function()
-		wipeWrap.BackgroundColor3=Color3.fromRGB(43,43,43)
-	end)
+	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},statusPill)
 
-	wipeBtn.MouseLeave:Connect(function()
-		wipeWrap.BackgroundColor3=THEME.BG
-	end)
-
-	wipeBtn.MouseButton1Click:Connect(api.ShowConfirm)
+	statusPillText=New("TextLabel",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,1,0),
+		Text="READY",
+		Font=Enum.Font.GothamMedium,
+		TextSize=10,
+		TextColor3=THEME.MUTED,
+		TextXAlignment=Enum.TextXAlignment.Center,
+		ZIndex=7,
+	},statusPill)
 
 	statusLabel=New("TextLabel",{
 		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,34),
-		Text="No wipe requested.",
+		Size=UDim2.new(1,0,0,32),
+		Text="Saved settings and owned presets are available.",
 		Font=Enum.Font.Gotham,
 		TextSize=11,
 		TextColor3=THEME.MUTED,
@@ -235,6 +253,38 @@ function PlayerData.new(ctx,page,deps)
 		TextYAlignment=Enum.TextYAlignment.Top,
 		ZIndex=6,
 	},dataSection)
+
+	local wipeRow=New("Frame",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,30),
+		ZIndex=5,
+	},dataSection)
+
+	local wipeBtn=New("TextButton",{
+		Size=UDim2.fromOffset(128,28),
+		Position=UDim2.new(1,-128,0,0),
+		BackgroundColor3=THEME.BG,
+		BorderSizePixel=0,
+		Text="WIPE DATA",
+		Font=Enum.Font.Gotham,
+		TextSize=12,
+		TextColor3=Color3.fromRGB(0,0,0),
+		AutoButtonColor=false,
+		ZIndex=6,
+	},wipeRow)
+
+	local wipeWrap=wrapTextButton(wipeBtn,THEME.BG,2)
+	wipeWrap.BackgroundColor3=THEME.RED
+
+	wipeBtn.MouseEnter:Connect(function()
+		wipeWrap.BackgroundColor3=Color3.fromRGB(255,124,118)
+	end)
+
+	wipeBtn.MouseLeave:Connect(function()
+		wipeWrap.BackgroundColor3=THEME.RED
+	end)
+
+	wipeBtn.MouseButton1Click:Connect(api.ShowConfirm)
 
 	return api
 end
