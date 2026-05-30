@@ -1039,6 +1039,23 @@ function QBAim.new(ctx,parent)
 		return marker
 	end
 
+	local function cleanupC3InfoGui()
+		local anchor=preview.c3InfoAnchor
+		if anchor and anchor.Parent then
+			anchor:Destroy()
+		end
+
+		preview.c3InfoAnchor=nil
+
+		local _,folder=originalCenter()
+		if folder then
+			local existing=folder:FindFirstChild("PreviewC3InfoAnchor")
+			if existing then
+				existing:Destroy()
+			end
+		end
+	end
+
 	local function ensureC3InfoGui()
 		if not C3_INFO_GUI_ENABLED then return nil,nil end
 
@@ -1128,9 +1145,6 @@ function QBAim.new(ctx,parent)
 			marker.Transparency=0
 		end
 
-		if not C3_INFO_GUI_ENABLED then
-			cleanupC3InfoGui()
-		end
 	end
 
 	local function hideC1AndC3Info()
