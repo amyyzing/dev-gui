@@ -64,6 +64,9 @@ local TOGGLE_JB_KEY=Enum.KeyCode.Unknown
 local TOGGLE_AB_KEY=Enum.KeyCode.Unknown
 local TOGGLE_ACTION_KEY=Enum.KeyCode.Unknown
 local TOGGLE_SPEED_KEY=Enum.KeyCode.Unknown
+local QB_AIM_LOCK_KEY=Enum.KeyCode.H
+local QB_AIM_THROW_KEY=Enum.KeyCode.T
+local QB_AIM_TOGGLE_KEY=Enum.KeyCode.P
 
 local DEFAULT_PRESETS={{key=Enum.KeyCode.Unknown, size=Vector3.new(0.1, 0.1, 0.1)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.7, 5.8, 1.65)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(3.1, 5.8, 1.70)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.52, 5.4, 1.41)},}
 
@@ -995,6 +998,9 @@ local function makePage1Ctx()
 		getJumpBoostToggleKey=function() return TOGGLE_JB_KEY end,
 		getAlwaysBoostToggleKey=function() return TOGGLE_AB_KEY end,
 		getESPToggleKey=function() return TOGGLE_ACTION_KEY end,
+		getQBAimLockKey=function() return QB_AIM_LOCK_KEY end,
+		getQBAimThrowKey=function() return QB_AIM_THROW_KEY end,
+		getQBAimToggleKey=function() return QB_AIM_TOGGLE_KEY end,
 		refreshESPStatus=function(state,available)
 			PAGE1_STATE.actionStatusOn=state and available~=false
 			actionStatusOn=PAGE1_STATE.actionStatusOn
@@ -1579,6 +1585,9 @@ local function buildPage2()
 			{label="Always Boost Toggle",get=function() return TOGGLE_AB_KEY end,set=function(v) TOGGLE_AB_KEY=v; requestPlayerAutosave() end},
 			{label="ESP Toggle",get=function() return TOGGLE_ACTION_KEY end,set=function(v) TOGGLE_ACTION_KEY=v; requestPlayerAutosave() end},
 			{label="Speed Toggle",get=function() return TOGGLE_SPEED_KEY end,set=function(v) TOGGLE_SPEED_KEY=v; requestPlayerAutosave() end},
+			{label="QB Aim Lock Receiver",get=function() return QB_AIM_LOCK_KEY end,set=function(v) QB_AIM_LOCK_KEY=v; requestPlayerAutosave() end},
+			{label="QB Aim Throw",get=function() return QB_AIM_THROW_KEY end,set=function(v) QB_AIM_THROW_KEY=v; requestPlayerAutosave() end},
+			{label="QB Aim Toggle",get=function() return QB_AIM_TOGGLE_KEY end,set=function(v) QB_AIM_TOGGLE_KEY=v; requestPlayerAutosave() end},
 		},
 	}
 
@@ -1656,6 +1665,9 @@ resetKeybindPresetPageDefaults=function()
 	TOGGLE_AB_KEY=Enum.KeyCode.Unknown
 	TOGGLE_ACTION_KEY=Enum.KeyCode.Unknown
 	TOGGLE_SPEED_KEY=Enum.KeyCode.Unknown
+	QB_AIM_LOCK_KEY=Enum.KeyCode.H
+	QB_AIM_THROW_KEY=Enum.KeyCode.T
+	QB_AIM_TOGGLE_KEY=Enum.KeyCode.P
 
 	if DataSaveAPI and DataSaveAPI.ResetPresetEditor then
 		DataSaveAPI.ResetPresetEditor(true)
@@ -1796,6 +1808,9 @@ local function getPersistentValue(name,default)
 	if name=="TOGGLE_AB_KEY" then return TOGGLE_AB_KEY end
 	if name=="TOGGLE_ACTION_KEY" then return TOGGLE_ACTION_KEY end
 	if name=="TOGGLE_SPEED_KEY" then return TOGGLE_SPEED_KEY end
+	if name=="QB_AIM_LOCK_KEY" then return QB_AIM_LOCK_KEY end
+	if name=="QB_AIM_THROW_KEY" then return QB_AIM_THROW_KEY end
+	if name=="QB_AIM_TOGGLE_KEY" then return QB_AIM_TOGGLE_KEY end
 	return default
 end
 
@@ -1809,6 +1824,9 @@ local function setPersistentValue(name,value)
 	if name=="TOGGLE_AB_KEY" then TOGGLE_AB_KEY=value return end
 	if name=="TOGGLE_ACTION_KEY" then TOGGLE_ACTION_KEY=value return end
 	if name=="TOGGLE_SPEED_KEY" then TOGGLE_SPEED_KEY=value return end
+	if name=="QB_AIM_LOCK_KEY" then QB_AIM_LOCK_KEY=value return end
+	if name=="QB_AIM_THROW_KEY" then QB_AIM_THROW_KEY=value return end
+	if name=="QB_AIM_TOGGLE_KEY" then QB_AIM_TOGGLE_KEY=value return end
 end
 
 local function refreshAllUI()

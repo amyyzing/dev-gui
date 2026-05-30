@@ -14,6 +14,9 @@ local KEYBIND_FIELDS={
 	{"toggleAlwaysBoost","TOGGLE_AB_KEY"},
 	{"toggleESP","TOGGLE_ACTION_KEY"},
 	{"toggleSpeed","TOGGLE_SPEED_KEY"},
+	{"qbAimLock","QB_AIM_LOCK_KEY"},
+	{"qbAimThrow","QB_AIM_THROW_KEY"},
+	{"qbAimToggle","QB_AIM_TOGGLE_KEY"},
 }
 
 local function cloneRoot()
@@ -422,6 +425,9 @@ function DataSave.new(ctx)
 				toggleESP=encodeBinding(getValue(ctx,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
 				toggleActionStatus=encodeBinding(getValue(ctx,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
 				toggleSpeed=encodeBinding(getValue(ctx,"TOGGLE_SPEED_KEY",Enum.KeyCode.Unknown)),
+				qbAimLock=encodeBinding(getValue(ctx,"QB_AIM_LOCK_KEY",Enum.KeyCode.H)),
+				qbAimThrow=encodeBinding(getValue(ctx,"QB_AIM_THROW_KEY",Enum.KeyCode.T)),
+				qbAimToggle=encodeBinding(getValue(ctx,"QB_AIM_TOGGLE_KEY",Enum.KeyCode.P)),
 			},
 
 			presetEditor=collectPresetEditor(ctx),
@@ -555,6 +561,9 @@ function DataSave.new(ctx)
 			toggleJumpBoost="TOGGLE_JB_KEY",
 			toggleAlwaysBoost="TOGGLE_AB_KEY",
 			toggleSpeed="TOGGLE_SPEED_KEY",
+			qbAimLock="QB_AIM_LOCK_KEY",
+			qbAimThrow="QB_AIM_THROW_KEY",
+			qbAimToggle="QB_AIM_TOGGLE_KEY",
 		}
 
 		for savedName,stateName in pairs(keyMap) do

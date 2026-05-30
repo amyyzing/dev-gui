@@ -11,7 +11,8 @@ local LP=Players.LocalPlayer
 local YARDS_TO_STUDS=3
 local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
-local BALL_SPEED=95
+local GAMEPLAY_BALL_POWER=95
+local SQUADS_BALL_POWER=100
 local PLAYER_G=196.2
 local JUMP_POWER=53.5
 local WR_MAX_Y=6+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
@@ -100,6 +101,25 @@ local function routeSpeed(speed)
 	end
 
 	return clamped
+end
+
+local function inputToBinding(input)
+	local key=input.KeyCode
+	if key and key~=Enum.KeyCode.Unknown then
+		return key
+	end
+
+	local uiType=tostring(input.UserInputType)
+	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
+	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
+	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
+	if uiType=="Enum.UserInputType.MouseButton4" then return"MouseButton4" end
+	if uiType=="Enum.UserInputType.MouseButton5" then return"MouseButton5" end
+
+	local name=uiType:gsub("Enum.UserInputType%.","")
+	if name:match("^Gamepad") then return name end
+
+	return nil
 end
 
 local function getModeKey(ctx)
@@ -254,58 +274,42 @@ local function prepPreviewObject(object)
 	end
 end
 
-local function getServerTime()
-	local ok,timeNow=pcall(function()
-		return Workspace:GetServerTimeNow()
-	end)
+local function getFirstMiniGameFolder(container)
+	if not container then return nil end
 
-	if ok and type(timeNow)=="number" then
-		return timeNow
-	end
-
-	return os.clock()
-end
-
-local function fireClientSignal(signal,...)
-	if typeof(firesignal)=="function" then
-		local ok=pcall(firesignal,signal,...)
-		if ok then
-			return true
+	for _,child in ipairs(container:GetChildren()) do
+		if child:IsA("Folder") or child:IsA("Model") then
+			return child
 		end
 	end
 
-	if typeof(getconnections)=="function" then
-		local ok,connections=pcall(getconnections,signal)
-		if ok and type(connections)=="table" then
-			local fired=false
-
-			for _,connection in ipairs(connections) do
-				local fn=connection.Function
-				if type(fn)=="function" then
-					local callOk=pcall(fn,...)
-					fired=fired or callOk
-				end
-			end
-
-			return fired
-		end
-	end
-
-	return false
+	return nil
 end
 
-local function getSquadsSettings()
-	local miniGames=ReplicatedStorage:FindFirstChild("MiniGames")
-	local firstMiniGame=miniGames and miniGames:GetChildren()[1]
-	if firstMiniGame then
-		return firstMiniGame.Name,firstMiniGame
-	end
-
+local function getSquadsReEvent()
+	local containers={}
+	local replicatedMiniGames=ReplicatedStorage:FindFirstChild("MiniGames")
 	local workspaceMiniGames=Workspace:FindFirstChild("MiniGames")
-	local workspaceFirst=workspaceMiniGames and workspaceMiniGames:GetChildren()[1]
-	if workspaceFirst then
-		local replicatedFirst=miniGames and miniGames:FindFirstChild(workspaceFirst.Name)
-		return workspaceFirst.Name,replicatedFirst or workspaceFirst
+	local workspaceGames=Workspace:FindFirstChild("Games")
+	local replicatedGames=ReplicatedStorage:FindFirstChild("Games")
+	local function addContainer(container)
+		if container then
+			table.insert(containers,container)
+		end
+	end
+
+	addContainer(replicatedMiniGames)
+	addContainer(workspaceMiniGames)
+	addContainer(workspaceGames and workspaceGames:FindFirstChild("MiniGames"))
+	addContainer(replicatedGames and replicatedGames:FindFirstChild("MiniGames"))
+
+	for _,container in ipairs(containers) do
+		local miniGame=getFirstMiniGameFolder(container)
+		local reEvent=miniGame and miniGame:FindFirstChild("ReEvent")
+
+		if reEvent and reEvent:IsA("RemoteEvent") then
+			return reEvent,miniGame
+		end
 	end
 
 	return nil,nil
@@ -398,6 +402,29 @@ function QBAim.new(ctx,parent)
 		else
 			targetLabel.Text="Target: none"
 		end
+	end
+
+	local function configuredBinding(getterName,fallback)
+		local getter=ctx[getterName]
+		if type(getter)=="function" then
+			local ok,binding=pcall(getter)
+			if ok and binding~=nil then
+				return binding
+			end
+		end
+
+		return fallback
+	end
+
+	local function bindingMatches(getterName,input,fallback)
+		local binding=configuredBinding(getterName,fallback)
+		if binding==nil or binding==Enum.KeyCode.Unknown then
+			return false
+		end
+
+		local convert=ctx.inputToBinding or inputToBinding
+		local incoming=convert(input)
+		return incoming~=nil and incoming==binding
 	end
 
 	local function syncControls()
@@ -757,7 +784,8 @@ function QBAim.new(ctx,parent)
 		}
 	end
 
-	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape)
+	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower)
+		ballPower=ballPower or GAMEPLAY_BALL_POWER
 		local originPosition=origin(qbRoot,ball)
 		local startTarget=receiverMax(receiverRoot)
 		local distance=distXZ(originPosition,startTarget)
@@ -777,9 +805,9 @@ function QBAim.new(ctx,parent)
 					local direction=needed.Unit
 					local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
 					if angle<=maxAngle then
-						local finalVelocity=direction*BALL_SPEED
+						local finalVelocity=direction*ballPower
 						local catchPosition=ballAt(originPosition,finalVelocity,time)
-						local speedError=math.abs(BALL_SPEED-requiredSpeed)
+						local speedError=math.abs(ballPower-requiredSpeed)
 						local verticalVelocity=finalVelocity.Y+G.Y*time
 						local upwardPenalty=verticalVelocity>4 and verticalVelocity*2 or 0
 						local lowPenalty=angle<minAngle and (minAngle-angle)*8 or 0
@@ -806,7 +834,7 @@ function QBAim.new(ctx,parent)
 								requiredSpeed=requiredSpeed,
 								direction=direction,
 								velocity=finalVelocity,
-								speed=BALL_SPEED,
+								speed=ballPower,
 								aimPoint=originPosition+direction*AIM_SCALE,
 								angleDeg=angle,
 								preferredAngle=preferred,
@@ -868,7 +896,11 @@ function QBAim.new(ctx,parent)
 		beam.Enabled=true
 	end
 
-	local function buildPlan(receiver)
+	local function currentBallPower()
+		return getModeKey(ctx)=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
+	end
+
+	local function buildPlan(receiver,ballPower)
 		local character=LP.Character
 		local qbRoot=root(character)
 		local ball=getHeldBall()
@@ -881,7 +913,7 @@ function QBAim.new(ctx,parent)
 
 		local originPosition=origin(qbRoot,ball)
 		local targetVelocity,shape=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
-		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape),ball
+		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower()),ball
 	end
 
 	local function fireGameplayThrow(plan)
@@ -890,7 +922,7 @@ function QBAim.new(ctx,parent)
 			return false,"Gameplay ReEvent missing"
 		end
 
-		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=BALL_SPEED})
+		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=plan.speed or GAMEPLAY_BALL_POWER})
 		pcall(function()
 			local variables=require(LP.PlayerScripts.ClientMain.Utilities.Variables)
 			if variables.Mechanics and variables.Mechanics.UnequipFootball then
@@ -901,31 +933,17 @@ function QBAim.new(ctx,parent)
 		return true,nil
 	end
 
-	local function fireSquadsThrow(plan,ball)
-		local reEvent=ReplicatedStorage:FindFirstChild("ReEvent")
-		if not(reEvent and reEvent:IsA("RemoteEvent")) then
-			return false,"Squads ReEvent missing"
+	local function fireSquadsThrow(plan)
+		local reEvent=getSquadsReEvent()
+		if not reEvent then
+			return false,"Squads MiniGames ReEvent missing"
 		end
 
-		local gameId,settings=getSquadsSettings()
-		if not(gameId and settings) then
-			return false,"Squads MiniGames settings missing"
-		end
-
-		local fired=fireClientSignal(reEvent.OnClientEvent,"UpdateFootball",ball,{
-			CenterWorld=Vector3.new(0,0.4,0),
-			GameID=gameId,
-			Sett=settings,
-			Power=BALL_SPEED,
+		reEvent:FireServer("Mechanics","ThrowBall",{
 			Target=plan.aimPoint,
-			SpawnPos=plan.origin,
-			SpinType=1,
-			LaunchTime=getServerTime(),
+			AutoThrow=false,
+			Power=plan.speed or SQUADS_BALL_POWER,
 		})
-
-		if not fired then
-			return false,"Client signal helper missing"
-		end
 
 		return true,nil
 	end
@@ -933,7 +951,8 @@ function QBAim.new(ctx,parent)
 	local function throwTo(receiver)
 		if not(enabled and isAvailable()) then return end
 
-		local plan,ball=buildPlan(receiver)
+		local modeKey=getModeKey(ctx)
+		local plan=buildPlan(receiver,modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER)
 		if not plan then
 			setStatus("No throw solution")
 			return
@@ -944,12 +963,11 @@ function QBAim.new(ctx,parent)
 			task.wait(THROW_ANIMATION_RELEASE_WAIT)
 		end
 
-		local modeKey=getModeKey(ctx)
 		local ok,err
 		if modeKey=="mode1" then
 			ok,err=fireGameplayThrow(plan)
 		elseif modeKey=="mode3" then
-			ok,err=fireSquadsThrow(plan,ball)
+			ok,err=fireSquadsThrow(plan)
 		else
 			ok,err=false,"Park route unknown"
 		end
@@ -1029,7 +1047,7 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
-	sectionBody=makeSection(parent,4,"QB Aim","H lock, T throw, P toggle")
+	sectionBody=makeSection(parent,4,"QB Aim","custom keys in Keybind Settings")
 	sectionFrame=sectionBody and sectionBody.Parent or nil
 
 	enabledToggle=buildToggleRow(sectionBody,"Enabled",enabled,function(value)
@@ -1097,16 +1115,16 @@ function QBAim.new(ctx,parent)
 	addConnection(UIS.InputBegan:Connect(function(input,processed)
 		if processed or not isAvailable() then return end
 
-		if input.KeyCode==Enum.KeyCode.P then
+		if bindingMatches("getQBAimToggleKey",input,Enum.KeyCode.P) then
 			setEnabled(not enabled)
 			return
 		end
 
 		if not enabled then return end
 
-		if input.KeyCode==Enum.KeyCode.H then
+		if bindingMatches("getQBAimLockKey",input,Enum.KeyCode.H) then
 			lockReceiverUnderCursor()
-		elseif input.KeyCode==Enum.KeyCode.T then
+		elseif bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T) then
 			if trackedReceiver then
 				throwTo(trackedReceiver)
 			else
