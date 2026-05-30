@@ -68,6 +68,8 @@ local CIRCLE_TANGENT_EXTRA_MAX=0.70
 local CIRCLE_LOS_RATE_GAIN=6
 local CIRCLE_LOS_RATE_EPSILON=1.00
 local CIRCLE_EXTRA_LEAD_TIME_MAX=0.78
+local CIRCLE_BALANCE_LEAD_SCALE_MIN=0.72
+local CIRCLE_BALANCE_LEAD_SCALE_MAX=1.00
 local DIAG_STREAK_SIDE_RATIO_MIN=0.30
 local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
@@ -849,6 +851,8 @@ function QBAim.new(ctx,parent)
 		local positiveAwayShare=math.clamp(result.away/speed,0,1)
 		local radialShareAbs=math.clamp(result.awayAbs/speed,0,1)
 		local lateralShare=math.clamp(result.sideAbs/speed,0,1)
+		local routeBalance=1-math.abs(radialShareAbs-lateralShare)
+		local balanceLeadScale=CIRCLE_BALANCE_LEAD_SCALE_MIN+(CIRCLE_BALANCE_LEAD_SCALE_MAX-CIRCLE_BALANCE_LEAD_SCALE_MIN)*routeBalance
 
 		local distanceScale=math.clamp(radius/CIRCLE_RADIUS_FULL_LEAD,CIRCLE_DISTANCE_SCALE_MIN,CIRCLE_DISTANCE_SCALE_MAX)
 
@@ -867,8 +871,8 @@ function QBAim.new(ctx,parent)
 		local losRate=result.sideAbs/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
 		local losDamping=1/(1+losRate*CIRCLE_LOS_RATE_GAIN)
 
-		local radialExtraTime=math.min(WR_LEAD_DELAY*distanceScale*radialGain,CIRCLE_EXTRA_LEAD_TIME_MAX)
-		local tangentExtraTime=math.min(WR_LEAD_DELAY*distanceScale*tangentGain*losDamping,CIRCLE_EXTRA_LEAD_TIME_MAX)
+		local radialExtraTime=math.min(WR_LEAD_DELAY*distanceScale*radialGain*balanceLeadScale,CIRCLE_EXTRA_LEAD_TIME_MAX)
+		local tangentExtraTime=math.min(WR_LEAD_DELAY*distanceScale*tangentGain*losDamping*balanceLeadScale,CIRCLE_EXTRA_LEAD_TIME_MAX)
 
 		local flightLead=flat(targetVelocity)*flightTime
 		local radialExtraLead=result.awayDir*result.away*radialExtraTime
@@ -891,6 +895,8 @@ function QBAim.new(ctx,parent)
 			positiveAwayShare=positiveAwayShare,
 			radialShareAbs=radialShareAbs,
 			lateralShare=lateralShare,
+			routeBalance=routeBalance,
+			balanceLeadScale=balanceLeadScale,
 			radialGain=radialGain,
 			tangentGain=tangentGain,
 			losRate=losRate,
