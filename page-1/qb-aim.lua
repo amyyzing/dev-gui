@@ -421,6 +421,14 @@ function QBAim.new(ctx,parent)
 	local enabledToggle=nil
 	local statusLabel=nil
 	local targetLabel=nil
+	local leadDelayFrame=nil
+	local leadDelayBox=nil
+	local leadDelaySlider=nil
+	local leadDelaySliderFill=nil
+	local leadDelaySliderKnob=nil
+	local leadDelayDragging=false
+	local LEAD_DELAY_MIN=0.00
+	local LEAD_DELAY_MAX=1.50
 
 	local function addConnection(conn)
 		table.insert(connections,conn)
@@ -463,6 +471,42 @@ function QBAim.new(ctx,parent)
 		else
 			targetLabel.Text="Target: none"
 		end
+	end
+
+	local function updateLeadDelayVisuals()
+		if leadDelayBox then
+			leadDelayBox.Text=string.format("%.2f",WR_LEAD_DELAY)
+		end
+
+		if leadDelaySliderFill and leadDelaySliderKnob and leadDelaySlider then
+			local alpha=(WR_LEAD_DELAY-LEAD_DELAY_MIN)/math.max(LEAD_DELAY_MAX-LEAD_DELAY_MIN,0.001)
+			alpha=math.clamp(alpha,0,1)
+			leadDelaySliderFill.Size=UDim2.new(alpha,0,1,0)
+			leadDelaySliderKnob.Position=UDim2.new(alpha,-5,0.5,-5)
+		end
+	end
+
+	local function setLeadDelay(value,showStatus)
+		local numberValue=tonumber(value)
+		if not numberValue then
+			updateLeadDelayVisuals()
+			return false
+		end
+
+		WR_LEAD_DELAY=math.clamp(numberValue,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
+		updateLeadDelayVisuals()
+		if showStatus then
+			setStatus(string.format("LD set to %.2fs",WR_LEAD_DELAY))
+		end
+		return true
+	end
+
+	local function setLeadDelayFromScreenX(screenX,showStatus)
+		if not leadDelaySlider then return false end
+		local pos=leadDelaySlider.AbsolutePosition.X
+		local size=math.max(leadDelaySlider.AbsoluteSize.X,1)
+		local alpha=math.clamp((screenX-pos)/size,0,1)
+		return setLeadDelay(LEAD_DELAY_MIN+(LEAD_DELAY_MAX-LEAD_DELAY_MIN)*alpha,showStatus)
 	end
 
 	local function ensureReceiverData(player,receiverRoot)
@@ -1405,6 +1449,54 @@ function QBAim.new(ctx,parent)
 
 	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Disabled",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
 	targetLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Target: none",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
+
+	leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,34),ZIndex=6},sectionBody)
+	New("TextLabel",{BackgroundTransparency=1,Position=UDim2.new(0,0,0,0),Size=UDim2.new(0,32,0,16),Text="LD",Font=Enum.Font.GothamBold,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},leadDelayFrame)
+	leadDelayBox=New("TextBox",{BackgroundColor3=Color3.fromRGB(20,22,28),BackgroundTransparency=0.08,BorderSizePixel=0,Position=UDim2.new(0,34,0,0),Size=UDim2.new(0,44,0,18),Text=string.format("%.2f",WR_LEAD_DELAY),ClearTextOnFocus=false,Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=Color3.fromRGB(235,235,235),TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},leadDelayFrame)
+	New("UICorner",{CornerRadius=UDim.new(0,5)},leadDelayBox)
+	leadDelaySlider=New("Frame",{BackgroundColor3=Color3.fromRGB(36,40,48),BackgroundTransparency=0.05,BorderSizePixel=0,Position=UDim2.new(0,84,0,7),Size=UDim2.new(1,-84,0,5),ZIndex=7},leadDelayFrame)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},leadDelaySlider)
+	leadDelaySliderFill=New("Frame",{BackgroundColor3=Color3.fromRGB(255,170,0),BorderSizePixel=0,Size=UDim2.new(0,0,1,0),ZIndex=8},leadDelaySlider)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},leadDelaySliderFill)
+	leadDelaySliderKnob=New("Frame",{BackgroundColor3=Color3.fromRGB(255,235,170),BorderSizePixel=0,Position=UDim2.new(0,-5,0.5,-5),Size=UDim2.new(0,10,0,10),ZIndex=9},leadDelaySlider)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},leadDelaySliderKnob)
+	updateLeadDelayVisuals()
+
+	addConnection(leadDelayBox.FocusLost:Connect(function()
+		setLeadDelay(leadDelayBox.Text,true)
+	end))
+
+	local function beginLeadDelayDrag(input)
+		leadDelayDragging=true
+		setLeadDelayFromScreenX(input.Position.X,true)
+	end
+
+	addConnection(leadDelaySlider.InputBegan:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+			beginLeadDelayDrag(input)
+		end
+	end))
+
+	addConnection(leadDelaySliderKnob.InputBegan:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+			beginLeadDelayDrag(input)
+		end
+	end))
+
+	addConnection(UIS.InputChanged:Connect(function(input)
+		if leadDelayDragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
+			setLeadDelayFromScreenX(input.Position.X,false)
+		end
+	end))
+
+	addConnection(UIS.InputEnded:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+			if leadDelayDragging then
+				leadDelayDragging=false
+				setStatus(string.format("LD set to %.2fs",WR_LEAD_DELAY))
+			end
+		end
+	end))
 
 	addConnection(RunService.Heartbeat:Connect(function()
 		if not isAlive() then return end
