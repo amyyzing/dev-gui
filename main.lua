@@ -271,6 +271,7 @@ local MODULE_PATHS={
 	Page1GameParams="page-1/game-params.lua",
 	Page1Boost="page-1/boost.lua",
 	Page1ESP="page-1/esp.lua",
+	Page1QBAim="page-1/qb-aim.lua",
 	StrokeColour="page-3/stroke-colour.lua",
 	MapEditor="page-4/map-editor.lua",
 	Workspace="page-4/workspace.lua",
@@ -340,6 +341,7 @@ local Page1SpeedModule=loadRemoteModule(MODULE_PATHS.Page1Speed)
 local Page1GameParamsModule=loadRemoteModule(MODULE_PATHS.Page1GameParams)
 local Page1BoostModule=loadRemoteModule(MODULE_PATHS.Page1Boost)
 local Page1ESPModule=loadRemoteModule(MODULE_PATHS.Page1ESP)
+local Page1QBAimModule=loadRemoteModule(MODULE_PATHS.Page1QBAim)
 local StrokeColourModule=loadRemoteModule(MODULE_PATHS.StrokeColour)
 local MapEditorModule=loadRemoteModule(MODULE_PATHS.MapEditor)
 local WorkspaceModule=loadRemoteModule(MODULE_PATHS.Workspace)
@@ -373,6 +375,7 @@ local PAGE1_RELOAD_PATHS={
 	[MODULE_PATHS.Page1GameParams]=function(module) Page1GameParamsModule=module end,
 	[MODULE_PATHS.Page1Boost]=function(module) Page1BoostModule=module end,
 	[MODULE_PATHS.Page1ESP]=function(module) Page1ESPModule=module end,
+	[MODULE_PATHS.Page1QBAim]=function(module) Page1QBAimModule=module end,
 }
 
 local function getUIStrokeColor()
@@ -1009,6 +1012,9 @@ local function makePage1Ctx()
 			if PAGE1_APIS.ESP and PAGE1_APIS.ESP.Refresh then
 				pcall(PAGE1_APIS.ESP.Refresh)
 			end
+			if PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.Refresh then
+				pcall(PAGE1_APIS.QBAim.Refresh)
+			end
 			refreshActionStatus()
 		end,
 		onChanged=function()
@@ -1079,6 +1085,15 @@ local function buildPage1()
 		if ok then PAGE1_APIS.ESP=result else addPage1Error(rightCol,3,"ESP",tostring(result)) end
 	else
 		addPage1Error(rightCol,3,"ESP","page-1/esp.lua")
+	end
+
+	if Page1QBAimModule and Page1QBAimModule.new then
+		local ok,result=pcall(function()
+			return Page1QBAimModule.new(ctx,rightCol)
+		end)
+		if ok then PAGE1_APIS.QBAim=result else addPage1Error(rightCol,4,"QB Aim",tostring(result)) end
+	else
+		addPage1Error(rightCol,4,"QB Aim","page-1/qb-aim.lua")
 	end
 
 	syncPage1State()

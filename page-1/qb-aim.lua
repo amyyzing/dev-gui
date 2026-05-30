@@ -1,0 +1,1122 @@
+local QBAim={}
+
+local Players=game:GetService("Players")
+local RunService=game:GetService("RunService")
+local UIS=game:GetService("UserInputService")
+local Workspace=game:GetService("Workspace")
+local ReplicatedStorage=game:GetService("ReplicatedStorage")
+
+local LP=Players.LocalPlayer
+
+local YARDS_TO_STUDS=3
+local BALL_G=28
+local G=Vector3.new(0,-BALL_G,0)
+local BALL_SPEED=95
+local PLAYER_G=196.2
+local JUMP_POWER=53.5
+local WR_MAX_Y=6+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
+local MAX_RUN_SPEED=21
+local NORMAL_ROUTE_MIN_SPEED=19
+local ROUTE_LOCK_MIN_SPEED=2.5
+local ROUTE_LOCK_MAX_AGE=1.5
+local WR_LEAD_DELAY=0.75
+local QB_RELEASE_DELAY=0.25
+local QB_XZ_RELEASE_FACTOR=0
+local QB_LAUNCH_Y_BIAS=0
+local QB_GROUND_ROOT_Y=3.648
+local QB_AIRBORNE_Y_EPSILON=0.35
+local QB_AIRBORNE_VY_EPSILON=2
+local QB_Y_RISE_FACTOR=0
+local QB_Y_FALL_FACTOR=0
+local QB_Y_MAX_CORRECTION=4.25
+local MIN_T,MAX_T,DT=0.35,6,0.01
+local AIM_SCALE=1000
+local ARC_PREVIEW_ENABLED=true
+local ARC_PREVIEW_USE_C2_Y=true
+local ARC_PREVIEW_UPDATE_INTERVAL=0.035
+local ARC_LANDING_Y=0.5
+local ARC_MAX_CURVE=400
+local PREVIEW_SMOOTH=0.28
+local STABLE_WINDOW=0.48
+local STABLE_MIN_DIST=2
+local STABLE_MIN_SPEED=5
+local STABLE_HOLD=0.55
+local STABLE_STOP_SPEED=1.75
+local STABLE_DOT_REPLACE=0.72
+local STABLE_BLEND=0.18
+local CIRCLE_RADIUS_FULL_LEAD=180
+local CIRCLE_DISTANCE_SCALE_MIN=0.35
+local CIRCLE_RADIAL_EXTRA_BASE=0.55
+local CIRCLE_RADIAL_EXTRA_GAIN=0.45
+local CIRCLE_RADIAL_EXTRA_MIN=0.25
+local CIRCLE_RADIAL_EXTRA_MAX=1
+local CIRCLE_TANGENT_EXTRA_BASE=0.25
+local CIRCLE_TANGENT_EXTRA_GAIN=0.50
+local CIRCLE_TANGENT_EXTRA_MIN=0.15
+local CIRCLE_TANGENT_EXTRA_MAX=0.70
+local CIRCLE_LOS_RATE_GAIN=6
+local CIRCLE_EXTRA_LEAD_TIME_MAX=0.78
+local DIAG_STREAK_SIDE_RATIO_MIN=0.30
+local DIAG_STREAK_SIDE_SPEED_MIN=4
+local PLAY_THROW_ANIMATION=true
+local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
+local THROW_ANIMATION_SPEED=1.35
+local THROW_ANIMATION_RELEASE_WAIT=0
+
+local function safeDisconnect(conn)
+	if conn and typeof(conn)=="RBXScriptConnection" then
+		pcall(function()
+			conn:Disconnect()
+		end)
+	end
+end
+
+local function flat(v)
+	return Vector3.new(v.X,0,v.Z)
+end
+
+local function distXZ(a,b)
+	return (flat(b)-flat(a)).Magnitude
+end
+
+local function unit(v,fallback)
+	if v.Magnitude<1e-6 then
+		return fallback or Vector3.new(1,0,0)
+	end
+
+	return v.Unit
+end
+
+local function root(character)
+	return character and (character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso"))
+end
+
+local function routeSpeed(speed)
+	local clamped=math.clamp(speed,0,MAX_RUN_SPEED)
+	if clamped<ROUTE_LOCK_MIN_SPEED then
+		return 0
+	elseif clamped>=NORMAL_ROUTE_MIN_SPEED then
+		return MAX_RUN_SPEED
+	end
+
+	return clamped
+end
+
+local function getModeKey(ctx)
+	if ctx.getCurrentModeKey then
+		local ok,modeKey=pcall(ctx.getCurrentModeKey)
+		if ok and modeKey then
+			return tostring(modeKey)
+		end
+	end
+
+	local games=Workspace:FindFirstChild("Games")
+	if games and #games:GetChildren()>0 then
+		return"mode1"
+	end
+
+	local miniGames=Workspace:FindFirstChild("MiniGames")
+	local count=miniGames and #miniGames:GetChildren() or 0
+	if count>1 then
+		return"mode2"
+	elseif count==1 then
+		return"mode3"
+	end
+
+	return"mode1"
+end
+
+local function getHeldBall()
+	local character=LP.Character
+	local characterRoot=root(character)
+	if not(character and characterRoot) then return nil end
+
+	local ball=character:FindFirstChild("Football")
+	if ball and ball:IsA("BasePart") and (ball.Position-characterRoot.Position).Magnitude<14 then
+		return ball
+	end
+
+	local gameObjects=character:FindFirstChild("GAMEOBJECTS")
+	ball=gameObjects and gameObjects:FindFirstChild("Football")
+	if ball and ball:IsA("BasePart") and (ball.Position-characterRoot.Position).Magnitude<14 then
+		return ball
+	end
+
+	return nil
+end
+
+local function getGameReEvent()
+	local games=Workspace:FindFirstChild("Games")
+	if games then
+		for _,gameFolder in ipairs(games:GetChildren()) do
+			local replicated=gameFolder:FindFirstChild("Replicated")
+			local playersFolder=replicated and replicated:FindFirstChild("Players")
+			local reEvent=gameFolder:FindFirstChild("ReEvent") or (replicated and replicated:FindFirstChild("ReEvent"))
+
+			if playersFolder and playersFolder:FindFirstChild(LP.Name) and reEvent and reEvent:IsA("RemoteEvent") then
+				return reEvent
+			end
+		end
+	end
+
+	local replicatedGames=ReplicatedStorage:FindFirstChild("Games")
+	if replicatedGames then
+		for _,gameFolder in ipairs(replicatedGames:GetChildren()) do
+			local replicated=gameFolder:FindFirstChild("Replicated")
+			local reEvent=gameFolder:FindFirstChild("ReEvent") or (replicated and replicated:FindFirstChild("ReEvent"))
+
+			if reEvent and reEvent:IsA("RemoteEvent") then
+				return reEvent
+			end
+		end
+	end
+
+	return nil
+end
+
+local function getFirstGame()
+	local games=Workspace:FindFirstChild("Games")
+	if not games then return nil end
+
+	for _,child in ipairs(games:GetChildren()) do
+		if child:IsA("Model") or child:IsA("Folder") then
+			return child
+		end
+	end
+
+	return nil
+end
+
+local function localFolder()
+	local gameFolder=getFirstGame()
+	return gameFolder and gameFolder:FindFirstChild("Local")
+end
+
+local function originalCenter()
+	local folder=localFolder()
+	return folder and folder:FindFirstChild("Center"),folder
+end
+
+local function attachmentCFrame(attachment)
+	if not(attachment and attachment.Parent) then return nil end
+
+	local ok,worldCFrame=pcall(function()
+		return attachment.WorldCFrame
+	end)
+	if ok then return worldCFrame end
+
+	if attachment.Parent:IsA("BasePart") then
+		return attachment.Parent.CFrame*attachment.CFrame
+	end
+
+	return nil
+end
+
+local function setAttachmentCFrame(attachment,cframe)
+	if not(attachment and attachment.Parent and typeof(cframe)=="CFrame") then return false end
+
+	if attachment.Parent:IsA("BasePart") then
+		attachment.CFrame=attachment.Parent.CFrame:ToObjectSpace(cframe)
+		return true
+	end
+
+	local ok=pcall(function()
+		attachment.WorldCFrame=cframe
+	end)
+
+	return ok
+end
+
+local function xAxisCFrame(position,xVector)
+	xVector=unit(xVector)
+	local up=Vector3.new(0,1,0)
+	if math.abs(xVector:Dot(up))>0.96 then
+		up=Vector3.new(0,0,1)
+	end
+
+	local z=unit(xVector:Cross(up),Vector3.new(0,0,1))
+	local y=unit(z:Cross(xVector),Vector3.new(0,1,0))
+	return CFrame.fromMatrix(position,xVector,y,z)
+end
+
+local function prepPreviewObject(object)
+	if not object then return end
+
+	for _,descendant in ipairs(object:GetDescendants()) do
+		if descendant:IsA("BasePart") then
+			descendant.Anchored=true
+			descendant.CanCollide=false
+			descendant.CanTouch=false
+			descendant.CanQuery=false
+		elseif descendant:IsA("Beam") then
+			descendant.Enabled=true
+		end
+	end
+end
+
+local function getServerTime()
+	local ok,timeNow=pcall(function()
+		return Workspace:GetServerTimeNow()
+	end)
+
+	if ok and type(timeNow)=="number" then
+		return timeNow
+	end
+
+	return os.clock()
+end
+
+local function fireClientSignal(signal,...)
+	if typeof(firesignal)=="function" then
+		local ok=pcall(firesignal,signal,...)
+		if ok then
+			return true
+		end
+	end
+
+	if typeof(getconnections)=="function" then
+		local ok,connections=pcall(getconnections,signal)
+		if ok and type(connections)=="table" then
+			local fired=false
+
+			for _,connection in ipairs(connections) do
+				local fn=connection.Function
+				if type(fn)=="function" then
+					local callOk=pcall(fn,...)
+					fired=fired or callOk
+				end
+			end
+
+			return fired
+		end
+	end
+
+	return false
+end
+
+local function getSquadsSettings()
+	local miniGames=ReplicatedStorage:FindFirstChild("MiniGames")
+	local firstMiniGame=miniGames and miniGames:GetChildren()[1]
+	if firstMiniGame then
+		return firstMiniGame.Name,firstMiniGame
+	end
+
+	local workspaceMiniGames=Workspace:FindFirstChild("MiniGames")
+	local workspaceFirst=workspaceMiniGames and workspaceMiniGames:GetChildren()[1]
+	if workspaceFirst then
+		local replicatedFirst=miniGames and miniGames:FindFirstChild(workspaceFirst.Name)
+		return workspaceFirst.Name,replicatedFirst or workspaceFirst
+	end
+
+	return nil,nil
+end
+
+local function playThrowAnimation()
+	if not PLAY_THROW_ANIMATION then return end
+
+	local globals=(typeof(getgenv)=="function" and getgenv()) or _G or {}
+	local mechanics=rawget(globals,"Mechanics")
+	if mechanics and type(mechanics.PlayAnimation)=="function" then
+		pcall(function()
+			mechanics:PlayAnimation(THROW_ANIMATION_NAME,THROW_ANIMATION_SPEED)
+		end)
+		return
+	end
+
+	local playerScripts=LP:FindFirstChild("PlayerScripts")
+	local clientMain=playerScripts and playerScripts:FindFirstChild("ClientMain")
+	local utilities=clientMain and clientMain:FindFirstChild("Utilities")
+	local variablesModule=utilities and utilities:FindFirstChild("Variables")
+
+	if variablesModule then
+		local ok,variables=pcall(require,variablesModule)
+		local clientMechanics=ok and variables and variables.Mechanics
+		if clientMechanics and type(clientMechanics.PlayAnimation)=="function" then
+			pcall(function()
+				clientMechanics:PlayAnimation(THROW_ANIMATION_NAME,THROW_ANIMATION_SPEED)
+			end)
+		end
+	end
+end
+
+function QBAim.new(ctx,parent)
+	local New=ctx.New
+	local THEME=ctx.THEME
+	local makeSection=ctx.makeSection
+	local buildToggleRow=ctx.buildToggleRow
+	local api={}
+	local enabled=false
+	local trackedReceiver=nil
+	local selectedRouteLock=nil
+	local receiverData={}
+	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil}
+	local connections={}
+	local sectionBody=nil
+	local sectionFrame=nil
+	local enabledToggle=nil
+	local statusLabel=nil
+	local targetLabel=nil
+
+	local function addConnection(conn)
+		table.insert(connections,conn)
+		return conn
+	end
+
+	local function isAlive()
+		return sectionFrame==nil or sectionFrame.Parent~=nil
+	end
+
+	local function isAvailable()
+		local modeKey=getModeKey(ctx)
+		return modeKey=="mode1" or modeKey=="mode3"
+	end
+
+	local function currentModeText()
+		local modeKey=getModeKey(ctx)
+		if modeKey=="mode1" then
+			return"Gameplay"
+		elseif modeKey=="mode2" then
+			return"Park"
+		elseif modeKey=="mode3" then
+			return"Squads"
+		end
+
+		return tostring(modeKey)
+	end
+
+	local function setStatus(text)
+		if statusLabel then
+			statusLabel.Text=text
+		end
+	end
+
+	local function setTargetText()
+		if not targetLabel then return end
+
+		if trackedReceiver then
+			targetLabel.Text="Target: "..trackedReceiver.Name
+		else
+			targetLabel.Text="Target: none"
+		end
+	end
+
+	local function syncControls()
+		if not isAvailable() then
+			enabled=false
+			trackedReceiver=nil
+			selectedRouteLock=nil
+		end
+
+		if enabledToggle then
+			enabledToggle.set(enabled)
+		end
+
+		setTargetText()
+
+		if not isAvailable() then
+			setStatus(currentModeText().." unsupported")
+		elseif enabled then
+			setStatus(currentModeText().." ready")
+		else
+			setStatus(currentModeText().." disabled")
+		end
+	end
+
+	local function c2Y()
+		local center=originalCenter()
+		local c2=center and center:FindFirstChild("C2",true)
+		local cf=c2 and attachmentCFrame(c2)
+		return cf and cf.Position.Y
+	end
+
+	local function arcRig()
+		local original,folder=originalCenter()
+		if not(original and folder) then return nil end
+
+		if not preview.center or preview.orig~=original or not preview.center.Parent then
+			if preview.center then
+				preview.center:Destroy()
+			end
+
+			preview.center=original:Clone()
+			preview.center.Name="ClonedCenter"
+			preview.center.Parent=folder
+			prepPreviewObject(preview.center)
+			preview.orig=original
+		end
+
+		local center=preview.center
+		preview.c2=center:FindFirstChild("C2",true)
+		preview.c3=center:FindFirstChild("C3",true)
+		if not(preview.c2 and preview.c3) then return nil end
+
+		preview.c1=center:FindFirstChild("C1",true)
+		if not preview.c1 then
+			preview.c1=Instance.new("Attachment")
+			preview.c1.Name="C1"
+			preview.c1.Parent=preview.c2.Parent
+		end
+
+		for _,descendant in ipairs(center:GetDescendants()) do
+			if descendant:IsA("Beam") then
+				preview.beam=descendant
+				break
+			end
+		end
+
+		if preview.beam then
+			preview.beam.Attachment0=preview.c2
+			preview.beam.Attachment1=preview.c3
+			preview.beam.Enabled=true
+		end
+
+		return preview.c2,preview.c1,preview.c3,preview.beam
+	end
+
+	local function historyVector(data,now)
+		if not(data and data.ph and #data.ph>=2) then
+			return nil,0,0
+		end
+
+		local latest=data.ph[#data.ph]
+		local earliest=data.ph[1]
+		for i=#data.ph,1,-1 do
+			if now-data.ph[i].t>=STABLE_WINDOW then
+				earliest=data.ph[i]
+				break
+			end
+		end
+
+		local dt=latest.t-earliest.t
+		if dt<=0 then
+			return nil,0,0
+		end
+
+		local movement=flat(latest.pos-earliest.pos)
+		local distance=movement.Magnitude
+		local speed=distance/dt
+		if distance<STABLE_MIN_DIST or speed<STABLE_MIN_SPEED then
+			return nil,speed,distance
+		end
+
+		return movement,speed,distance
+	end
+
+	local function updateStable(data)
+		if not data then return nil,0,"none" end
+
+		local now=os.clock()
+		local historyVelocity,historySpeed=historyVector(data,now)
+		local measuredVelocity=flat(data.vel or Vector3.zero)
+		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
+			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
+		end
+
+		local measuredSpeed=measuredVelocity.Magnitude
+		if measuredSpeed<=STABLE_STOP_SPEED then
+			data.sdir=nil
+			data.sspeed=0
+			data.stime=now
+			data.src="stopped"
+			return nil,0,"stopped"
+		end
+
+		local candidateDirection=nil
+		local candidateSpeed=0
+		local source="hold"
+		if historyVelocity and historyVelocity.Magnitude>0 then
+			candidateDirection=historyVelocity.Unit
+			candidateSpeed=routeSpeed(historySpeed)
+			source="history"
+		elseif measuredSpeed>=STABLE_MIN_SPEED then
+			candidateDirection=measuredVelocity.Unit
+			candidateSpeed=routeSpeed(measuredSpeed)
+			source="measured"
+		end
+
+		if candidateDirection and candidateSpeed>0 then
+			if data.sdir and data.sdir.Magnitude>0 then
+				local dot=math.clamp(data.sdir:Dot(candidateDirection),-1,1)
+				if dot>=STABLE_DOT_REPLACE then
+					data.sdir=unit(data.sdir:Lerp(candidateDirection,STABLE_BLEND),candidateDirection)
+				else
+					data.sdir=candidateDirection
+				end
+			else
+				data.sdir=candidateDirection
+			end
+
+			data.sspeed=candidateSpeed
+			data.stime=now
+			data.src=source
+			return data.sdir,data.sspeed,source
+		end
+
+		if data.sdir and now-(data.stime or 0)<=STABLE_HOLD then
+			return data.sdir,data.sspeed or 0,"held"
+		end
+
+		return nil,0,"none"
+	end
+
+	local function basis(origin,position)
+		local toTarget=flat(position-origin)
+		if toTarget.Magnitude<0.1 then
+			return Vector3.new(1,0,0),Vector3.new(0,0,1)
+		end
+
+		local away=toTarget.Unit
+		return away,Vector3.new(-away.Z,0,away.X)
+	end
+
+	local function components(origin,position,velocity)
+		local awayDirection,sideDirection=basis(origin,position)
+		local flatVelocity=flat(velocity or Vector3.zero)
+		local away=flatVelocity:Dot(awayDirection)
+		local side=flatVelocity:Dot(sideDirection)
+
+		return{
+			awayDir=awayDirection,
+			sideDir=sideDirection,
+			away=away,
+			side=side,
+			awayAbs=math.abs(away),
+			sideAbs=math.abs(side),
+			speed=flatVelocity.Magnitude,
+		}
+	end
+
+	local function movementShape(origin,position,velocity)
+		local result=components(origin,position,velocity)
+		if result.speed<0.1 then
+			return"standing"
+		elseif result.sideAbs>result.awayAbs*1.35 then
+			return"slant"
+		elseif result.away>0 and result.sideAbs>=DIAG_STREAK_SIDE_SPEED_MIN and result.sideAbs>=result.awayAbs*DIAG_STREAK_SIDE_RATIO_MIN then
+			return"diagonal_streak"
+		elseif result.awayAbs>result.sideAbs*1.35 then
+			return"streak"
+		end
+
+		return"diagonal"
+	end
+
+	local function lockRoute(receiver)
+		local receiverRoot=receiver.Character and root(receiver.Character)
+		local data=receiverData[receiver]
+		if not(receiverRoot and data) then return nil end
+
+		local measuredVelocity=flat(data.vel)
+		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
+			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
+		end
+
+		local stableDirection,stableSpeed,stableSource=updateStable(data)
+		local speed=stableSpeed>0 and stableSpeed or routeSpeed(measuredVelocity.Magnitude)
+		if not stableDirection and (measuredVelocity.Magnitude<ROUTE_LOCK_MIN_SPEED or speed<=0) then
+			return nil
+		end
+
+		local ball=getHeldBall()
+		local characterRoot=LP.Character and root(LP.Character)
+		local qbPosition=(ball and ball.Position) or (characterRoot and characterRoot.Position) or receiverRoot.Position
+		local direction=stableDirection or measuredVelocity.Unit
+
+		return{
+			player=receiver,
+			createdAt=os.clock(),
+			routeDir=direction,
+			routeSpeed=speed,
+			routeVelocity=direction*speed,
+			stableSource=stableSource,
+			shape=movementShape(qbPosition,receiverRoot.Position,direction*speed),
+		}
+	end
+
+	local function routeVelocity(receiver,data,origin,receiverRoot,routeLock)
+		local measuredVelocity=data and flat(data.vel) or Vector3.zero
+		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
+			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
+		end
+
+		local measuredSpeed=measuredVelocity.Magnitude
+		local adjustedSpeed=routeSpeed(measuredSpeed)
+		local stableDirection,stableSpeed=updateStable(data)
+
+		if routeLock and routeLock.player==receiver and routeLock.routeDir and os.clock()-routeLock.createdAt<=ROUTE_LOCK_MAX_AGE then
+			local speed=stableSpeed>0 and stableSpeed or adjustedSpeed
+			if speed<=0 then
+				speed=routeLock.routeSpeed or MAX_RUN_SPEED
+			end
+
+			local velocity=routeLock.routeDir*speed
+			return velocity,movementShape(origin,receiverRoot.Position,velocity)
+		end
+
+		if stableDirection and stableSpeed>0 then
+			local velocity=stableDirection*stableSpeed
+			return velocity,movementShape(origin,receiverRoot.Position,velocity)
+		end
+
+		if measuredSpeed>=ROUTE_LOCK_MIN_SPEED and adjustedSpeed>0 then
+			local velocity=measuredVelocity.Unit*adjustedSpeed
+			return velocity,movementShape(origin,receiverRoot.Position,velocity)
+		end
+
+		return Vector3.zero,"standing"
+	end
+
+	local function receiverMax(receiverRoot)
+		return Vector3.new(receiverRoot.Position.X,WR_MAX_Y,receiverRoot.Position.Z)
+	end
+
+	local function qbYCorrection(qbRoot)
+		local y=qbRoot.Position.Y
+		local vy=qbRoot.AssemblyLinearVelocity.Y
+		if not(math.abs(vy)>=QB_AIRBORNE_VY_EPSILON or y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON) then
+			return 0
+		end
+
+		local raw=vy>=0 and vy*QB_RELEASE_DELAY*QB_Y_RISE_FACTOR or -vy*QB_RELEASE_DELAY*QB_Y_FALL_FACTOR
+		return math.clamp(raw,0,QB_Y_MAX_CORRECTION)
+	end
+
+	local function origin(qbRoot,ball)
+		local rootVelocity=qbRoot.AssemblyLinearVelocity
+		local horizontal=Vector3.new(rootVelocity.X,0,rootVelocity.Z)*QB_RELEASE_DELAY*QB_XZ_RELEASE_FACTOR
+		local y=ball.Position.Y
+		if ARC_PREVIEW_USE_C2_Y then
+			y=c2Y() or y
+		end
+
+		return Vector3.new(ball.Position.X+horizontal.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),ball.Position.Z+horizontal.Z)
+	end
+
+	local function velocityNeeded(originPosition,targetPosition,time)
+		return(targetPosition-originPosition-0.5*G*time*time)/time
+	end
+
+	local function ballAt(originPosition,velocity,time)
+		return originPosition+velocity*time+0.5*G*time*time
+	end
+
+	local function landing(originPosition,velocity)
+		local discriminant=velocity.Y*velocity.Y+2*BALL_G*originPosition.Y
+		if discriminant<0 then return nil,nil end
+
+		local time=(velocity.Y+math.sqrt(discriminant))/BALL_G
+		if time<=0 then return nil,nil end
+
+		return ballAt(originPosition,velocity,time),time
+	end
+
+	local function preferredAngle(distance)
+		local yards=distance/YARDS_TO_STUDS
+		if yards<15 then return 24 elseif yards<25 then return 22 elseif yards<40 then return 19 elseif yards<55 then return 16 elseif yards<70 then return 14 elseif yards<85 then return 17 end
+		return 22
+	end
+
+	local function minimumAngle(distance)
+		local yards=distance/YARDS_TO_STUDS
+		if yards<15 then return 14 elseif yards<25 then return 17 elseif yards<40 then return 16 elseif yards<55 then return 11 end
+		return 0
+	end
+
+	local function maximumAngle(distance)
+		if distance<45 then return 42 elseif distance<75 then return 38 elseif distance<120 then return 34 elseif distance<170 then return 32 end
+		return 35
+	end
+
+	local function maximumTime(distance)
+		if distance<45 then return 1.35 elseif distance<75 then return 1.85 elseif distance<120 then return 2.45 elseif distance<170 then return 3.25 elseif distance<230 then return 4.25 end
+		return MAX_T
+	end
+
+	local function c1Target(receiverRoot,originPosition,targetVelocity,flightTime)
+		local result=components(originPosition,receiverRoot.Position,targetVelocity)
+		local radius=distXZ(originPosition,receiverRoot.Position)
+		local speed=math.max(result.speed,1e-6)
+		local positiveAway=math.clamp(result.away/speed,0,1)
+		local distanceScale=math.clamp(radius/CIRCLE_RADIUS_FULL_LEAD,CIRCLE_DISTANCE_SCALE_MIN,1)
+		local radialGain=math.clamp(CIRCLE_RADIAL_EXTRA_BASE+CIRCLE_RADIAL_EXTRA_GAIN*positiveAway,CIRCLE_RADIAL_EXTRA_MIN,CIRCLE_RADIAL_EXTRA_MAX)
+		local tangentGain=math.clamp(CIRCLE_TANGENT_EXTRA_BASE+CIRCLE_TANGENT_EXTRA_GAIN*positiveAway,CIRCLE_TANGENT_EXTRA_MIN,CIRCLE_TANGENT_EXTRA_MAX)
+		local lineOfSightRate=result.sideAbs/math.max(radius,1)
+		local damp=1/(1+lineOfSightRate*CIRCLE_LOS_RATE_GAIN)
+		local radialTime=math.min(WR_LEAD_DELAY*distanceScale*radialGain,CIRCLE_EXTRA_LEAD_TIME_MAX)
+		local tangentTime=math.min(WR_LEAD_DELAY*distanceScale*tangentGain*damp,CIRCLE_EXTRA_LEAD_TIME_MAX)
+		local flightLead=flat(targetVelocity)*flightTime
+		local extraLead=result.awayDir*result.away*radialTime+result.sideDir*result.side*tangentTime
+		local targetFlat=flat(receiverRoot.Position)+flightLead+extraLead
+
+		return Vector3.new(targetFlat.X,WR_MAX_Y,targetFlat.Z),{
+			flightLeadXZ=flightLead,
+			extraLeadXZ=extraLead,
+			extraLeadTime=speed>1e-6 and extraLead.Magnitude/speed or 0,
+			lateralShare=math.clamp(result.sideAbs/speed,0,1),
+			awayShare=math.clamp(result.away/speed,-1,1),
+		}
+	end
+
+	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape)
+		local originPosition=origin(qbRoot,ball)
+		local startTarget=receiverMax(receiverRoot)
+		local distance=distXZ(originPosition,startTarget)
+		local preferred=preferredAngle(distance)
+		local minAngle=minimumAngle(distance)
+		local maxAngle=maximumAngle(distance)
+		local maxTime=maximumTime(distance)
+		local best=nil
+
+		for time=MIN_T,MAX_T,DT do
+			if time<=maxTime then
+				local target,leadInfo=c1Target(receiverRoot,originPosition,targetVelocity,time)
+				local needed=velocityNeeded(originPosition,target,time)
+				local requiredSpeed=needed.Magnitude
+
+				if requiredSpeed>0 then
+					local direction=needed.Unit
+					local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
+					if angle<=maxAngle then
+						local finalVelocity=direction*BALL_SPEED
+						local catchPosition=ballAt(originPosition,finalVelocity,time)
+						local speedError=math.abs(BALL_SPEED-requiredSpeed)
+						local verticalVelocity=finalVelocity.Y+G.Y*time
+						local upwardPenalty=verticalVelocity>4 and verticalVelocity*2 or 0
+						local lowPenalty=angle<minAngle and (minAngle-angle)*8 or 0
+						local score=(catchPosition-target).Magnitude*5+speedError*2+math.abs(angle-preferred)*0.85+time*0.55+upwardPenalty+lowPenalty
+
+						if angle>30 then
+							score=score+(angle-30)*(leadInfo.lateralShare or 0)*0.35
+						end
+
+						if distance>130 and angle<16 and (leadInfo.awayShare or 0)>0 then
+							score=score+(16-angle)*leadInfo.awayShare*0.35
+						end
+
+						if not best or score<best.score then
+							local landingPosition,landingTime=landing(originPosition,finalVelocity)
+							best={
+								score=score,
+								time=time,
+								totalLeadTime=time+(leadInfo.extraLeadTime or 0),
+								origin=originPosition,
+								target=target,
+								c1Point=target,
+								requiredVelocity=needed,
+								requiredSpeed=requiredSpeed,
+								direction=direction,
+								velocity=finalVelocity,
+								speed=BALL_SPEED,
+								aimPoint=originPosition+direction*AIM_SCALE,
+								angleDeg=angle,
+								preferredAngle=preferred,
+								minDesiredAngle=minAngle,
+								maxAngle=maxAngle,
+								totalErr=(catchPosition-target).Magnitude,
+								speedError=speedError,
+								ballAtCatch=catchPosition,
+								landing=landingPosition,
+								landingTime=landingTime,
+								flatDistNow=distance,
+								movementShape=shape,
+								leadInfo=leadInfo,
+							}
+						end
+					end
+				end
+			end
+		end
+
+		return best
+	end
+
+	local function previewPlan(plan)
+		if not(ARC_PREVIEW_ENABLED and plan) then return end
+
+		local c2,c1,c3,beam=arcRig()
+		if not(c2 and c1 and c3 and beam) then return end
+
+		local startPoint=plan.origin
+		local rawEnd=plan.landing or plan.target
+		local previewTime=plan.landingTime or plan.time
+		local endPoint=Vector3.new(rawEnd.X,ARC_LANDING_Y,rawEnd.Z)
+		local endVelocity=plan.velocity+G*previewTime
+		local p2=startPoint
+		local p1=plan.target
+		local p3=endPoint
+
+		if preview.p2 then
+			p2=preview.p2:Lerp(p2,PREVIEW_SMOOTH)
+		end
+
+		if preview.p1 and (p1-preview.p1).Magnitude<=28 then
+			p1=preview.p1:Lerp(p1,PREVIEW_SMOOTH)
+		end
+
+		if preview.p3 and (p3-preview.p3).Magnitude<=45 then
+			p3=preview.p3:Lerp(p3,PREVIEW_SMOOTH)
+		end
+
+		preview.p1,preview.p2,preview.p3=p1,p2,p3
+		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity))
+		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*plan.time))
+		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity))
+		beam.Attachment0=c2
+		beam.Attachment1=c3
+		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
+		beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
+		beam.Enabled=true
+	end
+
+	local function buildPlan(receiver)
+		local character=LP.Character
+		local qbRoot=root(character)
+		local ball=getHeldBall()
+		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
+		local data=receiverData[receiver]
+
+		if not(qbRoot and ball and receiverRoot and data) then
+			return nil
+		end
+
+		local originPosition=origin(qbRoot,ball)
+		local targetVelocity,shape=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
+		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape),ball
+	end
+
+	local function fireGameplayThrow(plan)
+		local reEvent=getGameReEvent()
+		if not reEvent then
+			return false,"Gameplay ReEvent missing"
+		end
+
+		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=BALL_SPEED})
+		pcall(function()
+			local variables=require(LP.PlayerScripts.ClientMain.Utilities.Variables)
+			if variables.Mechanics and variables.Mechanics.UnequipFootball then
+				variables.Mechanics:UnequipFootball()
+			end
+		end)
+
+		return true,nil
+	end
+
+	local function fireSquadsThrow(plan,ball)
+		local reEvent=ReplicatedStorage:FindFirstChild("ReEvent")
+		if not(reEvent and reEvent:IsA("RemoteEvent")) then
+			return false,"Squads ReEvent missing"
+		end
+
+		local gameId,settings=getSquadsSettings()
+		if not(gameId and settings) then
+			return false,"Squads MiniGames settings missing"
+		end
+
+		local fired=fireClientSignal(reEvent.OnClientEvent,"UpdateFootball",ball,{
+			CenterWorld=Vector3.new(0,0.4,0),
+			GameID=gameId,
+			Sett=settings,
+			Power=BALL_SPEED,
+			Target=plan.aimPoint,
+			SpawnPos=plan.origin,
+			SpinType=1,
+			LaunchTime=getServerTime(),
+		})
+
+		if not fired then
+			return false,"Client signal helper missing"
+		end
+
+		return true,nil
+	end
+
+	local function throwTo(receiver)
+		if not(enabled and isAvailable()) then return end
+
+		local plan,ball=buildPlan(receiver)
+		if not plan then
+			setStatus("No throw solution")
+			return
+		end
+
+		playThrowAnimation()
+		if THROW_ANIMATION_RELEASE_WAIT>0 then
+			task.wait(THROW_ANIMATION_RELEASE_WAIT)
+		end
+
+		local modeKey=getModeKey(ctx)
+		local ok,err
+		if modeKey=="mode1" then
+			ok,err=fireGameplayThrow(plan)
+		elseif modeKey=="mode3" then
+			ok,err=fireSquadsThrow(plan,ball)
+		else
+			ok,err=false,"Park route unknown"
+		end
+
+		if ok then
+			setStatus(currentModeText().." throw sent")
+		else
+			setStatus(err or "Throw failed")
+		end
+	end
+
+	local function lockReceiverUnderCursor()
+		if not(enabled and isAvailable()) then return end
+
+		local camera=Workspace.CurrentCamera
+		local mouse=LP:GetMouse()
+		local best=nil
+		local bestDistance=math.huge
+
+		for _,player in ipairs(Players:GetPlayers()) do
+			local receiverRoot=player~=LP and player.Character and root(player.Character)
+			if receiverRoot and camera then
+				local screenPoint,onScreen=camera:WorldToViewportPoint(receiverRoot.Position)
+				if onScreen then
+					local distance=(Vector2.new(mouse.X,mouse.Y)-Vector2.new(screenPoint.X,screenPoint.Y)).Magnitude
+					if distance<bestDistance then
+						best=player
+						bestDistance=distance
+					end
+				end
+			end
+		end
+
+		if best then
+			trackedReceiver=best
+			selectedRouteLock=lockRoute(best)
+			preview.p1,preview.p2,preview.p3=nil,nil,nil
+			setTargetText()
+			setStatus("Locked "..best.Name)
+		else
+			setStatus("No receiver under cursor")
+		end
+	end
+
+	local function setEnabled(value)
+		enabled=value and isAvailable() and true or false
+		if not enabled then
+			trackedReceiver=nil
+			selectedRouteLock=nil
+			preview.p1,preview.p2,preview.p3=nil,nil,nil
+		end
+
+		syncControls()
+	end
+
+	function api.SetQBAimState(value)
+		setEnabled(value)
+	end
+
+	function api.Refresh()
+		syncControls()
+	end
+
+	function api.Reset()
+		setEnabled(false)
+	end
+
+	function api.Destroy()
+		for _,conn in ipairs(connections) do
+			safeDisconnect(conn)
+		end
+
+		table.clear(connections)
+
+		if preview.center and preview.center.Parent then
+			preview.center:Destroy()
+		end
+	end
+
+	sectionBody=makeSection(parent,4,"QB Aim","H lock, T throw, P toggle")
+	sectionFrame=sectionBody and sectionBody.Parent or nil
+
+	enabledToggle=buildToggleRow(sectionBody,"Enabled",enabled,function(value)
+		setEnabled(value)
+	end)
+
+	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Disabled",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
+	targetLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Target: none",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
+
+	addConnection(RunService.Heartbeat:Connect(function()
+		if not isAlive() then return end
+
+		for _,player in ipairs(Players:GetPlayers()) do
+			if player~=LP and player.Character then
+				local receiverRoot=root(player.Character)
+				if receiverRoot then
+					local now=os.clock()
+					local data=receiverData[player]
+
+					if not data then
+						data={pos=receiverRoot.Position,vel=Vector3.zero,t=now,vh={},ph={},sdir=nil,sspeed=0,stime=0,src="none"}
+						receiverData[player]=data
+					end
+
+					local dt=math.min(now-data.t,0.1)
+					if dt>0 then
+						local movement=(receiverRoot.Position-data.pos)/dt
+						table.insert(data.vh,movement)
+						if #data.vh>5 then
+							table.remove(data.vh,1)
+						end
+
+						local average=Vector3.zero
+						for _,velocity in ipairs(data.vh) do
+							average=average+velocity
+						end
+
+						data.vel=average/#data.vh
+						data.pos=receiverRoot.Position
+						data.t=now
+						table.insert(data.ph,{t=now,pos=receiverRoot.Position})
+
+						while #data.ph>0 and now-data.ph[1].t>1.25 do
+							table.remove(data.ph,1)
+						end
+					end
+				end
+			end
+		end
+	end))
+
+	addConnection(RunService.RenderStepped:Connect(function()
+		if not(enabled and isAvailable() and trackedReceiver) then return end
+
+		local now=os.clock()
+		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
+		preview.last=now
+
+		local plan=buildPlan(trackedReceiver)
+		if plan then
+			previewPlan(plan)
+		end
+	end))
+
+	addConnection(UIS.InputBegan:Connect(function(input,processed)
+		if processed or not isAvailable() then return end
+
+		if input.KeyCode==Enum.KeyCode.P then
+			setEnabled(not enabled)
+			return
+		end
+
+		if not enabled then return end
+
+		if input.KeyCode==Enum.KeyCode.H then
+			lockReceiverUnderCursor()
+		elseif input.KeyCode==Enum.KeyCode.T then
+			if trackedReceiver then
+				throwTo(trackedReceiver)
+			else
+				setStatus("No receiver locked")
+			end
+		end
+	end))
+
+	syncControls()
+	return api
+end
+
+return QBAim
