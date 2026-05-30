@@ -45,7 +45,7 @@ local PREVIEW_SMOOTH=0.28
 local C1_MARKER_ENABLED=true
 local C1_MARKER_SIZE=1.65
 local C3_INFO_GUI_ENABLED=true
-local C3_INFO_GUI_SIZE=UDim2.new(0,190,0,62)
+local C3_INFO_GUI_SIZE=UDim2.new(0,220,0,78)
 local C3_INFO_GUI_OFFSET=Vector3.new(0,3.2,0)
 local STABLE_WINDOW=0.48
 local STABLE_MIN_DIST=2
@@ -1093,8 +1093,8 @@ function QBAim.new(ctx,parent)
 			label.TextSize=12
 			label.TextColor3=Color3.fromRGB(255,235,205)
 			label.TextStrokeTransparency=0.85
-			label.TextXAlignment=Enum.TextXAlignment.Left
-			label.TextYAlignment=Enum.TextYAlignment.Top
+			label.TextXAlignment=Enum.TextXAlignment.Center
+			label.TextYAlignment=Enum.TextYAlignment.Center
 			label.Parent=frame
 		else
 			billboard.Enabled=true
@@ -1102,6 +1102,14 @@ function QBAim.new(ctx,parent)
 		end
 
 		local label=billboard:FindFirstChild("Panel") and billboard.Panel:FindFirstChild("Text")
+		if billboard then
+			billboard.Size=C3_INFO_GUI_SIZE
+			billboard.StudsOffset=C3_INFO_GUI_OFFSET
+		end
+		if label then
+			label.TextXAlignment=Enum.TextXAlignment.Center
+			label.TextYAlignment=Enum.TextYAlignment.Center
+		end
 		return anchor,label
 	end
 
@@ -1123,20 +1131,22 @@ function QBAim.new(ctx,parent)
 
 		local receiverRoot=trackedReceiver and trackedReceiver.Character and root(trackedReceiver.Character)
 		if not receiverRoot then
-			label.Text="WR: none\nC3-WR XZ: -- yd\nC1-WR XZ: -- yd\nC1 Y: --"
+			label.Text="WR: none\nQB-WR XZ: -- yd\nC3-WR XZ: -- yd\nC1-WR XZ: -- yd\nC1 Y: --"
 			return
 		end
 
 		local wrPos=receiverRoot.Position
 		local exactC1=plan.c1Point or plan.target or c1Pos
 		local exactC3=(plan.landing and Vector3.new(plan.landing.X,ARC_LANDING_Y,plan.landing.Z)) or c3Pos
+		local qbWrYards=distXZ(plan.origin or wrPos,wrPos)/YARDS_TO_STUDS
 		local c3Yards=distXZ(wrPos,exactC3)/YARDS_TO_STUDS
 		local c1Yards=distXZ(wrPos,exactC1)/YARDS_TO_STUDS
 		local c1Y=exactC1 and exactC1.Y or 0
 
 		label.Text=string.format(
-			"WR: %s\nC3-WR XZ: %.2f yd\nC1-WR XZ: %.2f yd\nC1 Y: %.2f",
+			"WR: %s\nQB-WR XZ: %.2f yd\nC3-WR XZ: %.2f yd\nC1-WR XZ: %.2f yd\nC1 Y: %.2f",
 			trackedReceiver.Name,
+			qbWrYards,
 			c3Yards,
 			c1Yards,
 			c1Y
