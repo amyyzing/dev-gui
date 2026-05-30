@@ -126,7 +126,7 @@ function KeybindSettings.new(ctx,bindSection)
 	function api.AddBindRow(label,getter,setter)
 		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,28),ZIndex=5},bindSection)
 
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-130,1,0),Text=label,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-130,1,0),Text=label,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},row)
 
 		local btn=api.MakeBindButton(row,0,0,122)
 		placeWrappedButton(btn,UDim2.new(1,-122,0,0))

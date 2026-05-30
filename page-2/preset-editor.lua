@@ -155,7 +155,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 	local function buildPresetRow(i)
 		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,62),ZIndex=5},editorSection)
 
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text="Preset "..i.." (Hitbox)",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text="Preset "..i.." (Hitbox)",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},row)
 
 		local keyBtn=keybinds.MakeBindButton(row,0,18,78)
 

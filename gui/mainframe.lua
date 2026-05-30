@@ -77,9 +77,9 @@ function MainFrame.new(ctx)
 
 	local header=New("Frame",{Size=UDim2.new(1,0,0,52),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=4,LayoutOrder=1},main)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.25},header)
-	New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,7),Size=UDim2.new(1,-180,0,18),Text="untitled gui",Font=Enum.Font.Gotham,TextSize=16,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+	New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,7),Size=UDim2.new(1,-180,0,18),Text="untitled gui",Font=Enum.Font.Gotham,TextSize=16,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=5},header)
 
-	local modeSubtitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,26),Size=UDim2.new(1,-180,0,14),Text=getModeLabel().." loaded",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+	local modeSubtitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,26),Size=UDim2.new(1,-180,0,14),Text=getModeLabel().." loaded",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=5},header)
 
 	local function makeTopButton(text,xOffset)
 		local b=New("TextButton",{Size=UDim2.fromOffset(28,28),Position=UDim2.new(1,xOffset,0.5,-14),BackgroundColor3=THEME.BG,BorderSizePixel=0,Text=text,Font=Enum.Font.Gotham,TextSize=17,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6},header)

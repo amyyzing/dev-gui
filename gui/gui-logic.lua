@@ -131,11 +131,11 @@ function GuiLogic.new(ctx)
 		New("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},sec)
 
 		local collapsed=false
-		local titleButton=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,20),Text="[-] "..titleText,Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=5,LayoutOrder=1},sec)
+		local titleButton=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,20),Text="[-] "..titleText,Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,AutoButtonColor=false,ZIndex=5,LayoutOrder=1},sec)
 
 		local subtitleLabel=nil
 		if subtitleText and subtitleText~="" then
-			subtitleLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text=subtitleText,Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,LayoutOrder=2},sec)
+			subtitleLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text=subtitleText,Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=5,LayoutOrder=2},sec)
 		end
 
 		local body=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=5,LayoutOrder=3,ClipsDescendants=true},sec)
@@ -285,7 +285,7 @@ function GuiLogic.new(ctx)
 
 	function api.buildSlider(parent,labelText,minVal,maxVal,startVal,decimals,onChange)
 		local container=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,32),ZIndex=5},parent)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.fromOffset(28,32),Text=labelText,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},container)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.fromOffset(28,32),Text=labelText,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},container)
 
 		local valueLabel=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,ClearTextOnFocus=true,Size=UDim2.fromOffset(72,28),Position=UDim2.new(1,-72,0.5,-14),Text=fmtNumber(startVal,decimals),Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},container)
 		local valueWrap,valueStroke=api.wrapTextBox(valueLabel,THEME.BG,2)
@@ -374,7 +374,7 @@ function GuiLogic.new(ctx)
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)
 		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},parent)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-64,1,0),Text=labelText,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-64,1,0),Text=labelText,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},row)
 
 		local wrap=New("Frame",{Size=UDim2.fromOffset(48,20),Position=UDim2.new(1,-48,0.5,-10),BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0,ClipsDescendants=false,ZIndex=6},row)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},wrap)

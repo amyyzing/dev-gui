@@ -508,7 +508,7 @@ function StrokeColour.new(ctx,page)
 			Font=Enum.Font.GothamMedium,
 			TextSize=12,
 			TextColor3=THEME.MUTED,
-			TextXAlignment=Enum.TextXAlignment.Left,
+			TextXAlignment=Enum.TextXAlignment.Center,
 			ZIndex=6,
 		},row)
 
@@ -542,7 +542,7 @@ function StrokeColour.new(ctx,page)
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
 		TextColor3=THEME.MUTED,
-		TextXAlignment=Enum.TextXAlignment.Left,
+		TextXAlignment=Enum.TextXAlignment.Center,
 		ZIndex=6,
 	},previewRow)
 
@@ -579,7 +579,7 @@ function StrokeColour.new(ctx,page)
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
 		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
+		TextXAlignment=Enum.TextXAlignment.Center,
 		ZIndex=6,
 	},presetSection)
 
@@ -632,7 +632,7 @@ function StrokeColour.new(ctx,page)
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
 		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
+		TextXAlignment=Enum.TextXAlignment.Center,
 		ZIndex=6,
 	},colourSection)
 
@@ -661,7 +661,7 @@ function StrokeColour.new(ctx,page)
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
 		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
+		TextXAlignment=Enum.TextXAlignment.Center,
 		ZIndex=6,
 	},colourSection)
 
@@ -690,7 +690,7 @@ function StrokeColour.new(ctx,page)
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
 		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
+		TextXAlignment=Enum.TextXAlignment.Center,
 		ZIndex=6,
 	},colourSection)
 
@@ -781,7 +781,7 @@ function StrokeColour.new(ctx,page)
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
 		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
+		TextXAlignment=Enum.TextXAlignment.Center,
 		ZIndex=6,
 	},shapeSection)
 

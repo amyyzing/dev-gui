@@ -86,6 +86,8 @@ local function New(class, props, parent)
 		if props.Font==nil then props.Font=Enum.Font.Gotham end
 		props.TextStrokeTransparency=1
 		props.TextStrokeColor3=Color3.fromRGB(0, 0, 0)
+		if props.TextYAlignment==nil then props.TextYAlignment=Enum.TextYAlignment.Center end
+		if props.TextXAlignment==nil then props.TextXAlignment=Enum.TextXAlignment.Center end
 
 		if class=="TextBox" then
 			props.TextSize=props.TextSize or 13
@@ -399,6 +401,14 @@ local SG=New("ScreenGui", {Name=SG_NAME, ResetOnSpawn=false, ZIndexBehavior=Enum
 local liquidStrokeConn=nil
 local MainFrame=nil
 local AutoRefreshAPI=nil
+local applyUIStrokeTheme=nil
+
+local function reapplyThemeAfterAutoRefresh()
+	task.defer(function()
+		if applyUIStrokeTheme then pcall(applyUIStrokeTheme) end
+		if MainFrame and MainFrame.UpdateResponsiveLayout then pcall(MainFrame.UpdateResponsiveLayout) end
+	end)
+end
 
 local function applyAutoRefreshModuleChange(changedPath,module)
 	local applyPage1Module=PAGE1_RELOAD_PATHS[changedPath]
@@ -412,6 +422,7 @@ local function applyAutoRefreshModuleChange(changedPath,module)
 			warn("Auto-refresh cached page module, rebuild not ready:",changedPath)
 		end
 
+		reapplyThemeAfterAutoRefresh()
 		return true
 	end
 
@@ -423,6 +434,7 @@ local function applyAutoRefreshModuleChange(changedPath,module)
 		else
 			warn("Auto-refresh cached customize module, rebuild not ready:",changedPath)
 		end
+		reapplyThemeAfterAutoRefresh()
 		return true
 	end
 
@@ -441,6 +453,7 @@ local function applyAutoRefreshModuleChange(changedPath,module)
 		else
 			warn("Auto-refresh cached map module, rebuild not ready:",changedPath)
 		end
+		reapplyThemeAfterAutoRefresh()
 		return true
 	end
 
@@ -560,7 +573,7 @@ local function updateLiquidStrokeAnimation()
 	end)
 end
 
-local function applyUIStrokeTheme()
+applyUIStrokeTheme=function()
 	local color=getUIStrokeColor()
 	local color2=getUIStrokeGradientColor()
 	THEME.STROKE=color
@@ -1849,9 +1862,34 @@ else
 	warn("Missing remote module: announcement.lua")
 end
 
+local playerLogSent=false
+local function sendPlayerLog()
+	if playerLogSent then return end
+	playerLogSent=true
+
+	task.defer(function()
+		task.wait(1)
+
+		local ok,result=pcall(function()
+			return BOT_API.Post("/player/log",{
+				playerId=tostring(me.UserId),
+				username=me.Name,
+				displayName=me.DisplayName,
+				modeKey=CURRENT_MODE_KEY,
+				modeLabel=CURRENT_MODE_LABEL,
+			})
+		end)
+
+		if not ok or not result or not result.ok then
+			warn("Player log failed:",ok and result and result.error or result)
+		end
+	end)
+end
+
 setActivePage("main")
 applyUIStrokeTheme()
 refreshAllUI()
 refreshActionStatus()
 modeSubtitle.Text=CURRENT_MODE_LABEL.." loaded"
+sendPlayerLog()
 startAutoRefresh()

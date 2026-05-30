@@ -588,7 +588,7 @@ function Hitbox.new(ctx,parent)
 	section=makeSection(parent,1,"Hitbox","")
 
 	local hitboxToggleRow=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},section)
-	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-76,1,0),Text="Hitbox Toggle",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},hitboxToggleRow)
+	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-76,1,0),Text="Hitbox Toggle",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},hitboxToggleRow)
 
 	toggleWrap=New("Frame",{Size=UDim2.fromOffset(58,24),Position=UDim2.new(1,-58,0.5,-12),BackgroundColor3=THEME.CARD,BorderSizePixel=0,ClipsDescendants=false,ZIndex=6},hitboxToggleRow)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},toggleWrap)
@@ -608,7 +608,7 @@ function Hitbox.new(ctx,parent)
 		end
 	end)
 
-	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="HITBOX SIZE",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="HITBOX SIZE",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},section)
 
 	local sizeReadout=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),ZIndex=5},section)
 	New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder,HorizontalAlignment=Enum.HorizontalAlignment.Left},sizeReadout)
@@ -621,7 +621,7 @@ function Hitbox.new(ctx,parent)
 	boxY=makeReadout("Y: "..fmtNumber(state.sizeY,2))
 	boxZ=makeReadout("Z: "..fmtNumber(state.sizeZ,2))
 
-	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="TRANSPARENCY",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="TRANSPARENCY",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},section)
 
 	transparencySlider=buildSlider(section,"A",0,1,state.targetTransparency,2,function(value)
 		api.SetTransparency(value,true)
