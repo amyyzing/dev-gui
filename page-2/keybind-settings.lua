@@ -68,6 +68,7 @@ function KeybindSettings.new(ctx,bindSection)
 	local activeCapture=nil
 	local refreshAll=nil
 	local inputConn=nil
+	local suppressMouseButton1ClickUntil=0
 
 	function api.GetActiveCapture()
 		return activeCapture
@@ -132,12 +133,31 @@ function KeybindSettings.new(ctx,bindSection)
 		placeWrappedButton(btn,UDim2.new(1,-122,0,0))
 
 		btn.MouseButton1Click:Connect(function()
+			if os.clock()<suppressMouseButton1ClickUntil then
+				return
+			end
+
+			if activeCapture and activeCapture.button==btn then
+				setter("MouseButton1")
+				activeCapture=nil
+				requestRefresh()
+				return
+			end
+
 			api.StartCapture(btn,getter,setter)
 		end)
 
 		btn.InputBegan:Connect(function(input)
-			if input.UserInputType==Enum.UserInputType.MouseButton2 then
-				setter(Enum.KeyCode.Unknown)
+			if not(activeCapture and activeCapture.button==btn) then return end
+
+			local binding=(ctx.inputToBinding or inputToBinding)(input)
+			if binding~=nil then
+				if binding=="MouseButton1" then
+					suppressMouseButton1ClickUntil=os.clock()+0.25
+				end
+
+				setter(binding)
+				activeCapture=nil
 				requestRefresh()
 			end
 		end)
@@ -179,8 +199,19 @@ function KeybindSettings.new(ctx,bindSection)
 			return
 		end
 
+		if inp.KeyCode==Enum.KeyCode.Backspace or inp.KeyCode==Enum.KeyCode.Delete then
+			cap.setter(Enum.KeyCode.Unknown)
+			activeCapture=nil
+			requestRefresh()
+			return
+		end
+
 		local binding=(ctx.inputToBinding or inputToBinding)(inp)
 		if binding~=nil then
+			if binding=="MouseButton1" then
+				suppressMouseButton1ClickUntil=os.clock()+0.25
+			end
+
 			cap.setter(binding)
 		end
 

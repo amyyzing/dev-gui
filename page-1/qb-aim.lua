@@ -1276,14 +1276,13 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function buildPlan(receiver,ballPower)
-		local modeKey=getModeKey(ctx)
 		local character=LP.Character
 		local qbRoot=root(character)
-		local ball=getModeFootball(modeKey)
+		local ball=getHeldBall()
 		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
 		local data=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
 
-		if not(qbRoot and receiverRoot and data) then
+		if not(qbRoot and ball and receiverRoot and data) then
 			return nil
 		end
 
@@ -1613,9 +1612,20 @@ function QBAim.new(ctx,parent)
 
 		if not enabled then return end
 
-		if bindingMatches("getQBAimLockKey",input,Enum.KeyCode.H) then
+		local wantsLock=bindingMatches("getQBAimLockKey",input,Enum.KeyCode.H)
+		local wantsThrow=bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T)
+		if not(wantsLock or wantsThrow) then return end
+
+		if not getHeldBall() then
+			previewFrozen=false
+			hideQBTrailPreview()
+			setStatus("No ball held")
+			return
+		end
+
+		if wantsLock then
 			lockReceiverUnderCursor()
-		elseif bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T) then
+		elseif wantsThrow then
 			if trackedReceiver then
 				throwTo(trackedReceiver)
 			else
