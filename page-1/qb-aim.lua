@@ -375,7 +375,7 @@ local function getSquadsReEvent()
 end
 
 local function playThrowAnimation()
-	if not PLAY_THROW_ANIMATION then return end
+	if not PLAY_THROW_ANIMATION or not getHeldBall() then return end
 
 	local globals=(typeof(getgenv)=="function" and getgenv()) or _G or {}
 	local mechanics=rawget(globals,"Mechanics")
@@ -1201,6 +1201,24 @@ function QBAim.new(ctx,parent)
 		cleanupC3InfoGui()
 	end
 
+	local function hideQBTrailPreview()
+		if preview.beam and preview.beam.Parent then
+			pcall(function()
+				preview.beam.Enabled=false
+			end)
+		end
+
+		if preview.center and preview.center.Parent then
+			for _,descendant in ipairs(preview.center:GetDescendants()) do
+				if descendant:IsA("Beam") then
+					descendant.Enabled=false
+				end
+			end
+		end
+
+		hideC1AndC3Info()
+	end
+
 	local function previewPlan(plan)
 		if not(ARC_PREVIEW_ENABLED and plan) then return end
 
@@ -1330,6 +1348,14 @@ function QBAim.new(ctx,parent)
 	local function throwTo(receiver)
 		if not(enabled and isAvailable()) then return end
 
+		local heldBall=getHeldBall()
+		if not heldBall then
+			previewFrozen=false
+			hideQBTrailPreview()
+			setStatus("No ball held")
+			return
+		end
+
 		local modeKey=getModeKey(ctx)
 		local power=modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
 		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
@@ -1343,6 +1369,13 @@ function QBAim.new(ctx,parent)
 		local plan=buildReleasePlan(receiver,power)
 		if not plan then
 			setStatus("No release-time throw solution")
+			return
+		end
+
+		if not getHeldBall() then
+			previewFrozen=false
+			hideQBTrailPreview()
+			setStatus("No ball held at release")
 			return
 		end
 
@@ -1403,8 +1436,9 @@ function QBAim.new(ctx,parent)
 		if not enabled then
 			trackedReceiver=nil
 			selectedRouteLock=nil
+			previewFrozen=false
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
-			hideC1AndC3Info()
+			hideQBTrailPreview()
 		end
 
 		syncControls()
@@ -1546,13 +1580,17 @@ function QBAim.new(ctx,parent)
 		local now=os.clock()
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
 			local holdingBall=hasHeldBallForPreview()
+			if not holdingBall then
+				previewFrozen=false
+				hideQBTrailPreview()
+				return
+			end
+
 			if previewFrozen then
-				if not holdingBall or now-previewFreezeStarted<PREVIEW_POST_THROW_FREEZE_MIN then
+				if now-previewFreezeStarted<PREVIEW_POST_THROW_FREEZE_MIN then
 					return
 				end
 				previewFrozen=false
-			elseif not holdingBall then
-				return
 			end
 		end
 
