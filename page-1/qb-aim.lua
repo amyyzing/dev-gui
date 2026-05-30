@@ -37,6 +37,8 @@ local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
 local ARC_PREVIEW_USE_C2_Y=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
+local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
+local PREVIEW_POST_THROW_FREEZE_MIN=0.75
 local ARC_LANDING_Y=0.5
 local ARC_MAX_CURVE=400
 local PREVIEW_SMOOTH=0.28
@@ -409,6 +411,8 @@ function QBAim.new(ctx,parent)
 	local selectedRouteLock=nil
 	local receiverData={}
 	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil}
+	local previewFrozen=false
+	local previewFreezeStarted=0
 	local connections={}
 	local sectionBody=nil
 	local sectionFrame=nil
@@ -1195,6 +1199,19 @@ function QBAim.new(ctx,parent)
 		return getModeKey(ctx)=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
 	end
 
+	local function hasHeldBallForPreview()
+		return getHeldBall()~=nil
+	end
+
+	local function freezePreviewAtCurrentPlan(plan)
+		if not FREEZE_PREVIEW_WHILE_BALL_RELEASED then return end
+		if plan then
+			previewPlan(plan)
+		end
+		previewFrozen=true
+		previewFreezeStarted=os.clock()
+	end
+
 	local function buildPlan(receiver,ballPower)
 		local modeKey=getModeKey(ctx)
 		local character=LP.Character
@@ -1294,6 +1311,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		if ok then
+			freezePreviewAtCurrentPlan(plan)
 			setStatus(currentModeText().." release-time throw sent")
 		else
 			setStatus(err or "Throw failed")
@@ -1326,6 +1344,7 @@ function QBAim.new(ctx,parent)
 			ensureReceiverData(best,best.Character and root(best.Character))
 			trackedReceiver=best
 			selectedRouteLock=lockRoute(best)
+			previewFrozen=false
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			setTargetText()
 			setStatus("Locked "..best.Name)
@@ -1432,6 +1451,18 @@ function QBAim.new(ctx,parent)
 		if not(enabled and isAvailable() and trackedReceiver) then return end
 
 		local now=os.clock()
+		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
+			local holdingBall=hasHeldBallForPreview()
+			if previewFrozen then
+				if not holdingBall or now-previewFreezeStarted<PREVIEW_POST_THROW_FREEZE_MIN then
+					return
+				end
+				previewFrozen=false
+			elseif not holdingBall then
+				return
+			end
+		end
+
 		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
 		preview.last=now
 
