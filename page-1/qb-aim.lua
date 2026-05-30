@@ -64,7 +64,7 @@ local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
-local THROW_ANIMATION_RELEASE_WAIT=0
+local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
 
 local function safeDisconnect(conn)
 	if conn and typeof(conn)=="RBXScriptConnection" then
@@ -1023,6 +1023,27 @@ function QBAim.new(ctx,parent)
 		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower()),ball
 	end
 
+	local function buildReleasePlan(receiver,ballPower)
+		if THROW_ANIMATION_RELEASE_WAIT<=0 then
+			return buildPlan(receiver,ballPower)
+		end
+
+		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
+		local latestPlan=nil
+		local latestBall=nil
+
+		while os.clock()<endAt do
+			latestPlan,latestBall=buildPlan(receiver,ballPower)
+			if latestPlan then
+				previewPlan(latestPlan)
+			end
+			RunService.Heartbeat:Wait()
+		end
+
+		local finalPlan,finalBall=buildPlan(receiver,ballPower)
+		return finalPlan or latestPlan,finalBall or latestBall
+	end
+
 	local function fireGameplayThrow(plan)
 		local reEvent=getGameReEvent()
 		if not reEvent then
@@ -1059,15 +1080,19 @@ function QBAim.new(ctx,parent)
 		if not(enabled and isAvailable()) then return end
 
 		local modeKey=getModeKey(ctx)
-		local plan=buildPlan(receiver,modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER)
-		if not plan then
-			setStatus("No throw solution")
+		local power=modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
+		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
+		if not receiverRoot then
+			setStatus("No receiver locked")
 			return
 		end
 
 		playThrowAnimation()
-		if THROW_ANIMATION_RELEASE_WAIT>0 then
-			task.wait(THROW_ANIMATION_RELEASE_WAIT)
+
+		local plan=buildReleasePlan(receiver,power)
+		if not plan then
+			setStatus("No release-time throw solution")
+			return
 		end
 
 		local ok,err
@@ -1080,7 +1105,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		if ok then
-			setStatus(currentModeText().." throw sent")
+			setStatus(currentModeText().." release-time throw sent")
 		else
 			setStatus(err or "Throw failed")
 		end
