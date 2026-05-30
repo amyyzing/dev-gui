@@ -38,6 +38,11 @@ local ARC_PREVIEW_UPDATE_INTERVAL=0.035
 local ARC_LANDING_Y=0.5
 local ARC_MAX_CURVE=400
 local PREVIEW_SMOOTH=0.28
+local C1_MARKER_ENABLED=true
+local C1_MARKER_SIZE=1.65
+local C3_INFO_GUI_ENABLED=true
+local C3_INFO_GUI_SIZE=UDim2.new(0,190,0,62)
+local C3_INFO_GUI_OFFSET=Vector3.new(0,3.2,0)
 local STABLE_WINDOW=0.48
 local STABLE_MIN_DIST=2
 local STABLE_MIN_SPEED=5
@@ -964,6 +969,187 @@ function QBAim.new(ctx,parent)
 		return best
 	end
 
+
+	local function ensureC1Marker()
+		if not C1_MARKER_ENABLED then return nil end
+
+		local _,folder=originalCenter()
+		if not folder then return nil end
+
+		local marker=preview.c1Marker
+		if marker and marker.Parent then
+			return marker
+		end
+
+		marker=folder:FindFirstChild("PreviewC1Marker")
+		if not(marker and marker:IsA("BasePart")) then
+			marker=Instance.new("Part")
+			marker.Name="PreviewC1Marker"
+			marker.Shape=Enum.PartType.Ball
+			marker.Size=Vector3.new(C1_MARKER_SIZE,C1_MARKER_SIZE,C1_MARKER_SIZE)
+			marker.Anchored=true
+			marker.CanCollide=false
+			marker.CanTouch=false
+			marker.CanQuery=false
+			marker.Material=Enum.Material.Neon
+			marker.Color=Color3.fromRGB(0,255,140)
+			marker.Parent=folder
+		end
+
+		marker.Transparency=0
+
+		local billboard=marker:FindFirstChild("C1Label")
+		if not billboard then
+			billboard=Instance.new("BillboardGui")
+			billboard.Name="C1Label"
+			billboard.Size=UDim2.new(0,60,0,24)
+			billboard.StudsOffset=Vector3.new(0,2.2,0)
+			billboard.AlwaysOnTop=true
+			billboard.Adornee=marker
+			billboard.Parent=marker
+
+			local label=Instance.new("TextLabel")
+			label.Name="Text"
+			label.BackgroundTransparency=1
+			label.Size=UDim2.new(1,0,1,0)
+			label.Text="C1"
+			label.Font=Enum.Font.GothamBold
+			label.TextSize=18
+			label.TextColor3=Color3.fromRGB(0,255,140)
+			label.TextStrokeTransparency=0.25
+			label.Parent=billboard
+		else
+			billboard.Enabled=true
+			billboard.Adornee=marker
+		end
+
+		preview.c1Marker=marker
+		return marker
+	end
+
+	local function ensureC3InfoGui()
+		if not C3_INFO_GUI_ENABLED then return nil,nil end
+
+		local _,folder=originalCenter()
+		if not folder then return nil,nil end
+
+		local anchor=preview.c3InfoAnchor
+		if not(anchor and anchor.Parent) then
+			anchor=folder:FindFirstChild("PreviewC3InfoAnchor")
+			if not(anchor and anchor:IsA("BasePart")) then
+				anchor=Instance.new("Part")
+				anchor.Name="PreviewC3InfoAnchor"
+				anchor.Size=Vector3.new(0.25,0.25,0.25)
+				anchor.Transparency=1
+				anchor.Anchored=true
+				anchor.CanCollide=false
+				anchor.CanTouch=false
+				anchor.CanQuery=false
+				anchor.Parent=folder
+			end
+			preview.c3InfoAnchor=anchor
+		end
+
+		local billboard=anchor:FindFirstChild("C3InfoGui")
+		if not billboard then
+			billboard=Instance.new("BillboardGui")
+			billboard.Name="C3InfoGui"
+			billboard.Size=C3_INFO_GUI_SIZE
+			billboard.StudsOffset=C3_INFO_GUI_OFFSET
+			billboard.AlwaysOnTop=true
+			billboard.Adornee=anchor
+			billboard.Parent=anchor
+
+			local frame=Instance.new("Frame")
+			frame.Name="Panel"
+			frame.BackgroundColor3=Color3.fromRGB(10,12,16)
+			frame.BackgroundTransparency=0.18
+			frame.BorderSizePixel=0
+			frame.Size=UDim2.new(1,0,1,0)
+			frame.Parent=billboard
+
+			local corner=Instance.new("UICorner")
+			corner.CornerRadius=UDim.new(0,8)
+			corner.Parent=frame
+
+			local stroke=Instance.new("UIStroke")
+			stroke.Color=Color3.fromRGB(255,170,0)
+			stroke.Thickness=1.5
+			stroke.Transparency=0.1
+			stroke.Parent=frame
+
+			local label=Instance.new("TextLabel")
+			label.Name="Text"
+			label.BackgroundTransparency=1
+			label.Position=UDim2.new(0,8,0,4)
+			label.Size=UDim2.new(1,-16,1,-8)
+			label.Font=Enum.Font.GothamMedium
+			label.TextSize=12
+			label.TextColor3=Color3.fromRGB(255,235,205)
+			label.TextStrokeTransparency=0.85
+			label.TextXAlignment=Enum.TextXAlignment.Left
+			label.TextYAlignment=Enum.TextYAlignment.Top
+			label.Parent=frame
+		else
+			billboard.Enabled=true
+			billboard.Adornee=anchor
+		end
+
+		local label=billboard:FindFirstChild("Panel") and billboard.Panel:FindFirstChild("Text")
+		return anchor,label
+	end
+
+	local function updateC1AndC3Info(plan,c1Pos,c3Pos)
+		if not plan then return end
+
+		local marker=ensureC1Marker()
+		if marker and typeof(c1Pos)=="Vector3" then
+			marker.CFrame=CFrame.new(c1Pos)
+			marker.Transparency=0
+		end
+
+		local anchor,label=ensureC3InfoGui()
+		if anchor and typeof(c3Pos)=="Vector3" then
+			anchor.CFrame=CFrame.new(c3Pos)
+		end
+
+		if not label then return end
+
+		local receiverRoot=trackedReceiver and trackedReceiver.Character and root(trackedReceiver.Character)
+		if not receiverRoot then
+			label.Text="WR: none\nC3-WR XZ: -- yd\nC1-WR XZ: -- yd\nC1 Y: --"
+			return
+		end
+
+		local wrPos=receiverRoot.Position
+		local exactC1=plan.c1Point or plan.target or c1Pos
+		local exactC3=(plan.landing and Vector3.new(plan.landing.X,ARC_LANDING_Y,plan.landing.Z)) or c3Pos
+		local c3Yards=distXZ(wrPos,exactC3)/YARDS_TO_STUDS
+		local c1Yards=distXZ(wrPos,exactC1)/YARDS_TO_STUDS
+		local c1Y=exactC1 and exactC1.Y or 0
+
+		label.Text=string.format(
+			"WR: %s\nC3-WR XZ: %.2f yd\nC1-WR XZ: %.2f yd\nC1 Y: %.2f",
+			trackedReceiver.Name,
+			c3Yards,
+			c1Yards,
+			c1Y
+		)
+	end
+
+	local function hideC1AndC3Info()
+		if preview.c1Marker and preview.c1Marker.Parent then
+			preview.c1Marker.Transparency=1
+			local billboard=preview.c1Marker:FindFirstChild("C1Label")
+			if billboard then billboard.Enabled=false end
+		end
+
+		if preview.c3InfoAnchor and preview.c3InfoAnchor.Parent then
+			local billboard=preview.c3InfoAnchor:FindFirstChild("C3InfoGui")
+			if billboard then billboard.Enabled=false end
+		end
+	end
+
 	local function previewPlan(plan)
 		if not(ARC_PREVIEW_ENABLED and plan) then return end
 
@@ -995,6 +1181,7 @@ function QBAim.new(ctx,parent)
 		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity))
 		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*plan.time))
 		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity))
+		updateC1AndC3Info(plan,p1,p3)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
 		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
@@ -1151,6 +1338,7 @@ function QBAim.new(ctx,parent)
 			trackedReceiver=nil
 			selectedRouteLock=nil
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
+			hideC1AndC3Info()
 		end
 
 		syncControls()
@@ -1177,6 +1365,12 @@ function QBAim.new(ctx,parent)
 
 		if preview.center and preview.center.Parent then
 			preview.center:Destroy()
+		end
+		if preview.c1Marker and preview.c1Marker.Parent then
+			preview.c1Marker:Destroy()
+		end
+		if preview.c3InfoAnchor and preview.c3InfoAnchor.Parent then
+			preview.c3InfoAnchor:Destroy()
 		end
 	end
 
