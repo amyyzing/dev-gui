@@ -1,0 +1,142 @@
+local Discord={}
+
+function Discord.new(ctx,page)
+	local New=ctx.New
+	local THEME=ctx.THEME
+	local makeSection=ctx.makeSection
+	local wrapTextButton=ctx.wrapTextButton
+
+	local api={}
+	local alive=true
+	local inviteLink=nil
+	local linkButton=nil
+	local statusLabel=nil
+	local linkWrap=nil
+
+	local function getClipboardSetter()
+		if type(setclipboard)=="function" then return setclipboard end
+		if type(toclipboard)=="function" then return toclipboard end
+		if typeof(Clipboard)=="table" and type(Clipboard.set)=="function" then return Clipboard.set end
+		return nil
+	end
+
+	local function setStatus(text,color)
+		if statusLabel then
+			statusLabel.Text=text or ""
+			statusLabel.TextColor3=color or THEME.MUTED
+		end
+	end
+
+	local function paint()
+		if not linkButton then return end
+
+		if inviteLink and inviteLink~="" then
+			linkButton.Text=inviteLink
+			linkButton.TextColor3=THEME.TEXT
+			if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
+			setStatus("Hover or click the link to copy it.",THEME.MUTED)
+		else
+			linkButton.Text="No invite link set."
+			linkButton.TextColor3=THEME.MUTED
+			if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
+			setStatus("Use /invite-link create in Discord to set this.",THEME.MUTED)
+		end
+	end
+
+	local function copyInvite()
+		if not inviteLink or inviteLink=="" then
+			setStatus("No Discord invite link has been set.",THEME.RED)
+			return
+		end
+
+		local setter=getClipboardSetter()
+		if not setter then
+			setStatus("Clipboard is not available in this executor.",THEME.RED)
+			return
+		end
+
+		local ok,err=pcall(setter,inviteLink)
+		if ok then
+			setStatus("Copied Discord invite link.",THEME.GREEN)
+		else
+			setStatus("Copy failed: "..tostring(err),THEME.RED)
+		end
+	end
+
+	function api.Refresh()
+		if not(ctx.BOT_API and ctx.BOT_API.Post) then
+			paint()
+			return
+		end
+
+		local ok,result=pcall(function()
+			return ctx.BOT_API.Post("/invite-link/get",{})
+		end)
+
+		if ok and result and result.ok then
+			inviteLink=result.inviteLink
+		else
+			setStatus("Could not fetch Discord invite link.",THEME.RED)
+		end
+
+		paint()
+	end
+
+	function api.Destroy()
+		alive=false
+	end
+
+	local section=makeSection(page,3,"Discord","Community invite")
+
+	linkButton=New("TextButton",{
+		BackgroundColor3=THEME.BG,
+		BorderSizePixel=0,
+		Size=UDim2.new(1,0,0,30),
+		Text="Loading invite link...",
+		Font=Enum.Font.Gotham,
+		TextSize=12,
+		TextColor3=THEME.MUTED,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		AutoButtonColor=false,
+		ZIndex=6,
+	},section)
+
+	linkWrap=wrapTextButton(linkButton,THEME.BG,2)
+
+	linkButton.MouseEnter:Connect(function()
+		if linkWrap then linkWrap.BackgroundColor3=Color3.fromRGB(43,43,43) end
+		copyInvite()
+	end)
+
+	linkButton.MouseLeave:Connect(function()
+		if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
+	end)
+
+	linkButton.MouseButton1Click:Connect(copyInvite)
+
+	statusLabel=New("TextLabel",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,18),
+		Text="Fetching invite link...",
+		Font=Enum.Font.Gotham,
+		TextSize=11,
+		TextColor3=THEME.MUTED,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		ZIndex=6,
+	},section)
+
+	api.Refresh()
+
+	task.spawn(function()
+		while alive do
+			task.wait(20)
+			if alive then
+				api.Refresh()
+			end
+		end
+	end)
+
+	return api
+end
+
+return Discord

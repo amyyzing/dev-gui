@@ -87,7 +87,6 @@ local function New(class, props, parent)
 		props.TextStrokeTransparency=1
 		props.TextStrokeColor3=Color3.fromRGB(0, 0, 0)
 		if props.TextYAlignment==nil then props.TextYAlignment=Enum.TextYAlignment.Center end
-		if props.TextXAlignment==nil then props.TextXAlignment=Enum.TextXAlignment.Center end
 
 		if class=="TextBox" then
 			props.TextSize=props.TextSize or 13
@@ -283,6 +282,7 @@ local MODULE_PATHS={
 	Workspace="page-4/workspace.lua",
 	RemoveAds="page-4/remove-ads.lua",
 	PlayerData="page-5/player-data.lua",
+	Discord="page-5/discord.lua",
 	DataSave="data-save/data-save.lua",
 }
 local AUTO_REFRESH_WATCH_PATHS={AUTO_REFRESH_RELOAD_PATH}
@@ -295,6 +295,7 @@ local REMOTE_MODULE_SOURCES={}
 local rebuildPage1FromModules=nil
 local rebuildCustomizeFromModules=nil
 local rebuildMapFromModules=nil
+local rebuildSettingsFromModules=nil
 
 local function loadModuleFromSource(modulePath,source)
 	local chunk,err=loadstring(source)
@@ -335,26 +336,166 @@ local function loadRemoteModule(modulePath)
 	return module
 end
 
-local GuiLogicModule=loadRemoteModule(MODULE_PATHS.GuiLogic)
-local MainFrameModule=loadRemoteModule(MODULE_PATHS.MainFrame)
-local AutoRefreshModule=loadRemoteModule(MODULE_PATHS.AutoRefresh)
-local AnnouncementModule=loadRemoteModule(MODULE_PATHS.Announcement)
-local HitboxPresetModule=loadRemoteModule(MODULE_PATHS.HitboxPreset)
-local KeybindSettingsModule=loadRemoteModule(MODULE_PATHS.KeybindSettings)
-local PresetEditorModule=loadRemoteModule(MODULE_PATHS.PresetEditor)
-local Page1HitboxModule=loadRemoteModule(MODULE_PATHS.Page1Hitbox)
-local Page1GravityModule=loadRemoteModule(MODULE_PATHS.Page1Gravity)
-local Page1SpeedModule=loadRemoteModule(MODULE_PATHS.Page1Speed)
-local Page1GameParamsModule=loadRemoteModule(MODULE_PATHS.Page1GameParams)
-local Page1BoostModule=loadRemoteModule(MODULE_PATHS.Page1Boost)
-local Page1ESPModule=loadRemoteModule(MODULE_PATHS.Page1ESP)
-local Page1QBAimModule=loadRemoteModule(MODULE_PATHS.Page1QBAim)
-local StrokeColourModule=loadRemoteModule(MODULE_PATHS.StrokeColour)
-local MapEditorModule=loadRemoteModule(MODULE_PATHS.MapEditor)
-local WorkspaceModule=loadRemoteModule(MODULE_PATHS.Workspace)
-local RemoveAdsModule=loadRemoteModule(MODULE_PATHS.RemoveAds)
-local PlayerDataModule=loadRemoteModule(MODULE_PATHS.PlayerData)
-local DataSaveModule=loadRemoteModule(MODULE_PATHS.DataSave)
+local SG_NAME="HitboxUI_DarkInfluenced_GUIOnly"
+local old=guiParent:FindFirstChild(SG_NAME)
+if old then old:Destroy() end
+
+local SG=New("ScreenGui", {Name=SG_NAME, ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, IgnoreGuiInset=false}, guiParent)
+
+local LOADER_TOTAL=0
+for _ in pairs(MODULE_PATHS) do
+	LOADER_TOTAL+=1
+end
+
+local loaderCurrent=0
+local loaderOverlay=New("Frame",{
+	Name="Loader",
+	BackgroundColor3=Color3.fromRGB(16,16,16),
+	BorderSizePixel=0,
+	Size=UDim2.new(1,0,1,0),
+	ZIndex=300,
+},SG)
+
+local loaderBox=New("Frame",{
+	AnchorPoint=Vector2.new(0.5,0.5),
+	Position=UDim2.new(0.5,0,0.5,0),
+	Size=UDim2.fromOffset(430,150),
+	BackgroundColor3=THEME.BG,
+	BorderSizePixel=0,
+	ZIndex=301,
+},loaderOverlay)
+
+New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},loaderBox)
+New("UIPadding",{PaddingTop=UDim.new(0,16),PaddingLeft=UDim.new(0,18),PaddingRight=UDim.new(0,18),PaddingBottom=UDim.new(0,16)},loaderBox)
+
+local loaderTitle=New("TextLabel",{
+	BackgroundTransparency=1,
+	Size=UDim2.new(1,0,0,26),
+	Text="Loading GUI",
+	Font=Enum.Font.GothamMedium,
+	TextSize=16,
+	TextColor3=THEME.TEXT,
+	TextXAlignment=Enum.TextXAlignment.Left,
+	ZIndex=302,
+},loaderBox)
+
+local loaderStatus=New("TextLabel",{
+	BackgroundTransparency=1,
+	Position=UDim2.fromOffset(0,34),
+	Size=UDim2.new(1,0,0,34),
+	Text="Preparing remote modules...",
+	Font=Enum.Font.Gotham,
+	TextSize=12,
+	TextColor3=THEME.MUTED,
+	TextWrapped=true,
+	TextXAlignment=Enum.TextXAlignment.Left,
+	ZIndex=302,
+},loaderBox)
+
+local loaderTrack=New("Frame",{
+	Position=UDim2.fromOffset(0,82),
+	Size=UDim2.new(1,0,0,10),
+	BackgroundColor3=THEME.PANEL,
+	BorderSizePixel=0,
+	ZIndex=302,
+},loaderBox)
+
+New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},loaderTrack)
+
+local loaderFill=New("Frame",{
+	Size=UDim2.new(0,0,1,0),
+	BackgroundColor3=THEME.GREEN,
+	BorderSizePixel=0,
+	ZIndex=303,
+},loaderTrack)
+
+local loaderPercent=New("TextLabel",{
+	BackgroundTransparency=1,
+	Position=UDim2.fromOffset(0,100),
+	Size=UDim2.new(1,0,0,18),
+	Text="0%",
+	Font=Enum.Font.Gotham,
+	TextSize=11,
+	TextColor3=THEME.MUTED,
+	TextXAlignment=Enum.TextXAlignment.Left,
+	ZIndex=302,
+},loaderBox)
+
+local function setLoaderProgress(text,current,total,isProblem)
+	if not loaderOverlay or not loaderOverlay.Parent then return end
+
+	current=math.clamp(tonumber(current) or 0,0,tonumber(total) or LOADER_TOTAL)
+	total=math.max(tonumber(total) or LOADER_TOTAL,1)
+
+	local pct=math.clamp(current/total,0,1)
+	loaderStatus.Text=tostring(text or "Loading...")
+	loaderStatus.TextColor3=isProblem and THEME.RED or THEME.MUTED
+	loaderPercent.Text=math.floor(pct*100+0.5).."%"
+	loaderFill.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
+	TweenService:Create(loaderFill,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
+	task.wait()
+end
+
+local function finishLoader()
+	if not loaderOverlay or not loaderOverlay.Parent then return end
+
+	loaderTitle.Text="Welcome, "..me.Name.."!"
+	setLoaderProgress("Everything is loaded and up to date.",LOADER_TOTAL,LOADER_TOTAL,false)
+
+	task.delay(1.2,function()
+		if not loaderOverlay or not loaderOverlay.Parent then return end
+
+		local ti=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		TweenService:Create(loaderOverlay,ti,{BackgroundTransparency=1}):Play()
+
+		for _,obj in ipairs(loaderOverlay:GetDescendants()) do
+			if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+				TweenService:Create(obj,ti,{TextTransparency=1}):Play()
+			elseif obj:IsA("Frame") then
+				TweenService:Create(obj,ti,{BackgroundTransparency=1}):Play()
+			elseif obj:IsA("UIStroke") then
+				TweenService:Create(obj,ti,{Transparency=1}):Play()
+			end
+		end
+
+		task.delay(0.24,function()
+			if loaderOverlay then
+				loaderOverlay:Destroy()
+				loaderOverlay=nil
+			end
+		end)
+	end)
+end
+
+local function loadRemoteModuleStep(name,path)
+	loaderCurrent+=1
+	setLoaderProgress("Fetching "..path,loaderCurrent-0.35,LOADER_TOTAL,false)
+	local module=loadRemoteModule(path)
+	setLoaderProgress((module and "Loaded " or "Missing ")..path,loaderCurrent,LOADER_TOTAL,not module)
+	return module
+end
+
+local GuiLogicModule=loadRemoteModuleStep("GuiLogic",MODULE_PATHS.GuiLogic)
+local MainFrameModule=loadRemoteModuleStep("MainFrame",MODULE_PATHS.MainFrame)
+local AutoRefreshModule=loadRemoteModuleStep("AutoRefresh",MODULE_PATHS.AutoRefresh)
+local AnnouncementModule=loadRemoteModuleStep("Announcement",MODULE_PATHS.Announcement)
+local HitboxPresetModule=loadRemoteModuleStep("HitboxPreset",MODULE_PATHS.HitboxPreset)
+local KeybindSettingsModule=loadRemoteModuleStep("KeybindSettings",MODULE_PATHS.KeybindSettings)
+local PresetEditorModule=loadRemoteModuleStep("PresetEditor",MODULE_PATHS.PresetEditor)
+local Page1HitboxModule=loadRemoteModuleStep("Page1Hitbox",MODULE_PATHS.Page1Hitbox)
+local Page1GravityModule=loadRemoteModuleStep("Page1Gravity",MODULE_PATHS.Page1Gravity)
+local Page1SpeedModule=loadRemoteModuleStep("Page1Speed",MODULE_PATHS.Page1Speed)
+local Page1GameParamsModule=loadRemoteModuleStep("Page1GameParams",MODULE_PATHS.Page1GameParams)
+local Page1BoostModule=loadRemoteModuleStep("Page1Boost",MODULE_PATHS.Page1Boost)
+local Page1ESPModule=loadRemoteModuleStep("Page1ESP",MODULE_PATHS.Page1ESP)
+local Page1QBAimModule=loadRemoteModuleStep("Page1QBAim",MODULE_PATHS.Page1QBAim)
+local StrokeColourModule=loadRemoteModuleStep("StrokeColour",MODULE_PATHS.StrokeColour)
+local MapEditorModule=loadRemoteModuleStep("MapEditor",MODULE_PATHS.MapEditor)
+local WorkspaceModule=loadRemoteModuleStep("Workspace",MODULE_PATHS.Workspace)
+local RemoveAdsModule=loadRemoteModuleStep("RemoveAds",MODULE_PATHS.RemoveAds)
+local PlayerDataModule=loadRemoteModuleStep("PlayerData",MODULE_PATHS.PlayerData)
+local DiscordModule=loadRemoteModuleStep("Discord",MODULE_PATHS.Discord)
+local DataSaveModule=loadRemoteModuleStep("DataSave",MODULE_PATHS.DataSave)
 
 local function runLoaderCheck()
 	local missing={}
@@ -368,8 +509,10 @@ local function runLoaderCheck()
 	if #missing>0 then
 		table.sort(missing)
 		warn("Loader check found missing modules:",table.concat(missing,", "))
+		setLoaderProgress("Missing modules: "..table.concat(missing,", "),LOADER_TOTAL,LOADER_TOTAL,true)
 	else
 		warn("Loader check complete: all remote modules loaded.")
+		setLoaderProgress("Verified remote modules.",LOADER_TOTAL,LOADER_TOTAL,false)
 	end
 end
 
@@ -393,11 +536,6 @@ local function getUIStrokeGradientColor()
 	return Color3.fromRGB(math.clamp(math.floor(UI_STYLE.GradientR+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.GradientG+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.GradientB+0.5), 0, 255))
 end
 
-local SG_NAME="HitboxUI_DarkInfluenced_GUIOnly"
-local old=guiParent:FindFirstChild(SG_NAME)
-if old then old:Destroy() end
-
-local SG=New("ScreenGui", {Name=SG_NAME, ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, IgnoreGuiInset=false}, guiParent)
 local liquidStrokeConn=nil
 local MainFrame=nil
 local AutoRefreshAPI=nil
@@ -453,6 +591,24 @@ local function applyAutoRefreshModuleChange(changedPath,module)
 		else
 			warn("Auto-refresh cached map module, rebuild not ready:",changedPath)
 		end
+		reapplyThemeAfterAutoRefresh()
+		return true
+	end
+
+	if changedPath==MODULE_PATHS.PlayerData or changedPath==MODULE_PATHS.Discord then
+		if changedPath==MODULE_PATHS.PlayerData then
+			PlayerDataModule=module
+		else
+			DiscordModule=module
+		end
+
+		if rebuildSettingsFromModules then
+			warn("Auto-refreshing settings module after remote change:",changedPath)
+			rebuildSettingsFromModules()
+		else
+			warn("Auto-refresh cached settings module, rebuild not ready:",changedPath)
+		end
+
 		reapplyThemeAfterAutoRefresh()
 		return true
 	end
@@ -739,6 +895,9 @@ local refreshFooterResetButton=function()
 end
 
 local AnnouncementAPI=nil
+local playerSessionId=nil
+local playerSessionHeartbeatStarted=false
+local sendPlayerSessionUpdate=function() end
 local resetKeybindPresetPageDefaults=function() end
 
 local DataSaveAPI=nil
@@ -1358,6 +1517,7 @@ buildMapPage()
 local refreshPage2UI=function() end
 local PAGE2_EXPANDED_OWNED={}
 local PlayerDataAPI=nil
+local DiscordAPI=nil
 
 local function showConfirmModal(titleText, bodyText, yesText, onYes)
 	local modal=New("Frame", {BackgroundColor3=Color3.fromRGB(0, 0, 0), BackgroundTransparency=0.25, BorderSizePixel=0, Size=UDim2.new(1, 0, 1, 0), ZIndex=100}, SG)
@@ -1411,6 +1571,12 @@ local function refreshSettingsPage()
 			RemoveAdsAPI.Refresh()
 		end)
 	end
+
+	if DiscordAPI and DiscordAPI.Refresh then
+		pcall(function()
+			DiscordAPI.Refresh()
+		end)
+	end
 end
 
 local function buildActualSettingsPage()
@@ -1461,10 +1627,59 @@ local function buildActualSettingsPage()
 		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-5/player-data.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 	end
 
+	if DiscordModule and DiscordModule.new then
+		local ok,result=pcall(function()
+			return DiscordModule.new({
+				New=New,
+				THEME=THEME,
+				BOT_API=BOT_API,
+				makeSection=makeSection,
+				wrapTextButton=wrapTextButton,
+			},actualSettingsPage)
+		end)
+
+		if ok then
+			DiscordAPI=result
+		else
+			local section=makeSection(actualSettingsPage,3,"Discord","Remote module failed to load.")
+			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Discord module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		end
+	else
+		local section=makeSection(actualSettingsPage,3,"Discord","Remote module failed to load.")
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-5/discord.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	end
+
 	refreshSettingsPage()
 end
 
 buildActualSettingsPage()
+
+local function clearActualSettingsPage()
+	for _,child in ipairs(actualSettingsPage:GetChildren()) do
+		if not child:IsA("UIListLayout") then
+			child:Destroy()
+		end
+	end
+end
+
+rebuildSettingsFromModules=function()
+	if PlayerDataAPI and PlayerDataAPI.Destroy then
+		pcall(function()
+			PlayerDataAPI.Destroy()
+		end)
+	end
+
+	if DiscordAPI and DiscordAPI.Destroy then
+		pcall(function()
+			DiscordAPI.Destroy()
+		end)
+	end
+
+	PlayerDataAPI=nil
+	DiscordAPI=nil
+	clearActualSettingsPage()
+	buildActualSettingsPage()
+end
 
 local activeCapture=nil
 
@@ -1636,6 +1851,8 @@ end)
 
 local function shutdownTool()
 	if not toolAlive then return end
+
+	sendPlayerSessionUpdate(true)
 	toolAlive=false
 
 	if AnnouncementAPI and AnnouncementAPI.Destroy then
@@ -1772,6 +1989,7 @@ local function refreshAllUI()
 	if MapEditorAPI and MapEditorAPI.Refresh then pcall(MapEditorAPI.Refresh) end
 	if WorkspaceAPI and WorkspaceAPI.Refresh then pcall(WorkspaceAPI.Refresh) end
 	if RemoveAdsAPI and RemoveAdsAPI.Refresh then pcall(RemoveAdsAPI.Refresh) end
+	if DiscordAPI and DiscordAPI.Refresh then pcall(DiscordAPI.Refresh) end
 	if refreshPage2UI then pcall(refreshPage2UI) end
 	if applyUIStrokeTheme then pcall(applyUIStrokeTheme) end
 	if updateResponsiveLayout then pcall(updateResponsiveLayout) end
@@ -1863,6 +2081,38 @@ else
 end
 
 local playerLogSent=false
+sendPlayerSessionUpdate=function(final)
+	if not playerSessionId then return end
+
+	local ok,result=pcall(function()
+		return BOT_API.Post("/player/session",{
+			playerId=tostring(me.UserId),
+			sessionId=playerSessionId,
+			modeKey=CURRENT_MODE_KEY,
+			modeLabel=CURRENT_MODE_LABEL,
+			final=final and true or false,
+		})
+	end)
+
+	if not ok or not result or not result.ok then
+		warn("Player session update failed:",ok and result and result.error or result)
+	end
+end
+
+local function startPlayerSessionHeartbeat()
+	if playerSessionHeartbeatStarted then return end
+	playerSessionHeartbeatStarted=true
+
+	task.spawn(function()
+		while toolAlive and playerSessionId do
+			task.wait(30)
+			if toolAlive and playerSessionId then
+				sendPlayerSessionUpdate(false)
+			end
+		end
+	end)
+end
+
 local function sendPlayerLog()
 	if playerLogSent then return end
 	playerLogSent=true
@@ -1882,7 +2132,11 @@ local function sendPlayerLog()
 
 		if not ok or not result or not result.ok then
 			warn("Player log failed:",ok and result and result.error or result)
+			return
 		end
+
+		playerSessionId=result.sessionId
+		startPlayerSessionHeartbeat()
 	end)
 end
 
@@ -1893,3 +2147,4 @@ refreshActionStatus()
 modeSubtitle.Text=CURRENT_MODE_LABEL.." loaded"
 sendPlayerLog()
 startAutoRefresh()
+finishLoader()
