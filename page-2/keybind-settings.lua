@@ -83,6 +83,33 @@ function KeybindSettings.new(ctx,bindSection)
 		if refreshAll then refreshAll() end
 	end
 
+	local function finishCapture(binding)
+		if not activeCapture then return false end
+
+		local cap=activeCapture
+		if binding~=nil then
+			if binding=="MouseButton1" then
+				suppressMouseButton1ClickUntil=os.clock()+0.25
+			end
+
+			cap.setter(binding)
+		end
+
+		activeCapture=nil
+		requestRefresh()
+		return true
+	end
+
+	function api.ShouldSuppressMouseButton1Click()
+		return os.clock()<suppressMouseButton1ClickUntil
+	end
+
+	function api.CaptureInput(input)
+		local binding=(ctx.inputToBinding or inputToBinding)(input)
+		if binding==nil then return false end
+		return finishCapture(binding)
+	end
+
 	function api.MakeBindButton(parent,x,y,w)
 		local btn=New("TextButton",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w or 122,28),Text="NIL",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6},parent)
 		local wrap=wrapTextButton(btn,THEME.BG,2)
@@ -138,9 +165,7 @@ function KeybindSettings.new(ctx,bindSection)
 			end
 
 			if activeCapture and activeCapture.button==btn then
-				setter("MouseButton1")
-				activeCapture=nil
-				requestRefresh()
+				finishCapture("MouseButton1")
 				return
 			end
 
@@ -150,16 +175,7 @@ function KeybindSettings.new(ctx,bindSection)
 		btn.InputBegan:Connect(function(input)
 			if not(activeCapture and activeCapture.button==btn) then return end
 
-			local binding=(ctx.inputToBinding or inputToBinding)(input)
-			if binding~=nil then
-				if binding=="MouseButton1" then
-					suppressMouseButton1ClickUntil=os.clock()+0.25
-				end
-
-				setter(binding)
-				activeCapture=nil
-				requestRefresh()
-			end
+			api.CaptureInput(input)
 		end)
 
 		table.insert(bindRows,{button=btn,getter=getter})
@@ -191,8 +207,6 @@ function KeybindSettings.new(ctx,bindSection)
 	inputConn=UIS.InputBegan:Connect(function(inp)
 		if not activeCapture then return end
 
-		local cap=activeCapture
-
 		if inp.KeyCode==Enum.KeyCode.Escape then
 			activeCapture=nil
 			requestRefresh()
@@ -200,23 +214,11 @@ function KeybindSettings.new(ctx,bindSection)
 		end
 
 		if inp.KeyCode==Enum.KeyCode.Backspace or inp.KeyCode==Enum.KeyCode.Delete then
-			cap.setter(Enum.KeyCode.Unknown)
-			activeCapture=nil
-			requestRefresh()
+			finishCapture(Enum.KeyCode.Unknown)
 			return
 		end
 
-		local binding=(ctx.inputToBinding or inputToBinding)(inp)
-		if binding~=nil then
-			if binding=="MouseButton1" then
-				suppressMouseButton1ClickUntil=os.clock()+0.25
-			end
-
-			cap.setter(binding)
-		end
-
-		activeCapture=nil
-		requestRefresh()
+		api.CaptureInput(inp)
 	end)
 
 	function api.Destroy()

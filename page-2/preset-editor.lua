@@ -15,6 +15,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 	local api={}
 	local presetRows={}
 	local refreshAll=nil
+	local suppressKeyButtonClickUntil=0
 
 	function api.SetRefreshAll(fn)
 		refreshAll=fn
@@ -189,6 +190,20 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 		zBox.FocusLost:Connect(applyPresetSize)
 
 		keyBtn.MouseButton1Click:Connect(function()
+			if os.clock()<suppressKeyButtonClickUntil then
+				return
+			end
+
+			local active=keybinds.GetActiveCapture and keybinds.GetActiveCapture()
+			if active and active.button==keyBtn then
+				setPresetKey(i,"MouseButton1")
+				if keybinds.CancelCapture then
+					keybinds.CancelCapture()
+				end
+				requestRefresh()
+				return
+			end
+
 			keybinds.StartCapture(keyBtn,function()
 				return PRESETS[i].key
 			end,function(v)
@@ -197,8 +212,14 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 		end)
 
 		keyBtn.InputBegan:Connect(function(input)
-			if input.UserInputType==Enum.UserInputType.MouseButton2 then
-				setPresetKey(i,Enum.KeyCode.Unknown)
+			local active=keybinds.GetActiveCapture and keybinds.GetActiveCapture()
+			if not(active and active.button==keyBtn) then return end
+
+			if input.UserInputType==Enum.UserInputType.MouseButton1 then
+				suppressKeyButtonClickUntil=os.clock()+0.25
+			end
+
+			if keybinds.CaptureInput and keybinds.CaptureInput(input) then
 				requestRefresh()
 			end
 		end)

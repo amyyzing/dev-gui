@@ -1266,6 +1266,27 @@ function QBAim.new(ctx,parent)
 		return getHeldBall()~=nil
 	end
 
+	local function clearPreviewForMissingBall(statusText)
+		previewFrozen=false
+		preview.p1,preview.p2,preview.p3=nil,nil,nil
+		hideQBTrailPreview()
+
+		if preview.center and preview.center.Parent then
+			preview.center:Destroy()
+		end
+
+		preview.center=nil
+		preview.c1=nil
+		preview.c2=nil
+		preview.c3=nil
+		preview.beam=nil
+		preview.orig=nil
+
+		if statusText then
+			setStatus(statusText)
+		end
+	end
+
 	local function freezePreviewAtCurrentPlan(plan)
 		if not FREEZE_PREVIEW_WHILE_BALL_RELEASED then return end
 		if plan then
@@ -1301,11 +1322,19 @@ function QBAim.new(ctx,parent)
 		local latestBall=nil
 
 		while os.clock()<endAt do
+			if not getHeldBall() then
+				return nil,nil
+			end
+
 			latestPlan,latestBall=buildPlan(receiver,ballPower)
 			if latestPlan then
 				previewPlan(latestPlan)
 			end
 			RunService.Heartbeat:Wait()
+		end
+
+		if not getHeldBall() then
+			return nil,nil
 		end
 
 		local finalPlan,finalBall=buildPlan(receiver,ballPower)
@@ -1349,9 +1378,7 @@ function QBAim.new(ctx,parent)
 
 		local heldBall=getHeldBall()
 		if not heldBall then
-			previewFrozen=false
-			hideQBTrailPreview()
-			setStatus("No ball held")
+			clearPreviewForMissingBall("No ball held")
 			return
 		end
 
@@ -1372,9 +1399,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		if not getHeldBall() then
-			previewFrozen=false
-			hideQBTrailPreview()
-			setStatus("No ball held at release")
+			clearPreviewForMissingBall("No ball held at release")
 			return
 		end
 
@@ -1431,6 +1456,16 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function setEnabled(value)
+		if value and not getHeldBall() then
+			enabled=false
+			trackedReceiver=nil
+			selectedRouteLock=nil
+			clearPreviewForMissingBall()
+			syncControls()
+			setStatus("No ball held")
+			return
+		end
+
 		enabled=value and isAvailable() and true or false
 		if not enabled then
 			trackedReceiver=nil
@@ -1574,14 +1609,13 @@ function QBAim.new(ctx,parent)
 	end))
 
 	addConnection(RunService.RenderStepped:Connect(function()
-		if not(enabled and isAvailable() and trackedReceiver) then return end
+		if not(enabled and isAvailable()) then return end
 
 		local now=os.clock()
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
 			local holdingBall=hasHeldBallForPreview()
 			if not holdingBall then
-				previewFrozen=false
-				hideQBTrailPreview()
+				clearPreviewForMissingBall()
 				return
 			end
 
@@ -1592,6 +1626,8 @@ function QBAim.new(ctx,parent)
 				previewFrozen=false
 			end
 		end
+
+		if not trackedReceiver then return end
 
 		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
 		preview.last=now
@@ -1606,6 +1642,11 @@ function QBAim.new(ctx,parent)
 		if processed or not isAvailable() then return end
 
 		if bindingMatches("getQBAimToggleKey",input,Enum.KeyCode.P) then
+			if not getHeldBall() then
+				clearPreviewForMissingBall("No ball held")
+				return
+			end
+
 			setEnabled(not enabled)
 			return
 		end
@@ -1617,9 +1658,7 @@ function QBAim.new(ctx,parent)
 		if not(wantsLock or wantsThrow) then return end
 
 		if not getHeldBall() then
-			previewFrozen=false
-			hideQBTrailPreview()
-			setStatus("No ball held")
+			clearPreviewForMissingBall("No ball held")
 			return
 		end
 
