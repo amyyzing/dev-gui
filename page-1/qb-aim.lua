@@ -22,8 +22,7 @@ local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
-local DEFAULT_WR_LEAD_DELAY=0.75
-local WR_LEAD_DELAY=DEFAULT_WR_LEAD_DELAY
+local WR_LEAD_DELAY=0.75
 local QB_RELEASE_DELAY=0.25
 local QB_XZ_RELEASE_FACTOR=0
 local QB_LAUNCH_Y_BIAS=0
@@ -45,7 +44,7 @@ local ARC_MAX_CURVE=400
 local PREVIEW_SMOOTH=0.28
 local C1_MARKER_ENABLED=true
 local C1_MARKER_SIZE=1.65
-local C3_INFO_GUI_ENABLED=true
+local C3_INFO_GUI_ENABLED=false
 local C3_INFO_GUI_SIZE=UDim2.new(0,220,0,78)
 local C3_INFO_GUI_OFFSET=Vector3.new(0,3.2,0)
 local STABLE_WINDOW=0.48
@@ -407,7 +406,6 @@ function QBAim.new(ctx,parent)
 	local New=ctx.New
 	local THEME=ctx.THEME
 	local makeSection=ctx.makeSection
-	local buildSlider=ctx.buildSlider
 	local buildToggleRow=ctx.buildToggleRow
 	local api={}
 	local enabled=false
@@ -421,7 +419,6 @@ function QBAim.new(ctx,parent)
 	local sectionBody=nil
 	local sectionFrame=nil
 	local enabledToggle=nil
-	local leadDelaySlider=nil
 	local statusLabel=nil
 	local targetLabel=nil
 
@@ -521,10 +518,6 @@ function QBAim.new(ctx,parent)
 
 		if enabledToggle then
 			enabledToggle.set(enabled)
-		end
-
-		if leadDelaySlider then
-			leadDelaySlider.set(WR_LEAD_DELAY)
 		end
 
 		setTargetText()
@@ -1135,35 +1128,9 @@ function QBAim.new(ctx,parent)
 			marker.Transparency=0
 		end
 
-		local anchor,label=ensureC3InfoGui()
-		if anchor and typeof(c3Pos)=="Vector3" then
-			anchor.CFrame=CFrame.new(c3Pos)
+		if not C3_INFO_GUI_ENABLED then
+			cleanupC3InfoGui()
 		end
-
-		if not label then return end
-
-		local receiverRoot=trackedReceiver and trackedReceiver.Character and root(trackedReceiver.Character)
-		if not receiverRoot then
-			label.Text="WR: none\nQB-WR XZ: -- yd\nC3-WR XZ: -- yd\nC1-WR XZ: -- yd\nC1 Y: --"
-			return
-		end
-
-		local wrPos=receiverRoot.Position
-		local exactC1=plan.c1Point or plan.target or c1Pos
-		local exactC3=(plan.landing and Vector3.new(plan.landing.X,ARC_LANDING_Y,plan.landing.Z)) or c3Pos
-		local qbWrYards=distXZ(plan.origin or wrPos,wrPos)/YARDS_TO_STUDS
-		local c3Yards=distXZ(wrPos,exactC3)/YARDS_TO_STUDS
-		local c1Yards=distXZ(wrPos,exactC1)/YARDS_TO_STUDS
-		local c1Y=exactC1 and exactC1.Y or 0
-
-		label.Text=string.format(
-			"WR: %s\nQB-WR XZ: %.2f yd\nC3-WR XZ: %.2f yd\nC1-WR XZ: %.2f yd\nC1 Y: %.2f",
-			trackedReceiver.Name,
-			qbWrYards,
-			c3Yards,
-			c1Yards,
-			c1Y
-		)
 	end
 
 	local function hideC1AndC3Info()
@@ -1173,10 +1140,7 @@ function QBAim.new(ctx,parent)
 			if billboard then billboard.Enabled=false end
 		end
 
-		if preview.c3InfoAnchor and preview.c3InfoAnchor.Parent then
-			local billboard=preview.c3InfoAnchor:FindFirstChild("C3InfoGui")
-			if billboard then billboard.Enabled=false end
-		end
+		cleanupC3InfoGui()
 	end
 
 	local function previewPlan(plan)
@@ -1392,17 +1356,11 @@ function QBAim.new(ctx,parent)
 		setEnabled(value)
 	end
 
-	function api.SetWRLeadDelay(value)
-		WR_LEAD_DELAY=math.clamp(tonumber(value) or DEFAULT_WR_LEAD_DELAY,0,2)
-		syncControls()
-	end
-
 	function api.Refresh()
 		syncControls()
 	end
 
 	function api.Reset()
-		WR_LEAD_DELAY=DEFAULT_WR_LEAD_DELAY
 		setEnabled(false)
 	end
 
@@ -1430,13 +1388,6 @@ function QBAim.new(ctx,parent)
 	enabledToggle=buildToggleRow(sectionBody,"Enabled",enabled,function(value)
 		setEnabled(value)
 	end)
-
-	if buildSlider then
-		leadDelaySlider=buildSlider(sectionBody,"LD",0,2,WR_LEAD_DELAY,2,function(value)
-			WR_LEAD_DELAY=math.clamp(tonumber(value) or DEFAULT_WR_LEAD_DELAY,0,2)
-			syncControls()
-		end)
-	end
 
 	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Disabled",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
 	targetLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Target: none",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
@@ -1529,6 +1480,7 @@ function QBAim.new(ctx,parent)
 		end
 	end))
 
+	cleanupC3InfoGui()
 	syncControls()
 	return api
 end
