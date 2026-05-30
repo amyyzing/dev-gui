@@ -11,8 +11,10 @@ local LP=Players.LocalPlayer
 local YARDS_TO_STUDS=3
 local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
-local GAMEPLAY_BALL_POWER=95
-local SQUADS_BALL_POWER=95
+local MODEL_BALL_SPEED=95
+local REMOTE_DISPLAY_POWER=100
+local GAMEPLAY_BALL_POWER=MODEL_BALL_SPEED
+local SQUADS_BALL_POWER=MODEL_BALL_SPEED
 local PLAYER_G=196.2
 local JUMP_POWER=53.5
 local WR_MAX_Y=6+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
@@ -1237,7 +1239,7 @@ function QBAim.new(ctx,parent)
 			return false,"Gameplay ReEvent missing"
 		end
 
-		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=plan.speed or GAMEPLAY_BALL_POWER})
+		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=REMOTE_DISPLAY_POWER})
 		pcall(function()
 			local variables=require(LP.PlayerScripts.ClientMain.Utilities.Variables)
 			if variables.Mechanics and variables.Mechanics.UnequipFootball then
@@ -1257,7 +1259,7 @@ function QBAim.new(ctx,parent)
 		reEvent:FireServer("Mechanics","ThrowBall",{
 			Target=plan.aimPoint,
 			AutoThrow=false,
-			Power=plan.speed or SQUADS_BALL_POWER,
+			Power=REMOTE_DISPLAY_POWER,
 		})
 
 		return true,nil
