@@ -12,7 +12,7 @@ local YARDS_TO_STUDS=3
 local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local GAMEPLAY_BALL_POWER=95
-local SQUADS_BALL_POWER=100
+local SQUADS_BALL_POWER=95
 local PLAYER_G=196.2
 local JUMP_POWER=53.5
 local WR_MAX_Y=6+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
@@ -47,6 +47,7 @@ local STABLE_DOT_REPLACE=0.72
 local STABLE_BLEND=0.18
 local CIRCLE_RADIUS_FULL_LEAD=180
 local CIRCLE_DISTANCE_SCALE_MIN=0.35
+local CIRCLE_DISTANCE_SCALE_MAX=1.00
 local CIRCLE_RADIAL_EXTRA_BASE=0.55
 local CIRCLE_RADIAL_EXTRA_GAIN=0.45
 local CIRCLE_RADIAL_EXTRA_MIN=0.25
@@ -56,13 +57,14 @@ local CIRCLE_TANGENT_EXTRA_GAIN=0.50
 local CIRCLE_TANGENT_EXTRA_MIN=0.15
 local CIRCLE_TANGENT_EXTRA_MAX=0.70
 local CIRCLE_LOS_RATE_GAIN=6
+local CIRCLE_LOS_RATE_EPSILON=1
 local CIRCLE_EXTRA_LEAD_TIME_MAX=0.78
 local DIAG_STREAK_SIDE_RATIO_MIN=0.30
 local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
-local THROW_ANIMATION_RELEASE_WAIT=0
+local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
 
 local function safeDisconnect(conn)
 	if conn and typeof(conn)=="RBXScriptConnection" then
@@ -832,10 +834,10 @@ function QBAim.new(ctx,parent)
 		local radius=distXZ(originPosition,receiverRoot.Position)
 		local speed=math.max(result.speed,1e-6)
 		local positiveAway=math.clamp(result.away/speed,0,1)
-		local distanceScale=math.clamp(radius/CIRCLE_RADIUS_FULL_LEAD,CIRCLE_DISTANCE_SCALE_MIN,1)
+		local distanceScale=math.clamp(radius/CIRCLE_RADIUS_FULL_LEAD,CIRCLE_DISTANCE_SCALE_MIN,CIRCLE_DISTANCE_SCALE_MAX)
 		local radialGain=math.clamp(CIRCLE_RADIAL_EXTRA_BASE+CIRCLE_RADIAL_EXTRA_GAIN*positiveAway,CIRCLE_RADIAL_EXTRA_MIN,CIRCLE_RADIAL_EXTRA_MAX)
 		local tangentGain=math.clamp(CIRCLE_TANGENT_EXTRA_BASE+CIRCLE_TANGENT_EXTRA_GAIN*positiveAway,CIRCLE_TANGENT_EXTRA_MIN,CIRCLE_TANGENT_EXTRA_MAX)
-		local lineOfSightRate=result.sideAbs/math.max(radius,1)
+		local lineOfSightRate=result.sideAbs/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
 		local damp=1/(1+lineOfSightRate*CIRCLE_LOS_RATE_GAIN)
 		local radialTime=math.min(WR_LEAD_DELAY*distanceScale*radialGain,CIRCLE_EXTRA_LEAD_TIME_MAX)
 		local tangentTime=math.min(WR_LEAD_DELAY*distanceScale*tangentGain*damp,CIRCLE_EXTRA_LEAD_TIME_MAX)
@@ -1021,15 +1023,16 @@ function QBAim.new(ctx,parent)
 		if not(enabled and isAvailable()) then return end
 
 		local modeKey=getModeKey(ctx)
-		local plan=buildPlan(receiver,modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER)
-		if not plan then
-			setStatus("No throw solution")
-			return
-		end
 
 		playThrowAnimation()
 		if THROW_ANIMATION_RELEASE_WAIT>0 then
 			task.wait(THROW_ANIMATION_RELEASE_WAIT)
+		end
+
+		local plan=buildPlan(receiver,modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER)
+		if not plan then
+			setStatus("No throw solution")
+			return
 		end
 
 		local ok,err
