@@ -57,14 +57,14 @@ local CIRCLE_TANGENT_EXTRA_GAIN=0.50
 local CIRCLE_TANGENT_EXTRA_MIN=0.15
 local CIRCLE_TANGENT_EXTRA_MAX=0.70
 local CIRCLE_LOS_RATE_GAIN=6
-local CIRCLE_LOS_RATE_EPSILON=1
+local CIRCLE_LOS_RATE_EPSILON=1.00
 local CIRCLE_EXTRA_LEAD_TIME_MAX=0.78
 local DIAG_STREAK_SIDE_RATIO_MIN=0.30
 local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
-local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
+local THROW_ANIMATION_RELEASE_WAIT=0
 
 local function safeDisconnect(conn)
 	if conn and typeof(conn)=="RBXScriptConnection" then
@@ -833,24 +833,60 @@ function QBAim.new(ctx,parent)
 		local result=components(originPosition,receiverRoot.Position,targetVelocity)
 		local radius=distXZ(originPosition,receiverRoot.Position)
 		local speed=math.max(result.speed,1e-6)
-		local positiveAway=math.clamp(result.away/speed,0,1)
+
+		local awayShare=math.clamp(result.away/speed,-1,1)
+		local positiveAwayShare=math.clamp(result.away/speed,0,1)
+		local radialShareAbs=math.clamp(result.awayAbs/speed,0,1)
+		local lateralShare=math.clamp(result.sideAbs/speed,0,1)
+
 		local distanceScale=math.clamp(radius/CIRCLE_RADIUS_FULL_LEAD,CIRCLE_DISTANCE_SCALE_MIN,CIRCLE_DISTANCE_SCALE_MAX)
-		local radialGain=math.clamp(CIRCLE_RADIAL_EXTRA_BASE+CIRCLE_RADIAL_EXTRA_GAIN*positiveAway,CIRCLE_RADIAL_EXTRA_MIN,CIRCLE_RADIAL_EXTRA_MAX)
-		local tangentGain=math.clamp(CIRCLE_TANGENT_EXTRA_BASE+CIRCLE_TANGENT_EXTRA_GAIN*positiveAway,CIRCLE_TANGENT_EXTRA_MIN,CIRCLE_TANGENT_EXTRA_MAX)
-		local lineOfSightRate=result.sideAbs/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
-		local damp=1/(1+lineOfSightRate*CIRCLE_LOS_RATE_GAIN)
-		local radialTime=math.min(WR_LEAD_DELAY*distanceScale*radialGain,CIRCLE_EXTRA_LEAD_TIME_MAX)
-		local tangentTime=math.min(WR_LEAD_DELAY*distanceScale*tangentGain*damp,CIRCLE_EXTRA_LEAD_TIME_MAX)
+
+		local radialGain=math.clamp(
+			CIRCLE_RADIAL_EXTRA_BASE+CIRCLE_RADIAL_EXTRA_GAIN*positiveAwayShare,
+			CIRCLE_RADIAL_EXTRA_MIN,
+			CIRCLE_RADIAL_EXTRA_MAX
+		)
+
+		local tangentGain=math.clamp(
+			CIRCLE_TANGENT_EXTRA_BASE+CIRCLE_TANGENT_EXTRA_GAIN*positiveAwayShare,
+			CIRCLE_TANGENT_EXTRA_MIN,
+			CIRCLE_TANGENT_EXTRA_MAX
+		)
+
+		local losRate=result.sideAbs/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
+		local losDamping=1/(1+losRate*CIRCLE_LOS_RATE_GAIN)
+
+		local radialExtraTime=math.min(WR_LEAD_DELAY*distanceScale*radialGain,CIRCLE_EXTRA_LEAD_TIME_MAX)
+		local tangentExtraTime=math.min(WR_LEAD_DELAY*distanceScale*tangentGain*losDamping,CIRCLE_EXTRA_LEAD_TIME_MAX)
+
 		local flightLead=flat(targetVelocity)*flightTime
-		local extraLead=result.awayDir*result.away*radialTime+result.sideDir*result.side*tangentTime
+		local radialExtraLead=result.awayDir*result.away*radialExtraTime
+		local tangentExtraLead=result.sideDir*result.side*tangentExtraTime
+		local extraLead=radialExtraLead+tangentExtraLead
+		local effectiveExtraTime=result.speed>1e-6 and extraLead.Magnitude/result.speed or 0
 		local targetFlat=flat(receiverRoot.Position)+flightLead+extraLead
 
 		return Vector3.new(targetFlat.X,WR_MAX_Y,targetFlat.Z),{
 			flightLeadXZ=flightLead,
 			extraLeadXZ=extraLead,
-			extraLeadTime=speed>1e-6 and extraLead.Magnitude/speed or 0,
-			lateralShare=math.clamp(result.sideAbs/speed,0,1),
-			awayShare=math.clamp(result.away/speed,-1,1),
+			radialExtraLeadXZ=radialExtraLead,
+			tangentExtraLeadXZ=tangentExtraLead,
+			extraLeadTime=effectiveExtraTime,
+			radialExtraTime=radialExtraTime,
+			tangentExtraTime=tangentExtraTime,
+			distanceXZNow=radius,
+			distanceScale=distanceScale,
+			awayShare=awayShare,
+			positiveAwayShare=positiveAwayShare,
+			radialShareAbs=radialShareAbs,
+			lateralShare=lateralShare,
+			radialGain=radialGain,
+			tangentGain=tangentGain,
+			losRate=losRate,
+			losDamping=losDamping,
+			routeAway=result.away,
+			routeSide=result.side,
+			routeSpeed=result.speed,
 		}
 	end
 
@@ -1023,16 +1059,15 @@ function QBAim.new(ctx,parent)
 		if not(enabled and isAvailable()) then return end
 
 		local modeKey=getModeKey(ctx)
-
-		playThrowAnimation()
-		if THROW_ANIMATION_RELEASE_WAIT>0 then
-			task.wait(THROW_ANIMATION_RELEASE_WAIT)
-		end
-
 		local plan=buildPlan(receiver,modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER)
 		if not plan then
 			setStatus("No throw solution")
 			return
+		end
+
+		playThrowAnimation()
+		if THROW_ANIMATION_RELEASE_WAIT>0 then
+			task.wait(THROW_ANIMATION_RELEASE_WAIT)
 		end
 
 		local ok,err
