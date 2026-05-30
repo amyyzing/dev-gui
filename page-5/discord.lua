@@ -34,7 +34,7 @@ function Discord.new(ctx,page)
 			linkButton.Text=inviteLink
 			linkButton.TextColor3=THEME.TEXT
 			if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
-			setStatus("Hover or click the link to copy it.",THEME.MUTED)
+			setStatus("Click the invite link to copy it.",THEME.MUTED)
 		else
 			linkButton.Text="No invite link set."
 			linkButton.TextColor3=THEME.MUTED
@@ -91,25 +91,34 @@ function Discord.new(ctx,page)
 	linkButton=New("TextButton",{
 		BackgroundColor3=THEME.BG,
 		BorderSizePixel=0,
-		Size=UDim2.new(1,0,0,30),
+		Size=UDim2.new(1,-10,0,30),
+		Position=UDim2.fromOffset(5,0),
 		Text="Loading invite link...",
 		Font=Enum.Font.Gotham,
 		TextSize=12,
 		TextColor3=THEME.MUTED,
 		TextXAlignment=Enum.TextXAlignment.Left,
+		TextTruncate=Enum.TextTruncate.AtEnd,
 		AutoButtonColor=false,
 		ZIndex=6,
 	},section)
 
 	linkWrap=wrapTextButton(linkButton,THEME.BG,2)
+	linkButton.Position=UDim2.fromOffset(10,0)
+	linkButton.Size=UDim2.new(1,-20,1,0)
 
 	linkButton.MouseEnter:Connect(function()
 		if linkWrap then linkWrap.BackgroundColor3=Color3.fromRGB(43,43,43) end
-		copyInvite()
+		if inviteLink and inviteLink~="" then
+			setStatus("Click to Copy",THEME.GREEN)
+		end
 	end)
 
 	linkButton.MouseLeave:Connect(function()
 		if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
+		if statusLabel and statusLabel.Text=="Click to Copy" then
+			paint()
+		end
 	end)
 
 	linkButton.MouseButton1Click:Connect(copyInvite)

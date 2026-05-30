@@ -22,7 +22,8 @@ local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
-local WR_LEAD_DELAY=0.7
+local DEFAULT_WR_LEAD_DELAY=0.75
+local WR_LEAD_DELAY=DEFAULT_WR_LEAD_DELAY
 local QB_RELEASE_DELAY=0.25
 local QB_XZ_RELEASE_FACTOR=0
 local QB_LAUNCH_Y_BIAS=0
@@ -406,6 +407,7 @@ function QBAim.new(ctx,parent)
 	local New=ctx.New
 	local THEME=ctx.THEME
 	local makeSection=ctx.makeSection
+	local buildSlider=ctx.buildSlider
 	local buildToggleRow=ctx.buildToggleRow
 	local api={}
 	local enabled=false
@@ -419,6 +421,7 @@ function QBAim.new(ctx,parent)
 	local sectionBody=nil
 	local sectionFrame=nil
 	local enabledToggle=nil
+	local leadDelaySlider=nil
 	local statusLabel=nil
 	local targetLabel=nil
 
@@ -518,6 +521,10 @@ function QBAim.new(ctx,parent)
 
 		if enabledToggle then
 			enabledToggle.set(enabled)
+		end
+
+		if leadDelaySlider then
+			leadDelaySlider.set(WR_LEAD_DELAY)
 		end
 
 		setTargetText()
@@ -1385,11 +1392,17 @@ function QBAim.new(ctx,parent)
 		setEnabled(value)
 	end
 
+	function api.SetWRLeadDelay(value)
+		WR_LEAD_DELAY=math.clamp(tonumber(value) or DEFAULT_WR_LEAD_DELAY,0,2)
+		syncControls()
+	end
+
 	function api.Refresh()
 		syncControls()
 	end
 
 	function api.Reset()
+		WR_LEAD_DELAY=DEFAULT_WR_LEAD_DELAY
 		setEnabled(false)
 	end
 
@@ -1417,6 +1430,13 @@ function QBAim.new(ctx,parent)
 	enabledToggle=buildToggleRow(sectionBody,"Enabled",enabled,function(value)
 		setEnabled(value)
 	end)
+
+	if buildSlider then
+		leadDelaySlider=buildSlider(sectionBody,"LD",0,2,WR_LEAD_DELAY,2,function(value)
+			WR_LEAD_DELAY=math.clamp(tonumber(value) or DEFAULT_WR_LEAD_DELAY,0,2)
+			syncControls()
+		end)
+	end
 
 	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Disabled",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
 	targetLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Target: none",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
