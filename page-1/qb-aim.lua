@@ -123,11 +123,12 @@ local function inputToBinding(input)
 end
 
 local function getModeKey(ctx)
-	if ctx.getCurrentModeKey then
-		local ok,modeKey=pcall(ctx.getCurrentModeKey)
-		if ok and modeKey then
-			return tostring(modeKey)
-		end
+	local miniGames=Workspace:FindFirstChild("MiniGames")
+	local miniCount=miniGames and #miniGames:GetChildren() or 0
+	if miniCount>1 then
+		return"mode2"
+	elseif miniCount==1 then
+		return"mode3"
 	end
 
 	local games=Workspace:FindFirstChild("Games")
@@ -135,12 +136,24 @@ local function getModeKey(ctx)
 		return"mode1"
 	end
 
-	local miniGames=Workspace:FindFirstChild("MiniGames")
-	local count=miniGames and #miniGames:GetChildren() or 0
-	if count>1 then
+	if ctx.getCurrentModeKey then
+		local ok,modeKey=pcall(ctx.getCurrentModeKey)
+		if ok and modeKey then
+			return tostring(modeKey)
+		end
+	end
+
+	local replicatedMiniGames=ReplicatedStorage:FindFirstChild("MiniGames")
+	local replicatedMiniCount=replicatedMiniGames and #replicatedMiniGames:GetChildren() or 0
+	if replicatedMiniCount>1 then
 		return"mode2"
-	elseif count==1 then
+	elseif replicatedMiniCount==1 then
 		return"mode3"
+	end
+
+	local replicatedGames=ReplicatedStorage:FindFirstChild("Games")
+	if replicatedGames and #replicatedGames:GetChildren()>0 then
+		return"mode1"
 	end
 
 	return"mode1"
@@ -160,6 +173,31 @@ local function getHeldBall()
 	ball=gameObjects and gameObjects:FindFirstChild("Football")
 	if ball and ball:IsA("BasePart") and (ball.Position-characterRoot.Position).Magnitude<14 then
 		return ball
+	end
+
+	return nil
+end
+
+local function getFootballFromFolder(folder)
+	if not folder then return nil end
+
+	for _,descendant in ipairs(folder:GetDescendants()) do
+		if descendant:IsA("BasePart") and descendant.Name=="Football" then
+			return descendant
+		end
+	end
+
+	return nil
+end
+
+local function getModeFootball(modeKey)
+	local heldBall=getHeldBall()
+	if heldBall then
+		return heldBall
+	end
+
+	if modeKey=="mode3" then
+		return getFootballFromFolder(Workspace:FindFirstChild("MiniGames")) or getFootballFromFolder(ReplicatedStorage:FindFirstChild("MiniGames"))
 	end
 
 	return nil
@@ -194,11 +232,10 @@ local function getGameReEvent()
 	return nil
 end
 
-local function getFirstGame()
-	local games=Workspace:FindFirstChild("Games")
-	if not games then return nil end
+local function getFirstChildFolder(container)
+	if not container then return nil end
 
-	for _,child in ipairs(games:GetChildren()) do
+	for _,child in ipairs(container:GetChildren()) do
 		if child:IsA("Model") or child:IsA("Folder") then
 			return child
 		end
@@ -207,8 +244,17 @@ local function getFirstGame()
 	return nil
 end
 
+local function getFirstGame()
+	return getFirstChildFolder(Workspace:FindFirstChild("Games"))
+end
+
+local function getFirstMiniGame()
+	return getFirstChildFolder(Workspace:FindFirstChild("MiniGames"))
+end
+
 local function localFolder()
-	local gameFolder=getFirstGame()
+	local miniGames=Workspace:FindFirstChild("MiniGames")
+	local gameFolder=(miniGames and #miniGames:GetChildren()==1) and getFirstMiniGame() or getFirstGame()
 	return gameFolder and gameFolder:FindFirstChild("Local")
 end
 
@@ -402,6 +448,27 @@ function QBAim.new(ctx,parent)
 		else
 			targetLabel.Text="Target: none"
 		end
+	end
+
+	local function ensureReceiverData(player,receiverRoot)
+		if receiverData[player] or not receiverRoot then
+			return receiverData[player]
+		end
+
+		local now=os.clock()
+		receiverData[player]={
+			pos=receiverRoot.Position,
+			vel=receiverRoot.AssemblyLinearVelocity or Vector3.zero,
+			t=now,
+			vh={},
+			ph={{t=now,pos=receiverRoot.Position}},
+			sdir=nil,
+			sspeed=0,
+			stime=0,
+			src="seeded",
+		}
+
+		return receiverData[player]
 	end
 
 	local function configuredBinding(getterName,fallback)
@@ -711,12 +778,13 @@ function QBAim.new(ctx,parent)
 	local function origin(qbRoot,ball)
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
 		local horizontal=Vector3.new(rootVelocity.X,0,rootVelocity.Z)*QB_RELEASE_DELAY*QB_XZ_RELEASE_FACTOR
-		local y=ball.Position.Y
+		local basePosition=ball and ball.Position or qbRoot.Position
+		local y=basePosition.Y
 		if ARC_PREVIEW_USE_C2_Y then
 			y=c2Y() or y
 		end
 
-		return Vector3.new(ball.Position.X+horizontal.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),ball.Position.Z+horizontal.Z)
+		return Vector3.new(basePosition.X+horizontal.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+horizontal.Z)
 	end
 
 	local function velocityNeeded(originPosition,targetPosition,time)
@@ -901,13 +969,14 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function buildPlan(receiver,ballPower)
+		local modeKey=getModeKey(ctx)
 		local character=LP.Character
 		local qbRoot=root(character)
-		local ball=getHeldBall()
+		local ball=getModeFootball(modeKey)
 		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
-		local data=receiverData[receiver]
+		local data=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
 
-		if not(qbRoot and ball and receiverRoot and data) then
+		if not(qbRoot and receiverRoot and data) then
 			return nil
 		end
 
@@ -1002,6 +1071,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		if best then
+			ensureReceiverData(best,best.Character and root(best.Character))
 			trackedReceiver=best
 			selectedRouteLock=lockRoute(best)
 			preview.p1,preview.p2,preview.p3=nil,nil,nil

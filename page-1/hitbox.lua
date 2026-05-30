@@ -111,11 +111,6 @@ function Hitbox.new(ctx,parent)
 	end
 
 	local function detectWorkspaceMode()
-		local games=workspace:FindFirstChild("Games")
-		if folderHasAnyDescendants(games) then
-			return 1,"mode1","Gameplay"
-		end
-
 		local miniGames=workspace:FindFirstChild("MiniGames")
 		local miniCount=getDirectChildCount(miniGames)
 
@@ -123,6 +118,11 @@ function Hitbox.new(ctx,parent)
 			return 2,"mode2","Park"
 		elseif miniCount==1 then
 			return 3,"mode3","Squads"
+		end
+
+		local games=workspace:FindFirstChild("Games")
+		if getDirectChildCount(games)>0 or folderHasAnyDescendants(games) then
+			return 1,"mode1","Gameplay"
 		end
 
 		return 1,"mode1","Gameplay"

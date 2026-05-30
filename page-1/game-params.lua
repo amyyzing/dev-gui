@@ -77,18 +77,6 @@ function GameParams.new(ctx,parent)
 	end
 
 	local function getCurrentModeKey()
-		if ctx.getCurrentModeKey then
-			local ok,modeKey=pcall(ctx.getCurrentModeKey)
-			if ok and modeKey then
-				return tostring(modeKey)
-			end
-		end
-
-		local games=ReplicatedStorage:FindFirstChild("Games")
-		if games and #games:GetChildren()>0 then
-			return"mode1"
-		end
-
 		local miniGames=ReplicatedStorage:FindFirstChild("MiniGames")
 		local miniCount=miniGames and #miniGames:GetChildren() or 0
 
@@ -96,6 +84,18 @@ function GameParams.new(ctx,parent)
 			return"mode2"
 		elseif miniCount==1 then
 			return"mode3"
+		end
+
+		local games=ReplicatedStorage:FindFirstChild("Games")
+		if games and #games:GetChildren()>0 then
+			return"mode1"
+		end
+
+		if ctx.getCurrentModeKey then
+			local ok,modeKey=pcall(ctx.getCurrentModeKey)
+			if ok and modeKey then
+				return tostring(modeKey)
+			end
 		end
 
 		return"mode1"

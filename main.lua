@@ -265,6 +265,7 @@ local MODULE_PATHS={
 	Announcement="announcement.lua",
 	GuiLogic="gui/gui-logic.lua",
 	MainFrame="gui/mainframe.lua",
+	AutoRefresh="gui/auto-refresh.lua",
 	HitboxPreset="page-2/hitbox-preset.lua",
 	KeybindSettings="page-2/keybind-settings.lua",
 	PresetEditor="page-2/preset-editor.lua",
@@ -334,6 +335,7 @@ end
 
 local GuiLogicModule=loadRemoteModule(MODULE_PATHS.GuiLogic)
 local MainFrameModule=loadRemoteModule(MODULE_PATHS.MainFrame)
+local AutoRefreshModule=loadRemoteModule(MODULE_PATHS.AutoRefresh)
 local AnnouncementModule=loadRemoteModule(MODULE_PATHS.Announcement)
 local HitboxPresetModule=loadRemoteModule(MODULE_PATHS.HitboxPreset)
 local KeybindSettingsModule=loadRemoteModule(MODULE_PATHS.KeybindSettings)
@@ -394,68 +396,11 @@ local old=guiParent:FindFirstChild(SG_NAME)
 if old then old:Destroy() end
 
 local SG=New("ScreenGui", {Name=SG_NAME, ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, IgnoreGuiInset=false}, guiParent)
-local autoRefreshReloading=false
 local liquidStrokeConn=nil
 local MainFrame=nil
+local AutoRefreshAPI=nil
 
-local function getRemoteSource(modulePath)
-	local result=BOT_API.Post("/module/get",{path=modulePath})
-	if not result or not result.ok or type(result.source)~="string" then
-		return nil,result and result.error or"unknown"
-	end
-
-	return result.source
-end
-
-local function reloadFromSource(sourcePath,source,changedPath,changedSource)
-	if autoRefreshReloading then return end
-
-	local chunk,err=loadstring(source)
-	if not chunk then
-		warn("Auto-refresh found bad source:",sourcePath,err)
-		REMOTE_MODULE_SOURCES[sourcePath]=source
-		if changedPath and changedPath~=sourcePath and changedSource then
-			REMOTE_MODULE_SOURCES[changedPath]=changedSource
-		end
-		return
-	end
-
-	autoRefreshReloading=true
-	toolAlive=false
-
-	task.defer(function()
-		local ok,reloadErr=pcall(chunk)
-		if not ok then
-			warn("Auto-refresh reload failed:",reloadErr)
-		end
-	end)
-end
-
-local function requestAutoRefresh(changedPath,changedSource)
-	if changedPath==AUTO_REFRESH_RELOAD_PATH then
-		warn("Auto-refreshing script after remote change:",changedPath)
-		reloadFromSource(changedPath,changedSource,changedPath,changedSource)
-		return
-	end
-
-	local module,err=loadModuleFromSource(changedPath,changedSource)
-	if not module then
-		warn("Auto-refresh found bad module source:",changedPath,err)
-		return
-	end
-
-	if changedPath==MODULE_PATHS.GuiLogic or changedPath==MODULE_PATHS.MainFrame or changedPath==MODULE_PATHS.Announcement then
-		local source,sourceErr=getRemoteSource(AUTO_REFRESH_RELOAD_PATH)
-		if not source then
-			warn("Auto-refresh detected a GUI module change in "..changedPath..", but "..AUTO_REFRESH_RELOAD_PATH.." could not be fetched:",sourceErr)
-			return
-		end
-
-		warn("Auto-refreshing script after GUI module change:",changedPath)
-		reloadFromSource(AUTO_REFRESH_RELOAD_PATH,source,changedPath,changedSource)
-		return
-	end
-
+local function applyAutoRefreshModuleChange(changedPath,module)
 	local applyPage1Module=PAGE1_RELOAD_PATHS[changedPath]
 	if applyPage1Module then
 		applyPage1Module(module)
@@ -467,95 +412,69 @@ local function requestAutoRefresh(changedPath,changedSource)
 			warn("Auto-refresh cached page module, rebuild not ready:",changedPath)
 		end
 
-		return
+		return true
 	end
 
 	if changedPath==MODULE_PATHS.StrokeColour then
 		StrokeColourModule=module
-
 		if rebuildCustomizeFromModules then
 			warn("Auto-refreshing customize module after remote change:",changedPath)
 			rebuildCustomizeFromModules()
 		else
 			warn("Auto-refresh cached customize module, rebuild not ready:",changedPath)
 		end
-
-		return
+		return true
 	end
 
-	if changedPath==MODULE_PATHS.MapEditor then
-		MapEditorModule=module
-
-		if rebuildMapFromModules then
-			warn("Auto-refreshing map editor module after remote change:",changedPath)
-			rebuildMapFromModules()
+	if changedPath==MODULE_PATHS.MapEditor or changedPath==MODULE_PATHS.Workspace or changedPath==MODULE_PATHS.RemoveAds then
+		if changedPath==MODULE_PATHS.MapEditor then
+			MapEditorModule=module
+		elseif changedPath==MODULE_PATHS.Workspace then
+			WorkspaceModule=module
 		else
-			warn("Auto-refresh cached map editor module, rebuild not ready:",changedPath)
+			RemoveAdsModule=module
 		end
 
-		return
-	end
-
-	if changedPath==MODULE_PATHS.Workspace then
-		WorkspaceModule=module
-
 		if rebuildMapFromModules then
-			warn("Auto-refreshing workspace module after remote change:",changedPath)
+			warn("Auto-refreshing map module after remote change:",changedPath)
 			rebuildMapFromModules()
 		else
-			warn("Auto-refresh cached workspace module, rebuild not ready:",changedPath)
+			warn("Auto-refresh cached map module, rebuild not ready:",changedPath)
 		end
-
-		return
+		return true
 	end
 
-	if changedPath==MODULE_PATHS.RemoveAds then
-		RemoveAdsModule=module
-
-		if rebuildMapFromModules then
-			warn("Auto-refreshing remove ads module after remote change:",changedPath)
-			rebuildMapFromModules()
-		else
-			warn("Auto-refresh cached remove ads module, rebuild not ready:",changedPath)
-		end
-
-		return
-	end
-
-	warn("Auto-refresh cached module after remote change:",changedPath)
+	return false
 end
 
 local function startAutoRefresh()
 	if not AUTO_REFRESH_ENABLED then return end
+	if not(AutoRefreshModule and AutoRefreshModule.new) then
+		warn("Missing remote module: gui/auto-refresh.lua")
+		return
+	end
 
-	task.spawn(function()
-		task.wait(AUTO_REFRESH_INTERVAL)
+	AutoRefreshAPI=AutoRefreshModule.new({
+		BOT_API=BOT_API,
+		enabled=AUTO_REFRESH_ENABLED,
+		interval=AUTO_REFRESH_INTERVAL,
+		reloadPath=AUTO_REFRESH_RELOAD_PATH,
+		watchPaths=AUTO_REFRESH_WATCH_PATHS,
+		sources=REMOTE_MODULE_SOURCES,
+		loadModuleFromSource=loadModuleFromSource,
+		setToolAlive=function(value)
+			toolAlive=value and true or false
+		end,
+		alive=function()
+			return toolAlive and SG and SG.Parent and guiParent:FindFirstChild(SG_NAME)==SG
+		end,
+		shouldReloadMain=function(changedPath)
+			return changedPath==MODULE_PATHS.GuiLogic or changedPath==MODULE_PATHS.MainFrame or changedPath==MODULE_PATHS.Announcement or changedPath==MODULE_PATHS.AutoRefresh
+		end,
+		applyModuleChange=applyAutoRefreshModuleChange,
+	})
 
-		while toolAlive and SG and SG.Parent and guiParent:FindFirstChild(SG_NAME)==SG do
-			for _,path in ipairs(AUTO_REFRESH_WATCH_PATHS) do
-				if not toolAlive or not SG.Parent or guiParent:FindFirstChild(SG_NAME)~=SG then
-					return
-				end
-
-				local source=getRemoteSource(path)
-				if source then
-					local previous=REMOTE_MODULE_SOURCES[path]
-					if previous~=nil and previous~=source then
-						requestAutoRefresh(path,source)
-						return
-					end
-
-					if previous==nil then
-						REMOTE_MODULE_SOURCES[path]=source
-					end
-				end
-
-				task.wait(0.05)
-			end
-
-			task.wait(AUTO_REFRESH_INTERVAL)
-		end
-	end)
+	AutoRefreshAPI.Start()
 end
 
 local function stopLiquidStrokeAnimation()
