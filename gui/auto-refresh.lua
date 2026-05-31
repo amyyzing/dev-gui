@@ -65,6 +65,18 @@ function AutoRefresh.new(ctx)
 			return
 		end
 
+		if shouldReloadMain(changedPath,nil) then
+			local source,sourceErr=fetchSource(reloadPath)
+			if not source then
+				warn("Auto-refresh detected a reload-required chunk change in "..changedPath..", but "..reloadPath.." could not be fetched:",sourceErr)
+				return
+			end
+
+			warn("Auto-refreshing script after runtime change:",changedPath)
+			runReload(reloadPath,source,changedPath,changedSource)
+			return
+		end
+
 		local module=nil
 		if loadModuleFromSource then
 			local err=nil
