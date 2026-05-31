@@ -3,6 +3,7 @@ local UIS=game:GetService("UserInputService")
 local TweenService=game:GetService("TweenService")
 local RunService=game:GetService("RunService")
 local HttpService=game:GetService("HttpService")
+local ContextActionService=game:GetService("ContextActionService")
 
 local me=Players.LocalPlayer
 local guiParent=me:WaitForChild("PlayerGui")
@@ -69,6 +70,7 @@ local QB_AIM_THROW_KEY=Enum.KeyCode.T
 local QB_AIM_TOGGLE_KEY=Enum.KeyCode.P
 local qbAimTeamFilter=true
 local qbAimShowArc=true
+local qbAimLeadDelay=0.75
 
 local DEFAULT_PRESETS={{key=Enum.KeyCode.Unknown, size=Vector3.new(0.1, 0.1, 0.1)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.7, 5.8, 1.65)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(3.1, 5.8, 1.70)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.52, 5.4, 1.41)},}
 
@@ -82,6 +84,10 @@ local BUTTON_WRAPPERS=setmetatable({}, {__mode="k"})
 
 local function New(class, props, parent)
 	props=props or {}
+
+	if props.Active==nil and (class=="Frame" or class=="ScrollingFrame" or class=="TextButton" or class=="TextBox") then
+		props.Active=true
+	end
 
 	if class=="TextLabel" or class=="TextButton" or class=="TextBox" then
 		if props.TextColor3==nil then props.TextColor3=THEME.TEXT end
@@ -265,7 +271,7 @@ function BOT_API.Post(path,body)
 end
 
 local AUTO_REFRESH_ENABLED=true
-local AUTO_REFRESH_INTERVAL=2.5
+local AUTO_REFRESH_INTERVAL=1.25
 local AUTO_REFRESH_RELOAD_PATH="loader.lua"
 
 local MODULE_PATHS={
@@ -1078,6 +1084,7 @@ local PAGE1_STATE={
 	actionStatusOn=actionStatusOn,
 	qbAimTeamFilter=qbAimTeamFilter,
 	qbAimShowArc=qbAimShowArc,
+	qbAimLeadDelay=qbAimLeadDelay,
 }
 
 local function syncPage1State()
@@ -1103,6 +1110,7 @@ local function syncPage1State()
 	actionStatusOn=PAGE1_STATE.actionStatusOn
 	qbAimTeamFilter=PAGE1_STATE.qbAimTeamFilter
 	qbAimShowArc=PAGE1_STATE.qbAimShowArc
+	qbAimLeadDelay=PAGE1_STATE.qbAimLeadDelay
 end
 
 local PAGE1_APIS={}
@@ -1284,6 +1292,7 @@ local function resetMainPageDefaults()
 	PAGE1_STATE.actionStatusOn=false
 	PAGE1_STATE.qbAimTeamFilter=true
 	PAGE1_STATE.qbAimShowArc=true
+	PAGE1_STATE.qbAimLeadDelay=0.75
 
 	for _,api in pairs(PAGE1_APIS) do
 		if api and api.Refresh then
@@ -1886,15 +1895,43 @@ resetBtn.MouseButton1Click:Connect(function()
 	requestPlayerAutosave()
 end)
 
+local globalSideButtonActionName="HitboxUIGlobalSideButton_"..tostring(math.random(100000,999999))
+local lastGlobalSideButtonBinding=nil
+local lastGlobalSideButtonAt=0
+
+local function markGlobalSideButtonHandled(binding)
+	if binding~="MouseButton4" and binding~="MouseButton5" then
+		return false
+	end
+
+	local now=os.clock()
+	if lastGlobalSideButtonBinding==binding and now-lastGlobalSideButtonAt<0.12 then
+		return true
+	end
+
+	lastGlobalSideButtonBinding=binding
+	lastGlobalSideButtonAt=now
+	return false
+end
+
 local function shutdownTool()
 	if not toolAlive then return end
 
 	sendPlayerSessionUpdate(true)
 	toolAlive=false
+	pcall(function()
+		ContextActionService:UnbindAction(globalSideButtonActionName)
+	end)
 
 	if AnnouncementAPI and AnnouncementAPI.Destroy then
 		pcall(function()
 			AnnouncementAPI.Destroy()
+		end)
+	end
+
+	if MainFrame and MainFrame.Destroy then
+		pcall(function()
+			MainFrame.Destroy()
 		end)
 	end
 
@@ -1928,14 +1965,14 @@ local function applyHitboxPreset(index)
 	end
 end
 
-UIS.InputBegan:Connect(function(inp, processed)
+local function handleGlobalInput(inp,processed)
 	if activeCapture then
 		local cap=activeCapture
 
 		if inp.KeyCode==Enum.KeyCode.Escape then
 			activeCapture=nil
 			if refreshPage2UI then refreshPage2UI() end
-			return
+			return true
 		end
 
 		local binding=inputToBinding(inp)
@@ -1949,18 +1986,22 @@ UIS.InputBegan:Connect(function(inp, processed)
 			refreshPage2UI()
 		end
 
-		return
+		return binding~=nil
 	end
 
-	if processed then return end
+	if processed then return false end
 
 	local bind=inputToBinding(inp)
+	local handled=false
 	if bind~=nil and bind==TOGGLE_UI_KEY and TOGGLE_UI_KEY~=Enum.KeyCode.Unknown then
+		if markGlobalSideButtonHandled(bind) then return true end
 		setUIVisible(not uiVisible)
+		handled=true
 	end
 
 	if bind~=nil and bind==TOGGLE_ACTION_KEY and TOGGLE_ACTION_KEY~=Enum.KeyCode.Unknown then
 		if not(PAGE1_APIS.ESP and PAGE1_APIS.ESP.SetESPState) then
+			if markGlobalSideButtonHandled(bind) then return true end
 			if CURRENT_MODE_KEY=="mode1" then
 				PAGE1_STATE.actionStatusOn=not PAGE1_STATE.actionStatusOn
 				syncPage1State()
@@ -1971,18 +2012,35 @@ UIS.InputBegan:Connect(function(inp, processed)
 				syncPage1State()
 				refreshActionStatus()
 			end
+			handled=true
 		end
 	end
 
 	if bind~=nil then
 		for i,preset in ipairs(PRESETS) do
 			if preset.key and preset.key~=Enum.KeyCode.Unknown and bind==preset.key then
+				if markGlobalSideButtonHandled(bind) then return true end
 				applyHitboxPreset(i)
+				handled=true
 				break
 			end
 		end
 	end
+
+	return handled
+end
+
+UIS.InputBegan:Connect(function(inp,processed)
+	handleGlobalInput(inp,processed)
 end)
+
+ContextActionService:BindActionAtPriority(globalSideButtonActionName,function(_,inputState,input)
+	if inputState~=Enum.UserInputState.Begin then
+		return Enum.ContextActionResult.Pass
+	end
+
+	return handleGlobalInput(input,false) and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
+end,false,Enum.ContextActionPriority.High.Value+900,Enum.UserInputType.MouseButton4,Enum.UserInputType.MouseButton5)
 
 local function getPersistentValue(name,default)
 	if name=="CURRENT_MODE_KEY" then return CURRENT_MODE_KEY end
@@ -2103,6 +2161,7 @@ if AnnouncementModule and AnnouncementModule.new then
 			SG=SG,
 			BOT_API=BOT_API,
 			playerId=tostring(me.UserId),
+			getSessionId=function() return playerSessionId end,
 			wrapTextButton=wrapTextButton,
 			safeDisconnect=safeDisconnect,
 		})

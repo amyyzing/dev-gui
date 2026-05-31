@@ -119,7 +119,7 @@ function AutoRefresh.new(ctx)
 						end
 					end
 
-					task.wait(0.05)
+					task.wait(0.025)
 				end
 
 				task.wait(interval)

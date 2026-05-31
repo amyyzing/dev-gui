@@ -3,6 +3,7 @@ local Boost={}
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
 local Debris=game:GetService("Debris")
+local ContextActionService=game:GetService("ContextActionService")
 
 local me=Players.LocalPlayer
 
@@ -119,6 +120,9 @@ function Boost.new(ctx,parent)
 	local jumpBoostTouchConn=nil
 	local characterAddedConn=nil
 	local inputConn=nil
+	local sideButtonActionName="BoostSideButton_"..tostring(math.random(100000,999999))
+	local lastSideButtonBinding=nil
+	local lastSideButtonAt=0
 	local destroyConn=nil
 	local boostReady=true
 	local section=nil
@@ -333,6 +337,9 @@ function Boost.new(ctx,parent)
 	function api.Destroy()
 		safeDisconnect(inputConn)
 		inputConn=nil
+		pcall(function()
+			ContextActionService:UnbindAction(sideButtonActionName)
+		end)
 		safeDisconnect(characterAddedConn)
 		characterAddedConn=nil
 		safeDisconnect(destroyConn)
@@ -351,9 +358,7 @@ function Boost.new(ctx,parent)
 		end
 	end)
 
-	inputConn=UIS.InputBegan:Connect(function(input,processed)
-		if processed then return end
-
+	local function handleBoostInput(input)
 		local jumpBoostKey=TOGGLE_JB_KEY
 		local alwaysBoostKey=TOGGLE_AB_KEY
 
@@ -366,6 +371,19 @@ function Boost.new(ctx,parent)
 		end
 
 		local binding=(ctx.inputToBinding or inputToBinding)(input)
+		local handled=isBound(binding,jumpBoostKey) or isBound(binding,alwaysBoostKey)
+		if not handled then
+			return false
+		end
+
+		if binding=="MouseButton4" or binding=="MouseButton5" then
+			local now=os.clock()
+			if lastSideButtonBinding==binding and now-lastSideButtonAt<0.12 then
+				return true
+			end
+			lastSideButtonBinding=binding
+			lastSideButtonAt=now
+		end
 
 		if isBound(binding,jumpBoostKey) then
 			api.SetJumpBoostState(not state.jumpBoostOn,true)
@@ -374,7 +392,22 @@ function Boost.new(ctx,parent)
 		if isBound(binding,alwaysBoostKey) then
 			api.SetAlwaysBoostState(not state.jumpBoostTradeMode,true)
 		end
+
+		return true
+	end
+
+	inputConn=UIS.InputBegan:Connect(function(input,processed)
+		if processed then return end
+		handleBoostInput(input)
 	end)
+
+	ContextActionService:BindActionAtPriority(sideButtonActionName,function(_,inputState,input)
+		if inputState~=Enum.UserInputState.Begin then
+			return Enum.ContextActionResult.Pass
+		end
+
+		return handleBoostInput(input) and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
+	end,false,Enum.ContextActionPriority.High.Value+900,Enum.UserInputType.MouseButton4,Enum.UserInputType.MouseButton5)
 
 	destroyConn=section.AncestryChanged:Connect(function()
 		if not isAlive() then

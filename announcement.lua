@@ -23,6 +23,7 @@ function Announcement.new(ctx)
 	local SG=ctx.SG
 	local BOT_API=ctx.BOT_API
 	local playerId=tostring(ctx.playerId or "")
+	local getSessionId=ctx.getSessionId
 	local wrapTextButton=ctx.wrapTextButton
 	local api={}
 	local alive=true
@@ -37,6 +38,12 @@ function Announcement.new(ctx)
 
 		body=body or {}
 		body.playerId=playerId
+		if getSessionId then
+			local ok,sessionId=pcall(getSessionId)
+			if ok and sessionId then
+				body.sessionId=tostring(sessionId)
+			end
+		end
 		return BOT_API.Post(path,body)
 	end
 
@@ -219,6 +226,12 @@ function Announcement.new(ctx)
 
 	local function checkLatest()
 		if not alive then return end
+		if getSessionId then
+			local ok,sessionId=pcall(getSessionId)
+			if not ok or not sessionId or tostring(sessionId)=="" then
+				return
+			end
+		end
 
 		local result=post("/announcement/latest",{})
 		if result and result.ok and result.announcement then

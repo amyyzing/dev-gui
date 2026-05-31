@@ -420,6 +420,7 @@ function DataSave.new(ctx)
 			qbAim={
 				teamFilter=getValue(ctx,"qbAimTeamFilter",true),
 				showArc=getValue(ctx,"qbAimShowArc",true),
+				leadDelay=getValue(ctx,"qbAimLeadDelay",0.75),
 			},
 
 			keybinds={
@@ -562,6 +563,7 @@ function DataSave.new(ctx)
 		local qbAim=settings.qbAim or {}
 		if qbAim.teamFilter~=nil then setValue(ctx,"qbAimTeamFilter",qbAim.teamFilter and true or false) end
 		if qbAim.showArc~=nil then setValue(ctx,"qbAimShowArc",qbAim.showArc and true or false) end
+		if qbAim.leadDelay~=nil then setValue(ctx,"qbAimLeadDelay",clampNumber(qbAim.leadDelay,0,1.5,0.75)) end
 
 		local keybinds=settings.keybinds or {}
 		local keyMap={

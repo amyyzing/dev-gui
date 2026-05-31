@@ -8,6 +8,7 @@ function MainFrame.new(ctx)
 	local UIS=ctx.UIS
 	local TweenService=ctx.TweenService
 	local RunService=ctx.RunService
+	local ContextActionService=game:GetService("ContextActionService")
 	local safeDisconnect=ctx.safeDisconnect
 	local wrapTextButton=ctx.wrapTextButton
 	local attachHover=ctx.attachHover
@@ -23,6 +24,25 @@ function MainFrame.new(ctx)
 	local uiMinimized=false
 	local rootSizeTween=nil
 	local rootPositionTween=nil
+
+	local function mouseInsideRoot()
+		if not root or not root.Parent or not root.Visible then
+			return false
+		end
+
+		local mouse=UIS:GetMouseLocation()
+		local pos=root.AbsolutePosition
+		local size=root.AbsoluteSize
+		return mouse.X>=pos.X and mouse.X<=pos.X+size.X and mouse.Y>=pos.Y and mouse.Y<=pos.Y+size.Y
+	end
+
+	ContextActionService:BindActionAtPriority("HitboxUI_MouseInputSink",function(_,_,input)
+		if input and mouseInsideRoot() then
+			return Enum.ContextActionResult.Sink
+		end
+
+		return Enum.ContextActionResult.Pass
+	end,false,Enum.ContextActionPriority.High.Value+1000,Enum.UserInputType.MouseButton1,Enum.UserInputType.MouseButton2,Enum.UserInputType.MouseButton3,Enum.UserInputType.MouseButton4,Enum.UserInputType.MouseButton5)
 
 	local function tweenRootPosition(position,duration)
 		if rootPositionTween then
@@ -493,6 +513,12 @@ function MainFrame.new(ctx)
 
 	function api.RefreshTheme()
 		paintResizeHandle(resizing)
+	end
+
+	function api.Destroy()
+		pcall(function()
+			ContextActionService:UnbindAction("HitboxUI_MouseInputSink")
+		end)
 	end
 
 	api.root=root

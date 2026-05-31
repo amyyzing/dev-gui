@@ -50,6 +50,7 @@ function GuiLogic.new(ctx)
 		wrap.BackgroundColor3=bgColor or THEME.PANEL
 		wrap.BorderSizePixel=0
 		wrap.ClipsDescendants=false
+		wrap.Active=true
 		wrap.Size=insetSize(box.Size)
 		wrap.Position=insetPosition(box.Position)
 		wrap.AnchorPoint=box.AnchorPoint
@@ -86,6 +87,7 @@ function GuiLogic.new(ctx)
 		wrap.BackgroundColor3=bgColor or THEME.BG
 		wrap.BorderSizePixel=0
 		wrap.ClipsDescendants=false
+		wrap.Active=true
 		wrap.Size=insetSize(button.Size)
 		wrap.Position=insetPosition(button.Position)
 		wrap.AnchorPoint=button.AnchorPoint
@@ -293,8 +295,8 @@ function GuiLogic.new(ctx)
 		local track=New("Frame",{Size=UDim2.new(1,-118,0,8),Position=UDim2.new(0,34,0.5,-4),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=6},container)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},track)
 
-		local fill=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=Color3.fromRGB(45,45,45),BorderSizePixel=0,ZIndex=7},track)
-		local knob=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(14,14),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=THEME.MUTED,BorderSizePixel=0,ZIndex=8},track)
+		local fill=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=THEME.STROKE:Lerp(THEME.TEXT,0.18),BorderSizePixel=0,ZIndex=7},track)
+		local knob=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(14,14),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=THEME.TEXT,BorderSizePixel=0,ZIndex=8},track)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},knob)
 
 		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,8),Position=UDim2.new(0,0,-0.5,-4),ZIndex=9,AutoButtonColor=false},track)

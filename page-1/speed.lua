@@ -3,6 +3,7 @@ local Speed={}
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
+local ContextActionService=game:GetService("ContextActionService")
 
 local me=Players.LocalPlayer
 local DEFAULT_SPEED=18
@@ -54,6 +55,9 @@ function Speed.new(ctx,parent)
 	local slider=nil
 	local speedConn=nil
 	local inputConn=nil
+	local sideButtonActionName="SpeedSideButton_"..tostring(math.random(100000,999999))
+	local lastSideButtonBinding=nil
+	local lastSideButtonAt=0
 	local destroyConn=nil
 	local section=nil
 
@@ -163,26 +167,52 @@ function Speed.new(ctx,parent)
 	function api.Destroy()
 		safeDisconnect(inputConn)
 		inputConn=nil
+		pcall(function()
+			ContextActionService:UnbindAction(sideButtonActionName)
+		end)
 		safeDisconnect(destroyConn)
 		destroyConn=nil
 		stopForcing(state.speedEnabled)
 	end
 
-	inputConn=UIS.InputBegan:Connect(function(input,processed)
-		if processed then return end
-
+	local function handleSpeedInput(input)
 		local speedKey=TOGGLE_SPEED_KEY
 		if ctx.getSpeedToggleKey then
 			speedKey=ctx.getSpeedToggleKey() or Enum.KeyCode.Unknown
 		end
 
-		if speedKey==nil or speedKey==Enum.KeyCode.Unknown then return end
+		if speedKey==nil or speedKey==Enum.KeyCode.Unknown then return false end
 
 		local binding=(ctx.inputToBinding or inputToBinding)(input)
 		if binding==speedKey then
+			if binding=="MouseButton4" or binding=="MouseButton5" then
+				local now=os.clock()
+				if lastSideButtonBinding==binding and now-lastSideButtonAt<0.12 then
+					return true
+				end
+				lastSideButtonBinding=binding
+				lastSideButtonAt=now
+			end
+
 			api.SetSpeedState(not state.speedEnabled,true,true)
+			return true
 		end
+
+		return false
+	end
+
+	inputConn=UIS.InputBegan:Connect(function(input,processed)
+		if processed then return end
+		handleSpeedInput(input)
 	end)
+
+	ContextActionService:BindActionAtPriority(sideButtonActionName,function(_,inputState,input)
+		if inputState~=Enum.UserInputState.Begin then
+			return Enum.ContextActionResult.Pass
+		end
+
+		return handleSpeedInput(input) and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
+	end,false,Enum.ContextActionPriority.High.Value+900,Enum.UserInputType.MouseButton4,Enum.UserInputType.MouseButton5)
 
 	destroyConn=section.AncestryChanged:Connect(function()
 		if not isAlive() then

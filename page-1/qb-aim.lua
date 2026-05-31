@@ -5,6 +5,7 @@ local RunService=game:GetService("RunService")
 local UIS=game:GetService("UserInputService")
 local Workspace=game:GetService("Workspace")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
+local ContextActionService=game:GetService("ContextActionService")
 
 local LP=Players.LocalPlayer
 
@@ -177,20 +178,63 @@ local function getModeKey(ctx)
 end
 
 local function getHeldBall()
-	local character=LP.Character
+	local character=Workspace:FindFirstChild(LP.Name) or LP.Character
 	local characterRoot=root(character)
 	if not(character and characterRoot) then return nil end
 
-	local ball=character:FindFirstChild("Football")
-	if ball and ball:IsA("BasePart") and (ball.Position-characterRoot.Position).Magnitude<14 then
-		return ball
+	local function findBallPart(container,maxDistance)
+		if not container then return nil end
+
+		local function looksLikeFootball(inst)
+			while inst and inst~=container do
+				if tostring(inst.Name):lower():find("football",1,true) then
+					return true
+				end
+				inst=inst.Parent
+			end
+
+			return false
+		end
+
+		local direct=container:FindFirstChild("Football")
+		if direct then
+			if direct:IsA("BasePart") and (direct.Position-characterRoot.Position).Magnitude<=maxDistance then
+				return direct
+			end
+
+			if direct:IsA("Model") or direct:IsA("Folder") or direct:IsA("Tool") then
+				for _,descendant in ipairs(direct:GetDescendants()) do
+					if descendant:IsA("BasePart") and (descendant.Position-characterRoot.Position).Magnitude<=maxDistance then
+						return descendant
+					end
+				end
+			end
+		end
+
+		for _,descendant in ipairs(container:GetDescendants()) do
+			if descendant:IsA("BasePart") and looksLikeFootball(descendant) and (descendant.Position-characterRoot.Position).Magnitude<=maxDistance then
+				return descendant
+			end
+		end
+
+		return nil
 	end
 
-	local gameObjects=character:FindFirstChild("GAMEOBJECTS")
-	ball=gameObjects and gameObjects:FindFirstChild("Football")
-	if ball and ball:IsA("BasePart") and (ball.Position-characterRoot.Position).Magnitude<14 then
-		return ball
+	local ball=findBallPart(character,35)
+	if ball then return ball end
+
+	ball=findBallPart(character:FindFirstChild("GAMEOBJECTS"),35)
+	if ball then return ball end
+
+	if LP.Character and LP.Character~=character then
+		local lpRoot=root(LP.Character)
+		if lpRoot then
+			characterRoot=lpRoot
+			ball=findBallPart(LP.Character,35)
+		end
 	end
+
+	if ball then return ball end
 
 	return nil
 end
@@ -446,6 +490,7 @@ function QBAim.new(ctx,parent)
 	local THEME=ctx.THEME
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
+	local buildSlider=ctx.buildSlider
 	local state=ctx.State or {}
 	local api={}
 	local enabled=false
@@ -456,6 +501,9 @@ function QBAim.new(ctx,parent)
 	local previewFrozen=false
 	local previewFreezeStarted=0
 	local connections={}
+	local sideButtonActionName="QBAimSideButton_"..tostring(math.random(100000,999999))
+	local lastSideButtonBinding=nil
+	local lastSideButtonAt=0
 	local sectionBody=nil
 	local sectionFrame=nil
 	local enabledToggle=nil
@@ -468,6 +516,7 @@ function QBAim.new(ctx,parent)
 	local leadDelaySlider=nil
 	local leadDelaySliderFill=nil
 	local leadDelaySliderKnob=nil
+	local leadDelaySliderControl=nil
 	local leadDelayDragging=false
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
@@ -479,6 +528,12 @@ function QBAim.new(ctx,parent)
 	if state.qbAimShowArc==nil then
 		state.qbAimShowArc=true
 	end
+
+	if state.qbAimLeadDelay==nil then
+		state.qbAimLeadDelay=WR_LEAD_DELAY
+	end
+
+	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
 
 	local function addConnection(conn)
 		table.insert(connections,conn)
@@ -530,6 +585,10 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function updateLeadDelayVisuals()
+		if leadDelaySliderControl then
+			leadDelaySliderControl.set(WR_LEAD_DELAY)
+		end
+
 		if leadDelayBox then
 			leadDelayBox.Text=string.format("%.2f",WR_LEAD_DELAY)
 		end
@@ -550,9 +609,11 @@ function QBAim.new(ctx,parent)
 		end
 
 		WR_LEAD_DELAY=math.clamp(numberValue,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
+		state.qbAimLeadDelay=WR_LEAD_DELAY
 		updateLeadDelayVisuals()
 		if showStatus then
 			setStatus(string.format("LD set to %.2fs",WR_LEAD_DELAY))
+			changed()
 		end
 		return true
 	end
@@ -1560,16 +1621,6 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function setEnabled(value)
-		if value and not getHeldBall() then
-			enabled=false
-			trackedReceiver=nil
-			selectedRouteLock=nil
-			clearPreviewForMissingBall()
-			syncControls()
-			setStatus("No ball held")
-			return
-		end
-
 		enabled=value and isAvailable() and true or false
 		if not enabled then
 			trackedReceiver=nil
@@ -1580,6 +1631,10 @@ function QBAim.new(ctx,parent)
 		end
 
 		syncControls()
+
+		if enabled and not getHeldBall() then
+			setStatus(currentModeText().." enabled, waiting for ball")
+		end
 	end
 
 	function api.SetQBAimState(value)
@@ -1600,6 +1655,9 @@ function QBAim.new(ctx,parent)
 		end
 
 		table.clear(connections)
+		pcall(function()
+			ContextActionService:UnbindAction(sideButtonActionName)
+		end)
 
 		if preview.center and preview.center.Parent then
 			preview.center:Destroy()
@@ -1645,53 +1703,20 @@ function QBAim.new(ctx,parent)
 	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Disabled",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
 	targetLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Target: none",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
 
-	leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,34),ZIndex=6},sectionBody)
-	New("TextLabel",{BackgroundTransparency=1,Position=UDim2.new(0,0,0,0),Size=UDim2.new(0,32,0,16),Text="LD",Font=Enum.Font.GothamBold,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},leadDelayFrame)
-	leadDelayBox=New("TextBox",{BackgroundColor3=Color3.fromRGB(20,22,28),BackgroundTransparency=0.08,BorderSizePixel=0,Position=UDim2.new(0,34,0,0),Size=UDim2.new(0,44,0,18),Text=string.format("%.2f",WR_LEAD_DELAY),ClearTextOnFocus=false,Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=Color3.fromRGB(235,235,235),TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},leadDelayFrame)
-	New("UICorner",{CornerRadius=UDim.new(0,5)},leadDelayBox)
-	leadDelaySlider=New("Frame",{BackgroundColor3=Color3.fromRGB(36,40,48),BackgroundTransparency=0.05,BorderSizePixel=0,Position=UDim2.new(0,84,0,7),Size=UDim2.new(1,-84,0,5),ZIndex=7},leadDelayFrame)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},leadDelaySlider)
-	leadDelaySliderFill=New("Frame",{BackgroundColor3=Color3.fromRGB(255,170,0),BorderSizePixel=0,Size=UDim2.new(0,0,1,0),ZIndex=8},leadDelaySlider)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},leadDelaySliderFill)
-	leadDelaySliderKnob=New("Frame",{BackgroundColor3=Color3.fromRGB(255,235,170),BorderSizePixel=0,Position=UDim2.new(0,-5,0.5,-5),Size=UDim2.new(0,10,0,10),ZIndex=9},leadDelaySlider)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},leadDelaySliderKnob)
-	updateLeadDelayVisuals()
-
-	addConnection(leadDelayBox.FocusLost:Connect(function()
-		setLeadDelay(leadDelayBox.Text,true)
-	end))
-
-	local function beginLeadDelayDrag(input)
-		leadDelayDragging=true
-		setLeadDelayFromScreenX(input.Position.X,true)
+	if buildSlider then
+		leadDelaySliderControl=buildSlider(sectionBody,"LD",LEAD_DELAY_MIN,LEAD_DELAY_MAX,WR_LEAD_DELAY,2,function(value)
+			setLeadDelay(value,true)
+		end)
+	else
+		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
+		leadDelayBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",WR_LEAD_DELAY),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},leadDelayFrame)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="LD",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},leadDelayFrame)
+		addConnection(leadDelayBox.FocusLost:Connect(function()
+			setLeadDelay(leadDelayBox.Text,true)
+		end))
 	end
 
-	addConnection(leadDelaySlider.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
-			beginLeadDelayDrag(input)
-		end
-	end))
-
-	addConnection(leadDelaySliderKnob.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
-			beginLeadDelayDrag(input)
-		end
-	end))
-
-	addConnection(UIS.InputChanged:Connect(function(input)
-		if leadDelayDragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
-			setLeadDelayFromScreenX(input.Position.X,false)
-		end
-	end))
-
-	addConnection(UIS.InputEnded:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
-			if leadDelayDragging then
-				leadDelayDragging=false
-				setStatus(string.format("LD set to %.2fs",WR_LEAD_DELAY))
-			end
-		end
-	end))
+	updateLeadDelayVisuals()
 
 	addConnection(RunService.Heartbeat:Connect(function()
 		if not isAlive() then return end
@@ -1770,28 +1795,41 @@ function QBAim.new(ctx,parent)
 		end
 	end))
 
-	addConnection(UIS.InputBegan:Connect(function(input,processed)
-		if processed or not isAvailable() then return end
+	local function handleQBAimInput(input)
+		if not isAvailable() then return false end
 
-		if bindingMatches("getQBAimToggleKey",input,Enum.KeyCode.P) then
-			if not getHeldBall() then
-				clearPreviewForMissingBall("No ball held")
-				return
+		local incoming=(ctx.inputToBinding or inputToBinding)(input)
+		local function rememberSideButton()
+			if incoming~="MouseButton4" and incoming~="MouseButton5" then
+				return false
 			end
 
-			setEnabled(not enabled)
-			return
+			local now=os.clock()
+			if lastSideButtonBinding==incoming and now-lastSideButtonAt<0.12 then
+				return true
+			end
+
+			lastSideButtonBinding=incoming
+			lastSideButtonAt=now
+			return false
 		end
 
-		if not enabled then return end
+		if bindingMatches("getQBAimToggleKey",input,Enum.KeyCode.P) then
+			if rememberSideButton() then return true end
+			setEnabled(not enabled)
+			return true
+		end
+
+		if not enabled then return false end
 
 		local wantsLock=bindingMatches("getQBAimLockKey",input,Enum.KeyCode.H)
 		local wantsThrow=bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T)
-		if not(wantsLock or wantsThrow) then return end
+		if not(wantsLock or wantsThrow) then return false end
+		if rememberSideButton() then return true end
 
 		if not getHeldBall() then
 			clearPreviewForMissingBall("No ball held")
-			return
+			return true
 		end
 
 		if wantsLock then
@@ -1803,7 +1841,22 @@ function QBAim.new(ctx,parent)
 				setStatus("No receiver locked")
 			end
 		end
+
+		return true
+	end
+
+	addConnection(UIS.InputBegan:Connect(function(input,processed)
+		if processed then return end
+		handleQBAimInput(input)
 	end))
+
+	ContextActionService:BindActionAtPriority(sideButtonActionName,function(_,inputState,input)
+		if inputState~=Enum.UserInputState.Begin then
+			return Enum.ContextActionResult.Pass
+		end
+
+		return handleQBAimInput(input) and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
+	end,false,Enum.ContextActionPriority.High.Value+900,Enum.UserInputType.MouseButton4,Enum.UserInputType.MouseButton5)
 
 	cleanupC3InfoGui()
 	syncControls()
