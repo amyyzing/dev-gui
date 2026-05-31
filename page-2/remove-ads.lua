@@ -199,7 +199,7 @@ function RemoveAds.new(ctx,page)
 		restoreAds()
 	end
 
-	local section=makeSection(page,2,"Remove Ads","Gameplay only")
+	local section=makeSection(page,3,"Remove Ads","Gameplay only")
 
 	toggle=buildToggleRow(section,"Remove Ads",enabled,function(state)
 		api.SetEnabled(state,true)

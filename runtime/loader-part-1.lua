@@ -277,22 +277,26 @@ MODULE_PATHS={
 	GuiLogic="gui/gui-logic.lua",
 	MainFrame="gui/mainframe.lua",
 	AutoRefresh="gui/auto-refresh.lua",
-	HitboxPreset="page-2/hitbox-preset.lua",
-	KeybindSettings="page-2/keybind-settings.lua",
-	PresetEditor="page-2/preset-editor.lua",
+	Description="gui/description.lua",
+	HitboxPreset="page-5/hitbox-preset.lua",
+	KeybindSettings="page-5/keybind-settings.lua",
+	PresetEditor="page-5/preset-editor.lua",
 	Page1Hitbox="page-1/hitbox.lua",
 	Page1Gravity="page-1/gravity.lua",
 	Page1Speed="page-1/speed.lua",
 	Page1GameParams="page-1/game-params.lua",
 	Page1Boost="page-1/boost.lua",
 	Page1ESP="page-1/esp.lua",
+	Page1ESPDefense="page-1/esp-defense.lua",
+	Page1ESPOffense="page-1/esp-offense.lua",
 	Page1QBAim="page-1/qb-aim.lua",
-	StrokeColour="page-3/stroke-colour.lua",
-	MapEditor="page-4/map-editor.lua",
-	Workspace="page-4/workspace.lua",
-	RemoveAds="page-4/remove-ads.lua",
-	PlayerData="page-5/player-data.lua",
-	Discord="page-5/discord.lua",
+	StrokeColour="page-4/stroke-colour.lua",
+	MapEditor="page-2/map-editor.lua",
+	AntiMaterial="page-2/anti-material.lua",
+	MapCleaner="page-2/map-cleaner.lua",
+	RemoveAds="page-2/remove-ads.lua",
+	PlayerData="page-6/player-data.lua",
+	Discord="page-6/discord.lua",
 	DataSave="data-save/data-save.lua",
 }
 AUTO_REFRESH_WATCH_PATHS={AUTO_REFRESH_RELOAD_PATH}
@@ -525,6 +529,7 @@ end
 GuiLogicModule=loadRemoteModuleStep("GuiLogic",MODULE_PATHS.GuiLogic)
 MainFrameModule=loadRemoteModuleStep("MainFrame",MODULE_PATHS.MainFrame)
 AutoRefreshModule=loadRemoteModuleStep("AutoRefresh",MODULE_PATHS.AutoRefresh)
+DescriptionModule=loadRemoteModuleStep("Description",MODULE_PATHS.Description)
 AnnouncementModule=loadRemoteModuleStep("Announcement",MODULE_PATHS.Announcement)
 HitboxPresetModule=loadRemoteModuleStep("HitboxPreset",MODULE_PATHS.HitboxPreset)
 KeybindSettingsModule=loadRemoteModuleStep("KeybindSettings",MODULE_PATHS.KeybindSettings)
@@ -535,10 +540,13 @@ Page1SpeedModule=loadRemoteModuleStep("Page1Speed",MODULE_PATHS.Page1Speed)
 Page1GameParamsModule=loadRemoteModuleStep("Page1GameParams",MODULE_PATHS.Page1GameParams)
 Page1BoostModule=loadRemoteModuleStep("Page1Boost",MODULE_PATHS.Page1Boost)
 Page1ESPModule=loadRemoteModuleStep("Page1ESP",MODULE_PATHS.Page1ESP)
+Page1ESPDefenseModule=loadRemoteModuleStep("Page1ESPDefense",MODULE_PATHS.Page1ESPDefense)
+Page1ESPOffenseModule=loadRemoteModuleStep("Page1ESPOffense",MODULE_PATHS.Page1ESPOffense)
 Page1QBAimModule=loadRemoteModuleStep("Page1QBAim",MODULE_PATHS.Page1QBAim)
 StrokeColourModule=loadRemoteModuleStep("StrokeColour",MODULE_PATHS.StrokeColour)
 MapEditorModule=loadRemoteModuleStep("MapEditor",MODULE_PATHS.MapEditor)
-WorkspaceModule=loadRemoteModuleStep("Workspace",MODULE_PATHS.Workspace)
+AntiMaterialModule=loadRemoteModuleStep("AntiMaterial",MODULE_PATHS.AntiMaterial)
+MapCleanerModule=loadRemoteModuleStep("MapCleaner",MODULE_PATHS.MapCleaner)
 RemoveAdsModule=loadRemoteModuleStep("RemoveAds",MODULE_PATHS.RemoveAds)
 PlayerDataModule=loadRemoteModuleStep("PlayerData",MODULE_PATHS.PlayerData)
 DiscordModule=loadRemoteModuleStep("Discord",MODULE_PATHS.Discord)
@@ -572,6 +580,8 @@ PAGE1_RELOAD_PATHS={
 	[MODULE_PATHS.Page1GameParams]=function(module) Page1GameParamsModule=module end,
 	[MODULE_PATHS.Page1Boost]=function(module) Page1BoostModule=module end,
 	[MODULE_PATHS.Page1ESP]=function(module) Page1ESPModule=module end,
+	[MODULE_PATHS.Page1ESPDefense]=function(module) Page1ESPDefenseModule=module end,
+	[MODULE_PATHS.Page1ESPOffense]=function(module) Page1ESPOffenseModule=module end,
 	[MODULE_PATHS.Page1QBAim]=function(module) Page1QBAimModule=module end,
 }
 
@@ -623,11 +633,13 @@ function applyAutoRefreshModuleChange(changedPath,module)
 		return true
 	end
 
-	if changedPath==MODULE_PATHS.MapEditor or changedPath==MODULE_PATHS.Workspace or changedPath==MODULE_PATHS.RemoveAds then
+	if changedPath==MODULE_PATHS.MapEditor or changedPath==MODULE_PATHS.AntiMaterial or changedPath==MODULE_PATHS.MapCleaner or changedPath==MODULE_PATHS.RemoveAds then
 		if changedPath==MODULE_PATHS.MapEditor then
 			MapEditorModule=module
-		elseif changedPath==MODULE_PATHS.Workspace then
-			WorkspaceModule=module
+		elseif changedPath==MODULE_PATHS.AntiMaterial then
+			AntiMaterialModule=module
+		elseif changedPath==MODULE_PATHS.MapCleaner then
+			MapCleanerModule=module
 		else
 			RemoveAdsModule=module
 		end
@@ -685,7 +697,7 @@ function startAutoRefresh()
 			return toolAlive and SG and SG.Parent and guiParent:FindFirstChild(SG_NAME)==SG
 		end,
 		shouldReloadMain=function(changedPath)
-			return APP_RUNTIME_PATH_SET[changedPath] or changedPath==MODULE_PATHS.GuiLogic or changedPath==MODULE_PATHS.MainFrame or changedPath==MODULE_PATHS.Announcement or changedPath==MODULE_PATHS.AutoRefresh
+			return APP_RUNTIME_PATH_SET[changedPath] or changedPath==MODULE_PATHS.GuiLogic or changedPath==MODULE_PATHS.MainFrame or changedPath==MODULE_PATHS.Description or changedPath==MODULE_PATHS.Announcement or changedPath==MODULE_PATHS.AutoRefresh
 		end,
 		applyModuleChange=applyAutoRefreshModuleChange,
 	})

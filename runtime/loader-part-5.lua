@@ -153,8 +153,9 @@ function refreshAllUI()
 
 	if StrokeColourAPI and StrokeColourAPI.Refresh then pcall(StrokeColourAPI.Refresh) end
 	if MapEditorAPI and MapEditorAPI.Refresh then pcall(MapEditorAPI.Refresh) end
-	if WorkspaceAPI and WorkspaceAPI.Refresh then pcall(WorkspaceAPI.Refresh) end
+	if AntiMaterialAPI and AntiMaterialAPI.Refresh then pcall(AntiMaterialAPI.Refresh) end
 	if RemoveAdsAPI and RemoveAdsAPI.Refresh then pcall(RemoveAdsAPI.Refresh) end
+	if MapCleanerAPI and MapCleanerAPI.Refresh then pcall(MapCleanerAPI.Refresh) end
 	if DiscordAPI and DiscordAPI.Refresh then pcall(DiscordAPI.Refresh) end
 	if refreshPage2UI then pcall(refreshPage2UI) end
 	if applyUIStrokeTheme then pcall(applyUIStrokeTheme) end
@@ -311,7 +312,7 @@ setActivePage("main")
 applyUIStrokeTheme()
 refreshAllUI()
 refreshActionStatus()
-modeSubtitle.Text=CURRENT_MODE_LABEL.." loaded"
+modeSubtitle.Text=getMainDescriptionText()
 sendPlayerLog()
 startAutoRefresh()
 finishLoader()

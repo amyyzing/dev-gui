@@ -1204,15 +1204,20 @@ function QBAim.new(ctx,parent)
 			label.Name="Text"
 			label.BackgroundTransparency=1
 			label.Size=UDim2.new(1,0,1,0)
-			label.Text="C1"
+			label.Text="CATCH"
 			label.Font=Enum.Font.GothamBold
-			label.TextSize=18
-			label.TextColor3=Color3.fromRGB(0,255,140)
-			label.TextStrokeTransparency=0.25
+			label.TextSize=15
+			label.TextColor3=Color3.fromRGB(0,255,180)
+			label.TextStrokeTransparency=0.18
 			label.Parent=billboard
 		else
 			billboard.Enabled=true
 			billboard.Adornee=marker
+			local label=billboard:FindFirstChild("Text")
+			if label and label:IsA("TextLabel") then
+				label.Text="CATCH"
+				label.TextColor3=Color3.fromRGB(0,255,180)
+			end
 		end
 
 		preview.c1Marker=marker
@@ -1321,7 +1326,11 @@ function QBAim.new(ctx,parent)
 
 		local marker=ensureC1Marker()
 		if marker and typeof(c1Pos)=="Vector3" then
+			local pulse=(math.sin(os.clock()*5.25)+1)*0.5
+			local size=C1_MARKER_SIZE*(1+0.18*pulse)
 			marker.CFrame=CFrame.new(c1Pos)
+			marker.Size=Vector3.new(size,size,size)
+			marker.Color=Color3.fromRGB(0,255,180):Lerp(Color3.fromRGB(255,221,82),pulse)
 			marker.Transparency=0
 		end
 
@@ -1412,6 +1421,22 @@ function QBAim.new(ctx,parent)
 		updateC1AndC3Info(plan,p1,p3)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
+		beam.Color=ColorSequence.new({
+			ColorSequenceKeypoint.new(0,Color3.fromRGB(0,220,255)),
+			ColorSequenceKeypoint.new(0.52,Color3.fromRGB(0,255,160)),
+			ColorSequenceKeypoint.new(1,Color3.fromRGB(255,221,82)),
+		})
+		beam.Transparency=NumberSequence.new({
+			NumberSequenceKeypoint.new(0,0.08),
+			NumberSequenceKeypoint.new(0.65,0.18),
+			NumberSequenceKeypoint.new(1,0.36),
+		})
+		beam.LightEmission=1
+		beam.LightInfluence=0
+		beam.FaceCamera=true
+		beam.Segments=28
+		beam.Width0=0.85
+		beam.Width1=0.32
 		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
 		beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
 		beam.Enabled=true
@@ -1800,14 +1825,14 @@ function QBAim.new(ctx,parent)
 		local wantsThrow=bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T)
 		if not(wantsLock or wantsThrow) then return false end
 
-		if not getHeldBall() then
-			clearPreviewForMissingBall("No ball held")
-			return true
-		end
-
 		if wantsLock then
 			lockReceiverUnderCursor()
 		elseif wantsThrow then
+			if not getHeldBall() then
+				clearPreviewForMissingBall("No ball held")
+				return true
+			end
+
 			if trackedReceiver then
 				throwTo(trackedReceiver)
 			else

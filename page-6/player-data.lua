@@ -153,6 +153,10 @@ function PlayerData.new(ctx,page,deps)
 			ctx.WorkspaceAPI.SetEnabled(false)
 		end
 
+		if deps.MapCleaner and deps.MapCleaner.SetEnabled then
+			deps.MapCleaner.SetEnabled(false)
+		end
+
 		if ctx.resetMainPageDefaults then pcall(ctx.resetMainPageDefaults) end
 		if ctx.resetCustomizePageDefaults then pcall(ctx.resetCustomizePageDefaults) end
 		if ctx.resetKeybindPresetPageDefaults then pcall(ctx.resetKeybindPresetPageDefaults) end

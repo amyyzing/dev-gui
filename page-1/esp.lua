@@ -3,6 +3,7 @@ local ESP={}
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
 local UIS=game:GetService("UserInputService")
+local ReplicatedStorage=game:GetService("ReplicatedStorage")
 
 local me=Players.LocalPlayer
 
@@ -10,11 +11,6 @@ local VALID_TEAM_IDS={
 	HomeTeam=true,
 	AwayTeam=true,
 }
-
-local ESP_HIGHLIGHT_NAME="MyESPHighlight"
-local RANGE_BASE_YARDS=7
-local YOUR_SPEED_YPS=7
-local ANTIMATTER_SPEED_YPS=25
 
 local function safeDisconnect(conn)
 	if conn and typeof(conn)=="RBXScriptConnection" then
@@ -24,32 +20,9 @@ local function safeDisconnect(conn)
 	end
 end
 
-local function getLiveCharacter(player)
-	if not player then return nil end
-
-	local workspaceCharacter=workspace:FindFirstChild(player.Name)
-	if workspaceCharacter and workspaceCharacter:IsA("Model") then
-		return workspaceCharacter
-	end
-
-	if player.Character and player.Character:IsA("Model") then
-		return player.Character
-	end
-
-	return nil
-end
-
-local function getCharacterRoot(character)
-	if not character then return nil end
-	return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
-end
-
-local function getPlayerRoot(player)
-	return getCharacterRoot(getLiveCharacter(player))
-end
-
-local function studsToYards(studs)
-	return studs/3
+local function firstChild(parent)
+	if not parent then return nil end
+	return parent:GetChildren()[1]
 end
 
 local function getPlayerTeamID(player)
@@ -76,174 +49,35 @@ local function isValidGameTeamID(teamID)
 	return teamID~=nil and VALID_TEAM_IDS[teamID]==true
 end
 
-local function isSameTeam(playerA,playerB)
-	local teamA=getPlayerTeamID(playerA)
-	local teamB=getPlayerTeamID(playerB)
+local function getGameplayOffenseTeam()
+	local games=ReplicatedStorage:FindFirstChild("Games")
+	local gameFolder=firstChild(games)
+	local offense=gameFolder and gameFolder:FindFirstChild("Offense")
+	local gameStatus=offense and offense:FindFirstChild("GameStatus")
+	if not gameStatus then return nil end
 
-	if not isValidGameTeamID(teamA) or not isValidGameTeamID(teamB) then
-		return false
+	if gameStatus:IsA("StringValue") or gameStatus:IsA("IntValue") or gameStatus:IsA("NumberValue") then
+		return tostring(gameStatus.Value)
 	end
 
-	return teamA==teamB
-end
+	local ok,value=pcall(function()
+		return gameStatus.Value
+	end)
 
-local function shouldHighlightPlayer(player)
-	if not player or player==me then
-		return false
-	end
-
-	local myTeam=getPlayerTeamID(me)
-	local theirTeam=getPlayerTeamID(player)
-	if not isValidGameTeamID(myTeam) or not isValidGameTeamID(theirTeam) then
-		return false
-	end
-
-	return myTeam~=theirTeam
-end
-
-local function getFootballPartFromPlayer(player)
-	local character=getLiveCharacter(player)
-	if not character then return nil end
-
-	local football=character:FindFirstChild("Football")
-	if football and football:IsA("BasePart") and football.Parent==character then
-		return football
+	if ok then
+		return tostring(value)
 	end
 
 	return nil
 end
 
-local function findAntimatterData()
-	for _,player in ipairs(Players:GetPlayers()) do
-		if shouldHighlightPlayer(player) then
-			local footballPart=getFootballPartFromPlayer(player)
-			if footballPart then
-				return{
-					player=player,
-					footballPart=footballPart,
-				}
-			end
-		end
-	end
-
-	return nil
-end
-
-local function getClosestFriendlyReachTime(targetPlayer)
-	local targetRoot=getPlayerRoot(targetPlayer)
-	if not targetRoot then
-		return math.huge
-	end
-
-	local bestTime=math.huge
-	for _,player in ipairs(Players:GetPlayers()) do
-		if isSameTeam(player,me) then
-			local friendlyRoot=getPlayerRoot(player)
-			if friendlyRoot then
-				local distStuds=(friendlyRoot.Position-targetRoot.Position).Magnitude
-				local distYards=studsToYards(distStuds)
-				local timeToReach=0
-
-				if distYards>RANGE_BASE_YARDS then
-					timeToReach=(distYards-RANGE_BASE_YARDS)/YOUR_SPEED_YPS
-				end
-
-				if timeToReach<bestTime then
-					bestTime=timeToReach
-				end
-			end
-		end
-	end
-
-	return bestTime
-end
-
-local function shouldTurnRedFromAntimatterRule(targetPlayer,antimatterData)
-	if not targetPlayer or not antimatterData then
-		return false
-	end
-
-	local antimatterPlayer=antimatterData.player
-	local footballPart=antimatterData.footballPart
-	if not antimatterPlayer or not footballPart or not footballPart.Parent then
-		return false
-	end
-
-	if targetPlayer==antimatterPlayer then
-		return false
-	end
-
-	if not isSameTeam(targetPlayer,antimatterPlayer) then
-		return false
-	end
-
-	local targetRoot=getPlayerRoot(targetPlayer)
-	if not targetRoot then
-		return false
-	end
-
-	local footballDistanceStuds=(footballPart.Position-targetRoot.Position).Magnitude
-	local footballDistanceYards=studsToYards(footballDistanceStuds)
-	local footballTime=footballDistanceYards/ANTIMATTER_SPEED_YPS
-	local closestFriendlyTime=getClosestFriendlyReachTime(targetPlayer)
-
-	return closestFriendlyTime<=footballTime
-end
-
-local function getMyESPHighlight(character)
-	local highlight=character and character:FindFirstChild(ESP_HIGHLIGHT_NAME)
-	if highlight and highlight:IsA("Highlight") then
-		return highlight
-	end
-
-	return nil
-end
-
-local function destroyMyESPHighlight(character)
-	local highlight=getMyESPHighlight(character)
-	if highlight then
-		highlight:Destroy()
-	end
-end
-
-local function createMyESPHighlight(character,color)
-	if not character then return nil end
-
-	local highlight=Instance.new("Highlight")
-	highlight.Name=ESP_HIGHLIGHT_NAME
-	highlight.Adornee=character
-	highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.FillTransparency=0.5
-	highlight.OutlineTransparency=0
-	highlight.FillColor=color
-	highlight.OutlineColor=color
-	highlight.Parent=character
-	return highlight
-end
-
-local function recreateMyESPHighlight(character,color)
-	if not character then return end
-	local highlight=getMyESPHighlight(character)
-	if not highlight then
-		createMyESPHighlight(character,color)
-		return
-	end
-
-	highlight.Adornee=character
-	highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-	highlight.FillTransparency=0.5
-	highlight.OutlineTransparency=0
-	highlight.FillColor=color
-	highlight.OutlineColor=color
-end
-
-local function clearAllMyESPHighlights()
-	for _,player in ipairs(Players:GetPlayers()) do
-		local character=getLiveCharacter(player)
-		if character then
-			destroyMyESPHighlight(character)
-		end
-	end
+local function makeNoop()
+	return{
+		Start=function() end,
+		Stop=function() end,
+		Refresh=function() end,
+		Destroy=function() end,
+	}
 end
 
 function ESP.new(ctx,parent)
@@ -256,9 +90,34 @@ function ESP.new(ctx,parent)
 	local sectionBody=nil
 	local sectionFrame=nil
 	local toggle=nil
+	local statusLabel=nil
 	local keybindConn=nil
 	local heartbeatConn=nil
-	local espEnabled=false
+	local defenseApi=nil
+	local offenseApi=nil
+	local activeMode=nil
+	local poll=0
+
+	local DefenseModule=ctx.ESPDefenseModule
+	local OffenseModule=ctx.ESPOffenseModule
+
+	if DefenseModule and DefenseModule.new then
+		local ok,result=pcall(function()
+			return DefenseModule.new({THEME=THEME})
+		end)
+		defenseApi=ok and result or makeNoop()
+	else
+		defenseApi=makeNoop()
+	end
+
+	if OffenseModule and OffenseModule.new then
+		local ok,result=pcall(function()
+			return OffenseModule.new({THEME=THEME})
+		end)
+		offenseApi=ok and result or makeNoop()
+	else
+		offenseApi=makeNoop()
+	end
 
 	local function isGameplay()
 		if ctx.getCurrentModeKey then
@@ -268,9 +127,33 @@ function ESP.new(ctx,parent)
 		return true
 	end
 
-	local function refreshFooter()
+	local function isDefensePossession()
+		local myTeam=getPlayerTeamID(me)
+		local offenseTeam=getGameplayOffenseTeam()
+
+		if not isValidGameTeamID(myTeam) or not isValidGameTeamID(offenseTeam) then
+			return true
+		end
+
+		return offenseTeam~=myTeam
+	end
+
+	local function setStatus(text,color)
+		if statusLabel then
+			statusLabel.Text=text
+			statusLabel.TextColor3=color or THEME.MUTED
+		end
+	end
+
+	local function stopBoth()
+		if defenseApi and defenseApi.Stop then pcall(defenseApi.Stop) end
+		if offenseApi and offenseApi.Stop then pcall(offenseApi.Stop) end
+		activeMode=nil
+	end
+
+	local function refreshFooter(available)
 		if ctx.refreshESPStatus then
-			pcall(ctx.refreshESPStatus,state.actionStatusOn,isGameplay())
+			pcall(ctx.refreshESPStatus,state.actionStatusOn,available)
 		end
 	end
 
@@ -279,88 +162,51 @@ function ESP.new(ctx,parent)
 			pcall(ctx.onChanged,state)
 		end
 
-		refreshFooter()
-	end
-
-	local function rebuildEnemyHighlights()
-		if not espEnabled or not isGameplay() then
-			clearAllMyESPHighlights()
-			return
-		end
-
-		local antimatterData=findAntimatterData()
-		local blue=THEME.BLUE or Color3.fromRGB(70,140,255)
-		local red=THEME.RED or Color3.fromRGB(210,70,70)
-		local green=THEME.GREEN or Color3.fromRGB(90,200,90)
-
-		for _,player in ipairs(Players:GetPlayers()) do
-			if player~=me then
-				local character=getLiveCharacter(player)
-				if character then
-					if shouldHighlightPlayer(player) then
-						if antimatterData and player==antimatterData.player then
-							recreateMyESPHighlight(character,blue)
-						elseif antimatterData and isSameTeam(player,antimatterData.player) then
-							if shouldTurnRedFromAntimatterRule(player,antimatterData) then
-								recreateMyESPHighlight(character,red)
-							else
-								recreateMyESPHighlight(character,green)
-							end
-						else
-							destroyMyESPHighlight(character)
-						end
-					else
-						destroyMyESPHighlight(character)
-					end
-				end
-			end
-		end
-	end
-
-	local function stopESP()
-		espEnabled=false
-		safeDisconnect(heartbeatConn)
-		heartbeatConn=nil
-		clearAllMyESPHighlights()
-	end
-
-	local function startESP()
-		if espEnabled then return end
-
-		espEnabled=true
-		safeDisconnect(heartbeatConn)
-		heartbeatConn=RunService.Heartbeat:Connect(rebuildEnemyHighlights)
-		rebuildEnemyHighlights()
+		refreshFooter(isGameplay() and isDefensePossession())
 	end
 
 	local function syncControls()
-		local available=isGameplay()
+		local gameplay=isGameplay()
+		local defense=gameplay and isDefensePossession()
+		local available=gameplay and defense
 
-		if not available and state.actionStatusOn then
+		if not gameplay then
 			state.actionStatusOn=false
-		end
-
-		if state.actionStatusOn and available then
-			startESP()
+			stopBoth()
+			setStatus("Gameplay only",THEME.MUTED)
+		elseif not defense then
+			state.actionStatusOn=false
+			stopBoth()
+			setStatus("Offense possession",THEME.MUTED)
+		elseif state.actionStatusOn then
+			if activeMode~="defense" then
+				stopBoth()
+				activeMode="defense"
+				if defenseApi and defenseApi.Start then pcall(defenseApi.Start) end
+			elseif defenseApi and defenseApi.Refresh then
+				pcall(defenseApi.Refresh)
+			end
+			setStatus("Defense active",THEME.GREEN or THEME.TEXT)
 		else
-			stopESP()
+			stopBoth()
+			setStatus("Off",THEME.MUTED)
 		end
 
 		if sectionFrame then
-			sectionFrame.Visible=available
+			sectionFrame.Visible=gameplay
 		elseif sectionBody then
-			sectionBody.Visible=available
+			sectionBody.Visible=gameplay
 		end
 
 		if toggle then
 			toggle.set(available and state.actionStatusOn)
 		end
 
-		refreshFooter()
+		refreshFooter(available)
 	end
 
 	function api.SetESPState(value,fire)
-		state.actionStatusOn=(value and isGameplay()) and true or false
+		state.actionStatusOn=(value and isGameplay() and isDefensePossession()) and true or false
 		syncControls()
 
 		if fire~=false then
@@ -378,8 +224,13 @@ function ESP.new(ctx,parent)
 
 	function api.Destroy()
 		safeDisconnect(keybindConn)
+		safeDisconnect(heartbeatConn)
 		keybindConn=nil
-		stopESP()
+		heartbeatConn=nil
+		stopBoth()
+
+		if defenseApi and defenseApi.Destroy then pcall(defenseApi.Destroy) end
+		if offenseApi and offenseApi.Destroy then pcall(offenseApi.Destroy) end
 
 		if sectionFrame and sectionFrame.Parent then
 			sectionFrame:Destroy()
@@ -399,8 +250,19 @@ function ESP.new(ctx,parent)
 		api.SetESPState(v,true)
 	end)
 
+	statusLabel=ctx.New("TextLabel",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,16),
+		Text="Off",
+		Font=Enum.Font.Gotham,
+		TextSize=11,
+		TextColor3=THEME.MUTED,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		ZIndex=6,
+	},sectionBody)
+
 	local function handleESPInput(input)
-		if not isGameplay() then return false end
+		if not isGameplay() or not isDefensePossession() then return false end
 
 		local getKey=ctx.getESPToggleKey or ctx.getActionToggleKey
 		local key=getKey and getKey() or Enum.KeyCode.Unknown
@@ -418,6 +280,13 @@ function ESP.new(ctx,parent)
 	keybindConn=UIS.InputBegan:Connect(function(input,processed)
 		if processed then return end
 		handleESPInput(input)
+	end)
+
+	heartbeatConn=RunService.Heartbeat:Connect(function(dt)
+		poll+=dt
+		if poll<0.25 then return end
+		poll=0
+		syncControls()
 	end)
 
 	syncControls()

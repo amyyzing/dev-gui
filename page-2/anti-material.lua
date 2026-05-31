@@ -1,4 +1,4 @@
-local WorkspaceModule={}
+local AntiMaterial={}
 
 local function safeDisconnect(conn)
 	if conn and typeof(conn)=="RBXScriptConnection" then
@@ -33,8 +33,7 @@ local function applySmoothPlasticToPart(worldSettings,part)
 	part.Material=Enum.Material.SmoothPlastic
 end
 
-function WorkspaceModule.new(ctx,page)
-	local New=ctx.New
+function AntiMaterial.new(ctx,page)
 	local THEME=ctx.THEME
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
@@ -59,7 +58,6 @@ function WorkspaceModule.new(ctx,page)
 					applySmoothPlasticToPart(worldSettings,inst)
 				end
 			end)
-
 		else
 			for part,material in pairs(worldSettings.OriginalMaterials) do
 				if part and part.Parent and part:IsA("BasePart") then
@@ -97,7 +95,7 @@ function WorkspaceModule.new(ctx,page)
 		api.SetEnabled(false,false)
 	end
 
-	local section=makeSection(page,1,"Workspace","")
+	local section=makeSection(page,1,"Anti Material","")
 
 	materialToggle=buildToggleRow(section,"SmoothPlastic",worldSettings.SmoothPlastic,function(state)
 		api.SetEnabled(state)
@@ -107,4 +105,4 @@ function WorkspaceModule.new(ctx,page)
 	return api
 end
 
-return WorkspaceModule
+return AntiMaterial

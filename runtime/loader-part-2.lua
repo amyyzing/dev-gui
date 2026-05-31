@@ -20,9 +20,24 @@ makeBox=GuiLogic.makeBox
 buildSlider=GuiLogic.buildSlider
 buildToggleRow=GuiLogic.buildToggleRow
 
+Description=DescriptionModule or {}
+rawMakeSection=makeSection
+function makeSection(parent,order,titleText,subtitleText)
+	if Description and type(Description.Section)=="function" then
+		local ok,newTitle,newSubtitle=pcall(Description.Section,titleText,subtitleText)
+		if ok then
+			titleText=newTitle
+			subtitleText=newSubtitle
+		end
+	end
+
+	return rawMakeSection(parent,order,titleText,subtitleText)
+end
+
 MainFrame=MainFrameModule.new({
 	New=New,
 	THEME=THEME,
+	Description=Description,
 	UI_WINDOW=UI_WINDOW,
 	SG=SG,
 	UIS=UIS,
@@ -54,10 +69,22 @@ settingsPage=MainFrame.settingsPage
 futurePage=MainFrame.futurePage
 uiSettingsPage=MainFrame.uiSettingsPage
 mapPage=MainFrame.mapPage
+serverPage=MainFrame.serverPage
 actualSettingsPage=MainFrame.actualSettingsPage
 leftCol=MainFrame.leftCol
 rightCol=MainFrame.rightCol
 footer=MainFrame.footer
+
+function getMainDescriptionText()
+	if Description and type(Description.Get)=="function" then
+		local ok,value=pcall(Description.Get,"Main.Description",CURRENT_MODE_LABEL.." loaded")
+		if ok and value~=nil then
+			return value
+		end
+	end
+
+	return CURRENT_MODE_LABEL.." loaded"
+end
 
 function setActivePage(name)
 	if MainFrame and MainFrame.SetActivePage then
@@ -289,6 +316,9 @@ function makePage1Ctx()
 		getQBAimLockKey=function() return QB_AIM_LOCK_KEY end,
 		getQBAimThrowKey=function() return QB_AIM_THROW_KEY end,
 		getQBAimToggleKey=function() return QB_AIM_TOGGLE_KEY end,
+		Description=Description,
+		ESPDefenseModule=Page1ESPDefenseModule,
+		ESPOffenseModule=Page1ESPOffenseModule,
 		refreshESPStatus=function(state,available)
 			PAGE1_STATE.actionStatusOn=state and available~=false
 			actionStatusOn=PAGE1_STATE.actionStatusOn
@@ -298,7 +328,7 @@ function makePage1Ctx()
 			CURRENT_MODE_KEY=tostring(key or"mode1")
 			CURRENT_MODE_LABEL=tostring(label or"Gameplay")
 			if modeSubtitle then
-				modeSubtitle.Text=CURRENT_MODE_LABEL.." loaded"
+				modeSubtitle.Text=getMainDescriptionText()
 			end
 			if PAGE1_APIS.GameParams and PAGE1_APIS.GameParams.Refresh then
 				pcall(PAGE1_APIS.GameParams.Refresh)

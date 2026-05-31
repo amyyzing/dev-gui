@@ -90,7 +90,7 @@ function buildCustomizePage()
 			New("TextLabel",{
 				BackgroundTransparency=1,
 				Size=UDim2.new(1,0,0,22),
-				Text="page-3/stroke-colour.lua failed: "..tostring(result),
+				Text="page-4/stroke-colour.lua failed: "..tostring(result),
 				Font=Enum.Font.Gotham,
 				TextSize=12,
 				TextColor3=THEME.RED,
@@ -99,13 +99,13 @@ function buildCustomizePage()
 			},fallbackSection)
 		end
 	else
-		warn("Missing remote module: page-3/stroke-colour.lua")
+		warn("Missing remote module: page-4/stroke-colour.lua")
 
 		local fallbackSection=makeSection(uiSettingsPage,1,"Stroke Colour","Remote module failed to load.")
 		New("TextLabel",{
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,0,0,22),
-			Text="Missing page-3/stroke-colour.lua",
+			Text="Missing page-4/stroke-colour.lua",
 			Font=Enum.Font.Gotham,
 			TextSize=12,
 			TextColor3=THEME.RED,
@@ -128,7 +128,8 @@ end
 buildCustomizePage()
 
 MapEditorAPI=nil
-WorkspaceAPI=nil
+AntiMaterialAPI=nil
+MapCleanerAPI=nil
 RemoveAdsAPI=nil
 
 function clearMapPage()
@@ -148,9 +149,15 @@ function buildMapPage()
 		end)
 	end
 
-	if WorkspaceAPI and WorkspaceAPI.Destroy then
+	if AntiMaterialAPI and AntiMaterialAPI.Destroy then
 		pcall(function()
-			WorkspaceAPI.Destroy()
+			AntiMaterialAPI.Destroy()
+		end)
+	end
+
+	if MapCleanerAPI and MapCleanerAPI.Destroy then
+		pcall(function()
+			MapCleanerAPI.Destroy()
 		end)
 	end
 
@@ -161,7 +168,8 @@ function buildMapPage()
 	end
 
 	MapEditorAPI=nil
-	WorkspaceAPI=nil
+	AntiMaterialAPI=nil
+	MapCleanerAPI=nil
 	RemoveAdsAPI=nil
 	clearMapPage()
 
@@ -192,9 +200,9 @@ function buildMapPage()
 		end
 	end
 
-	if WorkspaceModule and WorkspaceModule.new then
+	if AntiMaterialModule and AntiMaterialModule.new then
 		local ok,result=pcall(function()
-			return WorkspaceModule.new({
+			return AntiMaterialModule.new({
 				New=New,
 				THEME=THEME,
 				WORLD_SETTINGS=WORLD_SETTINGS,
@@ -209,14 +217,41 @@ function buildMapPage()
 		end)
 
 		if ok then
-			WorkspaceAPI=result
+			AntiMaterialAPI=result
 		else
-			local section=makeSection(mapPage,1,"Workspace","Remote module failed to load.")
-			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Workspace module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+			local section=makeSection(mapPage,1,"Anti Material","Remote module failed to load.")
+			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Anti Material module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 		end
 	else
-		local section=makeSection(mapPage,1,"Workspace","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-4/workspace.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		local section=makeSection(mapPage,1,"Anti Material","Remote module failed to load.")
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-2/anti-material.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	end
+
+	if MapCleanerModule and MapCleanerModule.new then
+		local ok,result=pcall(function()
+			return MapCleanerModule.new({
+				New=New,
+				THEME=THEME,
+				makeSection=makeSection,
+				buildToggleRow=buildToggleRow,
+				getCurrentModeKey=function()
+					return CURRENT_MODE_KEY
+				end,
+				onChanged=function()
+					requestPlayerAutosave()
+				end,
+			},mapPage)
+		end)
+
+		if ok then
+			MapCleanerAPI=result
+		else
+			local section=makeSection(mapPage,2,"Map Cleaner","Remote module failed to load.")
+			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Map Cleaner module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		end
+	else
+		local section=makeSection(mapPage,2,"Map Cleaner","Remote module failed to load.")
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-2/map-cleaner.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 	end
 
 	if RemoveAdsModule and RemoveAdsModule.new then
@@ -238,12 +273,12 @@ function buildMapPage()
 		if ok then
 			RemoveAdsAPI=result
 		else
-			local section=makeSection(mapPage,2,"Remove Ads","Remote module failed to load.")
+			local section=makeSection(mapPage,3,"Remove Ads","Remote module failed to load.")
 			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Remove Ads module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 		end
 	else
-		local section=makeSection(mapPage,2,"Remove Ads","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-4/remove-ads.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		local section=makeSection(mapPage,3,"Remove Ads","Remote module failed to load.")
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-2/remove-ads.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 	end
 
 	applyUIStrokeTheme()
