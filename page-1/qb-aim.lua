@@ -76,6 +76,10 @@ local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
 local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
+local VALID_TEAM_IDS={
+	HomeTeam=true,
+	AwayTeam=true,
+}
 
 local function safeDisconnect(conn)
 	if conn and typeof(conn)=="RBXScriptConnection" then
@@ -189,6 +193,41 @@ local function getHeldBall()
 	end
 
 	return nil
+end
+
+local function getPlayerTeamID(player)
+	local replicated=player and player:FindFirstChild("Replicated")
+	local teamValue=replicated and replicated:FindFirstChild("TeamID")
+	if not teamValue then return nil end
+
+	if teamValue:IsA("StringValue") or teamValue:IsA("IntValue") or teamValue:IsA("NumberValue") then
+		return tostring(teamValue.Value)
+	end
+
+	local ok,value=pcall(function()
+		return teamValue.Value
+	end)
+
+	if ok then
+		return tostring(value)
+	end
+
+	return nil
+end
+
+local function isValidGameTeamID(teamID)
+	return teamID~=nil and VALID_TEAM_IDS[teamID]==true
+end
+
+local function isSameTeam(playerA,playerB)
+	local teamA=getPlayerTeamID(playerA)
+	local teamB=getPlayerTeamID(playerB)
+
+	if not isValidGameTeamID(teamA) or not isValidGameTeamID(teamB) then
+		return false
+	end
+
+	return teamA==teamB
 end
 
 local function getFootballFromFolder(folder)
@@ -407,6 +446,7 @@ function QBAim.new(ctx,parent)
 	local THEME=ctx.THEME
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
+	local state=ctx.State or {}
 	local api={}
 	local enabled=false
 	local trackedReceiver=nil
@@ -419,6 +459,8 @@ function QBAim.new(ctx,parent)
 	local sectionBody=nil
 	local sectionFrame=nil
 	local enabledToggle=nil
+	local teamFilterToggle=nil
+	local arcToggle=nil
 	local statusLabel=nil
 	local targetLabel=nil
 	local leadDelayFrame=nil
@@ -430,9 +472,23 @@ function QBAim.new(ctx,parent)
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
 
+	if state.qbAimTeamFilter==nil then
+		state.qbAimTeamFilter=true
+	end
+
+	if state.qbAimShowArc==nil then
+		state.qbAimShowArc=true
+	end
+
 	local function addConnection(conn)
 		table.insert(connections,conn)
 		return conn
+	end
+
+	local function changed()
+		if ctx.onChanged then
+			pcall(ctx.onChanged,state)
+		end
 	end
 
 	local function isAlive()
@@ -509,6 +565,18 @@ function QBAim.new(ctx,parent)
 		return setLeadDelay(LEAD_DELAY_MIN+(LEAD_DELAY_MAX-LEAD_DELAY_MIN)*alpha,showStatus)
 	end
 
+	local function canTargetReceiver(player)
+		if not player or player==LP then
+			return false
+		end
+
+		if state.qbAimTeamFilter==false then
+			return true
+		end
+
+		return isSameTeam(player,LP)
+	end
+
 	local function ensureReceiverData(player,receiverRoot)
 		if receiverData[player] or not receiverRoot then
 			return receiverData[player]
@@ -558,10 +626,23 @@ function QBAim.new(ctx,parent)
 			enabled=false
 			trackedReceiver=nil
 			selectedRouteLock=nil
+		elseif trackedReceiver and not canTargetReceiver(trackedReceiver) then
+			trackedReceiver=nil
+			selectedRouteLock=nil
+			previewFrozen=false
+			preview.p1,preview.p2,preview.p3=nil,nil,nil
 		end
 
 		if enabledToggle then
 			enabledToggle.set(enabled)
+		end
+
+		if teamFilterToggle then
+			teamFilterToggle.set(state.qbAimTeamFilter~=false)
+		end
+
+		if arcToggle then
+			arcToggle.set(state.qbAimShowArc~=false)
 		end
 
 		setTargetText()
@@ -1219,8 +1300,31 @@ function QBAim.new(ctx,parent)
 		hideC1AndC3Info()
 	end
 
+	local function clearPreviewVisuals()
+		previewFrozen=false
+		preview.p1,preview.p2,preview.p3=nil,nil,nil
+		hideQBTrailPreview()
+
+		if preview.center and preview.center.Parent then
+			preview.center:Destroy()
+		end
+
+		preview.center=nil
+		preview.c1=nil
+		preview.c2=nil
+		preview.c3=nil
+		preview.beam=nil
+		preview.orig=nil
+	end
+
 	local function previewPlan(plan)
-		if not(ARC_PREVIEW_ENABLED and plan) then return end
+		if not(ARC_PREVIEW_ENABLED and plan and state.qbAimShowArc~=false) then
+			if state.qbAimShowArc==false then
+				hideQBTrailPreview()
+			end
+
+			return
+		end
 
 		local c2,c1,c3,beam=arcRig()
 		if not(c2 and c1 and c3 and beam) then return end
@@ -1267,20 +1371,7 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function clearPreviewForMissingBall(statusText)
-		previewFrozen=false
-		preview.p1,preview.p2,preview.p3=nil,nil,nil
-		hideQBTrailPreview()
-
-		if preview.center and preview.center.Parent then
-			preview.center:Destroy()
-		end
-
-		preview.center=nil
-		preview.c1=nil
-		preview.c2=nil
-		preview.c3=nil
-		preview.beam=nil
-		preview.orig=nil
+		clearPreviewVisuals()
 
 		if statusText then
 			setStatus(statusText)
@@ -1297,6 +1388,10 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function buildPlan(receiver,ballPower)
+		if not canTargetReceiver(receiver) then
+			return nil,nil
+		end
+
 		local character=LP.Character
 		local qbRoot=root(character)
 		local ball=getHeldBall()
@@ -1376,6 +1471,15 @@ function QBAim.new(ctx,parent)
 	local function throwTo(receiver)
 		if not(enabled and isAvailable()) then return end
 
+		if not canTargetReceiver(receiver) then
+			trackedReceiver=nil
+			selectedRouteLock=nil
+			clearPreviewVisuals()
+			setTargetText()
+			setStatus(state.qbAimTeamFilter~=false and "Target not teammate" or "No receiver locked")
+			return
+		end
+
 		local heldBall=getHeldBall()
 		if not heldBall then
 			clearPreviewForMissingBall("No ball held")
@@ -1430,7 +1534,7 @@ function QBAim.new(ctx,parent)
 
 		for _,player in ipairs(Players:GetPlayers()) do
 			local receiverRoot=player~=LP and player.Character and root(player.Character)
-			if receiverRoot and camera then
+			if receiverRoot and camera and canTargetReceiver(player) then
 				local screenPoint,onScreen=camera:WorldToViewportPoint(receiverRoot.Position)
 				if onScreen then
 					local distance=(Vector2.new(mouse.X,mouse.Y)-Vector2.new(screenPoint.X,screenPoint.Y)).Magnitude
@@ -1451,7 +1555,7 @@ function QBAim.new(ctx,parent)
 			setTargetText()
 			setStatus("Locked "..best.Name)
 		else
-			setStatus("No receiver under cursor")
+			setStatus(state.qbAimTeamFilter~=false and "No teammate under cursor" or "No receiver under cursor")
 		end
 	end
 
@@ -1513,6 +1617,29 @@ function QBAim.new(ctx,parent)
 
 	enabledToggle=buildToggleRow(sectionBody,"Enabled",enabled,function(value)
 		setEnabled(value)
+	end)
+
+	teamFilterToggle=buildToggleRow(sectionBody,"Team Filter",state.qbAimTeamFilter~=false,function(value)
+		state.qbAimTeamFilter=value and true or false
+		if state.qbAimTeamFilter and trackedReceiver and not canTargetReceiver(trackedReceiver) then
+			trackedReceiver=nil
+			selectedRouteLock=nil
+			clearPreviewVisuals()
+			setTargetText()
+			setStatus("Target cleared")
+		end
+		syncControls()
+		changed()
+	end)
+
+	arcToggle=buildToggleRow(sectionBody,"Show Arc",state.qbAimShowArc~=false,function(value)
+		state.qbAimShowArc=value and true or false
+		if not state.qbAimShowArc then
+			clearPreviewVisuals()
+			setStatus("Arc hidden")
+		end
+		syncControls()
+		changed()
 	end)
 
 	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Disabled",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
@@ -1628,6 +1755,11 @@ function QBAim.new(ctx,parent)
 		end
 
 		if not trackedReceiver then return end
+
+		if state.qbAimShowArc==false then
+			hideQBTrailPreview()
+			return
+		end
 
 		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
 		preview.last=now

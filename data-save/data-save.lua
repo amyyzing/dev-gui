@@ -417,6 +417,11 @@ function DataSave.new(ctx)
 				radius=getValue(ctx,"ballDetectionRadius",10),
 			},
 
+			qbAim={
+				teamFilter=getValue(ctx,"qbAimTeamFilter",true),
+				showArc=getValue(ctx,"qbAimShowArc",true),
+			},
+
 			keybinds={
 				toggleUI=encodeBinding(getValue(ctx,"TOGGLE_UI_KEY",Enum.KeyCode.Unknown)),
 				toggleHitbox=encodeBinding(getValue(ctx,"TOGGLE_HB_KEY",Enum.KeyCode.Unknown)),
@@ -553,6 +558,10 @@ function DataSave.new(ctx)
 		if boost.cooldown~=nil then setValue(ctx,"boostCooldown",clampNumber(boost.cooldown,0,60,5)) end
 		if boost.chance~=nil then setValue(ctx,"boostChance",clampNumber(boost.chance,0,100,100)) end
 		if boost.radius~=nil then setValue(ctx,"ballDetectionRadius",clampNumber(boost.radius,1,50,10)) end
+
+		local qbAim=settings.qbAim or {}
+		if qbAim.teamFilter~=nil then setValue(ctx,"qbAimTeamFilter",qbAim.teamFilter and true or false) end
+		if qbAim.showArc~=nil then setValue(ctx,"qbAimShowArc",qbAim.showArc and true or false) end
 
 		local keybinds=settings.keybinds or {}
 		local keyMap={

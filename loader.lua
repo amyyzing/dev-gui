@@ -67,6 +67,8 @@ local TOGGLE_SPEED_KEY=Enum.KeyCode.Unknown
 local QB_AIM_LOCK_KEY=Enum.KeyCode.H
 local QB_AIM_THROW_KEY=Enum.KeyCode.T
 local QB_AIM_TOGGLE_KEY=Enum.KeyCode.P
+local qbAimTeamFilter=true
+local qbAimShowArc=true
 
 local DEFAULT_PRESETS={{key=Enum.KeyCode.Unknown, size=Vector3.new(0.1, 0.1, 0.1)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.7, 5.8, 1.65)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(3.1, 5.8, 1.70)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.52, 5.4, 1.41)},}
 
@@ -1074,6 +1076,8 @@ local PAGE1_STATE={
 	boostChance=boostChance,
 	ballDetectionRadius=ballDetectionRadius,
 	actionStatusOn=actionStatusOn,
+	qbAimTeamFilter=qbAimTeamFilter,
+	qbAimShowArc=qbAimShowArc,
 }
 
 local function syncPage1State()
@@ -1097,6 +1101,8 @@ local function syncPage1State()
 	boostChance=PAGE1_STATE.boostChance
 	ballDetectionRadius=PAGE1_STATE.ballDetectionRadius
 	actionStatusOn=PAGE1_STATE.actionStatusOn
+	qbAimTeamFilter=PAGE1_STATE.qbAimTeamFilter
+	qbAimShowArc=PAGE1_STATE.qbAimShowArc
 end
 
 local PAGE1_APIS={}
@@ -1276,6 +1282,8 @@ local function resetMainPageDefaults()
 	PAGE1_STATE.boostChance=100
 	PAGE1_STATE.ballDetectionRadius=10
 	PAGE1_STATE.actionStatusOn=false
+	PAGE1_STATE.qbAimTeamFilter=true
+	PAGE1_STATE.qbAimShowArc=true
 
 	for _,api in pairs(PAGE1_APIS) do
 		if api and api.Refresh then
@@ -1723,7 +1731,7 @@ local function buildPage2()
 
 	local ownedSection=makeSection(page2Wrap,1,"Hitbox Presets","Your saved presets")
 	local editorSection=makeSection(page2Wrap,2,"Preset Editor","edit hotkeys and hitbox sizes and save (maybe?)")
-	local bindSection=makeSection(page2Wrap,3,"Keybind Settings","click a bind, then press the next input")
+	local bindSection=makeSection(page2Wrap,3,"Keybind Settings","keyboard, controller, and mouse buttons are supported")
 
 	local page2Ctx={
 		New=New,
