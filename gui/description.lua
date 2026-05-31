@@ -4,8 +4,8 @@ local Description={}
 
 -- Main frame
 Description.Main={
-	Title=EMPTY,
-	Description=EMPTY,
+	Title=untitled gui,
+	Description=hello,
 	LoadedSuffix=EMPTY,
 }
 
