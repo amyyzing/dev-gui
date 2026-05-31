@@ -13,6 +13,10 @@ local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local MODEL_BALL_SPEED=95
 local REMOTE_DISPLAY_POWER=100 -- send to remote; server converts incoming UpdateFootball Power to 95
+local GAME_MAX_POWER=100
+local GAME_POWER_COEFFICIENT=0.95
+local GAME_MIN_HEIGHT_TO_ARC_RATIO=0.01
+local GAME_MAX_TIME_IN_AIR=6
 local GAMEPLAY_BALL_POWER=MODEL_BALL_SPEED
 local SQUADS_BALL_POWER=MODEL_BALL_SPEED
 local PLAYER_G=196.2
@@ -1000,6 +1004,31 @@ function QBAim.new(ctx,parent)
 		return ballAt(originPosition,velocity,time),time
 	end
 
+	local function quadraticMax(a,b,c)
+		local discriminant=b*b-4*a*c
+		if discriminant<0 then return nil end
+
+		local rootA=(-b+math.sqrt(discriminant))/(2*a)
+		local rootB=(-b-math.sqrt(discriminant))/(2*a)
+		return math.max(rootA,rootB)
+	end
+
+	local function gameTimeToDestination(initialVelocity,spawnPosition,targetY)
+		return quadraticMax(-BALL_G/2,initialVelocity.Y,spawnPosition.Y-targetY)
+	end
+
+	local function gameInitialTimeSeed(displayPower)
+		if displayPower<50 then
+			return 3.5
+		elseif displayPower<60 then
+			return 2.5
+		elseif displayPower<70 then
+			return 1.25
+		end
+
+		return GAME_MIN_HEIGHT_TO_ARC_RATIO
+	end
+
 	local function preferredAngle(distance)
 		local yards=distance/YARDS_TO_STUDS
 		if yards<15 then return 24 elseif yards<25 then return 22 elseif yards<40 then return 19 elseif yards<55 then return 16 elseif yards<70 then return 14 elseif yards<85 then return 17 end
@@ -1095,33 +1124,47 @@ function QBAim.new(ctx,parent)
 		local preferred=preferredAngle(distance)
 		local minAngle=minimumAngle(distance)
 		local maxAngle=maximumAngle(distance)
-		local maxTime=maximumTime(distance)
+		local maxTime=math.min(maximumTime(distance),GAME_MAX_TIME_IN_AIR)
+		local targetPower=REMOTE_DISPLAY_POWER*GAME_POWER_COEFFICIENT
+		local maxModelPower=GAME_MAX_POWER*GAME_POWER_COEFFICIENT
+		local startTime=math.max(MIN_T,gameInitialTimeSeed(REMOTE_DISPLAY_POWER))
 		local best=nil
 
-		for time=MIN_T,MAX_T,DT do
+		for time=startTime,MAX_T,DT do
 			if time<=maxTime then
 				local target,leadInfo=c1Target(receiverRoot,originPosition,targetVelocity,time)
 				local needed=velocityNeeded(originPosition,target,time)
 				local requiredSpeed=needed.Magnitude
 
-				if requiredSpeed>0 then
+				if requiredSpeed>0 and math.floor(requiredSpeed)<=maxModelPower then
 					local direction=needed.Unit
 					local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
 					if angle<=maxAngle then
 						local finalVelocity=direction*ballPower
 						local catchPosition=ballAt(originPosition,finalVelocity,time)
-						local speedError=math.abs(ballPower-requiredSpeed)
+						local gameCalculatedTime=gameTimeToDestination(needed,originPosition,target.Y) or time
+						local speedError=math.abs(targetPower-requiredSpeed)
+						local totalErr=(catchPosition-target).Magnitude
 						local verticalVelocity=finalVelocity.Y+G.Y*time
-						local upwardPenalty=verticalVelocity>4 and verticalVelocity*2 or 0
-						local lowPenalty=angle<minAngle and (minAngle-angle)*8 or 0
-						local score=(catchPosition-target).Magnitude*5+speedError*2+math.abs(angle-preferred)*0.85+time*0.55+upwardPenalty+lowPenalty
+						local upwardPenalty=verticalVelocity>4 and verticalVelocity*1.25 or 0
+						local lowPenalty=angle<minAngle and (minAngle-angle)*4 or 0
+						local gameTimeError=math.abs(gameCalculatedTime-time)
+
+						local score=
+							speedError*14
+							+totalErr*5
+							+gameTimeError*2.5
+							+math.abs(angle-preferred)*0.20
+							+time*0.35
+							+upwardPenalty
+							+lowPenalty
 
 						if angle>30 then
-							score=score+(angle-30)*(leadInfo.lateralShare or 0)*0.35
+							score=score+(angle-30)*(leadInfo.lateralShare or 0)*0.20
 						end
 
 						if distance>130 and angle<16 and (leadInfo.awayShare or 0)>0 then
-							score=score+(16-angle)*leadInfo.awayShare*0.35
+							score=score+(16-angle)*leadInfo.awayShare*0.20
 						end
 
 						if not best or score<best.score then
@@ -1143,8 +1186,11 @@ function QBAim.new(ctx,parent)
 								preferredAngle=preferred,
 								minDesiredAngle=minAngle,
 								maxAngle=maxAngle,
-								totalErr=(catchPosition-target).Magnitude,
+								totalErr=totalErr,
 								speedError=speedError,
+								gameCalculatedTime=gameCalculatedTime,
+								gameTimeError=gameTimeError,
+								gameDisplayPower=requiredSpeed/GAME_POWER_COEFFICIENT,
 								ballAtCatch=catchPosition,
 								landing=landingPosition,
 								landingTime=landingTime,
