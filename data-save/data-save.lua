@@ -97,7 +97,7 @@ local function decodeBinding(binding)
 		binding=binding:gsub("^Enum%.UserInputType%.","")
 		binding=binding:gsub("^Enum%.KeyCode%.","")
 
-		if binding:match("^MouseButton") then
+		if binding=="MouseButton1" or binding=="MouseButton2" or binding=="MouseButton3" then
 			return binding
 		end
 
@@ -130,7 +130,11 @@ local function decodeBinding(binding)
 	end
 
 	if rawType=="UserInputType" then
-		return rawName
+		if rawName=="MouseButton1" or rawName=="MouseButton2" or rawName=="MouseButton3" then
+			return rawName
+		end
+
+		return Enum.KeyCode.Unknown
 	end
 
 	return Enum.KeyCode.Unknown

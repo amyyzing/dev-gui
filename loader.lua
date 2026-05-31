@@ -3,7 +3,6 @@ local UIS=game:GetService("UserInputService")
 local TweenService=game:GetService("TweenService")
 local RunService=game:GetService("RunService")
 local HttpService=game:GetService("HttpService")
-local ContextActionService=game:GetService("ContextActionService")
 
 local me=Players.LocalPlayer
 local guiParent=me:WaitForChild("PlayerGui")
@@ -190,8 +189,6 @@ local function inputToBinding(input)
 	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
 	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
 	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
-	if uiType=="Enum.UserInputType.MouseButton4" then return"MouseButton4" end
-	if uiType=="Enum.UserInputType.MouseButton5" then return"MouseButton5" end
 
 	local name=uiType:gsub("Enum.UserInputType%.", "")
 	if name:match("^Gamepad") then return name end
@@ -205,7 +202,7 @@ local function bindingToLabel(binding)
 	end
 
 	if type(binding)=="string" then
-		local map={MouseButton1="LMB", MouseButton2="RMB", MouseButton3="MMB", MouseButton4="MB4", MouseButton5="MB5", Touch="TOUCH", Gamepad1="PAD1", Gamepad2="PAD2", Gamepad3="PAD3", Gamepad4="PAD4", Gamepad5="PAD5", Gamepad6="PAD6", Gamepad7="PAD7", Gamepad8="PAD8",}
+		local map={MouseButton1="LMB", MouseButton2="RMB", MouseButton3="MMB", Touch="TOUCH", Gamepad1="PAD1", Gamepad2="PAD2", Gamepad3="PAD3", Gamepad4="PAD4", Gamepad5="PAD5", Gamepad6="PAD6", Gamepad7="PAD7", Gamepad8="PAD8",}
 		return map[binding] or string.upper(binding)
 	end
 
@@ -1895,33 +1892,11 @@ resetBtn.MouseButton1Click:Connect(function()
 	requestPlayerAutosave()
 end)
 
-local globalSideButtonActionName="HitboxUIGlobalSideButton_"..tostring(math.random(100000,999999))
-local lastGlobalSideButtonBinding=nil
-local lastGlobalSideButtonAt=0
-
-local function markGlobalSideButtonHandled(binding)
-	if binding~="MouseButton4" and binding~="MouseButton5" then
-		return false
-	end
-
-	local now=os.clock()
-	if lastGlobalSideButtonBinding==binding and now-lastGlobalSideButtonAt<0.12 then
-		return true
-	end
-
-	lastGlobalSideButtonBinding=binding
-	lastGlobalSideButtonAt=now
-	return false
-end
-
 local function shutdownTool()
 	if not toolAlive then return end
 
 	sendPlayerSessionUpdate(true)
 	toolAlive=false
-	pcall(function()
-		ContextActionService:UnbindAction(globalSideButtonActionName)
-	end)
 
 	if AnnouncementAPI and AnnouncementAPI.Destroy then
 		pcall(function()
@@ -1994,14 +1969,12 @@ local function handleGlobalInput(inp,processed)
 	local bind=inputToBinding(inp)
 	local handled=false
 	if bind~=nil and bind==TOGGLE_UI_KEY and TOGGLE_UI_KEY~=Enum.KeyCode.Unknown then
-		if markGlobalSideButtonHandled(bind) then return true end
 		setUIVisible(not uiVisible)
 		handled=true
 	end
 
 	if bind~=nil and bind==TOGGLE_ACTION_KEY and TOGGLE_ACTION_KEY~=Enum.KeyCode.Unknown then
 		if not(PAGE1_APIS.ESP and PAGE1_APIS.ESP.SetESPState) then
-			if markGlobalSideButtonHandled(bind) then return true end
 			if CURRENT_MODE_KEY=="mode1" then
 				PAGE1_STATE.actionStatusOn=not PAGE1_STATE.actionStatusOn
 				syncPage1State()
@@ -2019,7 +1992,6 @@ local function handleGlobalInput(inp,processed)
 	if bind~=nil then
 		for i,preset in ipairs(PRESETS) do
 			if preset.key and preset.key~=Enum.KeyCode.Unknown and bind==preset.key then
-				if markGlobalSideButtonHandled(bind) then return true end
 				applyHitboxPreset(i)
 				handled=true
 				break
@@ -2033,14 +2005,6 @@ end
 UIS.InputBegan:Connect(function(inp,processed)
 	handleGlobalInput(inp,processed)
 end)
-
-ContextActionService:BindActionAtPriority(globalSideButtonActionName,function(_,inputState,input)
-	if inputState~=Enum.UserInputState.Begin then
-		return Enum.ContextActionResult.Pass
-	end
-
-	return handleGlobalInput(input,false) and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
-end,false,Enum.ContextActionPriority.High.Value+900,Enum.UserInputType.MouseButton4,Enum.UserInputType.MouseButton5)
 
 local function getPersistentValue(name,default)
 	if name=="CURRENT_MODE_KEY" then return CURRENT_MODE_KEY end

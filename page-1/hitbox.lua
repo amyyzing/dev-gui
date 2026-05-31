@@ -3,7 +3,6 @@ local Hitbox={}
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
 local TweenService=game:GetService("TweenService")
-local ContextActionService=game:GetService("ContextActionService")
 
 local me=Players.LocalPlayer
 local ZERO=Vector3.new(0,0,0)
@@ -43,8 +42,6 @@ local function inputToBinding(input)
 	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
 	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
 	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
-	if uiType=="Enum.UserInputType.MouseButton4" then return"MouseButton4" end
-	if uiType=="Enum.UserInputType.MouseButton5" then return"MouseButton5" end
 
 	local key=input.KeyCode
 	if key and key~=Enum.KeyCode.Unknown then return key end
@@ -76,9 +73,6 @@ function Hitbox.new(ctx,parent)
 	local boxZ=nil
 	local transparencySlider=nil
 	local inputConn=nil
-	local sideButtonActionName="HitboxSideButton_"..tostring(math.random(100000,999999))
-	local lastSideButtonBinding=nil
-	local lastSideButtonAt=0
 	local workspaceConn=nil
 	local destroyConn=nil
 	local section=nil
@@ -578,9 +572,6 @@ function Hitbox.new(ctx,parent)
 
 		safeDisconnect(inputConn)
 		inputConn=nil
-		pcall(function()
-			ContextActionService:UnbindAction(sideButtonActionName)
-		end)
 		safeDisconnect(workspaceConn)
 		workspaceConn=nil
 		safeDisconnect(destroyConn)
@@ -644,15 +635,6 @@ function Hitbox.new(ctx,parent)
 
 		local binding=(ctx.inputToBinding or inputToBinding)(input)
 		if binding==hitboxKey then
-			if (binding=="MouseButton4" or binding=="MouseButton5") then
-				local now=os.clock()
-				if lastSideButtonBinding==binding and now-lastSideButtonAt<0.12 then
-					return true
-				end
-				lastSideButtonBinding=binding
-				lastSideButtonAt=now
-			end
-
 			api.SetHitboxLock(not state.hitboxOn,true)
 			return true
 		end
@@ -664,14 +646,6 @@ function Hitbox.new(ctx,parent)
 		if processed then return end
 		handleToggleInput(input)
 	end)
-
-	ContextActionService:BindActionAtPriority(sideButtonActionName,function(_,inputState,input)
-		if inputState~=Enum.UserInputState.Begin then
-			return Enum.ContextActionResult.Pass
-		end
-
-		return handleToggleInput(input) and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
-	end,false,Enum.ContextActionPriority.High.Value+900,Enum.UserInputType.MouseButton4,Enum.UserInputType.MouseButton5)
 
 	workspaceConn=workspace.ChildAdded:Connect(function(child)
 		if child.Name=="Games" or child.Name=="MiniGames" then

@@ -3,7 +3,6 @@ local ESP={}
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
 local UIS=game:GetService("UserInputService")
-local ContextActionService=game:GetService("ContextActionService")
 
 local me=Players.LocalPlayer
 
@@ -258,9 +257,6 @@ function ESP.new(ctx,parent)
 	local sectionFrame=nil
 	local toggle=nil
 	local keybindConn=nil
-	local sideButtonActionName="ESPSideButton_"..tostring(math.random(100000,999999))
-	local lastSideButtonBinding=nil
-	local lastSideButtonAt=0
 	local heartbeatConn=nil
 	local espEnabled=false
 
@@ -383,9 +379,6 @@ function ESP.new(ctx,parent)
 	function api.Destroy()
 		safeDisconnect(keybindConn)
 		keybindConn=nil
-		pcall(function()
-			ContextActionService:UnbindAction(sideButtonActionName)
-		end)
 		stopESP()
 
 		if sectionFrame and sectionFrame.Parent then
@@ -415,15 +408,6 @@ function ESP.new(ctx,parent)
 
 		local binding=inputToBinding and inputToBinding(input) or nil
 		if binding~=nil and binding==key then
-			if binding=="MouseButton4" or binding=="MouseButton5" then
-				local now=os.clock()
-				if lastSideButtonBinding==binding and now-lastSideButtonAt<0.12 then
-					return true
-				end
-				lastSideButtonBinding=binding
-				lastSideButtonAt=now
-			end
-
 			api.SetESPState(not state.actionStatusOn,true)
 			return true
 		end
@@ -435,14 +419,6 @@ function ESP.new(ctx,parent)
 		if processed then return end
 		handleESPInput(input)
 	end)
-
-	ContextActionService:BindActionAtPriority(sideButtonActionName,function(_,inputState,input)
-		if inputState~=Enum.UserInputState.Begin then
-			return Enum.ContextActionResult.Pass
-		end
-
-		return handleESPInput(input) and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
-	end,false,Enum.ContextActionPriority.High.Value+900,Enum.UserInputType.MouseButton4,Enum.UserInputType.MouseButton5)
 
 	syncControls()
 	return api

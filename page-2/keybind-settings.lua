@@ -1,7 +1,6 @@
 local KeybindSettings={}
 
 local UIS=game:GetService("UserInputService")
-local ContextActionService=game:GetService("ContextActionService")
 
 local function inputToBinding(input)
 	local uiType=tostring(input.UserInputType)
@@ -11,8 +10,6 @@ local function inputToBinding(input)
 	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
 	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
 	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
-	if uiType=="Enum.UserInputType.MouseButton4" then return"MouseButton4" end
-	if uiType=="Enum.UserInputType.MouseButton5" then return"MouseButton5" end
 
 	local name=uiType:gsub("Enum.UserInputType%.","")
 	if name:match("^Gamepad") then return name end
@@ -69,7 +66,6 @@ function KeybindSettings.new(ctx,bindSection)
 	local activeCapture=nil
 	local refreshAll=nil
 	local inputConn=nil
-	local sideButtonActionName="KeybindSideButtonCapture_"..tostring(math.random(100000,999999))
 	local suppressMouseButton1ClickUntil=0
 
 	function api.GetActiveCapture()
@@ -156,18 +152,10 @@ function KeybindSettings.new(ctx,bindSection)
 	function api.AddBindRow(label,getter,setter)
 		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,28),ZIndex=5},bindSection)
 
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-224,1,0),Text=label,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-130,1,0),Text=label,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
 
-		local btn=api.MakeBindButton(row,0,0,94)
-		placeWrappedButton(btn,UDim2.new(1,-216,0,0))
-
-		local mb4=api.MakeBindButton(row,0,0,54)
-		placeWrappedButton(mb4,UDim2.new(1,-114,0,0))
-		mb4.Text="MB4"
-
-		local mb5=api.MakeBindButton(row,0,0,54)
-		placeWrappedButton(mb5,UDim2.new(1,-54,0,0))
-		mb5.Text="MB5"
+		local btn=api.MakeBindButton(row,0,0,122)
+		placeWrappedButton(btn,UDim2.new(1,-122,0,0))
 
 		btn.MouseButton1Click:Connect(function()
 			if os.clock()<suppressMouseButton1ClickUntil then
@@ -180,18 +168,6 @@ function KeybindSettings.new(ctx,bindSection)
 			end
 
 			api.StartCapture(btn,getter,setter)
-		end)
-
-		mb4.MouseButton1Click:Connect(function()
-			activeCapture=nil
-			setter("MouseButton4")
-			requestRefresh()
-		end)
-
-		mb5.MouseButton1Click:Connect(function()
-			activeCapture=nil
-			setter("MouseButton5")
-			requestRefresh()
 		end)
 
 		btn.InputBegan:Connect(function(input)
@@ -243,28 +219,11 @@ function KeybindSettings.new(ctx,bindSection)
 		api.CaptureInput(inp)
 	end)
 
-	ContextActionService:BindActionAtPriority(sideButtonActionName,function(_,inputState,input)
-		if inputState~=Enum.UserInputState.Begin or not activeCapture then
-			return Enum.ContextActionResult.Pass
-		end
-
-		local binding=inputToBinding(input)
-		if binding=="MouseButton4" or binding=="MouseButton5" then
-			api.CaptureInput(input)
-			return Enum.ContextActionResult.Sink
-		end
-
-		return Enum.ContextActionResult.Pass
-	end,false,Enum.ContextActionPriority.High.Value+1100,Enum.UserInputType.MouseButton4,Enum.UserInputType.MouseButton5)
-
 	function api.Destroy()
 		if inputConn then
 			inputConn:Disconnect()
 			inputConn=nil
 		end
-		pcall(function()
-			ContextActionService:UnbindAction(sideButtonActionName)
-		end)
 		activeCapture=nil
 	end
 

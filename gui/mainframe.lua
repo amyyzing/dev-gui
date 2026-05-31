@@ -42,7 +42,7 @@ function MainFrame.new(ctx)
 		end
 
 		return Enum.ContextActionResult.Pass
-	end,false,Enum.ContextActionPriority.High.Value+1000,Enum.UserInputType.MouseButton1,Enum.UserInputType.MouseButton2,Enum.UserInputType.MouseButton3,Enum.UserInputType.MouseButton4,Enum.UserInputType.MouseButton5)
+	end,false,Enum.ContextActionPriority.High.Value+1000,Enum.UserInputType.MouseButton1,Enum.UserInputType.MouseButton2,Enum.UserInputType.MouseButton3)
 
 	local function tweenRootPosition(position,duration)
 		if rootPositionTween then

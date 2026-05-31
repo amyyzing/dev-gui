@@ -5,7 +5,6 @@ local RunService=game:GetService("RunService")
 local UIS=game:GetService("UserInputService")
 local Workspace=game:GetService("Workspace")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
-local ContextActionService=game:GetService("ContextActionService")
 
 local LP=Players.LocalPlayer
 
@@ -131,8 +130,6 @@ local function inputToBinding(input)
 	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
 	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
 	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
-	if uiType=="Enum.UserInputType.MouseButton4" then return"MouseButton4" end
-	if uiType=="Enum.UserInputType.MouseButton5" then return"MouseButton5" end
 
 	local name=uiType:gsub("Enum.UserInputType%.","")
 	if name:match("^Gamepad") then return name end
@@ -501,9 +498,6 @@ function QBAim.new(ctx,parent)
 	local previewFrozen=false
 	local previewFreezeStarted=0
 	local connections={}
-	local sideButtonActionName="QBAimSideButton_"..tostring(math.random(100000,999999))
-	local lastSideButtonBinding=nil
-	local lastSideButtonAt=0
 	local sectionBody=nil
 	local sectionFrame=nil
 	local enabledToggle=nil
@@ -1655,9 +1649,6 @@ function QBAim.new(ctx,parent)
 		end
 
 		table.clear(connections)
-		pcall(function()
-			ContextActionService:UnbindAction(sideButtonActionName)
-		end)
 
 		if preview.center and preview.center.Parent then
 			preview.center:Destroy()
@@ -1798,24 +1789,7 @@ function QBAim.new(ctx,parent)
 	local function handleQBAimInput(input)
 		if not isAvailable() then return false end
 
-		local incoming=(ctx.inputToBinding or inputToBinding)(input)
-		local function rememberSideButton()
-			if incoming~="MouseButton4" and incoming~="MouseButton5" then
-				return false
-			end
-
-			local now=os.clock()
-			if lastSideButtonBinding==incoming and now-lastSideButtonAt<0.12 then
-				return true
-			end
-
-			lastSideButtonBinding=incoming
-			lastSideButtonAt=now
-			return false
-		end
-
 		if bindingMatches("getQBAimToggleKey",input,Enum.KeyCode.P) then
-			if rememberSideButton() then return true end
 			setEnabled(not enabled)
 			return true
 		end
@@ -1825,7 +1799,6 @@ function QBAim.new(ctx,parent)
 		local wantsLock=bindingMatches("getQBAimLockKey",input,Enum.KeyCode.H)
 		local wantsThrow=bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T)
 		if not(wantsLock or wantsThrow) then return false end
-		if rememberSideButton() then return true end
 
 		if not getHeldBall() then
 			clearPreviewForMissingBall("No ball held")
@@ -1849,14 +1822,6 @@ function QBAim.new(ctx,parent)
 		if processed then return end
 		handleQBAimInput(input)
 	end))
-
-	ContextActionService:BindActionAtPriority(sideButtonActionName,function(_,inputState,input)
-		if inputState~=Enum.UserInputState.Begin then
-			return Enum.ContextActionResult.Pass
-		end
-
-		return handleQBAimInput(input) and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
-	end,false,Enum.ContextActionPriority.High.Value+900,Enum.UserInputType.MouseButton4,Enum.UserInputType.MouseButton5)
 
 	cleanupC3InfoGui()
 	syncControls()
