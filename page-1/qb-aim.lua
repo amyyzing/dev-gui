@@ -13,10 +13,6 @@ local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local MODEL_BALL_SPEED=95
 local REMOTE_DISPLAY_POWER=100 -- send to remote; server converts incoming UpdateFootball Power to 95
-local GAME_MAX_POWER=100
-local GAME_POWER_COEFFICIENT=0.95
-local GAME_MIN_HEIGHT_TO_ARC_RATIO=0.01
-local GAME_MAX_TIME_IN_AIR=6
 local GAMEPLAY_BALL_POWER=MODEL_BALL_SPEED
 local SQUADS_BALL_POWER=MODEL_BALL_SPEED
 local PLAYER_G=196.2
@@ -80,10 +76,6 @@ local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
 local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
-local VALID_TEAM_IDS={
-	HomeTeam=true,
-	AwayTeam=true,
-}
 
 local function safeDisconnect(conn)
 	if conn and typeof(conn)=="RBXScriptConnection" then
@@ -134,6 +126,8 @@ local function inputToBinding(input)
 	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
 	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
 	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
+	if uiType=="Enum.UserInputType.MouseButton4" then return"MouseButton4" end
+	if uiType=="Enum.UserInputType.MouseButton5" then return"MouseButton5" end
 
 	local name=uiType:gsub("Enum.UserInputType%.","")
 	if name:match("^Gamepad") then return name end
@@ -179,100 +173,22 @@ local function getModeKey(ctx)
 end
 
 local function getHeldBall()
-	local character=Workspace:FindFirstChild(LP.Name) or LP.Character
+	local character=LP.Character
 	local characterRoot=root(character)
 	if not(character and characterRoot) then return nil end
 
-	local function findBallPart(container,maxDistance)
-		if not container then return nil end
-
-		local function looksLikeFootball(inst)
-			while inst and inst~=container do
-				if tostring(inst.Name):lower():find("football",1,true) then
-					return true
-				end
-				inst=inst.Parent
-			end
-
-			return false
-		end
-
-		local direct=container:FindFirstChild("Football")
-		if direct then
-			if direct:IsA("BasePart") and (direct.Position-characterRoot.Position).Magnitude<=maxDistance then
-				return direct
-			end
-
-			if direct:IsA("Model") or direct:IsA("Folder") or direct:IsA("Tool") then
-				for _,descendant in ipairs(direct:GetDescendants()) do
-					if descendant:IsA("BasePart") and (descendant.Position-characterRoot.Position).Magnitude<=maxDistance then
-						return descendant
-					end
-				end
-			end
-		end
-
-		for _,descendant in ipairs(container:GetDescendants()) do
-			if descendant:IsA("BasePart") and looksLikeFootball(descendant) and (descendant.Position-characterRoot.Position).Magnitude<=maxDistance then
-				return descendant
-			end
-		end
-
-		return nil
+	local ball=character:FindFirstChild("Football")
+	if ball and ball:IsA("BasePart") and (ball.Position-characterRoot.Position).Magnitude<14 then
+		return ball
 	end
 
-	local ball=findBallPart(character,35)
-	if ball then return ball end
-
-	ball=findBallPart(character:FindFirstChild("GAMEOBJECTS"),35)
-	if ball then return ball end
-
-	if LP.Character and LP.Character~=character then
-		local lpRoot=root(LP.Character)
-		if lpRoot then
-			characterRoot=lpRoot
-			ball=findBallPart(LP.Character,35)
-		end
-	end
-
-	if ball then return ball end
-
-	return nil
-end
-
-local function getPlayerTeamID(player)
-	local replicated=player and player:FindFirstChild("Replicated")
-	local teamValue=replicated and replicated:FindFirstChild("TeamID")
-	if not teamValue then return nil end
-
-	if teamValue:IsA("StringValue") or teamValue:IsA("IntValue") or teamValue:IsA("NumberValue") then
-		return tostring(teamValue.Value)
-	end
-
-	local ok,value=pcall(function()
-		return teamValue.Value
-	end)
-
-	if ok then
-		return tostring(value)
+	local gameObjects=character:FindFirstChild("GAMEOBJECTS")
+	ball=gameObjects and gameObjects:FindFirstChild("Football")
+	if ball and ball:IsA("BasePart") and (ball.Position-characterRoot.Position).Magnitude<14 then
+		return ball
 	end
 
 	return nil
-end
-
-local function isValidGameTeamID(teamID)
-	return teamID~=nil and VALID_TEAM_IDS[teamID]==true
-end
-
-local function isSameTeam(playerA,playerB)
-	local teamA=getPlayerTeamID(playerA)
-	local teamB=getPlayerTeamID(playerB)
-
-	if not isValidGameTeamID(teamA) or not isValidGameTeamID(teamB) then
-		return false
-	end
-
-	return teamA==teamB
 end
 
 local function getFootballFromFolder(folder)
@@ -491,8 +407,6 @@ function QBAim.new(ctx,parent)
 	local THEME=ctx.THEME
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
-	local buildSlider=ctx.buildSlider
-	local state=ctx.State or {}
 	local api={}
 	local enabled=false
 	local trackedReceiver=nil
@@ -505,8 +419,6 @@ function QBAim.new(ctx,parent)
 	local sectionBody=nil
 	local sectionFrame=nil
 	local enabledToggle=nil
-	local teamFilterToggle=nil
-	local arcToggle=nil
 	local statusLabel=nil
 	local targetLabel=nil
 	local leadDelayFrame=nil
@@ -514,34 +426,13 @@ function QBAim.new(ctx,parent)
 	local leadDelaySlider=nil
 	local leadDelaySliderFill=nil
 	local leadDelaySliderKnob=nil
-	local leadDelaySliderControl=nil
 	local leadDelayDragging=false
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
 
-	if state.qbAimTeamFilter==nil then
-		state.qbAimTeamFilter=true
-	end
-
-	if state.qbAimShowArc==nil then
-		state.qbAimShowArc=true
-	end
-
-	if state.qbAimLeadDelay==nil then
-		state.qbAimLeadDelay=WR_LEAD_DELAY
-	end
-
-	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
-
 	local function addConnection(conn)
 		table.insert(connections,conn)
 		return conn
-	end
-
-	local function changed()
-		if ctx.onChanged then
-			pcall(ctx.onChanged,state)
-		end
 	end
 
 	local function isAlive()
@@ -583,10 +474,6 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function updateLeadDelayVisuals()
-		if leadDelaySliderControl then
-			leadDelaySliderControl.set(WR_LEAD_DELAY)
-		end
-
 		if leadDelayBox then
 			leadDelayBox.Text=string.format("%.2f",WR_LEAD_DELAY)
 		end
@@ -607,11 +494,9 @@ function QBAim.new(ctx,parent)
 		end
 
 		WR_LEAD_DELAY=math.clamp(numberValue,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
-		state.qbAimLeadDelay=WR_LEAD_DELAY
 		updateLeadDelayVisuals()
 		if showStatus then
 			setStatus(string.format("LD set to %.2fs",WR_LEAD_DELAY))
-			changed()
 		end
 		return true
 	end
@@ -622,18 +507,6 @@ function QBAim.new(ctx,parent)
 		local size=math.max(leadDelaySlider.AbsoluteSize.X,1)
 		local alpha=math.clamp((screenX-pos)/size,0,1)
 		return setLeadDelay(LEAD_DELAY_MIN+(LEAD_DELAY_MAX-LEAD_DELAY_MIN)*alpha,showStatus)
-	end
-
-	local function canTargetReceiver(player)
-		if not player or player==LP then
-			return false
-		end
-
-		if state.qbAimTeamFilter==false then
-			return true
-		end
-
-		return isSameTeam(player,LP)
 	end
 
 	local function ensureReceiverData(player,receiverRoot)
@@ -685,23 +558,10 @@ function QBAim.new(ctx,parent)
 			enabled=false
 			trackedReceiver=nil
 			selectedRouteLock=nil
-		elseif trackedReceiver and not canTargetReceiver(trackedReceiver) then
-			trackedReceiver=nil
-			selectedRouteLock=nil
-			previewFrozen=false
-			preview.p1,preview.p2,preview.p3=nil,nil,nil
 		end
 
 		if enabledToggle then
 			enabledToggle.set(enabled)
-		end
-
-		if teamFilterToggle then
-			teamFilterToggle.set(state.qbAimTeamFilter~=false)
-		end
-
-		if arcToggle then
-			arcToggle.set(state.qbAimShowArc~=false)
 		end
 
 		setTargetText()
@@ -1004,31 +864,6 @@ function QBAim.new(ctx,parent)
 		return ballAt(originPosition,velocity,time),time
 	end
 
-	local function quadraticMax(a,b,c)
-		local discriminant=b*b-4*a*c
-		if discriminant<0 then return nil end
-
-		local rootA=(-b+math.sqrt(discriminant))/(2*a)
-		local rootB=(-b-math.sqrt(discriminant))/(2*a)
-		return math.max(rootA,rootB)
-	end
-
-	local function gameTimeToDestination(initialVelocity,spawnPosition,targetY)
-		return quadraticMax(-BALL_G/2,initialVelocity.Y,spawnPosition.Y-targetY)
-	end
-
-	local function gameInitialTimeSeed(displayPower)
-		if displayPower<50 then
-			return 3.5
-		elseif displayPower<60 then
-			return 2.5
-		elseif displayPower<70 then
-			return 1.25
-		end
-
-		return GAME_MIN_HEIGHT_TO_ARC_RATIO
-	end
-
 	local function preferredAngle(distance)
 		local yards=distance/YARDS_TO_STUDS
 		if yards<15 then return 24 elseif yards<25 then return 22 elseif yards<40 then return 19 elseif yards<55 then return 16 elseif yards<70 then return 14 elseif yards<85 then return 17 end
@@ -1124,47 +959,33 @@ function QBAim.new(ctx,parent)
 		local preferred=preferredAngle(distance)
 		local minAngle=minimumAngle(distance)
 		local maxAngle=maximumAngle(distance)
-		local maxTime=math.min(maximumTime(distance),GAME_MAX_TIME_IN_AIR)
-		local targetPower=REMOTE_DISPLAY_POWER*GAME_POWER_COEFFICIENT
-		local maxModelPower=GAME_MAX_POWER*GAME_POWER_COEFFICIENT
-		local startTime=math.max(MIN_T,gameInitialTimeSeed(REMOTE_DISPLAY_POWER))
+		local maxTime=maximumTime(distance)
 		local best=nil
 
-		for time=startTime,MAX_T,DT do
+		for time=MIN_T,MAX_T,DT do
 			if time<=maxTime then
 				local target,leadInfo=c1Target(receiverRoot,originPosition,targetVelocity,time)
 				local needed=velocityNeeded(originPosition,target,time)
 				local requiredSpeed=needed.Magnitude
 
-				if requiredSpeed>0 and math.floor(requiredSpeed)<=maxModelPower then
+				if requiredSpeed>0 then
 					local direction=needed.Unit
 					local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
 					if angle<=maxAngle then
 						local finalVelocity=direction*ballPower
 						local catchPosition=ballAt(originPosition,finalVelocity,time)
-						local gameCalculatedTime=gameTimeToDestination(needed,originPosition,target.Y) or time
-						local speedError=math.abs(targetPower-requiredSpeed)
-						local totalErr=(catchPosition-target).Magnitude
+						local speedError=math.abs(ballPower-requiredSpeed)
 						local verticalVelocity=finalVelocity.Y+G.Y*time
-						local upwardPenalty=verticalVelocity>4 and verticalVelocity*1.25 or 0
-						local lowPenalty=angle<minAngle and (minAngle-angle)*4 or 0
-						local gameTimeError=math.abs(gameCalculatedTime-time)
-
-						local score=
-							speedError*14
-							+totalErr*5
-							+gameTimeError*2.5
-							+math.abs(angle-preferred)*0.20
-							+time*0.35
-							+upwardPenalty
-							+lowPenalty
+						local upwardPenalty=verticalVelocity>4 and verticalVelocity*2 or 0
+						local lowPenalty=angle<minAngle and (minAngle-angle)*8 or 0
+						local score=(catchPosition-target).Magnitude*5+speedError*2+math.abs(angle-preferred)*0.85+time*0.55+upwardPenalty+lowPenalty
 
 						if angle>30 then
-							score=score+(angle-30)*(leadInfo.lateralShare or 0)*0.20
+							score=score+(angle-30)*(leadInfo.lateralShare or 0)*0.35
 						end
 
 						if distance>130 and angle<16 and (leadInfo.awayShare or 0)>0 then
-							score=score+(16-angle)*leadInfo.awayShare*0.20
+							score=score+(16-angle)*leadInfo.awayShare*0.35
 						end
 
 						if not best or score<best.score then
@@ -1186,11 +1007,8 @@ function QBAim.new(ctx,parent)
 								preferredAngle=preferred,
 								minDesiredAngle=minAngle,
 								maxAngle=maxAngle,
-								totalErr=totalErr,
+								totalErr=(catchPosition-target).Magnitude,
 								speedError=speedError,
-								gameCalculatedTime=gameCalculatedTime,
-								gameTimeError=gameTimeError,
-								gameDisplayPower=requiredSpeed/GAME_POWER_COEFFICIENT,
 								ballAtCatch=catchPosition,
 								landing=landingPosition,
 								landingTime=landingTime,
@@ -1401,31 +1219,8 @@ function QBAim.new(ctx,parent)
 		hideC1AndC3Info()
 	end
 
-	local function clearPreviewVisuals()
-		previewFrozen=false
-		preview.p1,preview.p2,preview.p3=nil,nil,nil
-		hideQBTrailPreview()
-
-		if preview.center and preview.center.Parent then
-			preview.center:Destroy()
-		end
-
-		preview.center=nil
-		preview.c1=nil
-		preview.c2=nil
-		preview.c3=nil
-		preview.beam=nil
-		preview.orig=nil
-	end
-
 	local function previewPlan(plan)
-		if not(ARC_PREVIEW_ENABLED and plan and state.qbAimShowArc~=false) then
-			if state.qbAimShowArc==false then
-				hideQBTrailPreview()
-			end
-
-			return
-		end
+		if not(ARC_PREVIEW_ENABLED and plan) then return end
 
 		local c2,c1,c3,beam=arcRig()
 		if not(c2 and c1 and c3 and beam) then return end
@@ -1471,14 +1266,6 @@ function QBAim.new(ctx,parent)
 		return getHeldBall()~=nil
 	end
 
-	local function clearPreviewForMissingBall(statusText)
-		clearPreviewVisuals()
-
-		if statusText then
-			setStatus(statusText)
-		end
-	end
-
 	local function freezePreviewAtCurrentPlan(plan)
 		if not FREEZE_PREVIEW_WHILE_BALL_RELEASED then return end
 		if plan then
@@ -1489,17 +1276,14 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function buildPlan(receiver,ballPower)
-		if not canTargetReceiver(receiver) then
-			return nil,nil
-		end
-
+		local modeKey=getModeKey(ctx)
 		local character=LP.Character
 		local qbRoot=root(character)
-		local ball=getHeldBall()
+		local ball=getModeFootball(modeKey)
 		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
 		local data=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
 
-		if not(qbRoot and ball and receiverRoot and data) then
+		if not(qbRoot and receiverRoot and data) then
 			return nil
 		end
 
@@ -1518,19 +1302,11 @@ function QBAim.new(ctx,parent)
 		local latestBall=nil
 
 		while os.clock()<endAt do
-			if not getHeldBall() then
-				return nil,nil
-			end
-
 			latestPlan,latestBall=buildPlan(receiver,ballPower)
 			if latestPlan then
 				previewPlan(latestPlan)
 			end
 			RunService.Heartbeat:Wait()
-		end
-
-		if not getHeldBall() then
-			return nil,nil
 		end
 
 		local finalPlan,finalBall=buildPlan(receiver,ballPower)
@@ -1572,18 +1348,11 @@ function QBAim.new(ctx,parent)
 	local function throwTo(receiver)
 		if not(enabled and isAvailable()) then return end
 
-		if not canTargetReceiver(receiver) then
-			trackedReceiver=nil
-			selectedRouteLock=nil
-			clearPreviewVisuals()
-			setTargetText()
-			setStatus(state.qbAimTeamFilter~=false and "Target not teammate" or "No receiver locked")
-			return
-		end
-
 		local heldBall=getHeldBall()
 		if not heldBall then
-			clearPreviewForMissingBall("No ball held")
+			previewFrozen=false
+			hideQBTrailPreview()
+			setStatus("No ball held")
 			return
 		end
 
@@ -1604,7 +1373,9 @@ function QBAim.new(ctx,parent)
 		end
 
 		if not getHeldBall() then
-			clearPreviewForMissingBall("No ball held at release")
+			previewFrozen=false
+			hideQBTrailPreview()
+			setStatus("No ball held at release")
 			return
 		end
 
@@ -1635,7 +1406,7 @@ function QBAim.new(ctx,parent)
 
 		for _,player in ipairs(Players:GetPlayers()) do
 			local receiverRoot=player~=LP and player.Character and root(player.Character)
-			if receiverRoot and camera and canTargetReceiver(player) then
+			if receiverRoot and camera then
 				local screenPoint,onScreen=camera:WorldToViewportPoint(receiverRoot.Position)
 				if onScreen then
 					local distance=(Vector2.new(mouse.X,mouse.Y)-Vector2.new(screenPoint.X,screenPoint.Y)).Magnitude
@@ -1656,7 +1427,7 @@ function QBAim.new(ctx,parent)
 			setTargetText()
 			setStatus("Locked "..best.Name)
 		else
-			setStatus(state.qbAimTeamFilter~=false and "No teammate under cursor" or "No receiver under cursor")
+			setStatus("No receiver under cursor")
 		end
 	end
 
@@ -1671,10 +1442,6 @@ function QBAim.new(ctx,parent)
 		end
 
 		syncControls()
-
-		if enabled and not getHeldBall() then
-			setStatus(currentModeText().." enabled, waiting for ball")
-		end
 	end
 
 	function api.SetQBAimState(value)
@@ -1714,46 +1481,56 @@ function QBAim.new(ctx,parent)
 		setEnabled(value)
 	end)
 
-	teamFilterToggle=buildToggleRow(sectionBody,"Team Filter",state.qbAimTeamFilter~=false,function(value)
-		state.qbAimTeamFilter=value and true or false
-		if state.qbAimTeamFilter and trackedReceiver and not canTargetReceiver(trackedReceiver) then
-			trackedReceiver=nil
-			selectedRouteLock=nil
-			clearPreviewVisuals()
-			setTargetText()
-			setStatus("Target cleared")
-		end
-		syncControls()
-		changed()
-	end)
-
-	arcToggle=buildToggleRow(sectionBody,"Show Arc",state.qbAimShowArc~=false,function(value)
-		state.qbAimShowArc=value and true or false
-		if not state.qbAimShowArc then
-			clearPreviewVisuals()
-			setStatus("Arc hidden")
-		end
-		syncControls()
-		changed()
-	end)
-
 	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Disabled",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
 	targetLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Target: none",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
 
-	if buildSlider then
-		leadDelaySliderControl=buildSlider(sectionBody,"LD",LEAD_DELAY_MIN,LEAD_DELAY_MAX,WR_LEAD_DELAY,2,function(value)
-			setLeadDelay(value,true)
-		end)
-	else
-		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
-		leadDelayBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",WR_LEAD_DELAY),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},leadDelayFrame)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="LD",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},leadDelayFrame)
-		addConnection(leadDelayBox.FocusLost:Connect(function()
-			setLeadDelay(leadDelayBox.Text,true)
-		end))
+	leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,34),ZIndex=6},sectionBody)
+	New("TextLabel",{BackgroundTransparency=1,Position=UDim2.new(0,0,0,0),Size=UDim2.new(0,32,0,16),Text="LD",Font=Enum.Font.GothamBold,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},leadDelayFrame)
+	leadDelayBox=New("TextBox",{BackgroundColor3=Color3.fromRGB(20,22,28),BackgroundTransparency=0.08,BorderSizePixel=0,Position=UDim2.new(0,34,0,0),Size=UDim2.new(0,44,0,18),Text=string.format("%.2f",WR_LEAD_DELAY),ClearTextOnFocus=false,Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=Color3.fromRGB(235,235,235),TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},leadDelayFrame)
+	New("UICorner",{CornerRadius=UDim.new(0,5)},leadDelayBox)
+	leadDelaySlider=New("Frame",{BackgroundColor3=Color3.fromRGB(36,40,48),BackgroundTransparency=0.05,BorderSizePixel=0,Position=UDim2.new(0,84,0,7),Size=UDim2.new(1,-84,0,5),ZIndex=7},leadDelayFrame)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},leadDelaySlider)
+	leadDelaySliderFill=New("Frame",{BackgroundColor3=Color3.fromRGB(255,170,0),BorderSizePixel=0,Size=UDim2.new(0,0,1,0),ZIndex=8},leadDelaySlider)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},leadDelaySliderFill)
+	leadDelaySliderKnob=New("Frame",{BackgroundColor3=Color3.fromRGB(255,235,170),BorderSizePixel=0,Position=UDim2.new(0,-5,0.5,-5),Size=UDim2.new(0,10,0,10),ZIndex=9},leadDelaySlider)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},leadDelaySliderKnob)
+	updateLeadDelayVisuals()
+
+	addConnection(leadDelayBox.FocusLost:Connect(function()
+		setLeadDelay(leadDelayBox.Text,true)
+	end))
+
+	local function beginLeadDelayDrag(input)
+		leadDelayDragging=true
+		setLeadDelayFromScreenX(input.Position.X,true)
 	end
 
-	updateLeadDelayVisuals()
+	addConnection(leadDelaySlider.InputBegan:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+			beginLeadDelayDrag(input)
+		end
+	end))
+
+	addConnection(leadDelaySliderKnob.InputBegan:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+			beginLeadDelayDrag(input)
+		end
+	end))
+
+	addConnection(UIS.InputChanged:Connect(function(input)
+		if leadDelayDragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
+			setLeadDelayFromScreenX(input.Position.X,false)
+		end
+	end))
+
+	addConnection(UIS.InputEnded:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+			if leadDelayDragging then
+				leadDelayDragging=false
+				setStatus(string.format("LD set to %.2fs",WR_LEAD_DELAY))
+			end
+		end
+	end))
 
 	addConnection(RunService.Heartbeat:Connect(function()
 		if not isAlive() then return end
@@ -1798,13 +1575,14 @@ function QBAim.new(ctx,parent)
 	end))
 
 	addConnection(RunService.RenderStepped:Connect(function()
-		if not(enabled and isAvailable()) then return end
+		if not(enabled and isAvailable() and trackedReceiver) then return end
 
 		local now=os.clock()
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
 			local holdingBall=hasHeldBallForPreview()
 			if not holdingBall then
-				clearPreviewForMissingBall()
+				previewFrozen=false
+				hideQBTrailPreview()
 				return
 			end
 
@@ -1816,13 +1594,6 @@ function QBAim.new(ctx,parent)
 			end
 		end
 
-		if not trackedReceiver then return end
-
-		if state.qbAimShowArc==false then
-			hideQBTrailPreview()
-			return
-		end
-
 		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
 		preview.last=now
 
@@ -1832,41 +1603,25 @@ function QBAim.new(ctx,parent)
 		end
 	end))
 
-	local function handleQBAimInput(input)
-		if not isAvailable() then return false end
+	addConnection(UIS.InputBegan:Connect(function(input,processed)
+		if processed or not isAvailable() then return end
 
 		if bindingMatches("getQBAimToggleKey",input,Enum.KeyCode.P) then
 			setEnabled(not enabled)
-			return true
+			return
 		end
 
-		if not enabled then return false end
+		if not enabled then return end
 
-		local wantsLock=bindingMatches("getQBAimLockKey",input,Enum.KeyCode.H)
-		local wantsThrow=bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T)
-		if not(wantsLock or wantsThrow) then return false end
-
-		if not getHeldBall() then
-			clearPreviewForMissingBall("No ball held")
-			return true
-		end
-
-		if wantsLock then
+		if bindingMatches("getQBAimLockKey",input,Enum.KeyCode.H) then
 			lockReceiverUnderCursor()
-		elseif wantsThrow then
+		elseif bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T) then
 			if trackedReceiver then
 				throwTo(trackedReceiver)
 			else
 				setStatus("No receiver locked")
 			end
 		end
-
-		return true
-	end
-
-	addConnection(UIS.InputBegan:Connect(function(input,processed)
-		if processed then return end
-		handleQBAimInput(input)
 	end))
 
 	cleanupC3InfoGui()
