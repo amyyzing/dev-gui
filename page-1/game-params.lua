@@ -36,13 +36,16 @@ end
 function GameParams.new(ctx,parent)
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
+	local buildToggleRow=ctx.buildToggleRow
 	local state=ctx.State
 	local api={}
+	local toggle=nil
 	local staminaRegenSlider=nil
 	local staminaDepleteSlider=nil
 	local jumpSlider=nil
 	local diveSlider=nil
 	local section=nil
+	local sectionControls=nil
 	local rootConns={}
 	local folderConns=setmetatable({}, {__mode="k"})
 	local valueConns=setmetatable({}, {__mode="k"})
@@ -59,6 +62,7 @@ function GameParams.new(ctx,parent)
 	end
 
 	local function normalizeState()
+		state.gameParamsEnabled=state.gameParamsEnabled and true or false
 		state.staminaRegenValue=clampNumber(state.staminaRegenValue,0,50,10)
 		state.staminaDepleteValue=clampStaminaDeplete(state.staminaDepleteValue)
 		state.jumpPowerValue=clampNumber(state.jumpPowerValue,0,300,53.5)
@@ -66,6 +70,7 @@ function GameParams.new(ctx,parent)
 	end
 
 	local function syncControls()
+		if toggle then toggle.set(state.gameParamsEnabled) end
 		if staminaRegenSlider then staminaRegenSlider.set(state.staminaRegenValue) end
 		if staminaDepleteSlider then staminaDepleteSlider.set(state.staminaDepleteValue) end
 		if jumpSlider then jumpSlider.set(state.jumpPowerValue) end
@@ -143,7 +148,7 @@ function GameParams.new(ctx,parent)
 		valueConns[valueObject]={}
 
 		table.insert(valueConns[valueObject],valueObject:GetPropertyChangedSignal("Value"):Connect(function()
-			if applying or not isAlive() or not valueObject.Parent then
+			if applying or not isAlive() or not state.gameParamsEnabled or not valueObject.Parent then
 				return
 			end
 
@@ -164,6 +169,10 @@ function GameParams.new(ctx,parent)
 	end
 
 	local function applyNumberValue(gameParams,paramName,stateKey)
+		if not state.gameParamsEnabled then
+			return
+		end
+
 		local valueObject=gameParams:FindFirstChild(paramName)
 
 		if not(valueObject and valueObject:IsA("NumberValue")) then
@@ -181,6 +190,10 @@ function GameParams.new(ctx,parent)
 	end
 
 	local function watchGameParamsFolder(gameParams)
+		if not state.gameParamsEnabled then
+			return
+		end
+
 		if folderConns[gameParams] then
 			return
 		end
@@ -188,12 +201,12 @@ function GameParams.new(ctx,parent)
 		folderConns[gameParams]={}
 
 		table.insert(folderConns[gameParams],gameParams.ChildAdded:Connect(function(child)
-			if not isAlive() then return end
+			if not isAlive() or not state.gameParamsEnabled then return end
 
 			local stateKey=PARAMS[child.Name]
 			if stateKey and child:IsA("NumberValue") then
 				task.defer(function()
-					if isAlive() and child.Parent then
+					if isAlive() and state.gameParamsEnabled and child.Parent then
 						applyNumberValue(gameParams,child.Name,stateKey)
 					end
 				end)
@@ -209,7 +222,7 @@ function GameParams.new(ctx,parent)
 	end
 
 	local function applyGameParams()
-		if not isAlive() then return end
+		if not isAlive() or not state.gameParamsEnabled then return end
 
 		for _,gameFolder in ipairs(getTargetGameFolders()) do
 			local gameParams=gameFolder:FindFirstChild("GameParams")
@@ -228,14 +241,65 @@ function GameParams.new(ctx,parent)
 		if not root then return end
 
 		table.insert(rootConns,root.ChildAdded:Connect(function()
-			task.defer(applyGameParams)
-		end))
-
-		table.insert(rootConns,root.DescendantAdded:Connect(function(descendant)
-			if descendant.Name=="GameParams" or PARAMS[descendant.Name] then
+			if state.gameParamsEnabled then
 				task.defer(applyGameParams)
 			end
 		end))
+
+		table.insert(rootConns,root.DescendantAdded:Connect(function(descendant)
+			if state.gameParamsEnabled and (descendant.Name=="GameParams" or PARAMS[descendant.Name]) then
+				task.defer(applyGameParams)
+			end
+		end))
+	end
+
+	local function disconnectWatchers()
+		safeDisconnectAll(rootConns)
+
+		for folder,conns in pairs(folderConns) do
+			safeDisconnectAll(conns)
+			folderConns[folder]=nil
+		end
+
+		for valueObject,conns in pairs(valueConns) do
+			safeDisconnectAll(conns)
+			valueConns[valueObject]=nil
+		end
+	end
+
+	local function startWatching()
+		if #rootConns>0 then
+			return
+		end
+
+		table.insert(rootConns,ReplicatedStorage.ChildAdded:Connect(function(child)
+			if not state.gameParamsEnabled then return end
+
+			if child.Name=="Games" or child.Name=="MiniGames" then
+				watchRootFolder(child)
+				task.defer(applyGameParams)
+			end
+		end))
+
+		watchRootFolder(ReplicatedStorage:FindFirstChild("Games"))
+		watchRootFolder(ReplicatedStorage:FindFirstChild("MiniGames"))
+	end
+
+	function api.SetGameParamsState(value,fire)
+		state.gameParamsEnabled=value and true or false
+
+		if state.gameParamsEnabled then
+			startWatching()
+			applyGameParams()
+		else
+			disconnectWatchers()
+		end
+
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
 	end
 
 	function api.SetStaminaRegenValue(value,fire)
@@ -278,9 +342,22 @@ function GameParams.new(ctx,parent)
 		end
 	end
 
-	section=makeSection(parent,1,"Game Params","")
-
 	normalizeState()
+	section,sectionControls=makeSection(parent,4,"Game Params","",{
+		headerToggle={
+			startState=state.gameParamsEnabled,
+			onChange=function(value)
+				api.SetGameParamsState(value,true)
+			end,
+		},
+	})
+
+	toggle=sectionControls and sectionControls.toggle
+	if not toggle and buildToggleRow then
+		toggle=buildToggleRow(section,"Game Params",state.gameParamsEnabled,function(value)
+			api.SetGameParamsState(value,true)
+		end)
+	end
 
 	staminaRegenSlider=buildSlider(section,"SR",0,50,state.staminaRegenValue,1,function(v)
 		api.SetStaminaRegenValue(v,true)
@@ -300,11 +377,17 @@ function GameParams.new(ctx,parent)
 
 	function api.Refresh()
 		normalizeState()
-		applyGameParams()
+		if state.gameParamsEnabled then
+			startWatching()
+			applyGameParams()
+		else
+			disconnectWatchers()
+		end
 		syncControls()
 	end
 
 	function api.Reset()
+		state.gameParamsEnabled=false
 		state.staminaRegenValue=10
 		state.staminaDepleteValue=10
 		state.jumpPowerValue=53.5
@@ -314,28 +397,8 @@ function GameParams.new(ctx,parent)
 	end
 
 	function api.Destroy()
-		safeDisconnectAll(rootConns)
-
-		for folder,conns in pairs(folderConns) do
-			safeDisconnectAll(conns)
-			folderConns[folder]=nil
-		end
-
-		for valueObject,conns in pairs(valueConns) do
-			safeDisconnectAll(conns)
-			valueConns[valueObject]=nil
-		end
+		disconnectWatchers()
 	end
-
-	table.insert(rootConns,ReplicatedStorage.ChildAdded:Connect(function(child)
-		if child.Name=="Games" or child.Name=="MiniGames" then
-			watchRootFolder(child)
-			task.defer(applyGameParams)
-		end
-	end))
-
-	watchRootFolder(ReplicatedStorage:FindFirstChild("Games"))
-	watchRootFolder(ReplicatedStorage:FindFirstChild("MiniGames"))
 	api.Refresh()
 
 	return api

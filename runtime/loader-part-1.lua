@@ -47,9 +47,11 @@ toolAlive=true
 hitboxOn=false
 sizeX, sizeY, sizeZ=2.52, 5.4, 1.41
 targetTransparency=0.7
+gravityEnabled=false
 gravityValue=196.2
 speedEnabled=false
 speedValue=18
+gameParamsEnabled=false
 staminaRegenValue=10
 staminaDepleteValue=10
 jumpPowerValue=53.5
@@ -404,7 +406,7 @@ function BOT_API.Post(path,body)
 end
 
 AUTO_REFRESH_ENABLED=true
-AUTO_REFRESH_INTERVAL=0.65
+AUTO_REFRESH_INTERVAL=0.25
 AUTO_REFRESH_RELOAD_PATH="loader.lua"
 
 MODULE_PATHS={

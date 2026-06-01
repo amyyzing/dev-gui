@@ -162,6 +162,7 @@ function AutoRefresh.new(ctx)
 							if requestRefresh(path,source) then
 								return
 							end
+							sourceCache[path]=source
 						end
 
 						if previous==nil then
@@ -183,7 +184,7 @@ function AutoRefresh.new(ctx)
 						end
 					end
 
-					task.wait(0.025)
+					task.wait(0.005)
 				end
 
 				task.wait(interval)

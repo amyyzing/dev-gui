@@ -399,6 +399,7 @@ function DataSave.new(ctx)
 			},
 
 			gravity=getValue(ctx,"gravityValue",196.2),
+			gravityEnabled=getValue(ctx,"gravityEnabled",false),
 
 			speed={
 				enabled=getValue(ctx,"speedEnabled",false),
@@ -406,6 +407,7 @@ function DataSave.new(ctx)
 			},
 
 			gameParams={
+				enabled=getValue(ctx,"gameParamsEnabled",false),
 				staminaRegen=getValue(ctx,"staminaRegenValue",10),
 				staminaDeplete=getValue(ctx,"staminaDepleteValue",10),
 				jumpPower=getValue(ctx,"jumpPowerValue",53.5),
@@ -521,6 +523,10 @@ function DataSave.new(ctx)
 			if ctx.setGravity then pcall(ctx.setGravity,gv) else setValue(ctx,"gravityValue",gv) end
 		end
 
+		if settings.gravityEnabled~=nil then
+			if ctx.setGravityState then pcall(ctx.setGravityState,settings.gravityEnabled) else setValue(ctx,"gravityEnabled",settings.gravityEnabled and true or false) end
+		end
+
 		local speed=settings.speed or {}
 		if speed.value~=nil then
 			local sv=clampNumber(speed.value,0,100,18)
@@ -532,6 +538,10 @@ function DataSave.new(ctx)
 		end
 
 		local gameParams=settings.gameParams or {}
+		if gameParams.enabled~=nil then
+			if ctx.setGameParamsState then pcall(ctx.setGameParamsState,gameParams.enabled) else setValue(ctx,"gameParamsEnabled",gameParams.enabled and true or false) end
+		end
+
 		if gameParams.staminaRegen~=nil then
 			local sr=clampNumber(gameParams.staminaRegen,0,50,10)
 			if ctx.setStaminaRegenValue then pcall(ctx.setStaminaRegenValue,sr) else setValue(ctx,"staminaRegenValue",sr) end

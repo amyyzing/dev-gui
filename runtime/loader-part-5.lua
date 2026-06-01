@@ -196,9 +196,23 @@ function buildDataSaveContext()
 		setHitboxSize=function(x,y,z) PAGE1_STATE.sizeX=x; PAGE1_STATE.sizeY=y; PAGE1_STATE.sizeZ=z; syncPage1State() end,
 		setTransparency=function(v) PAGE1_STATE.targetTransparency=v; syncPage1State() end,
 		setGravity=function(v) PAGE1_STATE.gravityValue=v; syncPage1State() end,
+		setGravityState=function(v)
+			PAGE1_STATE.gravityEnabled=v and true or false
+			syncPage1State()
+			if PAGE1_APIS.Gravity and PAGE1_APIS.Gravity.SetGravityState then
+				pcall(PAGE1_APIS.Gravity.SetGravityState,PAGE1_STATE.gravityEnabled,false)
+			end
+		end,
 		setHitboxLock=function(v) PAGE1_STATE.hitboxOn=v and true or false; syncPage1State() end,
 		setSpeedValue=function(v) PAGE1_STATE.speedValue=v; syncPage1State() end,
 		setSpeedState=function(v) PAGE1_STATE.speedEnabled=v and true or false; syncPage1State() end,
+		setGameParamsState=function(v)
+			PAGE1_STATE.gameParamsEnabled=v and true or false
+			syncPage1State()
+			if PAGE1_APIS.GameParams and PAGE1_APIS.GameParams.SetGameParamsState then
+				pcall(PAGE1_APIS.GameParams.SetGameParamsState,PAGE1_STATE.gameParamsEnabled,false)
+			end
+		end,
 		setStaminaRegenValue=function(v) PAGE1_STATE.staminaRegenValue=v; syncPage1State() end,
 		setStaminaDepleteValue=function(v) PAGE1_STATE.staminaDepleteValue=v; syncPage1State() end,
 		setJumpPowerValue=function(v) PAGE1_STATE.jumpPowerValue=v; syncPage1State() end,

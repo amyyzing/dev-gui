@@ -251,8 +251,9 @@ function ESP.new(ctx,parent)
 				api.SetESPState(v,true)
 			end,
 		},
+		compact=true,
 	})
-	sectionFrame=sectionBody and sectionBody.Parent or nil
+	sectionFrame=(sectionControls and sectionControls.section) or (sectionBody and sectionBody.Parent) or nil
 
 	toggle=sectionControls and sectionControls.toggle
 	if not toggle then
@@ -260,17 +261,6 @@ function ESP.new(ctx,parent)
 			api.SetESPState(v,true)
 		end)
 	end
-
-	statusLabel=ctx.New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,16),
-		Text="",
-		Font=Enum.Font.Gotham,
-		TextSize=11,
-		TextColor3=THEME.MUTED,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},sectionBody)
 
 	local function handleESPInput(input)
 		if not isGameplay() or not isDefensePossession() then return false end

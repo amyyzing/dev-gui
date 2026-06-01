@@ -102,6 +102,7 @@ function AntiMaterial.new(ctx,page)
 				api.SetEnabled(state)
 			end,
 		},
+		compact=true,
 	})
 
 	materialToggle=sectionControls and sectionControls.toggle

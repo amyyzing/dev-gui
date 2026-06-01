@@ -30,12 +30,12 @@ local function defaultBindingRows(ctx)
 	ensure("TOGGLE_ACTION_KEY")
 	ensure("TOGGLE_SPEED_KEY")
 	return{
-		{label="Toggle open / hide GUI",key="TOGGLE_UI_KEY",description="Show or hide the GUI."},
-		{label="Hitbox Toggle",key="TOGGLE_HB_KEY",description="Enable or disable hitbox edits."},
-		{label="Jump Boost Toggle",key="TOGGLE_JB_KEY",description="Turn jump boost on or off."},
-		{label="Always Boost Toggle",key="TOGGLE_AB_KEY",description="Switch always boost behavior."},
-		{label="ESP Toggle",key="TOGGLE_ACTION_KEY",description="Toggle ESP overlays."},
-		{label="Speed Toggle",key="TOGGLE_SPEED_KEY",description="Toggle forced player speed."},
+		{label="Toggle open / hide GUI",key="TOGGLE_UI_KEY"},
+		{label="Hitbox Toggle",key="TOGGLE_HB_KEY"},
+		{label="Jump Boost Toggle",key="TOGGLE_JB_KEY"},
+		{label="Always Boost Toggle",key="TOGGLE_AB_KEY"},
+		{label="ESP Toggle",key="TOGGLE_ACTION_KEY"},
+		{label="Speed Toggle",key="TOGGLE_SPEED_KEY"},
 	}
 end
 
@@ -149,16 +149,10 @@ function KeybindSettings.new(ctx,bindSection)
 		requestRefresh()
 	end
 
-	function api.AddBindRow(label,getter,setter,description)
-		local hasDescription=type(description)=="string" and description~=""
-		local rowHeight=hasDescription and 42 or 30
-		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5},bindSection)
+	function api.AddBindRow(label,getter,setter)
+		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},bindSection)
 
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-138,0,18),Position=UDim2.fromOffset(0,hasDescription and 2 or 6),Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
-
-		if hasDescription then
-			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-138,0,18),Position=UDim2.fromOffset(0,20),Text=description,Font=Enum.Font.Gotham,TextSize=10,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
-		end
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-138,1,0),Position=UDim2.fromOffset(0,0),Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
 
 		local btn=api.MakeBindButton(row,0,0,122)
 		placeWrappedButton(btn,UDim2.new(1,-122,0.5,-14))
@@ -203,7 +197,7 @@ function KeybindSettings.new(ctx,bindSection)
 				return getBinding(ctx,item)
 			end,function(v)
 				setBinding(ctx,item,v)
-			end,item.description)
+			end)
 		end
 		api.Refresh()
 	end

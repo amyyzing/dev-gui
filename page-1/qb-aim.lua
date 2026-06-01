@@ -1661,12 +1661,23 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
-	sectionBody=makeSection(parent,4,"QB Aim","custom keys in Keybind Settings")
+	local sectionControls=nil
+	sectionBody,sectionControls=makeSection(parent,4,"QB Aim","custom keys in Keybind Settings",{
+		headerToggle={
+			startState=enabled,
+			onChange=function(value)
+				setEnabled(value)
+			end,
+		},
+	})
 	sectionFrame=sectionBody and sectionBody.Parent or nil
 
-	enabledToggle=buildToggleRow(sectionBody,"Enabled",enabled,function(value)
-		setEnabled(value)
-	end)
+	enabledToggle=sectionControls and sectionControls.toggle
+	if not enabledToggle then
+		enabledToggle=buildToggleRow(sectionBody,"Enabled",enabled,function(value)
+			setEnabled(value)
+		end)
+	end
 
 	teamFilterToggle=buildToggleRow(sectionBody,"Team Filter",state.qbAimTeamFilter~=false,function(value)
 		state.qbAimTeamFilter=value and true or false

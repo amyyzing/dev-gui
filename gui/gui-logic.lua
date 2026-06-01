@@ -179,6 +179,7 @@ function GuiLogic.new(ctx)
 
 	function api.makeSection(parent,order,titleText,subtitleText,options)
 		options=options or {}
+		local hasBody=options.compact~=true and options.headerOnly~=true
 		local sec=New("Frame",{BackgroundColor3=THEME.CARD,BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=4,LayoutOrder=order},parent)
 
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},sec)
@@ -187,9 +188,9 @@ function GuiLogic.new(ctx)
 
 		local collapsed=false
 		local header=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),ZIndex=5,LayoutOrder=1},sec)
-		local controls={}
+		local controls={section=sec}
 		local titleReserve=options.headerToggle and 58 or 0
-		local titleButton=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-titleReserve,1,0),Text="[-] "..titleText,Font=Enum.Font.GothamBold,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=5},header)
+		local titleButton=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-titleReserve,1,0),Text=hasBody and "[-] "..titleText or titleText,Font=Enum.Font.GothamBold,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=5},header)
 
 		if options.headerToggle then
 			local toggleOptions=options.headerToggle
@@ -198,22 +199,24 @@ function GuiLogic.new(ctx)
 		end
 
 		local subtitleLabel=nil
-		if subtitleText and subtitleText~="" then
+		if hasBody and subtitleText and subtitleText~="" then
 			subtitleLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text=subtitleText,Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,LayoutOrder=2},sec)
 		end
 
-		local body=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=5,LayoutOrder=3,ClipsDescendants=true},sec)
+		local body=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=hasBody and Enum.AutomaticSize.Y or Enum.AutomaticSize.None,Visible=hasBody,ZIndex=5,LayoutOrder=3,ClipsDescendants=true},hasBody and sec or nil)
 		New("UIPadding",{PaddingTop=UDim.new(0,2),PaddingLeft=UDim.new(0,2),PaddingRight=UDim.new(0,2),PaddingBottom=UDim.new(0,2)},body)
 		local bodyLayout=New("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},body)
 		local bodyTween=nil
 		local lastBodyHeight=0
 
 		local function getBodyHeight()
+			if not hasBody then return 0 end
 			local h=math.max(body.AbsoluteSize.Y,bodyLayout.AbsoluteContentSize.Y,lastBodyHeight)
 			return math.max(0,math.floor(h+0.5))
 		end
 
 		local function tweenTitle()
+			if not hasBody then return end
 			titleButton.TextTransparency=0.18
 			TweenService:Create(titleButton,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
 			TweenService:Create(sec,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundColor3=collapsed and THEME.PANEL or THEME.CARD}):Play()
@@ -305,6 +308,14 @@ function GuiLogic.new(ctx)
 		end
 
 		local function paint(animate)
+			if not hasBody then
+				titleButton.Text=titleText
+				body.Visible=false
+				body.Size=UDim2.new(1,0,0,0)
+				sec.BackgroundColor3=THEME.CARD
+				return
+			end
+
 			titleButton.Text=(collapsed and "[+] " or "[-] ")..titleText
 			tweenTitle()
 
@@ -316,12 +327,13 @@ function GuiLogic.new(ctx)
 		end
 
 		titleButton.MouseButton1Click:Connect(function()
+			if not hasBody then return end
 			collapsed=not collapsed
 			paint(true)
 		end)
 
 		sec:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-			if not collapsed then
+			if hasBody and not collapsed then
 				lastBodyHeight=getBodyHeight()
 			end
 		end)

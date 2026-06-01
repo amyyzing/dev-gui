@@ -203,6 +203,7 @@ function MapCleaner.new(ctx,page)
 				api.SetEnabled(state,true)
 			end,
 		},
+		compact=true,
 	})
 
 	toggle=sectionControls and sectionControls.toggle
@@ -211,17 +212,6 @@ function MapCleaner.new(ctx,page)
 			api.SetEnabled(state,true)
 		end)
 	end
-
-	statusLabel=New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,18),
-		Text="",
-		Font=Enum.Font.Gotham,
-		TextSize=11,
-		TextColor3=THEME.MUTED,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},section)
 
 	api.Refresh()
 	return api

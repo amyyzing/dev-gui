@@ -183,6 +183,12 @@ function MainFrame.new(ctx)
 	local activePageName="main"
 
 	local function paintPageTabs()
+		settingsTab:SetAttribute("ThemeTextRole",activePageName=="main" and "TEXT" or "MUTED")
+		mapsPageTab:SetAttribute("ThemeTextRole",activePageName=="maps" and "TEXT" or "MUTED")
+		serverPageTab:SetAttribute("ThemeTextRole",activePageName=="server" and "TEXT" or "MUTED")
+		uiSettingsTab:SetAttribute("ThemeTextRole",activePageName=="customize" and "TEXT" or "MUTED")
+		futureTab:SetAttribute("ThemeTextRole",activePageName=="page2" and "TEXT" or "MUTED")
+		settingsPageTab:SetAttribute("ThemeTextRole",activePageName=="settings" and "TEXT" or "MUTED")
 		settingsTab.TextColor3=activePageName=="main" and THEME.TEXT or THEME.MUTED
 		mapsPageTab.TextColor3=activePageName=="maps" and THEME.TEXT or THEME.MUTED
 		serverPageTab.TextColor3=activePageName=="server" and THEME.TEXT or THEME.MUTED
@@ -239,19 +245,6 @@ function MainFrame.new(ctx)
 	uiSettingsTab.MouseButton1Click:Connect(function() setActivePage("customize") end)
 	futureTab.MouseButton1Click:Connect(function() setActivePage("page2") end)
 	settingsPageTab.MouseButton1Click:Connect(function() setActivePage("settings") end)
-
-	settingsTab.MouseEnter:Connect(paintPageTabs)
-	settingsTab.MouseLeave:Connect(paintPageTabs)
-	mapsPageTab.MouseEnter:Connect(paintPageTabs)
-	mapsPageTab.MouseLeave:Connect(paintPageTabs)
-	serverPageTab.MouseEnter:Connect(paintPageTabs)
-	serverPageTab.MouseLeave:Connect(paintPageTabs)
-	uiSettingsTab.MouseEnter:Connect(paintPageTabs)
-	uiSettingsTab.MouseLeave:Connect(paintPageTabs)
-	futureTab.MouseEnter:Connect(paintPageTabs)
-	futureTab.MouseLeave:Connect(paintPageTabs)
-	settingsPageTab.MouseEnter:Connect(paintPageTabs)
-	settingsPageTab.MouseLeave:Connect(paintPageTabs)
 
 	local contentWrap=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ZIndex=3,LayoutOrder=1},settingsPage)
 	local contentLayout=New("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder,FillDirection=Enum.FillDirection.Horizontal},contentWrap)
@@ -555,6 +548,7 @@ function MainFrame.new(ctx)
 	end
 
 	function api.RefreshTheme()
+		paintPageTabs()
 		paintResizeHandle(resizing)
 	end
 
@@ -568,6 +562,7 @@ function MainFrame.new(ctx)
 		uiSettingsTab.Text=text(desc("Pages.Customize","CUSTOMIZE"))
 		futureTab.Text=text(desc("Pages.Keybinds","KEYBINDS"))
 		settingsPageTab.Text=text(desc("Pages.Settings","SETTINGS"))
+		paintPageTabs()
 		refreshFooterResetButton()
 	end
 

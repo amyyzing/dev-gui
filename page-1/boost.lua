@@ -288,11 +288,22 @@ function Boost.new(ctx,parent)
 	end
 
 	normalizeState()
-	section=makeSection(parent,2,"Boost","")
+	local sectionControls=nil
+	section,sectionControls=makeSection(parent,2,"Boost","",{
+		headerToggle={
+			startState=state.jumpBoostOn,
+			onChange=function(value)
+				api.SetJumpBoostState(value,true)
+			end,
+		},
+	})
 
-	jumpBoostToggle=buildToggleRow(section,"Jump Boost",state.jumpBoostOn,function(value)
-		api.SetJumpBoostState(value,true)
-	end)
+	jumpBoostToggle=sectionControls and sectionControls.toggle
+	if not jumpBoostToggle then
+		jumpBoostToggle=buildToggleRow(section,"Jump Boost",state.jumpBoostOn,function(value)
+			api.SetJumpBoostState(value,true)
+		end)
+	end
 
 	jumpBoostModeToggle=buildToggleRow(section,"Always Boost",state.jumpBoostTradeMode,function(value)
 		api.SetAlwaysBoostState(value,true)

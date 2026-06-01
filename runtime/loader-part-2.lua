@@ -255,9 +255,11 @@ PAGE1_STATE={
 	sizeY=sizeY,
 	sizeZ=sizeZ,
 	targetTransparency=targetTransparency,
+	gravityEnabled=gravityEnabled,
 	gravityValue=gravityValue,
 	speedEnabled=speedEnabled,
 	speedValue=speedValue,
+	gameParamsEnabled=gameParamsEnabled,
 	staminaRegenValue=staminaRegenValue,
 	staminaDepleteValue=staminaDepleteValue,
 	jumpPowerValue=jumpPowerValue,
@@ -280,9 +282,11 @@ function syncPage1State()
 	sizeY=PAGE1_STATE.sizeY
 	sizeZ=PAGE1_STATE.sizeZ
 	targetTransparency=PAGE1_STATE.targetTransparency
+	gravityEnabled=PAGE1_STATE.gravityEnabled
 	gravityValue=PAGE1_STATE.gravityValue
 	speedEnabled=PAGE1_STATE.speedEnabled
 	speedValue=PAGE1_STATE.speedValue
+	gameParamsEnabled=PAGE1_STATE.gameParamsEnabled
 	staminaRegenValue=PAGE1_STATE.staminaRegenValue
 	staminaDepleteValue=PAGE1_STATE.staminaDepleteValue
 	jumpPowerValue=PAGE1_STATE.jumpPowerValue
@@ -392,11 +396,11 @@ function buildPage1()
 
 	if Page1GameParamsModule and Page1GameParamsModule.new then
 		local ok,result=pcall(function()
-			return Page1GameParamsModule.new(ctx,rightCol)
+			return Page1GameParamsModule.new(ctx,leftCol)
 		end)
-		if ok then PAGE1_APIS.GameParams=result else addPage1Error(rightCol,1,"Game Params",tostring(result)) end
+		if ok then PAGE1_APIS.GameParams=result else addPage1Error(leftCol,4,"Game Params",tostring(result)) end
 	else
-		addPage1Error(rightCol,1,"Game Params","page-1/game-params.lua")
+		addPage1Error(leftCol,4,"Game Params","page-1/game-params.lua")
 	end
 
 	if Page1BoostModule and Page1BoostModule.new then
@@ -465,9 +469,11 @@ function resetMainPageDefaults()
 	PAGE1_STATE.sizeY=5.4
 	PAGE1_STATE.sizeZ=1.41
 	PAGE1_STATE.targetTransparency=0.7
+	PAGE1_STATE.gravityEnabled=false
 	PAGE1_STATE.gravityValue=196.2
 	PAGE1_STATE.speedEnabled=false
 	PAGE1_STATE.speedValue=18
+	PAGE1_STATE.gameParamsEnabled=false
 	PAGE1_STATE.staminaRegenValue=10
 	PAGE1_STATE.staminaDepleteValue=10
 	PAGE1_STATE.jumpPowerValue=53.5

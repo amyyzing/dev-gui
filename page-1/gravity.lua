@@ -3,14 +3,24 @@ local Gravity={}
 function Gravity.new(ctx,parent)
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
+	local buildToggleRow=ctx.buildToggleRow
 	local state=ctx.State
 	local api={}
 	local slider=nil
+	local toggle=nil
+	local DEFAULT_GRAVITY=196.2
+
+	local function normalizeState()
+		state.gravityEnabled=state.gravityEnabled and true or false
+		state.gravityValue=math.clamp(tonumber(state.gravityValue) or DEFAULT_GRAVITY,0,1000)
+	end
 
 	local function applyGravity(value)
-		local gravity=math.clamp(tonumber(value) or 196.2,0,1000)
+		local gravity=math.clamp(tonumber(value) or DEFAULT_GRAVITY,0,1000)
 		state.gravityValue=gravity
-		workspace.Gravity=gravity
+		if state.gravityEnabled then
+			workspace.Gravity=gravity
+		end
 		return gravity
 	end
 
@@ -18,7 +28,42 @@ function Gravity.new(ctx,parent)
 		if ctx.onChanged then pcall(ctx.onChanged,state) end
 	end
 
-	local section=makeSection(parent,2,"Gravity","")
+	local function syncControls()
+		if toggle then toggle.set(state.gravityEnabled) end
+		if slider then slider.set(state.gravityValue) end
+	end
+
+	function api.SetGravityState(value,fire)
+		state.gravityEnabled=value and true or false
+		if state.gravityEnabled then
+			applyGravity(state.gravityValue)
+		else
+			workspace.Gravity=DEFAULT_GRAVITY
+		end
+
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
+	end
+
+	normalizeState()
+	local section,sectionControls=makeSection(parent,2,"Gravity","",{
+		headerToggle={
+			startState=state.gravityEnabled,
+			onChange=function(value)
+				api.SetGravityState(value,true)
+			end,
+		},
+	})
+
+	toggle=sectionControls and sectionControls.toggle
+	if not toggle and buildToggleRow then
+		toggle=buildToggleRow(section,"Gravity",state.gravityEnabled,function(value)
+			api.SetGravityState(value,true)
+		end)
+	end
 
 	slider=buildSlider(section,"G",0,1000,state.gravityValue,1,function(v)
 		applyGravity(v)
@@ -26,13 +71,18 @@ function Gravity.new(ctx,parent)
 	end)
 
 	function api.Refresh()
-		local gravity=applyGravity(state.gravityValue)
-		if slider then slider.set(gravity) end
+		normalizeState()
+		if state.gravityEnabled then
+			applyGravity(state.gravityValue)
+		end
+		syncControls()
 	end
 
 	function api.Reset()
-		applyGravity(196.2)
-		api.Refresh()
+		state.gravityEnabled=false
+		state.gravityValue=DEFAULT_GRAVITY
+		api.SetGravityState(false,false)
+		syncControls()
 		changed()
 	end
 
