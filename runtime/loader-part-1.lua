@@ -1,3 +1,4 @@
+-- HB_RUNTIME_PART_1
 -- Runtime chunk 1. Loaded by loader.lua with a shared environment.
 Players=game:GetService("Players")
 UIS=game:GetService("UserInputService")
@@ -49,7 +50,6 @@ targetTransparency=0.7
 gravityValue=196.2
 speedEnabled=false
 speedValue=18
-athleticismOn=false
 staminaRegenValue=10
 staminaDepleteValue=10
 jumpPowerValue=53.5
@@ -106,6 +106,8 @@ function markThemeRole(obj,color)
 		role="TEXT"
 	elseif colorClose(color,THEME.MUTED) then
 		role="MUTED"
+	elseif colorClose(color,THEME.STROKE) then
+		role="STROKE"
 	elseif colorClose(color,THEME.GREEN) then
 		role="GREEN"
 	elseif colorClose(color,THEME.RED) then
@@ -306,11 +308,33 @@ function bindingToLabel(binding)
 end
 
 function getApiKey()
-	return table.concat({"the","key","to","heaven"})
+	if type(BOOT_BOT_API)=="table" and type(BOOT_BOT_API.Key)=="string" then
+		return BOOT_BOT_API.Key
+	end
+
+	return nil
 end
 
+TRUSTED_API_URL="https://lint-bot-production.up.railway.app"
+
+API_ALLOWED_PATHS={
+	["/module/get"]=true,
+	["/player/save"]=true,
+	["/player/load"]=true,
+	["/player/wipe"]=true,
+	["/player/session"]=true,
+	["/player/log"]=true,
+	["/preset/create"]=true,
+	["/preset/equip"]=true,
+	["/preset/delete"]=true,
+	["/preset/list-owned"]=true,
+	["/invite-link/get"]=true,
+	["/announcement/latest"]=true,
+	["/announcement/seen"]=true,
+}
+
 BOT_API={
-	Url="https://lint-bot-production.up.railway.app",
+	Url=TRUSTED_API_URL,
 	Key=getApiKey(),
 }
 
@@ -324,6 +348,22 @@ function BOT_API.GetRequestFunction()
 end
 
 function BOT_API.Post(path,body)
+	if type(path)~="string" or not API_ALLOWED_PATHS[path] then
+		return{ok=false,error="API path blocked: "..tostring(path)}
+	end
+
+	if BOT_API.Url~=TRUSTED_API_URL then
+		return{ok=false,error="API URL verification failed."}
+	end
+
+	if type(BOT_API.Key)~="string" or BOT_API.Key=="" then
+		return{ok=false,error="API key verification failed."}
+	end
+
+	if path=="/module/get" and isAllowedModulePath and not isAllowedModulePath(body and body.path) then
+		return{ok=false,error="Module path blocked: "..tostring(body and body.path)}
+	end
+
 	local requestFn=BOT_API.GetRequestFunction()
 	if not requestFn then
 		return{ok=false,error="No client HTTP request function found."}
@@ -405,6 +445,16 @@ if type(APP_RUNTIME_PATHS)=="table" then
 		table.insert(AUTO_REFRESH_WATCH_PATHS,path)
 	end
 end
+MODULE_PATH_SET={}
+for _,path in pairs(MODULE_PATHS) do
+	MODULE_PATH_SET[path]=true
+end
+MODULE_PATH_SET[AUTO_REFRESH_RELOAD_PATH]=true
+for path in pairs(APP_RUNTIME_PATH_SET) do
+	MODULE_PATH_SET[path]=true
+end
+MAX_REMOTE_MODULE_BYTES=300000
+REMOTE_MODULE_MARKERS={[AUTO_REFRESH_RELOAD_PATH]="HB_LOADER_V2"}
 
 REMOTE_MODULE_CACHE={}
 REMOTE_MODULE_SOURCES={}
@@ -419,7 +469,38 @@ rebuildMapFromModules=nil
 rebuildSettingsFromModules=nil
 rebuildPage2FromModules=nil
 
+function isAllowedModulePath(modulePath)
+	return type(modulePath)=="string" and MODULE_PATH_SET[modulePath]==true
+end
+
+function verifyRemoteModuleSource(modulePath,source)
+	if not isAllowedModulePath(modulePath) then
+		return false,"Module path is not allowed: "..tostring(modulePath)
+	end
+
+	if type(source)~="string" or source=="" then
+		return false,"Module source missing: "..tostring(modulePath)
+	end
+
+	if #source>MAX_REMOTE_MODULE_BYTES then
+		return false,"Module source too large: "..tostring(modulePath)
+	end
+
+	local marker=(type(APP_RUNTIME_MARKERS)=="table" and APP_RUNTIME_MARKERS[modulePath]) or REMOTE_MODULE_MARKERS[modulePath]
+	if marker and not source:find(marker,1,true) then
+		return false,"Module marker verification failed: "..tostring(modulePath)
+	end
+
+	return true,nil
+end
+
 function loadModuleFromSource(modulePath,source)
+	local verified,verifyErr=verifyRemoteModuleSource(modulePath,source)
+	if not verified then
+		REMOTE_MODULE_SOURCES[modulePath]=false
+		return nil,verifyErr
+	end
+
 	local chunk,err=loadstring(source)
 	if not chunk then
 		REMOTE_MODULE_SOURCES[modulePath]=source
@@ -438,6 +519,11 @@ function loadModuleFromSource(modulePath,source)
 end
 
 function loadRemoteModule(modulePath)
+	if not isAllowedModulePath(modulePath) then
+		warn("Blocked remote module path:",modulePath)
+		return nil
+	end
+
 	if REMOTE_MODULE_CACHE[modulePath] then
 		return REMOTE_MODULE_CACHE[modulePath]
 	end
@@ -458,8 +544,8 @@ function loadRemoteModule(modulePath)
 	return module
 end
 
-SG_NAME="1"
-for _,existingName in ipairs({"HitboxUI_DarkInfluenced_GUIOnly",SG_NAME}) do
+SG_NAME="HitboxUI"
+for _,existingName in ipairs({"HitboxUI_DarkInfluenced_GUIOnly","1",SG_NAME}) do
 	old=guiParent:FindFirstChild(existingName)
 	if old then old:Destroy() end
 end
@@ -915,6 +1001,19 @@ function startAutoRefresh()
 		reloadPath=AUTO_REFRESH_RELOAD_PATH,
 		watchPaths=AUTO_REFRESH_WATCH_PATHS,
 		sources=REMOTE_MODULE_SOURCES,
+		getRemoteSource=function(path)
+			local result=BOT_API.Post("/module/get",{path=path})
+			if not result or not result.ok or type(result.source)~="string" then
+				return nil,result and result.error or "unknown"
+			end
+
+			local verified,verifyErr=verifyRemoteModuleSource(path,result.source)
+			if not verified then
+				return nil,verifyErr
+			end
+
+			return result.source,nil
+		end,
 		loadModuleFromSource=loadModuleFromSource,
 		setToolAlive=function(value)
 			toolAlive=value and true or false
@@ -1016,11 +1115,10 @@ function updateLiquidStrokeAnimation()
 end
 
 applyUIStrokeTheme=function()
-	applyUIPrimaryTheme()
-
 	local color=getUIStrokeColor()
 	local color2=getUIStrokeGradientColor()
 	THEME.STROKE=color
+	applyUIPrimaryTheme()
 
 	if not SG then return end
 

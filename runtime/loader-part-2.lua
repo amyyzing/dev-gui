@@ -1,3 +1,4 @@
+-- HB_RUNTIME_PART_2
 -- Runtime chunk 2. Loaded by loader.lua with a shared environment.
 GuiLogic=GuiLogicModule.new({
 	New=New,
@@ -252,7 +253,6 @@ PAGE1_STATE={
 	gravityValue=gravityValue,
 	speedEnabled=speedEnabled,
 	speedValue=speedValue,
-	athleticismOn=athleticismOn,
 	staminaRegenValue=staminaRegenValue,
 	staminaDepleteValue=staminaDepleteValue,
 	jumpPowerValue=jumpPowerValue,
@@ -278,7 +278,6 @@ function syncPage1State()
 	gravityValue=PAGE1_STATE.gravityValue
 	speedEnabled=PAGE1_STATE.speedEnabled
 	speedValue=PAGE1_STATE.speedValue
-	athleticismOn=PAGE1_STATE.athleticismOn
 	staminaRegenValue=PAGE1_STATE.staminaRegenValue
 	staminaDepleteValue=PAGE1_STATE.staminaDepleteValue
 	jumpPowerValue=PAGE1_STATE.jumpPowerValue
@@ -463,7 +462,6 @@ function resetMainPageDefaults()
 	PAGE1_STATE.gravityValue=196.2
 	PAGE1_STATE.speedEnabled=false
 	PAGE1_STATE.speedValue=18
-	PAGE1_STATE.athleticismOn=false
 	PAGE1_STATE.staminaRegenValue=10
 	PAGE1_STATE.staminaDepleteValue=10
 	PAGE1_STATE.jumpPowerValue=53.5

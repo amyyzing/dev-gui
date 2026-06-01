@@ -1,3 +1,4 @@
+-- HB_RUNTIME_PART_5
 -- Runtime chunk 5. Loaded by loader.lua with a shared environment.
 function shutdownTool()
 	if not toolAlive then return end
@@ -199,7 +200,6 @@ if DataSaveModule and DataSaveModule.new then
 			setHitboxLock=function(v) PAGE1_STATE.hitboxOn=v and true or false; syncPage1State() end,
 			setSpeedValue=function(v) PAGE1_STATE.speedValue=v; syncPage1State() end,
 			setSpeedState=function(v) PAGE1_STATE.speedEnabled=v and true or false; syncPage1State() end,
-			setAthleticism=function(v) PAGE1_STATE.athleticismOn=v and true or false; syncPage1State() end,
 			setStaminaRegenValue=function(v) PAGE1_STATE.staminaRegenValue=v; syncPage1State() end,
 			setStaminaDepleteValue=function(v) PAGE1_STATE.staminaDepleteValue=v; syncPage1State() end,
 			setJumpPowerValue=function(v) PAGE1_STATE.jumpPowerValue=v; syncPage1State() end,

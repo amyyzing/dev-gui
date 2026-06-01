@@ -1,11 +1,16 @@
 local HttpService=game:GetService("HttpService")
+local TRUSTED_API_URL="https://lint-bot-production.up.railway.app"
+local MODULE_GET_PATH="/module/get"
+local LOADER_PATH="loader.lua"
+local LOADER_MARKER="HB_LOADER_V2"
+local MAX_LOADER_BYTES=120000
 
 local function getApiKey()
 	return table.concat({"the","key","to","heaven"})
 end
 
 local BOT_API={
-	Url="https://lint-bot-production.up.railway.app",
+	Url=TRUSTED_API_URL,
 	Key=getApiKey(),
 }
 
@@ -19,6 +24,18 @@ local function getRequestFunction()
 end
 
 local function post(path,body)
+	if path~=MODULE_GET_PATH then
+		return nil,"API path blocked: "..tostring(path)
+	end
+
+	if BOT_API.Url~=TRUSTED_API_URL then
+		return nil,"API URL verification failed."
+	end
+
+	if not body or body.path~=LOADER_PATH then
+		return nil,"Loader path blocked: "..tostring(body and body.path)
+	end
+
 	local requestFn=getRequestFunction()
 	if not requestFn then
 		return nil,"No client HTTP request function found."
@@ -60,9 +77,17 @@ local function post(path,body)
 	return decoded.source,nil
 end
 
-local source,fetchErr=post("/module/get",{path="loader.lua"})
+local source,fetchErr=post(MODULE_GET_PATH,{path=LOADER_PATH})
 if not source then
 	error("Loader fetch failed: "..tostring(fetchErr))
+end
+
+if #source>MAX_LOADER_BYTES then
+	error("Loader verification failed: source too large.")
+end
+
+if not source:find(LOADER_MARKER,1,true) then
+	error("Loader verification failed: marker missing.")
 end
 
 local chunk,compileErr=loadstring(source)

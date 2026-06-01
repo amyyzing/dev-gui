@@ -532,10 +532,6 @@ function DataSave.new(ctx)
 		end
 
 		local gameParams=settings.gameParams or {}
-		if gameParams.athleticism~=nil then
-			if ctx.setAthleticism then pcall(ctx.setAthleticism,gameParams.athleticism) else setValue(ctx,"athleticismOn",gameParams.athleticism and true or false) end
-		end
-
 		if gameParams.staminaRegen~=nil then
 			local sr=clampNumber(gameParams.staminaRegen,0,50,10)
 			if ctx.setStaminaRegenValue then pcall(ctx.setStaminaRegenValue,sr) else setValue(ctx,"staminaRegenValue",sr) end

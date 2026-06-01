@@ -1,3 +1,4 @@
+-- HB_RUNTIME_PART_4
 -- Runtime chunk 4. Loaded by loader.lua with a shared environment.
 refreshPage2UI=function() end
 PAGE2_EXPANDED_OWNED={}

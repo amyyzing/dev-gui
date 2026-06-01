@@ -317,10 +317,10 @@ function MainFrame.new(ctx)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},fab)
 	attachHover(fab,THEME.BG,THEME.TEXT,THEME.TEXT,Color3.fromRGB(0,0,0))
 
-	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=getUIStrokeColor():Lerp(THEME.TEXT,0.22),BackgroundTransparency=0.02,BorderSizePixel=0,Text="",ZIndex=30},root)
+	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=getUIStrokeColor():Lerp(getUIStrokeGradientColor(),0.18),BackgroundTransparency=0.02,BorderSizePixel=0,Text="",ZIndex=30,SkipThemeRole=true},root)
 	New("UICorner",{CornerRadius=UDim.new(1,0)},resizeHandle)
 	local resizeStroke=New("UIStroke",{Color=getUIStrokeColor(),Thickness=1,Transparency=0.05},resizeHandle)
-	local resizeGlow=New("UIGradient",{Rotation=45,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,getUIStrokeColor():Lerp(THEME.TEXT,0.45)),ColorSequenceKeypoint.new(1,getUIStrokeGradientColor():Lerp(THEME.TEXT,0.1))})},resizeHandle)
+	local resizeGlow=New("UIGradient",{Rotation=45,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,getUIStrokeColor()),ColorSequenceKeypoint.new(1,getUIStrokeGradientColor())})},resizeHandle)
 
 	local resizeHovering=false
 	local resizing=false
@@ -328,27 +328,27 @@ function MainFrame.new(ctx)
 	local function resizeColorSet(held)
 		local stroke=getUIStrokeColor()
 		local accent=getUIStrokeGradientColor()
-		local base=stroke:Lerp(THEME.TEXT,0.22)
+		local base=stroke:Lerp(accent,0.18)
 
 		if held then
-			return accent:Lerp(THEME.TEXT,0.12),accent,ColorSequence.new({
-				ColorSequenceKeypoint.new(0,THEME.TEXT),
-				ColorSequenceKeypoint.new(0.5,accent:Lerp(THEME.TEXT,0.28)),
+			return accent,accent:Lerp(stroke,0.2),ColorSequence.new({
+				ColorSequenceKeypoint.new(0,accent),
+				ColorSequenceKeypoint.new(0.5,accent:Lerp(stroke,0.25)),
 				ColorSequenceKeypoint.new(1,stroke:Lerp(accent,0.55)),
 			})
 		end
 
 		if resizeHovering then
-			return accent:Lerp(THEME.TEXT,0.2),stroke:Lerp(accent,0.65),ColorSequence.new({
-				ColorSequenceKeypoint.new(0,stroke:Lerp(THEME.TEXT,0.5)),
-				ColorSequenceKeypoint.new(0.45,accent:Lerp(THEME.TEXT,0.35)),
+			return accent:Lerp(stroke,0.25),stroke:Lerp(accent,0.65),ColorSequence.new({
+				ColorSequenceKeypoint.new(0,stroke),
+				ColorSequenceKeypoint.new(0.45,accent:Lerp(stroke,0.2)),
 				ColorSequenceKeypoint.new(1,stroke:Lerp(accent,0.75)),
 			})
 		end
 
 		return base,stroke,ColorSequence.new({
-			ColorSequenceKeypoint.new(0,stroke:Lerp(THEME.TEXT,0.45)),
-			ColorSequenceKeypoint.new(1,accent:Lerp(THEME.TEXT,0.1)),
+			ColorSequenceKeypoint.new(0,stroke),
+			ColorSequenceKeypoint.new(1,accent),
 		})
 	end
 

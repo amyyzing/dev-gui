@@ -298,8 +298,8 @@ function GuiLogic.new(ctx)
 		local track=New("Frame",{Size=UDim2.new(1,-86,0,8),Position=UDim2.new(0,0,0,30),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=6},container)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},track)
 
-		local fill=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=THEME.STROKE:Lerp(THEME.TEXT,0.18),BorderSizePixel=0,ZIndex=7},track)
-		local knob=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(14,14),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=THEME.TEXT,BorderSizePixel=0,ZIndex=8},track)
+		local fill=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=THEME.STROKE,BorderSizePixel=0,ZIndex=7,ThemeRole="STROKE"},track)
+		local knob=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(14,14),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=THEME.STROKE,BorderSizePixel=0,ZIndex=8,ThemeRole="STROKE"},track)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},knob)
 
 		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,8),Position=UDim2.new(0,0,-0.5,-4),ZIndex=9,AutoButtonColor=false},track)
@@ -391,7 +391,7 @@ function GuiLogic.new(ctx)
 
 		local function paint()
 			local ti=TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out)
-			local bg=state and THEME.GREEN or THEME.CARD
+			local bg=state and THEME.GREEN or THEME.RED
 			local pos=state and UDim2.new(1,-18,0,2) or UDim2.fromOffset(2,2)
 
 			TweenService:Create(wrap,ti,{BackgroundColor3=bg}):Play()

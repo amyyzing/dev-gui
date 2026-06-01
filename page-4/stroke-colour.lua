@@ -8,13 +8,13 @@ local DEFAULTS={
 	PrimaryG=28,
 	PrimaryB=28,
 
-	StrokeR=255,
-	StrokeG=255,
-	StrokeB=255,
+	StrokeR=76,
+	StrokeG=76,
+	StrokeB=76,
 
-	GradientR=255,
-	GradientG=255,
-	GradientB=255,
+	GradientR=45,
+	GradientG=45,
+	GradientB=45,
 
 	StrokeGradient=false,
 	LiquidStroke=false,
@@ -22,9 +22,9 @@ local DEFAULTS={
 	LiquidStrokeSpeed=1,
 	LiquidStrokeDirection="Right",
 
-	StrokeThickness=2,
-	StrokeTransparency=0,
-	CornerRadius=0,
+	StrokeThickness=1,
+	StrokeTransparency=0.25,
+	CornerRadius=8,
 }
 
 local function clampByte(v)
@@ -425,9 +425,9 @@ function StrokeColour.new(ctx,page)
 		tintSlider(ggSlider,Color3.fromRGB(0,clampByte(UI_STYLE.GradientG),0))
 		tintSlider(gbSlider,Color3.fromRGB(0,0,clampByte(UI_STYLE.GradientB)))
 
-		tintSlider(speedSlider,THEME.TEXT)
-		tintSlider(thicknessSlider,THEME.TEXT)
-		tintSlider(transparencySlider,THEME.TEXT)
+		tintSlider(speedSlider,getUIStrokeColor())
+		tintSlider(thicknessSlider,getUIStrokeColor())
+		tintSlider(transparencySlider,getUIStrokeColor())
 	end
 
 	local function tweenStyleTo(c1,c2,gradientEnabled)

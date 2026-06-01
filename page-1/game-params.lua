@@ -305,7 +305,6 @@ function GameParams.new(ctx,parent)
 	end
 
 	function api.Reset()
-		state.athleticismOn=false
 		state.staminaRegenValue=10
 		state.staminaDepleteValue=10
 		state.jumpPowerValue=53.5
