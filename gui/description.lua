@@ -11,12 +11,12 @@ Description.Main={
 
 -- Page labels
 Description.Pages={
-	Main=EMPTY,
-	Maps=EMPTY,
-	Server=EMPTY,
-	Customize=EMPTY,
-	Keybinds=EMPTY,
-	Settings=EMPTY,
+	Main="Main",
+	Maps="Map Editor",
+	Server="Server",
+	Customize="GUI Customizer",
+	Keybinds="Keybinds",
+	Settings="Settings",
 }
 
 -- Page descriptions
@@ -31,26 +31,26 @@ Description.PageDescriptions={
 
 -- Page 1 categories
 Description.Sections={
-	["Hitbox"]={Title=EMPTY,Description=EMPTY},
-	["Gravity"]={Title=EMPTY,Description=EMPTY},
-	["Speed"]={Title=EMPTY,Description=EMPTY},
-	["Game Params"]={Title=EMPTY,Description=EMPTY},
-	["Boost"]={Title=EMPTY,Description=EMPTY},
-	["ESP"]={Title=EMPTY,Description=EMPTY},
-	["QB Aim"]={Title=EMPTY,Description=EMPTY},
+	["Hitbox"]={Title="HITBOX",Description="Tackle Hitbox"},
+	["Gravity"]={Title="GRAVITY",Description="Player Gravity"},
+	["Speed"]={Title="SPEED",Description="Forced Speed"},
+	["Game Params"]={Title="PARAMS",Description="Your Athleticism Setting..."},
+	["Boost"]={Title="AUTO BOOST",Description="Configure your boost"},
+	["ESP"]={"ESP"=EMPTY,Description="WR/DB coverage esp, self-explanatory for league players"},
+	["QB Aim"]={Title="QB AIMBOT",Description="bad aim lol"},
 
 -- Page 2 categories
-	["Map Editor"]={Title=EMPTY,Description=EMPTY},
-	["Anti Material"]={Title=EMPTY,Description=EMPTY},
-	["Map Cleaner"]={Title=EMPTY,Description=EMPTY},
-	["Remove Ads"]={Title=EMPTY,Description=EMPTY},
-	["Workspace"]={Title=EMPTY,Description=EMPTY},
+	["Map Editor"]={Title="Map Editor",Description="Change the map how you want!"},
+	["Anti Material"]={Title="Anti-Material",Description="Get rid of materials"},
+	["Map Cleaner"]={Title="Map Cleaner",Description="Remove the large chunk of the map you'll never touch under the field"},
+	["Remove Ads"]={Title="Billboard Remove",Description="Remove the ad billboard. I KNOW your pain"},
+	["Workspace"]={Title="Hi" ,Description="IDK"},
 
 -- Page 4 categories
-	["Customisation"]={Title=EMPTY,Description=EMPTY},
-	["Colours"]={Title=EMPTY,Description=EMPTY},
-	["Pulse Accent"]={Title=EMPTY,Description=EMPTY},
-	["Border Shape"]={Title=EMPTY,Description=EMPTY},
+	["Customisation"]={Title="Customization",Description="Customize your GUI here"},
+	["Colours"]={Title="Colors",Description="Precise customization of GUI color"},
+	["Pulse Accent"]={Title="Stroke Customization",Description="Some stuff that moves around in your GUI secondary."},
+	["Border Shape"]={Title="Border",Description="Your Border Thing"},
 	["Stroke Colour"]={Title=EMPTY,Description=EMPTY},
 
 -- Page 5 categories
