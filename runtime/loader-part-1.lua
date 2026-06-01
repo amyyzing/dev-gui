@@ -455,6 +455,10 @@ MODULE_PATH_SET[AUTO_REFRESH_RELOAD_PATH]=true
 for path in pairs(APP_RUNTIME_PATH_SET) do
 	MODULE_PATH_SET[path]=true
 end
+OPTIONAL_MODULE_PATH_SET={
+	[MODULE_PATHS.PrimaryColour]=true,
+	[MODULE_PATHS.SecondaryColour]=true,
+}
 MAX_REMOTE_MODULE_BYTES=300000
 REMOTE_MODULE_MARKERS={[AUTO_REFRESH_RELOAD_PATH]="HB_LOADER_V2"}
 
@@ -470,6 +474,7 @@ rebuildCustomizeFromModules=nil
 rebuildMapFromModules=nil
 rebuildSettingsFromModules=nil
 rebuildPage2FromModules=nil
+rebuildDataSaveFromModule=nil
 
 function isAllowedModulePath(modulePath)
 	return type(modulePath)=="string" and MODULE_PATH_SET[modulePath]==true
@@ -533,7 +538,11 @@ function loadRemoteModule(modulePath)
 	local result=BOT_API.Post("/module/get",{path=modulePath})
 	if not result or not result.ok then
 		REMOTE_MODULE_SOURCES[modulePath]=false
-		warn("Failed to load remote module:",modulePath,result and result.error or"unknown")
+		if OPTIONAL_MODULE_PATH_SET[modulePath] then
+			warn("Optional remote module unavailable:",modulePath,result and result.error or"unknown")
+		else
+			warn("Failed to load remote module:",modulePath,result and result.error or"unknown")
+		end
 		return nil
 	end
 
@@ -803,7 +812,7 @@ function runLoaderCheck()
 	local missing={}
 
 	for name,path in pairs(MODULE_PATHS) do
-		if not REMOTE_MODULE_CACHE[path] then
+		if not OPTIONAL_MODULE_PATH_SET[path] and not REMOTE_MODULE_CACHE[path] then
 			table.insert(missing,name.." ("..path..")")
 		end
 	end
@@ -994,6 +1003,20 @@ function applyAutoRefreshModuleChange(changedPath,module)
 		return true
 	end
 
+	if changedPath==MODULE_PATHS.DataSave then
+		DataSaveModule=module
+
+		if rebuildDataSaveFromModule then
+			warn("Auto-refreshing data-save module after remote change:",changedPath)
+			rebuildDataSaveFromModule(false)
+		else
+			warn("Auto-refresh cached data-save module, rebuild not ready:",changedPath)
+		end
+
+		reapplyThemeAfterAutoRefresh()
+		return true
+	end
+
 	return false
 end
 
@@ -1035,6 +1058,7 @@ function startAutoRefresh()
 			return APP_RUNTIME_PATH_SET[changedPath] or changedPath==MODULE_PATHS.GuiLogic or changedPath==MODULE_PATHS.MainFrame or changedPath==MODULE_PATHS.Announcement or changedPath==MODULE_PATHS.AutoRefresh
 		end,
 		applyModuleChange=applyAutoRefreshModuleChange,
+		optionalPaths=OPTIONAL_MODULE_PATH_SET,
 		onError=closeAfterAutoRefreshError,
 	})
 

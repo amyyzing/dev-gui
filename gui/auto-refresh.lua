@@ -13,9 +13,11 @@ function AutoRefresh.new(ctx)
 	local applyModuleChange=ctx.applyModuleChange or function() return false end
 	local getRemoteSource=ctx.getRemoteSource
 	local reloadFromSource=ctx.reloadFromSource
+	local optionalPaths=ctx.optionalPaths or {}
 	local reloading=false
 	local failed=false
 	local fetchFailures={}
+	local optionalMissing={}
 
 	local function fail(message,path,detail)
 		if failed then
@@ -154,6 +156,7 @@ function AutoRefresh.new(ctx)
 					local source,sourceErr=fetchSource(path)
 					if source then
 						fetchFailures[path]=0
+						optionalMissing[path]=nil
 						local previous=sourceCache[path]
 						if previous~=nil and previous~=source then
 							if requestRefresh(path,source) then
@@ -165,10 +168,18 @@ function AutoRefresh.new(ctx)
 							sourceCache[path]=source
 						end
 					else
-						fetchFailures[path]=(fetchFailures[path] or 0)+1
-						if fetchFailures[path]>=3 then
-							fail("Closing... encountered error",path,sourceErr or "remote source fetch failed")
-							return
+						if optionalPaths[path] then
+							fetchFailures[path]=0
+							if not optionalMissing[path] then
+								optionalMissing[path]=true
+								warn("Auto-refresh skipping unavailable optional module:",path,sourceErr or "remote source fetch failed")
+							end
+						else
+							fetchFailures[path]=(fetchFailures[path] or 0)+1
+							if fetchFailures[path]>=3 then
+								fail("Closing... encountered error",path,sourceErr or "remote source fetch failed")
+								return
+							end
 						end
 					end
 

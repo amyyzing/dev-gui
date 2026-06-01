@@ -164,66 +164,81 @@ function refreshAllUI()
 	if refreshActionStatus then pcall(refreshActionStatus) end
 end
 
-if DataSaveModule and DataSaveModule.new then
-	local ok,result=pcall(function()
-		return DataSaveModule.new({
-			BOT_API=BOT_API,
-			me=me,
-			playerId=tostring(me.UserId),
-			toolAlive=toolAlive,
+function buildDataSaveContext()
+	return {
+		BOT_API=BOT_API,
+		me=me,
+		playerId=tostring(me.UserId),
+		toolAlive=toolAlive,
 
-			State=PAGE1_STATE,
-			Get=getPersistentValue,
-			Set=setPersistentValue,
+		State=PAGE1_STATE,
+		Get=getPersistentValue,
+		Set=setPersistentValue,
 
-			PRESETS=PRESETS,
-			DEFAULT_PRESETS=DEFAULT_PRESETS,
-			OWNED_PRESETS=OWNED_PRESETS,
-			expandedOwned=PAGE2_EXPANDED_OWNED,
+		PRESETS=PRESETS,
+		DEFAULT_PRESETS=DEFAULT_PRESETS,
+		OWNED_PRESETS=OWNED_PRESETS,
+		expandedOwned=PAGE2_EXPANDED_OWNED,
 
-			UI_STYLE=UI_STYLE,
-			UI_WINDOW=UI_WINDOW,
-			WORLD_SETTINGS=WORLD_SETTINGS,
-			root=root,
+		UI_STYLE=UI_STYLE,
+		UI_WINDOW=UI_WINDOW,
+		WORLD_SETTINGS=WORLD_SETTINGS,
+		root=root,
 
-			RefreshAll=refreshAllUI,
-			refreshPage2UI=function() if refreshPage2UI then refreshPage2UI() end end,
-			rebuildOwnedList=function() if refreshPage2UI then refreshPage2UI() end end,
-			refreshSettingsPage=refreshSettingsPage,
-			applyUIStrokeTheme=applyUIStrokeTheme,
-			updateResponsiveLayout=updateResponsiveLayout,
-			refreshActionStatus=refreshActionStatus,
+		RefreshAll=refreshAllUI,
+		refreshPage2UI=function() if refreshPage2UI then refreshPage2UI() end end,
+		rebuildOwnedList=function() if refreshPage2UI then refreshPage2UI() end end,
+		refreshSettingsPage=refreshSettingsPage,
+		applyUIStrokeTheme=applyUIStrokeTheme,
+		updateResponsiveLayout=updateResponsiveLayout,
+		refreshActionStatus=refreshActionStatus,
 
-			setHitboxSize=function(x,y,z) PAGE1_STATE.sizeX=x; PAGE1_STATE.sizeY=y; PAGE1_STATE.sizeZ=z; syncPage1State() end,
-			setTransparency=function(v) PAGE1_STATE.targetTransparency=v; syncPage1State() end,
-			setGravity=function(v) PAGE1_STATE.gravityValue=v; syncPage1State() end,
-			setHitboxLock=function(v) PAGE1_STATE.hitboxOn=v and true or false; syncPage1State() end,
-			setSpeedValue=function(v) PAGE1_STATE.speedValue=v; syncPage1State() end,
-			setSpeedState=function(v) PAGE1_STATE.speedEnabled=v and true or false; syncPage1State() end,
-			setStaminaRegenValue=function(v) PAGE1_STATE.staminaRegenValue=v; syncPage1State() end,
-			setStaminaDepleteValue=function(v) PAGE1_STATE.staminaDepleteValue=v; syncPage1State() end,
-			setJumpPowerValue=function(v) PAGE1_STATE.jumpPowerValue=v; syncPage1State() end,
-			setDivePowerValue=function(v) PAGE1_STATE.divePowerValue=v; syncPage1State() end,
-			setJumpBoostState=function(v) PAGE1_STATE.jumpBoostOn=v and true or false; syncPage1State() end,
-		})
-	end)
+		setHitboxSize=function(x,y,z) PAGE1_STATE.sizeX=x; PAGE1_STATE.sizeY=y; PAGE1_STATE.sizeZ=z; syncPage1State() end,
+		setTransparency=function(v) PAGE1_STATE.targetTransparency=v; syncPage1State() end,
+		setGravity=function(v) PAGE1_STATE.gravityValue=v; syncPage1State() end,
+		setHitboxLock=function(v) PAGE1_STATE.hitboxOn=v and true or false; syncPage1State() end,
+		setSpeedValue=function(v) PAGE1_STATE.speedValue=v; syncPage1State() end,
+		setSpeedState=function(v) PAGE1_STATE.speedEnabled=v and true or false; syncPage1State() end,
+		setStaminaRegenValue=function(v) PAGE1_STATE.staminaRegenValue=v; syncPage1State() end,
+		setStaminaDepleteValue=function(v) PAGE1_STATE.staminaDepleteValue=v; syncPage1State() end,
+		setJumpPowerValue=function(v) PAGE1_STATE.jumpPowerValue=v; syncPage1State() end,
+		setDivePowerValue=function(v) PAGE1_STATE.divePowerValue=v; syncPage1State() end,
+		setJumpBoostState=function(v) PAGE1_STATE.jumpBoostOn=v and true or false; syncPage1State() end,
+	}
+end
 
-	if ok then
-		DataSaveAPI=result
+function rebuildDataSaveFromModule(loadRemoteData)
+	local previous=DataSaveAPI
+
+	if DataSaveModule and DataSaveModule.new then
+		local ok,result=pcall(function()
+			return DataSaveModule.new(buildDataSaveContext())
+		end)
+
+		if ok then
+			DataSaveAPI=result
+		else
+			DataSaveAPI=previous
+			warn("DataSave module failed:",result)
+			return false
+		end
 	else
-		warn("DataSave module failed:",result)
+		warn("Missing remote module: data-save/data-save.lua")
+		return false
 	end
-else
-	warn("Missing remote module: data-save/data-save.lua")
+
+	if loadRemoteData and DataSaveAPI then
+		pcall(function()
+			DataSaveAPI.Load()
+			DataSaveAPI.LoadOwnedPresets()
+		end)
+	end
+
+	refreshAllUI()
+	return DataSaveAPI~=nil
 end
 
-if DataSaveAPI then
-	pcall(function()
-		DataSaveAPI.Load()
-		DataSaveAPI.LoadOwnedPresets()
-	end)
-	refreshAllUI()
-end
+rebuildDataSaveFromModule(true)
 
 if AnnouncementModule and AnnouncementModule.new then
 	local ok,result=pcall(function()

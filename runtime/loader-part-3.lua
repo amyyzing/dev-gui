@@ -1,6 +1,7 @@
 -- HB_RUNTIME_PART_3
 -- Runtime chunk 3. Loaded by loader.lua with a shared environment.
 function tintSlider(slider, color)
+	if not slider then return end
 	if slider.fill then slider.fill.BackgroundColor3=color end
 	if slider.knob then slider.knob.BackgroundColor3=color end
 end

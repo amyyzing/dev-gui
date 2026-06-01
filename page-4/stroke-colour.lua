@@ -179,7 +179,7 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function tintSlider(slider,color)
-		local sliderColor=getUIStrokeColor()
+		local sliderColor=color or getUIStrokeColor()
 		if ctx.tintSlider then
 			ctx.tintSlider(slider,sliderColor)
 			return
@@ -559,6 +559,14 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function buildPage3Slider(parent,titleText,shortLabel,minVal,maxVal,startVal,decimals,onChange)
+		if type(shortLabel)=="number" then
+			onChange=decimals
+			decimals=startVal
+			startVal=maxVal
+			maxVal=minVal
+			minVal=shortLabel
+		end
+
 		return buildSlider(parent,titleText,minVal,maxVal,startVal,decimals,onChange)
 	end
 
