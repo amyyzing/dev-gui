@@ -5,7 +5,7 @@ PAGE2_EXPANDED_OWNED={}
 PlayerDataAPI=nil
 DiscordAPI=nil
 
-function showConfirmModal(titleText, bodyText, yesText, onYes)
+function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	local modal=New("Frame", {BackgroundColor3=Color3.fromRGB(0, 0, 0), BackgroundTransparency=0.25, BorderSizePixel=0, Size=UDim2.new(1, 0, 1, 0), ZIndex=100}, SG)
 
 	local box=New("Frame", {AnchorPoint=Vector2.new(0.5, 0.5), Position=UDim2.new(0.5, 0, 0.5, 0), Size=UDim2.fromOffset(390, 170), BackgroundColor3=THEME.BG, BorderSizePixel=0, ZIndex=101}, modal)
@@ -16,24 +16,33 @@ function showConfirmModal(titleText, bodyText, yesText, onYes)
 
 	New("TextLabel", {BackgroundTransparency=1, Position=UDim2.fromOffset(16, 48), Size=UDim2.new(1, -32, 0, 54), Text=bodyText, Font=Enum.Font.Gotham, TextSize=12, TextWrapped=true, TextColor3=THEME.MUTED, TextXAlignment=Enum.TextXAlignment.Left, TextYAlignment=Enum.TextYAlignment.Top, ZIndex=102}, box)
 
-	local function modalButton(text, x)
-		local b=New("TextButton", {Position=UDim2.fromOffset(x, 120), Size=UDim2.fromOffset(104, 30), BackgroundColor3=THEME.BG, BorderSizePixel=0, Text=text, Font=Enum.Font.Gotham, TextSize=12, TextColor3=THEME.TEXT, AutoButtonColor=false, ZIndex=102}, box)
+	local function modalButton(text, x, danger)
+		local normalBg=danger and THEME.RED or THEME.BG
+		local hoverBg=danger and Color3.fromRGB(255,124,118) or THEME.CARD
+		local leaveBg=danger and THEME.RED or THEME.PANEL
+		local textColor=danger and Color3.fromRGB(0,0,0) or THEME.TEXT
+		local b=New("TextButton", {Position=UDim2.fromOffset(x, 120), Size=UDim2.fromOffset(104, 30), BackgroundColor3=normalBg, BorderSizePixel=0, Text=text, Font=Enum.Font.Gotham, TextSize=12, TextColor3=textColor, AutoButtonColor=false, ZIndex=102}, box)
 
-		local wrap=wrapTextButton(b, THEME.BG, 2)
+		local wrap=wrapTextButton(b, normalBg, 2)
+		wrap.BackgroundColor3=normalBg
+		if danger then
+			wrap:SetAttribute("ThemeRole","RED")
+		end
 
 		b.MouseEnter:Connect(function()
-			wrap.BackgroundColor3=THEME.CARD
+			wrap.BackgroundColor3=hoverBg
 		end)
 
 		b.MouseLeave:Connect(function()
-			wrap.BackgroundColor3=THEME.PANEL
+			wrap.BackgroundColor3=leaveBg
 		end)
 
 		return b
 	end
 
-	local no=modalButton("CANCEL", 160)
-	local yes=modalButton(yesText or"YES", 274)
+	local danger=options and options.danger==true
+	local no=modalButton("CANCEL", 160, false)
+	local yes=modalButton(yesText or"YES", 274, danger)
 
 	no.MouseButton1Click:Connect(function()
 		modal:Destroy()

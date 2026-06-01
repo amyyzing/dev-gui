@@ -37,36 +37,44 @@ function PlayerData.new(ctx,page,deps)
 		end
 	end
 
-	local function modalButton(parent,text,x)
+	local function modalButton(parent,text,x,danger)
+		local normalBg=danger and THEME.RED or THEME.BG
+		local hoverBg=danger and Color3.fromRGB(255,124,118) or THEME.CARD
+		local leaveBg=danger and THEME.RED or THEME.PANEL
+		local textColor=danger and Color3.fromRGB(0,0,0) or THEME.TEXT
 		local btn=New("TextButton",{
 			Position=UDim2.fromOffset(x,120),
 			Size=UDim2.fromOffset(104,30),
-			BackgroundColor3=THEME.BG,
+			BackgroundColor3=normalBg,
 			BorderSizePixel=0,
 			Text=text,
 			Font=Enum.Font.Gotham,
 			TextSize=12,
-			TextColor3=THEME.TEXT,
+			TextColor3=textColor,
 			AutoButtonColor=false,
 			ZIndex=102,
 		},parent)
 
-		local wrap=wrapTextButton(btn,THEME.BG,2)
+		local wrap=wrapTextButton(btn,normalBg,2)
+		wrap.BackgroundColor3=normalBg
+		if danger then
+			wrap:SetAttribute("ThemeRole","RED")
+		end
 
 		btn.MouseEnter:Connect(function()
-			wrap.BackgroundColor3=THEME.CARD
+			wrap.BackgroundColor3=hoverBg
 		end)
 
 		btn.MouseLeave:Connect(function()
-			wrap.BackgroundColor3=THEME.PANEL
+			wrap.BackgroundColor3=leaveBg
 		end)
 
 		return btn
 	end
 
-	local function showConfirmModal(titleText,bodyText,yesText,onYes)
+	local function showConfirmModal(titleText,bodyText,yesText,onYes,options)
 		if ctx.showConfirmModal then
-			ctx.showConfirmModal(titleText,bodyText,yesText,onYes)
+			ctx.showConfirmModal(titleText,bodyText,yesText,onYes,options)
 			return
 		end
 
@@ -115,8 +123,9 @@ function PlayerData.new(ctx,page,deps)
 			ZIndex=102,
 		},box)
 
-		local no=modalButton(box,"CANCEL",160)
-		local yes=modalButton(box,yesText or"YES",274)
+		local danger=options and options.danger==true
+		local no=modalButton(box,"CANCEL",160,false)
+		local yes=modalButton(box,yesText or"YES",274,danger)
 
 		no.MouseButton1Click:Connect(function()
 			modal:Destroy()
@@ -197,16 +206,24 @@ function PlayerData.new(ctx,page,deps)
 
 	function api.ShowConfirm()
 		showConfirmModal(
-			"Wipe all saved player data?",
-			"This clears this player's saved GUI data and owned preset list. It does not delete the global preset database.",
+			"Wipe your data?",
+			"This WILL delete your data across all gamemodes. Continue?",
 			"WIPE",
 			function()
 				api.Wipe()
-			end
+			end,
+			{danger=true}
 		)
 	end
 
-	local dataSection=makeSection(page,2,"Player Data","Saved settings")
+	local dataSection=makeSection(page,2,"Player Data","Saved settings",{
+		headerButton={
+			text="WIPE DATA",
+			width=92,
+			danger=true,
+			onClick=api.ShowConfirm,
+		},
+	})
 
 	local statusRow=New("Frame",{
 		BackgroundTransparency=1,
@@ -258,39 +275,6 @@ function PlayerData.new(ctx,page,deps)
 		TextYAlignment=Enum.TextYAlignment.Top,
 		ZIndex=6,
 	},dataSection)
-
-	local wipeRow=New("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,30),
-		ZIndex=5,
-	},dataSection)
-
-	local wipeBtn=New("TextButton",{
-		Size=UDim2.fromOffset(128,28),
-		Position=UDim2.new(1,-128,0,0),
-		BackgroundColor3=THEME.BG,
-		BorderSizePixel=0,
-		Text="WIPE DATA",
-		Font=Enum.Font.Gotham,
-		TextSize=12,
-		TextColor3=Color3.fromRGB(0,0,0),
-		AutoButtonColor=false,
-		ZIndex=6,
-	},wipeRow)
-
-	local wipeWrap=wrapTextButton(wipeBtn,THEME.BG,2)
-	wipeWrap.BackgroundColor3=THEME.RED
-	wipeWrap:SetAttribute("ThemeRole","RED")
-
-	wipeBtn.MouseEnter:Connect(function()
-		wipeWrap.BackgroundColor3=Color3.fromRGB(255,124,118)
-	end)
-
-	wipeBtn.MouseLeave:Connect(function()
-		wipeWrap.BackgroundColor3=THEME.RED
-	end)
-
-	wipeBtn.MouseButton1Click:Connect(api.ShowConfirm)
 
 	return api
 end
