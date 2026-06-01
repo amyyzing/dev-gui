@@ -22,7 +22,7 @@ function showConfirmModal(titleText, bodyText, yesText, onYes)
 		local wrap=wrapTextButton(b, THEME.BG, 2)
 
 		b.MouseEnter:Connect(function()
-			wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+			wrap.BackgroundColor3=THEME.CARD
 		end)
 
 		b.MouseLeave:Connect(function()

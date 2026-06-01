@@ -15,6 +15,7 @@ function MainFrame.new(ctx)
 	local attachHover=ctx.attachHover
 	local isAlive=ctx.isAlive or function() return true end
 	local getModeLabel=ctx.getModeLabel or function() return "Gameplay" end
+	local getUIPrimaryColor=ctx.getUIPrimaryColor or function() return THEME.BG end
 	local getUIStrokeColor=ctx.getUIStrokeColor or function() return THEME.STROKE end
 	local getUIStrokeGradientColor=ctx.getUIStrokeGradientColor or function() return THEME.GREEN or THEME.ACC or THEME.TEXT end
 
@@ -86,7 +87,7 @@ function MainFrame.new(ctx)
 		return rootSizeTween
 	end
 
-	New("UICorner",{CornerRadius=UDim.new(0,8)},root)
+	New("UICorner",{CornerRadius=UDim.new(0,0)},root)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.15},root)
 	New("UIPadding",{PaddingTop=UDim.new(0,8),PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8),PaddingBottom=UDim.new(0,8)},root)
 
@@ -129,7 +130,7 @@ function MainFrame.new(ctx)
 		local wrap=wrapTextButton(b,THEME.BG,2)
 
 		b.MouseEnter:Connect(function()
-			wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+			wrap.BackgroundColor3=THEME.CARD
 		end)
 
 		b.MouseLeave:Connect(function()
@@ -292,7 +293,7 @@ function MainFrame.new(ctx)
 		local wrap=wrapTextButton(b,THEME.BG,2)
 
 		b.MouseEnter:Connect(function()
-			wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+			wrap.BackgroundColor3=THEME.CARD
 		end)
 
 		b.MouseLeave:Connect(function()
@@ -315,10 +316,10 @@ function MainFrame.new(ctx)
 
 	local fab=New("TextButton",{Name="FAB",Visible=false,AutoButtonColor=false,Size=UDim2.fromOffset(42,42),AnchorPoint=Vector2.new(1,1),Position=UDim2.new(1,-16,1,-16),BackgroundColor3=THEME.BG,BorderSizePixel=0,Text="[]",TextColor3=THEME.TEXT,Font=Enum.Font.Gotham,TextSize=16,ZIndex=20},SG)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},fab)
-	attachHover(fab,THEME.BG,THEME.TEXT,THEME.TEXT,Color3.fromRGB(0,0,0))
+	attachHover(fab,THEME.BG,THEME.CARD,THEME.TEXT,THEME.TEXT)
 
-	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=getUIStrokeColor():Lerp(getUIStrokeGradientColor(),0.18),BackgroundTransparency=0.02,BorderSizePixel=0,Text="",ZIndex=30,SkipThemeRole=true},root)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},resizeHandle)
+	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=THEME.CARD,BackgroundTransparency=0.02,BorderSizePixel=0,Text="",ZIndex=30,ThemeRole="CARD"},root)
+	New("UICorner",{CornerRadius=UDim.new(0,0)},resizeHandle)
 	local resizeStroke=New("UIStroke",{Color=getUIStrokeColor(),Thickness=1,Transparency=0.05},resizeHandle)
 	local resizeGlow=New("UIGradient",{Rotation=45,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,getUIStrokeColor()),ColorSequenceKeypoint.new(1,getUIStrokeGradientColor())})},resizeHandle)
 
@@ -328,27 +329,28 @@ function MainFrame.new(ctx)
 	local function resizeColorSet(held)
 		local stroke=getUIStrokeColor()
 		local accent=getUIStrokeGradientColor()
-		local base=stroke:Lerp(accent,0.18)
+		local primary=getUIPrimaryColor()
+		local base=primary:Lerp(stroke,0.18)
 
 		if held then
-			return accent,accent:Lerp(stroke,0.2),ColorSequence.new({
-				ColorSequenceKeypoint.new(0,accent),
-				ColorSequenceKeypoint.new(0.5,accent:Lerp(stroke,0.25)),
-				ColorSequenceKeypoint.new(1,stroke:Lerp(accent,0.55)),
+			return primary:Lerp(accent,0.35),accent:Lerp(stroke,0.2),ColorSequence.new({
+				ColorSequenceKeypoint.new(0,primary:Lerp(accent,0.25)),
+				ColorSequenceKeypoint.new(0.5,accent:Lerp(primary,0.2)),
+				ColorSequenceKeypoint.new(1,primary:Lerp(stroke,0.35)),
 			})
 		end
 
 		if resizeHovering then
-			return accent:Lerp(stroke,0.25),stroke:Lerp(accent,0.65),ColorSequence.new({
-				ColorSequenceKeypoint.new(0,stroke),
-				ColorSequenceKeypoint.new(0.45,accent:Lerp(stroke,0.2)),
-				ColorSequenceKeypoint.new(1,stroke:Lerp(accent,0.75)),
+			return primary:Lerp(accent,0.22),stroke:Lerp(accent,0.65),ColorSequence.new({
+				ColorSequenceKeypoint.new(0,primary:Lerp(stroke,0.16)),
+				ColorSequenceKeypoint.new(0.45,accent:Lerp(primary,0.25)),
+				ColorSequenceKeypoint.new(1,primary:Lerp(accent,0.32)),
 			})
 		end
 
 		return base,stroke,ColorSequence.new({
-			ColorSequenceKeypoint.new(0,stroke),
-			ColorSequenceKeypoint.new(1,accent),
+			ColorSequenceKeypoint.new(0,primary),
+			ColorSequenceKeypoint.new(1,stroke),
 		})
 	end
 

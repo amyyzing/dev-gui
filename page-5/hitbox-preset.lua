@@ -127,7 +127,7 @@ function HitboxPreset.new(ctx,ownedSection)
 		local wrap=wrapTextButton(btn,THEME.BG,2)
 
 		btn.MouseEnter:Connect(function()
-			wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+			wrap.BackgroundColor3=THEME.CARD
 		end)
 
 		btn.MouseLeave:Connect(function()
@@ -248,7 +248,7 @@ function HitboxPreset.new(ctx,ownedSection)
 		local wrap=wrapTextButton(btn,THEME.BG,2)
 
 		btn.MouseEnter:Connect(function()
-			wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+			wrap.BackgroundColor3=THEME.CARD
 		end)
 
 		btn.MouseLeave:Connect(function()

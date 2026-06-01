@@ -32,7 +32,7 @@ UI_STYLE={
 
 	StrokeThickness=1,
 	StrokeTransparency=0.25,
-	CornerRadius=8,
+	CornerRadius=0,
 }
 
 UI_WINDOW={W=880, H=540, MinW=560, MinH=360, MaxW=1220, MaxH=820,}
@@ -425,6 +425,8 @@ MODULE_PATHS={
 	Page1ESPDefense="page-1/esp-defense.lua",
 	Page1ESPOffense="page-1/esp-offense.lua",
 	Page1QBAim="page-1/qb-aim.lua",
+	PrimaryColour="page-4/primary.lua",
+	SecondaryColour="page-4/secondary.lua",
 	StrokeColour="page-4/stroke-colour.lua",
 	MapEditor="page-2/map-editor.lua",
 	AntiMaterial="page-2/anti-material.lua",
@@ -668,7 +670,6 @@ function setLoaderProgress(text,current,total,isProblem)
 	loaderPercent.Text=math.floor(pct*100+0.5).."%"
 	loaderFill.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
 	TweenService:Create(loaderFill,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
-	task.wait()
 end
 
 function finishLoader()
@@ -677,7 +678,7 @@ function finishLoader()
 	loaderTitle.Text="Welcome, "..me.Name.."!"
 	setLoaderProgress("Everything is loaded and up to date.",LOADER_TOTAL,LOADER_TOTAL,false)
 
-	task.delay(1.2,function()
+	task.delay(0.35,function()
 		if not loaderOverlay or not loaderOverlay.Parent then return end
 
 		local ti=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
@@ -787,6 +788,8 @@ Page1ESPModule=loadRemoteModuleStep("Page1ESP",MODULE_PATHS.Page1ESP)
 Page1ESPDefenseModule=loadRemoteModuleStep("Page1ESPDefense",MODULE_PATHS.Page1ESPDefense)
 Page1ESPOffenseModule=loadRemoteModuleStep("Page1ESPOffense",MODULE_PATHS.Page1ESPOffense)
 Page1QBAimModule=loadRemoteModuleStep("Page1QBAim",MODULE_PATHS.Page1QBAim)
+PrimaryColourModule=loadRemoteModuleStep("PrimaryColour",MODULE_PATHS.PrimaryColour)
+SecondaryColourModule=loadRemoteModuleStep("SecondaryColour",MODULE_PATHS.SecondaryColour)
 StrokeColourModule=loadRemoteModuleStep("StrokeColour",MODULE_PATHS.StrokeColour)
 MapEditorModule=loadRemoteModuleStep("MapEditor",MODULE_PATHS.MapEditor)
 AntiMaterialModule=loadRemoteModuleStep("AntiMaterial",MODULE_PATHS.AntiMaterial)
@@ -933,8 +936,15 @@ function applyAutoRefreshModuleChange(changedPath,module)
 		return true
 	end
 
-	if changedPath==MODULE_PATHS.StrokeColour then
-		StrokeColourModule=module
+	if changedPath==MODULE_PATHS.StrokeColour or changedPath==MODULE_PATHS.PrimaryColour or changedPath==MODULE_PATHS.SecondaryColour then
+		if changedPath==MODULE_PATHS.StrokeColour then
+			StrokeColourModule=module
+		elseif changedPath==MODULE_PATHS.PrimaryColour then
+			PrimaryColourModule=module
+		else
+			SecondaryColourModule=module
+		end
+
 		if rebuildCustomizeFromModules then
 			warn("Auto-refreshing customize module after remote change:",changedPath)
 			rebuildCustomizeFromModules()
@@ -1129,7 +1139,7 @@ applyUIStrokeTheme=function()
 			obj.Transparency=math.clamp(tonumber(UI_STYLE.StrokeTransparency) or obj.Transparency,0,1)
 
 			pcall(function()
-				obj.LineJoinMode=Enum.LineJoinMode.Round
+				obj.LineJoinMode=Enum.LineJoinMode.Miter
 			end)
 
 			local gradient=obj:FindFirstChild("StrokeGradient")
@@ -1163,7 +1173,7 @@ applyUIStrokeTheme=function()
 			end
 
 		elseif obj:IsA("UICorner") then
-			obj.CornerRadius=UDim.new(0,math.clamp(tonumber(UI_STYLE.CornerRadius) or 8,0,24))
+			obj.CornerRadius=UDim.new(0,0)
 		end
 	end
 

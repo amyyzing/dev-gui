@@ -89,7 +89,7 @@ function Announcement.new(ctx)
 
 		button.MouseEnter:Connect(function()
 			if wrap then
-				wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+				wrap.BackgroundColor3=THEME.CARD
 			end
 		end)
 

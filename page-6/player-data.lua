@@ -54,7 +54,7 @@ function PlayerData.new(ctx,page,deps)
 		local wrap=wrapTextButton(btn,THEME.BG,2)
 
 		btn.MouseEnter:Connect(function()
-			wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+			wrap.BackgroundColor3=THEME.CARD
 		end)
 
 		btn.MouseLeave:Connect(function()
@@ -248,8 +248,8 @@ function PlayerData.new(ctx,page,deps)
 
 	statusLabel=New("TextLabel",{
 		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,32),
-		Text="Saved settings and owned presets are available.",
+		Size=UDim2.new(1,0,0,18),
+		Text="",
 		Font=Enum.Font.Gotham,
 		TextSize=11,
 		TextColor3=THEME.MUTED,

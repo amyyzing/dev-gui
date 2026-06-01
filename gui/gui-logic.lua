@@ -379,12 +379,15 @@ function GuiLogic.new(ctx)
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)
 		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},parent)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-64,1,0),Text=labelText,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
+		local label=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-64,1,0),Text=labelText,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
+		if label.Text=="" then
+			label.Visible=false
+		end
 
 		local wrap=New("Frame",{Size=UDim2.fromOffset(48,20),Position=UDim2.new(1,-48,0.5,-10),BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0,ClipsDescendants=false,ZIndex=6},row)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},wrap)
 
-		local knob=New("Frame",{Size=UDim2.fromOffset(16,16),Position=UDim2.fromOffset(2,2),BackgroundColor3=THEME.TEXT,BorderSizePixel=0,ClipsDescendants=false,ZIndex=7},wrap)
+		local knob=New("Frame",{Size=UDim2.fromOffset(16,16),Position=UDim2.fromOffset(2,2),BackgroundColor3=THEME.STROKE,BorderSizePixel=0,ClipsDescendants=false,ZIndex=7,ThemeRole="STROKE"},wrap)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},knob)
 
 		local state=startState and true or false
@@ -395,7 +398,7 @@ function GuiLogic.new(ctx)
 			local pos=state and UDim2.new(1,-18,0,2) or UDim2.fromOffset(2,2)
 
 			TweenService:Create(wrap,ti,{BackgroundColor3=bg}):Play()
-			TweenService:Create(knob,ti,{Position=pos,BackgroundColor3=THEME.TEXT}):Play()
+			TweenService:Create(knob,ti,{Position=pos,BackgroundColor3=THEME.STROKE}):Play()
 		end
 
 		local function setState(v,fire)

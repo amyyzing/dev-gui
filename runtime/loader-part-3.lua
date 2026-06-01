@@ -58,10 +58,12 @@ function buildCustomizePage()
 
 					StrokeThickness=1,
 					StrokeTransparency=0.25,
-					CornerRadius=8,
+					CornerRadius=0,
 				},
 
 				SG=SG,
+				PrimaryColourModule=PrimaryColourModule,
+				SecondaryColourModule=SecondaryColourModule,
 
 				makeSection=makeSection,
 				buildSlider=buildSlider,

@@ -108,7 +108,7 @@ function Discord.new(ctx,page)
 	linkButton.Size=UDim2.new(1,-20,1,0)
 
 	linkButton.MouseEnter:Connect(function()
-		if linkWrap then linkWrap.BackgroundColor3=Color3.fromRGB(43,43,43) end
+		if linkWrap then linkWrap.BackgroundColor3=THEME.CARD end
 		if inviteLink and inviteLink~="" then
 			setStatus("Click to Copy",THEME.GREEN)
 		end

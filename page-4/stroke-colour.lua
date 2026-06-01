@@ -24,7 +24,7 @@ local DEFAULTS={
 
 	StrokeThickness=1,
 	StrokeTransparency=0.25,
-	CornerRadius=8,
+	CornerRadius=0,
 }
 
 local function clampByte(v)
@@ -67,7 +67,7 @@ local function ensureStyleDefaults(style)
 
 	style.StrokeThickness=math.clamp(numberOrDefault(style.StrokeThickness,DEFAULTS.StrokeThickness),0,8)
 	style.StrokeTransparency=math.clamp(numberOrDefault(style.StrokeTransparency,DEFAULTS.StrokeTransparency),0,1)
-	style.CornerRadius=math.clamp(numberOrDefault(style.CornerRadius,DEFAULTS.CornerRadius),0,24)
+	style.CornerRadius=0
 end
 
 local function copyDefaultStyle(style)
@@ -94,7 +94,7 @@ local function copyDefaultStyle(style)
 
 		StrokeThickness=math.clamp(numberOrDefault(style.StrokeThickness,DEFAULTS.StrokeThickness),0,8),
 		StrokeTransparency=math.clamp(numberOrDefault(style.StrokeTransparency,DEFAULTS.StrokeTransparency),0,1),
-		CornerRadius=math.clamp(numberOrDefault(style.CornerRadius,DEFAULTS.CornerRadius),0,24),
+		CornerRadius=0,
 	}
 end
 
@@ -134,8 +134,9 @@ function StrokeColour.new(ctx,page)
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
 	local buildToggleRow=ctx.buildToggleRow
-	local wrapTextButton=ctx.wrapTextButton
 	local externalThemeApplier=ctx.applyUIStrokeTheme~=nil
+	local PrimaryColourModule=ctx.PrimaryColourModule
+	local SecondaryColourModule=ctx.SecondaryColourModule
 
 	ensureStyleDefaults(UI_STYLE)
 
@@ -304,7 +305,7 @@ function StrokeColour.new(ctx,page)
 							obj.Transparency=UI_STYLE.StrokeTransparency
 
 							pcall(function()
-								obj.LineJoinMode=Enum.LineJoinMode.Round
+								obj.LineJoinMode=Enum.LineJoinMode.Miter
 							end)
 
 							if UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke then
@@ -561,102 +562,31 @@ function StrokeColour.new(ctx,page)
 		return buildSlider(parent,titleText,minVal,maxVal,startVal,decimals,onChange)
 	end
 
-	local function buildGradientPresets(parent)
-		New("TextLabel",{
-			BackgroundTransparency=1,
-			Size=UDim2.new(1,0,0,16),
-			Text="Gradient presets",
-			Font=Enum.Font.GothamMedium,
-			TextSize=12,
-			TextColor3=THEME.TEXT,
-			TextXAlignment=Enum.TextXAlignment.Left,
-			ZIndex=6,
-		},parent)
-
-		local presetRow=New("Frame",{
-			BackgroundTransparency=1,
-			Size=UDim2.new(1,0,0,30),
-			ZIndex=5,
-		},parent)
-
-		New("UIListLayout",{
-			FillDirection=Enum.FillDirection.Horizontal,
-			Padding=UDim.new(0,6),
-			SortOrder=Enum.SortOrder.LayoutOrder,
-		},presetRow)
-
-		for _,pair in ipairs({
-			{Color3.fromRGB(32,202,106),Color3.fromRGB(21,103,251)},
-			{Color3.fromRGB(254,94,86),Color3.fromRGB(255,210,80)},
-			{Color3.fromRGB(195,195,195),Color3.fromRGB(76,76,76)},
-			{Color3.fromRGB(0,255,255),Color3.fromRGB(255,0,190)},
-			{Color3.fromRGB(150,255,80),Color3.fromRGB(80,70,255)},
-			{Color3.fromRGB(255,255,255),Color3.fromRGB(45,45,45)},
-			{Color3.fromRGB(255,130,0),Color3.fromRGB(0,230,255)},
-			{Color3.fromRGB(200,90,255),Color3.fromRGB(255,70,80)},
-		}) do
-			local btn=New("TextButton",{
-				Size=UDim2.fromOffset(38,24),
-				BackgroundColor3=pair[1],
-				BorderSizePixel=0,
-				Text="",
-				AutoButtonColor=false,
-				ZIndex=6,
-			},presetRow)
-
-			New("UIStroke",{
-				Color=THEME.STROKE,
-				Thickness=1,
-				Transparency=0,
-			},btn)
-
-			local grad=Instance.new("UIGradient")
-			grad.Color=ColorSequence.new({
-				ColorSequenceKeypoint.new(0,pair[1]),
-				ColorSequenceKeypoint.new(1,pair[2]),
-			})
-			grad.Parent=btn
-
-			btn.MouseButton1Click:Connect(function()
-				api.ApplyGradient(pair[1],pair[2])
-			end)
-		end
-	end
-
 	clearPage()
 
 	local presetSection=makeSection(page,1,"Customisation","Live preview and quick styles.")
-	local colourSection=makeSection(page,2,"Colours","Tune the base stroke and gradient endpoint.")
-	local motionSection=makeSection(page,3,"Pulse Accent","A slow accent pulse. No moving stroke effects.")
-	local shapeSection=makeSection(page,4,"Border Shape","Control border weight and opacity.")
+	local primarySection=makeSection(page,2,"Primary Colours","")
+	local colourSection=makeSection(page,3,"Secondary Colours","")
+	local motionSection=makeSection(page,4,"Pulse Accent","A slow accent pulse. No moving stroke effects.")
+	local shapeSection=makeSection(page,5,"Border Shape","Control border weight and opacity.")
 
 	local previewRow=New("Frame",{
 		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,42),
+		Size=UDim2.new(1,0,0,62),
 		ZIndex=5,
 	},presetSection)
 
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,-170,1,0),
-		Text="Live preview",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=THEME.MUTED,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},previewRow)
-
 	previewBox=New("Frame",{
-		Size=UDim2.fromOffset(150,30),
-		Position=UDim2.new(1,-150,0.5,-15),
+		AnchorPoint=Vector2.new(1,0.5),
+		Size=UDim2.fromOffset(58,58),
+		Position=UDim2.new(1,0,0.5,0),
 		BackgroundColor3=getUIPrimaryColor(),
 		BorderSizePixel=0,
 		SkipThemeRole=true,
 		ZIndex=6,
 	},previewRow)
 
-	New("UICorner",{CornerRadius=UDim.new(0,4)},previewBox)
+	New("UICorner",{CornerRadius=UDim.new(0,0)},previewBox)
 
 	previewStroke=New("UIStroke",{
 		Color=getUIStrokeColor(),
@@ -669,197 +599,72 @@ function StrokeColour.new(ctx,page)
 		Size=UDim2.new(1,0,1,0),
 		Text="PREVIEW",
 		Font=Enum.Font.GothamMedium,
-		TextSize=11,
+		TextSize=10,
+		TextScaled=true,
+		TextWrapped=true,
 		TextColor3=Color3.fromRGB(0,0,0),
 		ZIndex=7,
 	},previewBox)
 
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,16),
-		Text="Primary colour",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},presetSection)
+	if PrimaryColourModule and PrimaryColourModule.new then
+		local primaryRefs=PrimaryColourModule.new({
+			New=New,
+			THEME=THEME,
+			UI_STYLE=UI_STYLE,
+			buildSlider=buildPage3Slider,
+			tintSlider=tintSlider,
+			updateEverything=updateEverything,
+			applyPrimaryColour=api.ApplyPrimaryColour,
+		},primarySection) or {}
 
-	local primaryPaletteRow=New("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,30),
-		ZIndex=5,
-	},presetSection)
-
-	New("UIListLayout",{
-		FillDirection=Enum.FillDirection.Horizontal,
-		Padding=UDim.new(0,6),
-		SortOrder=Enum.SortOrder.LayoutOrder,
-	},primaryPaletteRow)
-
-	for _,c in ipairs({
-		Color3.fromRGB(28,28,28),
-		Color3.fromRGB(238,238,238),
-		Color3.fromRGB(90,90,90),
-		Color3.fromRGB(58,17,24),
-		Color3.fromRGB(12,18,38),
-		Color3.fromRGB(18,36,34),
-		Color3.fromRGB(42,30,54),
-		Color3.fromRGB(24,24,30),
-	}) do
-		local swatch=New("TextButton",{
-			Size=UDim2.fromOffset(34,24),
-			BackgroundColor3=c,
-			BorderSizePixel=0,
-			Text="",
-			AutoButtonColor=false,
-			SkipThemeRole=true,
+		prSlider=primaryRefs.pr
+		pgSlider=primaryRefs.pg
+		pbSlider=primaryRefs.pb
+	else
+		New("TextLabel",{
+			BackgroundTransparency=1,
+			Size=UDim2.new(1,0,0,20),
+			Text="Primary colour module missing.",
+			Font=Enum.Font.Gotham,
+			TextSize=12,
+			TextColor3=THEME.RED,
+			TextXAlignment=Enum.TextXAlignment.Left,
 			ZIndex=6,
-		},primaryPaletteRow)
-
-		New("UIStroke",{
-			Color=THEME.STROKE,
-			Thickness=1,
-			Transparency=0,
-		},swatch)
-
-		swatch.MouseButton1Click:Connect(function()
-			api.ApplyPrimaryColour(c)
-		end)
+		},primarySection)
 	end
 
-	prSlider=buildPage3Slider(colourSection,"Primary red","PR",0,255,UI_STYLE.PrimaryR,0,function(v)
-		UI_STYLE.PrimaryR=v
-		tintSlider(prSlider,Color3.fromRGB(v,0,0))
-		updateEverything()
-	end)
+	if SecondaryColourModule and SecondaryColourModule.new then
+		local secondaryRefs=SecondaryColourModule.new({
+			New=New,
+			THEME=THEME,
+			UI_STYLE=UI_STYLE,
+			buildSlider=buildPage3Slider,
+			tintSlider=tintSlider,
+			updateEverything=updateEverything,
+			applyMainColour=api.ApplyMainColour,
+			applyGradient=api.ApplyGradient,
+		},colourSection) or {}
 
-	pgSlider=buildPage3Slider(colourSection,"Primary green","PG",0,255,UI_STYLE.PrimaryG,0,function(v)
-		UI_STYLE.PrimaryG=v
-		tintSlider(pgSlider,Color3.fromRGB(0,v,0))
-		updateEverything()
-	end)
-
-	pbSlider=buildPage3Slider(colourSection,"Primary blue","PB",0,255,UI_STYLE.PrimaryB,0,function(v)
-		UI_STYLE.PrimaryB=v
-		tintSlider(pbSlider,Color3.fromRGB(0,0,v))
-		updateEverything()
-	end)
-
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,16),
-		Text="Quick colours",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},presetSection)
-
-	local paletteRow=New("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,30),
-		ZIndex=5,
-	},presetSection)
-
-	New("UIListLayout",{
-		FillDirection=Enum.FillDirection.Horizontal,
-		Padding=UDim.new(0,6),
-		SortOrder=Enum.SortOrder.LayoutOrder,
-	},paletteRow)
-
-	for _,c in ipairs({
-		Color3.fromRGB(255,255,255),
-		Color3.fromRGB(0,255,255),
-		Color3.fromRGB(255,0,0),
-		Color3.fromRGB(0,255,0),
-		Color3.fromRGB(0,120,255),
-		Color3.fromRGB(180,80,255),
-		Color3.fromRGB(255,210,0),
-		Color3.fromRGB(130,130,130),
-	}) do
-		local swatch=New("TextButton",{
-			Size=UDim2.fromOffset(28,24),
-			BackgroundColor3=c,
-			BorderSizePixel=0,
-			Text="",
-			AutoButtonColor=false,
+		rSlider=secondaryRefs.r
+		gSlider=secondaryRefs.g
+		bSlider=secondaryRefs.b
+		grSlider=secondaryRefs.gr
+		ggSlider=secondaryRefs.gg
+		gbSlider=secondaryRefs.gb
+	else
+		New("TextLabel",{
+			BackgroundTransparency=1,
+			Size=UDim2.new(1,0,0,20),
+			Text="Secondary colour module missing.",
+			Font=Enum.Font.Gotham,
+			TextSize=12,
+			TextColor3=THEME.RED,
+			TextXAlignment=Enum.TextXAlignment.Left,
 			ZIndex=6,
-		},paletteRow)
-
-		New("UIStroke",{
-			Color=THEME.STROKE,
-			Thickness=1,
-			Transparency=0,
-		},swatch)
-
-		swatch.MouseButton1Click:Connect(function()
-			api.ApplyMainColour(c)
-		end)
+		},colourSection)
 	end
 
-	buildGradientPresets(presetSection)
-
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,16),
-		Text="Main stroke colour",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},colourSection)
-
-	rSlider=buildPage3Slider(colourSection,"Main red","R",0,255,UI_STYLE.StrokeR,0,function(v)
-		UI_STYLE.StrokeR=v
-		tintSlider(rSlider,Color3.fromRGB(v,0,0))
-		updateEverything()
-	end)
-
-	gSlider=buildPage3Slider(colourSection,"Main green","G",0,255,UI_STYLE.StrokeG,0,function(v)
-		UI_STYLE.StrokeG=v
-		tintSlider(gSlider,Color3.fromRGB(0,v,0))
-		updateEverything()
-	end)
-
-	bSlider=buildPage3Slider(colourSection,"Main blue","B",0,255,UI_STYLE.StrokeB,0,function(v)
-		UI_STYLE.StrokeB=v
-		tintSlider(bSlider,Color3.fromRGB(0,0,v))
-		updateEverything()
-	end)
-
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,16),
-		Text="Gradient end colour",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},colourSection)
-
-	grSlider=buildPage3Slider(colourSection,"Gradient red","R2",0,255,UI_STYLE.GradientR,0,function(v)
-		UI_STYLE.GradientR=v
-		tintSlider(grSlider,Color3.fromRGB(v,0,0))
-		updateEverything()
-	end)
-
-	ggSlider=buildPage3Slider(colourSection,"Gradient green","G2",0,255,UI_STYLE.GradientG,0,function(v)
-		UI_STYLE.GradientG=v
-		tintSlider(ggSlider,Color3.fromRGB(0,v,0))
-		updateEverything()
-	end)
-
-	gbSlider=buildPage3Slider(colourSection,"Gradient blue","B2",0,255,UI_STYLE.GradientB,0,function(v)
-		UI_STYLE.GradientB=v
-		tintSlider(gbSlider,Color3.fromRGB(0,0,v))
-		updateEverything()
-	end)
-
-	gradientToggle=buildToggleRow(colourSection,"Gradient Stroke",UI_STYLE.StrokeGradient,function(state)
+	gradientToggle=buildToggleRow(motionSection,"Gradient Stroke",UI_STYLE.StrokeGradient,function(state)
 		UI_STYLE.StrokeGradient=state and true or false
 
 		if not UI_STYLE.StrokeGradient then
@@ -890,17 +695,6 @@ function StrokeColour.new(ctx,page)
 		updateEverything()
 	end)
 
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,16),
-		Text="Weight and opacity",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},shapeSection)
-
 	thicknessSlider=buildPage3Slider(shapeSection,"Stroke thickness","W",0,6,math.clamp(UI_STYLE.StrokeThickness,0,6),1,function(v)
 		UI_STYLE.StrokeThickness=math.clamp(tonumber(v) or 0,0,8)
 		updateEverything()
@@ -910,37 +704,6 @@ function StrokeColour.new(ctx,page)
 		UI_STYLE.StrokeTransparency=math.clamp(tonumber(v) or 0,0,1)
 		updateEverything()
 	end)
-
-	local resetRow=New("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,30),
-		ZIndex=5,
-	},shapeSection)
-
-	local resetBtn=New("TextButton",{
-		Size=UDim2.fromOffset(120,28),
-		Position=UDim2.new(1,-120,0,0),
-		BackgroundColor3=THEME.BG,
-		BorderSizePixel=0,
-		Text="RESET",
-		Font=Enum.Font.Gotham,
-		TextSize=12,
-		TextColor3=THEME.TEXT,
-		AutoButtonColor=false,
-		ZIndex=6,
-	},resetRow)
-
-	local resetWrap=wrapTextButton(resetBtn,THEME.BG,2)
-
-	resetBtn.MouseEnter:Connect(function()
-		resetWrap.BackgroundColor3=Color3.fromRGB(43,43,43)
-	end)
-
-	resetBtn.MouseLeave:Connect(function()
-		resetWrap.BackgroundColor3=THEME.BG
-	end)
-
-	resetBtn.MouseButton1Click:Connect(api.Reset)
 
 	api.Refresh()
 

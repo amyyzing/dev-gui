@@ -114,7 +114,7 @@ function KeybindSettings.new(ctx,bindSection)
 
 		btn.MouseEnter:Connect(function()
 			if activeCapture and activeCapture.button==btn then return end
-			wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+			wrap.BackgroundColor3=THEME.CARD
 		end)
 
 		btn.MouseLeave:Connect(function()

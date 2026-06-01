@@ -1278,7 +1278,7 @@ function QBAim.new(ctx,parent)
 			frame.Parent=billboard
 
 			local corner=Instance.new("UICorner")
-			corner.CornerRadius=UDim.new(0,8)
+			corner.CornerRadius=UDim.new(0,0)
 			corner.Parent=frame
 
 			local stroke=Instance.new("UIStroke")

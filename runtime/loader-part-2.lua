@@ -21,6 +21,10 @@ makeSection=GuiLogic.makeSection
 makeBox=GuiLogic.makeBox
 buildSlider=GuiLogic.buildSlider
 buildToggleRow=GuiLogic.buildToggleRow
+HITBOX_ORIGINALS=HITBOX_ORIGINALS or {
+	Transparency=setmetatable({}, {__mode="k"}),
+	Size=setmetatable({}, {__mode="k"}),
+}
 
 Description=DescriptionModule or {}
 rawMakeSection=makeSection
@@ -48,6 +52,7 @@ MainFrame=MainFrameModule.new({
 	safeDisconnect=safeDisconnect,
 	wrapTextButton=wrapTextButton,
 	attachHover=attachHover,
+	getUIPrimaryColor=getUIPrimaryColor,
 	getUIStrokeColor=getUIStrokeColor,
 	getUIStrokeGradientColor=getUIStrokeGradientColor,
 	isAlive=function()
@@ -305,6 +310,7 @@ function makePage1Ctx()
 		makeSection=makeSection,
 		buildSlider=buildSlider,
 		buildToggleRow=buildToggleRow,
+		HITBOX_ORIGINALS=HITBOX_ORIGINALS,
 		fmtNumber=fmtNumber,
 		inputToBinding=inputToBinding,
 		getCurrentModeKey=function() return CURRENT_MODE_KEY end,
