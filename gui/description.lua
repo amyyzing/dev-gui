@@ -71,6 +71,94 @@ Description.Labels={
 	Busy=EMPTY,
 }
 
+-- Static control labels
+Description.Texts={
+	["untitled gui"]=EMPTY,
+	["MAIN"]=EMPTY,
+	["MAPS"]=EMPTY,
+	["SERVER"]=EMPTY,
+	["CUSTOMIZE"]=EMPTY,
+	["KEYBINDS"]=EMPTY,
+	["SETTINGS"]=EMPTY,
+	["RESET"]=EMPTY,
+	["PREVIEW"]=EMPTY,
+	["Live preview"]=EMPTY,
+	["Quick colours"]=EMPTY,
+	["Main stroke colour"]=EMPTY,
+	["Gradient end colour"]=EMPTY,
+	["Gradient presets"]=EMPTY,
+	["Weight and opacity"]=EMPTY,
+	["Hitbox Toggle"]=EMPTY,
+	["HITBOX SIZE"]=EMPTY,
+	["TRANSPARENCY"]=EMPTY,
+	["Force Speed"]=EMPTY,
+	["+12 Stam / -8 Stam"]=EMPTY,
+	["Jump Boost"]=EMPTY,
+	["Always Boost"]=EMPTY,
+	["ESP"]=EMPTY,
+	["Enabled"]=EMPTY,
+	["Team Filter"]=EMPTY,
+	["Show Arc"]=EMPTY,
+	["LD"]=EMPTY,
+	["SR"]=EMPTY,
+	["SD"]=EMPTY,
+	["SmoothPlastic"]=EMPTY,
+	["Map Cleaner"]=EMPTY,
+	["Remove Ads"]=EMPTY,
+	["Gradient Stroke"]=EMPTY,
+	["Pulse Accent"]=EMPTY,
+	["Cloud Profile"]=EMPTY,
+	["READY"]=EMPTY,
+	["BUSY"]=EMPTY,
+	["WIPE DATA"]=EMPTY,
+	["Saved settings and owned presets are available."]=EMPTY,
+	["Loading invite link..."]=EMPTY,
+	["Fetching invite link..."]=EMPTY,
+	["No invite link set."]=EMPTY,
+	["Click to Copy"]=EMPTY,
+	["Copied"]=EMPTY,
+	["Toggle open / hide GUI"]=EMPTY,
+	["Hitbox Toggle"]=EMPTY,
+	["Jump Boost Toggle"]=EMPTY,
+	["Always Boost Toggle"]=EMPTY,
+	["ESP Toggle"]=EMPTY,
+	["Speed Toggle"]=EMPTY,
+	["QB Aim Lock Receiver"]=EMPTY,
+	["QB Aim Throw"]=EMPTY,
+	["QB Aim Toggle"]=EMPTY,
+	["SAVE PRESET"]=EMPTY,
+	["No saved presets yet."]=EMPTY,
+	["Name this preset"]=EMPTY,
+	["Preset name"]=EMPTY,
+	["Save current preset?"]=EMPTY,
+	["This saves the preset to your owned preset list."]=EMPTY,
+	["CANCEL"]=EMPTY,
+	["SAVE"]=EMPTY,
+	["YES"]=EMPTY,
+	["NO"]=EMPTY,
+	["EQUIP"]=EMPTY,
+	["DELETE"]=EMPTY,
+	["NIL"]=EMPTY,
+	["PRESS..."]=EMPTY,
+	["Off"]=EMPTY,
+	["Disabled"]=EMPTY,
+	["Target: none"]=EMPTY,
+	["A"]=EMPTY,
+	["G"]=EMPTY,
+	["S"]=EMPTY,
+	["J"]=EMPTY,
+	["D"]=EMPTY,
+	["F"]=EMPTY,
+	["C"]=EMPTY,
+	["R"]=EMPTY,
+	["R2"]=EMPTY,
+	["G2"]=EMPTY,
+	["B2"]=EMPTY,
+	["X"]=EMPTY,
+	["Y"]=EMPTY,
+	["Z"]=EMPTY,
+}
+
 function Description.Get(path,fallback)
 	local value=Description
 	for part in tostring(path or ""):gmatch("[^%.]+") do
@@ -94,6 +182,19 @@ function Description.Section(title,subtitle)
 	end
 
 	return item.Title or title,item.Description or subtitle
+end
+
+function Description.Text(raw)
+	if type(raw)~="string" then
+		return raw
+	end
+
+	local mapped=Description.Texts[raw]
+	if mapped~=nil then
+		return mapped
+	end
+
+	return raw
 end
 
 return Description

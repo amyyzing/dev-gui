@@ -82,6 +82,22 @@ UI_MAIN={}
 BOX_WRAPPERS=setmetatable({}, {__mode="k"})
 BUTTON_WRAPPERS=setmetatable({}, {__mode="k"})
 
+function translateUIText(value)
+	if type(value)~="string" then
+		return value
+	end
+
+	local description=Description or DescriptionModule
+	if description and type(description.Text)=="function" then
+		local ok,result=pcall(description.Text,value)
+		if ok and result~=nil then
+			return result
+		end
+	end
+
+	return value
+end
+
 function New(class, props, parent)
 	props=props or {}
 
@@ -95,6 +111,8 @@ function New(class, props, parent)
 		props.TextStrokeTransparency=1
 		props.TextStrokeColor3=Color3.fromRGB(0, 0, 0)
 		if props.TextYAlignment==nil then props.TextYAlignment=Enum.TextYAlignment.Center end
+		if props.Text~=nil then props.Text=translateUIText(props.Text) end
+		if props.PlaceholderText~=nil then props.PlaceholderText=translateUIText(props.PlaceholderText) end
 
 		if class=="TextBox" then
 			props.TextSize=props.TextSize or 13
@@ -269,7 +287,7 @@ function BOT_API.Post(path,body)
 end
 
 AUTO_REFRESH_ENABLED=true
-AUTO_REFRESH_INTERVAL=1.25
+AUTO_REFRESH_INTERVAL=0.65
 AUTO_REFRESH_RELOAD_PATH="loader.lua"
 
 MODULE_PATHS={
@@ -322,6 +340,7 @@ rebuildPage1FromModules=nil
 rebuildCustomizeFromModules=nil
 rebuildMapFromModules=nil
 rebuildSettingsFromModules=nil
+rebuildPage2FromModules=nil
 
 function loadModuleFromSource(modulePath,source)
 	local chunk,err=loadstring(source)
@@ -606,6 +625,26 @@ function reapplyThemeAfterAutoRefresh()
 end
 
 function applyAutoRefreshModuleChange(changedPath,module)
+	if changedPath==MODULE_PATHS.Description then
+		DescriptionModule=module
+		Description=module
+
+		if MainFrame and MainFrame.RefreshText then
+			pcall(function()
+				MainFrame.RefreshText(Description)
+			end)
+		end
+
+		if rebuildPage1FromModules then pcall(rebuildPage1FromModules) end
+		if rebuildCustomizeFromModules then pcall(rebuildCustomizeFromModules) end
+		if rebuildMapFromModules then pcall(rebuildMapFromModules) end
+		if rebuildSettingsFromModules then pcall(rebuildSettingsFromModules) end
+		if rebuildPage2FromModules then pcall(rebuildPage2FromModules) end
+		if refreshAllUI then pcall(refreshAllUI) end
+		reapplyThemeAfterAutoRefresh()
+		return true
+	end
+
 	local applyPage1Module=PAGE1_RELOAD_PATHS[changedPath]
 	if applyPage1Module then
 		applyPage1Module(module)
@@ -697,7 +736,7 @@ function startAutoRefresh()
 			return toolAlive and SG and SG.Parent and guiParent:FindFirstChild(SG_NAME)==SG
 		end,
 		shouldReloadMain=function(changedPath)
-			return APP_RUNTIME_PATH_SET[changedPath] or changedPath==MODULE_PATHS.GuiLogic or changedPath==MODULE_PATHS.MainFrame or changedPath==MODULE_PATHS.Description or changedPath==MODULE_PATHS.Announcement or changedPath==MODULE_PATHS.AutoRefresh
+			return APP_RUNTIME_PATH_SET[changedPath] or changedPath==MODULE_PATHS.GuiLogic or changedPath==MODULE_PATHS.MainFrame or changedPath==MODULE_PATHS.Announcement or changedPath==MODULE_PATHS.AutoRefresh
 		end,
 		applyModuleChange=applyAutoRefreshModuleChange,
 	})

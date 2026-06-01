@@ -29,6 +29,17 @@ function MainFrame.new(ctx)
 		return fallback
 	end
 
+	local function text(raw)
+		if Description and type(Description.Text)=="function" then
+			local ok,value=pcall(Description.Text,raw)
+			if ok and value~=nil then
+				return value
+			end
+		end
+
+		return raw
+	end
+
 	local api={}
 	local MINIMIZED_ROOT_H=68
 
@@ -109,7 +120,7 @@ function MainFrame.new(ctx)
 
 	local header=New("Frame",{Size=UDim2.new(1,0,0,52),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=4,LayoutOrder=1},main)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.25},header)
-	New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,7),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=Enum.Font.Gotham,TextSize=16,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+	local titleLabel=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,7),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=Enum.Font.Gotham,TextSize=16,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
 
 	local modeSubtitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,26),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
 
@@ -296,7 +307,7 @@ function MainFrame.new(ctx)
 	refreshFooterResetButton=function()
 		local showReset=activePageName~="settings" and activePageName~="maps" and activePageName~="server"
 		resetBtn.Visible=showReset
-		resetBtn.Text="RESET"
+		resetBtn.Text=text("RESET")
 		resetWrap.Visible=showReset
 	end
 
@@ -537,6 +548,19 @@ function MainFrame.new(ctx)
 
 	function api.RefreshTheme()
 		paintResizeHandle(resizing)
+	end
+
+	function api.RefreshText(newDescription)
+		Description=newDescription or Description
+		titleLabel.Text=desc("Main.Title","untitled gui")
+		modeSubtitle.Text=desc("Main.Description",getModeLabel().." loaded")
+		settingsTab.Text=desc("Pages.Main","MAIN")
+		mapsPageTab.Text=desc("Pages.Maps","MAPS")
+		serverPageTab.Text=desc("Pages.Server","SERVER")
+		uiSettingsTab.Text=desc("Pages.Customize","CUSTOMIZE")
+		futureTab.Text=desc("Pages.Keybinds","KEYBINDS")
+		settingsPageTab.Text=desc("Pages.Settings","SETTINGS")
+		refreshFooterResetButton()
 	end
 
 	function api.Destroy()

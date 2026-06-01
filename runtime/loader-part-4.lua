@@ -295,6 +295,24 @@ function buildPage2()
 	refreshPage2UI()
 end
 
+function clearPage2()
+	if not futurePage then return end
+
+	for _,child in ipairs(futurePage:GetChildren()) do
+		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+			child:Destroy()
+		end
+	end
+end
+
+rebuildPage2FromModules=function()
+	activeCapture=nil
+	clearPage2()
+	buildPage2()
+	if refreshFooterResetButton then pcall(refreshFooterResetButton) end
+	if applyUIStrokeTheme then pcall(applyUIStrokeTheme) end
+end
+
 buildPage2()
 refreshFooterResetButton()
 
