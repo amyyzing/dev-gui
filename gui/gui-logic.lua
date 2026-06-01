@@ -276,7 +276,7 @@ function GuiLogic.new(ctx)
 		local wrap,stroke=api.wrapTextBox(b,THEME.PANEL,2)
 
 		b.Focused:Connect(function()
-			wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+			wrap.BackgroundColor3=THEME.PANEL
 			stroke.Thickness=2
 		end)
 
@@ -290,7 +290,7 @@ function GuiLogic.new(ctx)
 
 	function api.buildSlider(parent,labelText,minVal,maxVal,startVal,decimals,onChange)
 		local container=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,50),ZIndex=5},parent)
-		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(0,0),Size=UDim2.new(1,-82,0,16),Text=labelText,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},container)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(0,0),Size=UDim2.new(1,-82,0,16),Text=labelText,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},container)
 
 		local valueLabel=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,ClearTextOnFocus=true,Size=UDim2.fromOffset(72,28),Position=UDim2.new(1,-72,0,20),Text=fmtNumber(startVal,decimals),Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},container)
 		local valueWrap,valueStroke=api.wrapTextBox(valueLabel,THEME.BG,2)
@@ -357,7 +357,7 @@ function GuiLogic.new(ctx)
 		end)
 
 		valueLabel.Focused:Connect(function()
-			valueWrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+			valueWrap.BackgroundColor3=THEME.BG
 			valueStroke.Thickness=2
 		end)
 

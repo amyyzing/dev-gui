@@ -147,7 +147,7 @@ function StrokeColour.new(ctx,page)
 	local grSlider,ggSlider,gbSlider
 	local speedSlider,thicknessSlider,transparencySlider
 	local gradientToggle,liquidToggle
-	local previewBox,previewStroke
+	local previewBox,previewStroke,previewText
 	local colourTweenToken=0
 	local liquidConn=nil
 	local liquidClock=0
@@ -178,13 +178,14 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function tintSlider(slider,color)
+		local sliderColor=getUIStrokeColor()
 		if ctx.tintSlider then
-			ctx.tintSlider(slider,color)
+			ctx.tintSlider(slider,sliderColor)
 			return
 		end
 
-		if slider and slider.fill then slider.fill.BackgroundColor3=color end
-		if slider and slider.knob then slider.knob.BackgroundColor3=color end
+		if slider and slider.fill then slider.fill.BackgroundColor3=sliderColor end
+		if slider and slider.knob then slider.knob.BackgroundColor3=sliderColor end
 	end
 
 	local function setGradientColors(grad,c1,c2)
@@ -342,7 +343,13 @@ function StrokeColour.new(ctx,page)
 		local c1=getUIStrokeColor()
 		local c2=getUIStrokeGradientColor()
 
-		previewBox.BackgroundColor3=getUIPrimaryColor()
+		local primary=getUIPrimaryColor()
+		previewBox.BackgroundColor3=primary
+
+		if previewText then
+			local luminance=(primary.R*0.2126)+(primary.G*0.7152)+(primary.B*0.0722)
+			previewText.TextColor3=luminance<0.55 and Color3.fromRGB(245,245,245) or Color3.fromRGB(18,18,18)
+		end
 
 		if previewStroke then
 			previewStroke.Color=getPulseColor()
@@ -551,31 +558,69 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function buildPage3Slider(parent,titleText,shortLabel,minVal,maxVal,startVal,decimals,onChange)
-		local row=New("Frame",{
+		return buildSlider(parent,titleText,minVal,maxVal,startVal,decimals,onChange)
+	end
+
+	local function buildGradientPresets(parent)
+		New("TextLabel",{
 			BackgroundTransparency=1,
-			Size=UDim2.new(1,0,0,74),
+			Size=UDim2.new(1,0,0,16),
+			Text="Gradient presets",
+			Font=Enum.Font.GothamMedium,
+			TextSize=12,
+			TextColor3=THEME.TEXT,
+			TextXAlignment=Enum.TextXAlignment.Left,
+			ZIndex=6,
+		},parent)
+
+		local presetRow=New("Frame",{
+			BackgroundTransparency=1,
+			Size=UDim2.new(1,0,0,30),
 			ZIndex=5,
 		},parent)
 
-		New("TextLabel",{
-			BackgroundTransparency=1,
-			Size=UDim2.new(1,0,0,18),
-			Text=titleText,
-			Font=Enum.Font.GothamMedium,
-			TextSize=12,
-			TextColor3=THEME.MUTED,
-			TextXAlignment=Enum.TextXAlignment.Left,
-			ZIndex=6,
-		},row)
+		New("UIListLayout",{
+			FillDirection=Enum.FillDirection.Horizontal,
+			Padding=UDim.new(0,6),
+			SortOrder=Enum.SortOrder.LayoutOrder,
+		},presetRow)
 
-		local sliderHost=New("Frame",{
-			BackgroundTransparency=1,
-			Position=UDim2.fromOffset(0,20),
-			Size=UDim2.new(1,0,0,50),
-			ZIndex=5,
-		},row)
+		for _,pair in ipairs({
+			{Color3.fromRGB(32,202,106),Color3.fromRGB(21,103,251)},
+			{Color3.fromRGB(254,94,86),Color3.fromRGB(255,210,80)},
+			{Color3.fromRGB(195,195,195),Color3.fromRGB(76,76,76)},
+			{Color3.fromRGB(0,255,255),Color3.fromRGB(255,0,190)},
+			{Color3.fromRGB(150,255,80),Color3.fromRGB(80,70,255)},
+			{Color3.fromRGB(255,255,255),Color3.fromRGB(45,45,45)},
+			{Color3.fromRGB(255,130,0),Color3.fromRGB(0,230,255)},
+			{Color3.fromRGB(200,90,255),Color3.fromRGB(255,70,80)},
+		}) do
+			local btn=New("TextButton",{
+				Size=UDim2.fromOffset(38,24),
+				BackgroundColor3=pair[1],
+				BorderSizePixel=0,
+				Text="",
+				AutoButtonColor=false,
+				ZIndex=6,
+			},presetRow)
 
-		return buildSlider(sliderHost,shortLabel,minVal,maxVal,startVal,decimals,onChange)
+			New("UIStroke",{
+				Color=THEME.STROKE,
+				Thickness=1,
+				Transparency=0,
+			},btn)
+
+			local grad=Instance.new("UIGradient")
+			grad.Color=ColorSequence.new({
+				ColorSequenceKeypoint.new(0,pair[1]),
+				ColorSequenceKeypoint.new(1,pair[2]),
+			})
+			grad.Parent=btn
+
+			btn.MouseButton1Click:Connect(function()
+				api.ApplyGradient(pair[1],pair[2])
+			end)
+		end
 	end
 
 	clearPage()
@@ -619,7 +664,7 @@ function StrokeColour.new(ctx,page)
 		Transparency=UI_STYLE.StrokeTransparency,
 	},previewBox)
 
-	New("TextLabel",{
+	previewText=New("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,1,0),
 		Text="PREVIEW",
@@ -754,6 +799,8 @@ function StrokeColour.new(ctx,page)
 		end)
 	end
 
+	buildGradientPresets(presetSection)
+
 	New("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,16),
@@ -811,66 +858,6 @@ function StrokeColour.new(ctx,page)
 		tintSlider(gbSlider,Color3.fromRGB(0,0,v))
 		updateEverything()
 	end)
-
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,16),
-		Text="Gradient presets",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},colourSection)
-
-	local presetRow=New("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,30),
-		ZIndex=5,
-	},colourSection)
-
-	New("UIListLayout",{
-		FillDirection=Enum.FillDirection.Horizontal,
-		Padding=UDim.new(0,6),
-		SortOrder=Enum.SortOrder.LayoutOrder,
-	},presetRow)
-
-	for _,pair in ipairs({
-		{Color3.fromRGB(32,202,106),Color3.fromRGB(21,103,251)},
-		{Color3.fromRGB(254,94,86),Color3.fromRGB(255,210,80)},
-		{Color3.fromRGB(195,195,195),Color3.fromRGB(76,76,76)},
-		{Color3.fromRGB(0,255,255),Color3.fromRGB(255,0,190)},
-		{Color3.fromRGB(150,255,80),Color3.fromRGB(80,70,255)},
-		{Color3.fromRGB(255,255,255),Color3.fromRGB(45,45,45)},
-		{Color3.fromRGB(255,130,0),Color3.fromRGB(0,230,255)},
-		{Color3.fromRGB(200,90,255),Color3.fromRGB(255,70,80)},
-	}) do
-		local btn=New("TextButton",{
-			Size=UDim2.fromOffset(38,24),
-			BackgroundColor3=pair[1],
-			BorderSizePixel=0,
-			Text="",
-			AutoButtonColor=false,
-			ZIndex=6,
-		},presetRow)
-
-		New("UIStroke",{
-			Color=THEME.STROKE,
-			Thickness=1,
-			Transparency=0,
-		},btn)
-
-		local grad=Instance.new("UIGradient")
-		grad.Color=ColorSequence.new({
-			ColorSequenceKeypoint.new(0,pair[1]),
-			ColorSequenceKeypoint.new(1,pair[2]),
-		})
-		grad.Parent=btn
-
-		btn.MouseButton1Click:Connect(function()
-			api.ApplyGradient(pair[1],pair[2])
-		end)
-	end
 
 	gradientToggle=buildToggleRow(colourSection,"Gradient Stroke",UI_STYLE.StrokeGradient,function(state)
 		UI_STYLE.StrokeGradient=state and true or false

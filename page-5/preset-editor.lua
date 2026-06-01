@@ -110,7 +110,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 		local wrap,stroke=wrapTextBox(b,THEME.PANEL,2)
 
 		b.Focused:Connect(function()
-			wrap.BackgroundColor3=Color3.fromRGB(43,43,43)
+			wrap.BackgroundColor3=THEME.PANEL
 			stroke.Thickness=2
 		end)
 

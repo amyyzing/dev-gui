@@ -189,7 +189,7 @@ function ESP.new(ctx,parent)
 			setStatus("Defense active",THEME.GREEN or THEME.TEXT)
 		else
 			stopBoth()
-			setStatus("Off",THEME.MUTED)
+			setStatus("",THEME.MUTED)
 		end
 
 		if sectionFrame then
@@ -253,7 +253,7 @@ function ESP.new(ctx,parent)
 	statusLabel=ctx.New("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,16),
-		Text="Off",
+		Text="",
 		Font=Enum.Font.Gotham,
 		TextSize=11,
 		TextColor3=THEME.MUTED,

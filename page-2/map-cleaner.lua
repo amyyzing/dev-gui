@@ -186,7 +186,7 @@ function MapCleaner.new(ctx,page)
 			watchWorkspace()
 			removeCurrent()
 		else
-			setStatus(isGameplay() and "Off" or "Gameplay only.",THEME.MUTED)
+			setStatus(isGameplay() and "" or "Gameplay only.",THEME.MUTED)
 		end
 	end
 
@@ -205,7 +205,7 @@ function MapCleaner.new(ctx,page)
 	statusLabel=New("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,18),
-		Text="Off",
+		Text="",
 		Font=Enum.Font.Gotham,
 		TextSize=11,
 		TextColor3=THEME.MUTED,

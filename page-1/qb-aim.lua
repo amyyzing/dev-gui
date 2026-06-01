@@ -705,9 +705,9 @@ function QBAim.new(ctx,parent)
 		if not isAvailable() then
 			setStatus(currentModeText().." unsupported")
 		elseif enabled then
-			setStatus(currentModeText().." ready")
+			setStatus("")
 		else
-			setStatus(currentModeText().." disabled")
+			setStatus("")
 		end
 	end
 
@@ -1627,7 +1627,7 @@ function QBAim.new(ctx,parent)
 		syncControls()
 
 		if enabled and not getHeldBall() then
-			setStatus(currentModeText().." enabled, waiting for ball")
+			setStatus("Waiting for ball")
 		end
 	end
 
@@ -1691,7 +1691,7 @@ function QBAim.new(ctx,parent)
 		changed()
 	end)
 
-	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Disabled",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
+	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
 	targetLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Target: none",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
 
 	if buildSlider then

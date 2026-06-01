@@ -280,6 +280,7 @@ function PlayerData.new(ctx,page,deps)
 
 	local wipeWrap=wrapTextButton(wipeBtn,THEME.BG,2)
 	wipeWrap.BackgroundColor3=THEME.RED
+	wipeWrap:SetAttribute("ThemeRole","RED")
 
 	wipeBtn.MouseEnter:Connect(function()
 		wipeWrap.BackgroundColor3=Color3.fromRGB(255,124,118)
