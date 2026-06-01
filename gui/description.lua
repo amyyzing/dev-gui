@@ -36,7 +36,7 @@ Description.Sections={
 	["Speed"]={Title="SPEED",Description="Forced Speed"},
 	["Game Params"]={Title="PARAMS",Description="Your Athleticism Setting..."},
 	["Boost"]={Title="AUTO BOOST",Description="Configure your boost"},
-	["ESP"]={"ESP"=EMPTY,Description="WR/DB coverage esp, self-explanatory for league players"},
+	["ESP"]={Title="ESP",Description="WR/DB coverage esp, self-explanatory for league players"},
 	["QB Aim"]={Title="QB AIMBOT",Description="bad aim lol"},
 
 -- Page 2 categories
