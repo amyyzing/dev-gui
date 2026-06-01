@@ -552,14 +552,14 @@ function MainFrame.new(ctx)
 
 	function api.RefreshText(newDescription)
 		Description=newDescription or Description
-		titleLabel.Text=desc("Main.Title","untitled gui")
-		modeSubtitle.Text=desc("Main.Description",getModeLabel().." loaded")
-		settingsTab.Text=desc("Pages.Main","MAIN")
-		mapsPageTab.Text=desc("Pages.Maps","MAPS")
-		serverPageTab.Text=desc("Pages.Server","SERVER")
-		uiSettingsTab.Text=desc("Pages.Customize","CUSTOMIZE")
-		futureTab.Text=desc("Pages.Keybinds","KEYBINDS")
-		settingsPageTab.Text=desc("Pages.Settings","SETTINGS")
+		titleLabel.Text=text(desc("Main.Title","untitled gui"))
+		modeSubtitle.Text=text(desc("Main.Description",getModeLabel().." loaded"))
+		settingsTab.Text=text(desc("Pages.Main","MAIN"))
+		mapsPageTab.Text=text(desc("Pages.Maps","MAPS"))
+		serverPageTab.Text=text(desc("Pages.Server","SERVER"))
+		uiSettingsTab.Text=text(desc("Pages.Customize","CUSTOMIZE"))
+		futureTab.Text=text(desc("Pages.Keybinds","KEYBINDS"))
+		settingsPageTab.Text=text(desc("Pages.Settings","SETTINGS"))
 		refreshFooterResetButton()
 	end
 

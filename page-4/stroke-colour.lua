@@ -4,6 +4,10 @@ local TweenService=game:GetService("TweenService")
 local RunService=game:GetService("RunService")
 
 local DEFAULTS={
+	PrimaryR=28,
+	PrimaryG=28,
+	PrimaryB=28,
+
 	StrokeR=255,
 	StrokeG=255,
 	StrokeB=255,
@@ -43,6 +47,10 @@ local function boolOrDefault(v,default)
 end
 
 local function ensureStyleDefaults(style)
+	style.PrimaryR=numberOrDefault(style.PrimaryR,DEFAULTS.PrimaryR)
+	style.PrimaryG=numberOrDefault(style.PrimaryG,DEFAULTS.PrimaryG)
+	style.PrimaryB=numberOrDefault(style.PrimaryB,DEFAULTS.PrimaryB)
+
 	style.StrokeR=numberOrDefault(style.StrokeR,DEFAULTS.StrokeR)
 	style.StrokeG=numberOrDefault(style.StrokeG,DEFAULTS.StrokeG)
 	style.StrokeB=numberOrDefault(style.StrokeB,DEFAULTS.StrokeB)
@@ -66,6 +74,10 @@ local function copyDefaultStyle(style)
 	style=style or DEFAULTS
 
 	return{
+		PrimaryR=numberOrDefault(style.PrimaryR,DEFAULTS.PrimaryR),
+		PrimaryG=numberOrDefault(style.PrimaryG,DEFAULTS.PrimaryG),
+		PrimaryB=numberOrDefault(style.PrimaryB,DEFAULTS.PrimaryB),
+
 		StrokeR=numberOrDefault(style.StrokeR,DEFAULTS.StrokeR),
 		StrokeG=numberOrDefault(style.StrokeG,DEFAULTS.StrokeG),
 		StrokeB=numberOrDefault(style.StrokeB,DEFAULTS.StrokeB),
@@ -87,6 +99,10 @@ local function copyDefaultStyle(style)
 end
 
 local function colorFromStyle(style,prefix)
+	if prefix=="Primary" then
+		return Color3.fromRGB(clampByte(style.PrimaryR),clampByte(style.PrimaryG),clampByte(style.PrimaryB))
+	end
+
 	if prefix=="Gradient" then
 		return Color3.fromRGB(clampByte(style.GradientR),clampByte(style.GradientG),clampByte(style.GradientB))
 	end
@@ -95,7 +111,11 @@ local function colorFromStyle(style,prefix)
 end
 
 local function writeColorToStyle(style,prefix,c)
-	if prefix=="Gradient" then
+	if prefix=="Primary" then
+		style.PrimaryR=math.floor(c.R*255+0.5)
+		style.PrimaryG=math.floor(c.G*255+0.5)
+		style.PrimaryB=math.floor(c.B*255+0.5)
+	elseif prefix=="Gradient" then
 		style.GradientR=math.floor(c.R*255+0.5)
 		style.GradientG=math.floor(c.G*255+0.5)
 		style.GradientB=math.floor(c.B*255+0.5)
@@ -122,6 +142,7 @@ function StrokeColour.new(ctx,page)
 	local defaultStyle=copyDefaultStyle(ctx.DEFAULT_UI_STYLE or UI_STYLE)
 
 	local api={}
+	local prSlider,pgSlider,pbSlider
 	local rSlider,gSlider,bSlider
 	local grSlider,ggSlider,gbSlider
 	local speedSlider,thicknessSlider,transparencySlider
@@ -146,6 +167,14 @@ function StrokeColour.new(ctx,page)
 		end
 
 		return colorFromStyle(UI_STYLE,"Gradient")
+	end
+
+	local function getUIPrimaryColor()
+		if ctx.getUIPrimaryColor then
+			return ctx.getUIPrimaryColor()
+		end
+
+		return colorFromStyle(UI_STYLE,"Primary")
 	end
 
 	local function tintSlider(slider,color)
@@ -313,7 +342,7 @@ function StrokeColour.new(ctx,page)
 		local c1=getUIStrokeColor()
 		local c2=getUIStrokeGradientColor()
 
-		previewBox.BackgroundColor3=c1
+		previewBox.BackgroundColor3=getUIPrimaryColor()
 
 		if previewStroke then
 			previewStroke.Color=getPulseColor()
@@ -321,13 +350,18 @@ function StrokeColour.new(ctx,page)
 			previewStroke.Transparency=math.clamp(UI_STYLE.StrokeTransparency+(getPulseAlpha()*0.08),0,1)
 		end
 
-		local grad=previewBox:FindFirstChild("PreviewGradient")
+		local oldFillGradient=previewBox:FindFirstChild("PreviewGradient")
+		if oldFillGradient then
+			oldFillGradient:Destroy()
+		end
+
+		local grad=previewStroke and previewStroke:FindFirstChild("PreviewGradient")
 
 		if UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke then
 			if not grad then
 				grad=Instance.new("UIGradient")
 				grad.Name="PreviewGradient"
-				grad.Parent=previewBox
+				grad.Parent=previewStroke
 			end
 
 			setGradientColors(grad,c1,c2)
@@ -351,11 +385,19 @@ function StrokeColour.new(ctx,page)
 		writeColorToStyle(UI_STYLE,"Stroke",c)
 	end
 
+	local function setPrimaryColour(c)
+		writeColorToStyle(UI_STYLE,"Primary",c)
+	end
+
 	local function setGradientColour(c)
 		writeColorToStyle(UI_STYLE,"Gradient",c)
 	end
 
 	local function syncColourControls()
+		if prSlider then prSlider.set(UI_STYLE.PrimaryR) end
+		if pgSlider then pgSlider.set(UI_STYLE.PrimaryG) end
+		if pbSlider then pbSlider.set(UI_STYLE.PrimaryB) end
+
 		if rSlider then rSlider.set(UI_STYLE.StrokeR) end
 		if gSlider then gSlider.set(UI_STYLE.StrokeG) end
 		if bSlider then bSlider.set(UI_STYLE.StrokeB) end
@@ -370,6 +412,10 @@ function StrokeColour.new(ctx,page)
 
 		if gradientToggle then gradientToggle.set(UI_STYLE.StrokeGradient) end
 		if liquidToggle then liquidToggle.set(UI_STYLE.LiquidStroke) end
+
+		tintSlider(prSlider,Color3.fromRGB(clampByte(UI_STYLE.PrimaryR),0,0))
+		tintSlider(pgSlider,Color3.fromRGB(0,clampByte(UI_STYLE.PrimaryG),0))
+		tintSlider(pbSlider,Color3.fromRGB(0,0,clampByte(UI_STYLE.PrimaryB)))
 
 		tintSlider(rSlider,Color3.fromRGB(clampByte(UI_STYLE.StrokeR),0,0))
 		tintSlider(gSlider,Color3.fromRGB(0,clampByte(UI_STYLE.StrokeG),0))
@@ -443,6 +489,10 @@ function StrokeColour.new(ctx,page)
 	end
 
 	function api.Reset()
+		UI_STYLE.PrimaryR=defaultStyle.PrimaryR
+		UI_STYLE.PrimaryG=defaultStyle.PrimaryG
+		UI_STYLE.PrimaryB=defaultStyle.PrimaryB
+
 		UI_STYLE.StrokeR=defaultStyle.StrokeR
 		UI_STYLE.StrokeG=defaultStyle.StrokeG
 		UI_STYLE.StrokeB=defaultStyle.StrokeB
@@ -462,6 +512,12 @@ function StrokeColour.new(ctx,page)
 		UI_STYLE.CornerRadius=defaultStyle.CornerRadius
 
 		api.Refresh()
+	end
+
+	function api.ApplyPrimaryColour(c)
+		setPrimaryColour(c)
+		syncColourControls()
+		updateEverything()
 	end
 
 	function api.ApplyMainColour(c)
@@ -497,7 +553,7 @@ function StrokeColour.new(ctx,page)
 	local function buildPage3Slider(parent,titleText,shortLabel,minVal,maxVal,startVal,decimals,onChange)
 		local row=New("Frame",{
 			BackgroundTransparency=1,
-			Size=UDim2.new(1,0,0,54),
+			Size=UDim2.new(1,0,0,74),
 			ZIndex=5,
 		},parent)
 
@@ -515,7 +571,7 @@ function StrokeColour.new(ctx,page)
 		local sliderHost=New("Frame",{
 			BackgroundTransparency=1,
 			Position=UDim2.fromOffset(0,20),
-			Size=UDim2.new(1,0,0,32),
+			Size=UDim2.new(1,0,0,50),
 			ZIndex=5,
 		},row)
 
@@ -549,8 +605,9 @@ function StrokeColour.new(ctx,page)
 	previewBox=New("Frame",{
 		Size=UDim2.fromOffset(150,30),
 		Position=UDim2.new(1,-150,0.5,-15),
-		BackgroundColor3=getUIStrokeColor(),
+		BackgroundColor3=getUIPrimaryColor(),
 		BorderSizePixel=0,
+		SkipThemeRole=true,
 		ZIndex=6,
 	},previewRow)
 
@@ -571,6 +628,78 @@ function StrokeColour.new(ctx,page)
 		TextColor3=Color3.fromRGB(0,0,0),
 		ZIndex=7,
 	},previewBox)
+
+	New("TextLabel",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,16),
+		Text="Primary colour",
+		Font=Enum.Font.GothamMedium,
+		TextSize=12,
+		TextColor3=THEME.TEXT,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		ZIndex=6,
+	},presetSection)
+
+	local primaryPaletteRow=New("Frame",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,30),
+		ZIndex=5,
+	},presetSection)
+
+	New("UIListLayout",{
+		FillDirection=Enum.FillDirection.Horizontal,
+		Padding=UDim.new(0,6),
+		SortOrder=Enum.SortOrder.LayoutOrder,
+	},primaryPaletteRow)
+
+	for _,c in ipairs({
+		Color3.fromRGB(28,28,28),
+		Color3.fromRGB(238,238,238),
+		Color3.fromRGB(90,90,90),
+		Color3.fromRGB(58,17,24),
+		Color3.fromRGB(12,18,38),
+		Color3.fromRGB(18,36,34),
+		Color3.fromRGB(42,30,54),
+		Color3.fromRGB(24,24,30),
+	}) do
+		local swatch=New("TextButton",{
+			Size=UDim2.fromOffset(34,24),
+			BackgroundColor3=c,
+			BorderSizePixel=0,
+			Text="",
+			AutoButtonColor=false,
+			SkipThemeRole=true,
+			ZIndex=6,
+		},primaryPaletteRow)
+
+		New("UIStroke",{
+			Color=THEME.STROKE,
+			Thickness=1,
+			Transparency=0,
+		},swatch)
+
+		swatch.MouseButton1Click:Connect(function()
+			api.ApplyPrimaryColour(c)
+		end)
+	end
+
+	prSlider=buildPage3Slider(colourSection,"Primary red","PR",0,255,UI_STYLE.PrimaryR,0,function(v)
+		UI_STYLE.PrimaryR=v
+		tintSlider(prSlider,Color3.fromRGB(v,0,0))
+		updateEverything()
+	end)
+
+	pgSlider=buildPage3Slider(colourSection,"Primary green","PG",0,255,UI_STYLE.PrimaryG,0,function(v)
+		UI_STYLE.PrimaryG=v
+		tintSlider(pgSlider,Color3.fromRGB(0,v,0))
+		updateEverything()
+	end)
+
+	pbSlider=buildPage3Slider(colourSection,"Primary blue","PB",0,255,UI_STYLE.PrimaryB,0,function(v)
+		UI_STYLE.PrimaryB=v
+		tintSlider(pbSlider,Color3.fromRGB(0,0,v))
+		updateEverything()
+	end)
 
 	New("TextLabel",{
 		BackgroundTransparency=1,

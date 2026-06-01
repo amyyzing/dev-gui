@@ -7,6 +7,7 @@ GuiLogic=GuiLogicModule.new({
 	fmtNumber=fmtNumber,
 	BOX_WRAPPERS=BOX_WRAPPERS,
 	BUTTON_WRAPPERS=BUTTON_WRAPPERS,
+	markThemeRole=markThemeRole,
 })
 
 attachHover=GuiLogic.attachHover

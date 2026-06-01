@@ -443,6 +443,9 @@ function DataSave.new(ctx)
 			presetEditor=collectPresetEditor(ctx),
 
 			uiStyle={
+				primaryR=uiStyle.PrimaryR,
+				primaryG=uiStyle.PrimaryG,
+				primaryB=uiStyle.PrimaryB,
 				strokeR=uiStyle.StrokeR,
 				strokeG=uiStyle.StrokeG,
 				strokeB=uiStyle.StrokeB,
@@ -597,6 +600,9 @@ function DataSave.new(ctx)
 
 		local uiStyle=settings.uiStyle or {}
 		if ctx.UI_STYLE then
+			if uiStyle.primaryR~=nil then ctx.UI_STYLE.PrimaryR=clampNumber(uiStyle.primaryR,0,255,ctx.UI_STYLE.PrimaryR or 28) end
+			if uiStyle.primaryG~=nil then ctx.UI_STYLE.PrimaryG=clampNumber(uiStyle.primaryG,0,255,ctx.UI_STYLE.PrimaryG or 28) end
+			if uiStyle.primaryB~=nil then ctx.UI_STYLE.PrimaryB=clampNumber(uiStyle.primaryB,0,255,ctx.UI_STYLE.PrimaryB or 28) end
 			if uiStyle.strokeR~=nil then ctx.UI_STYLE.StrokeR=clampNumber(uiStyle.strokeR,0,255,ctx.UI_STYLE.StrokeR or 255) end
 			if uiStyle.strokeG~=nil then ctx.UI_STYLE.StrokeG=clampNumber(uiStyle.strokeG,0,255,ctx.UI_STYLE.StrokeG or 255) end
 			if uiStyle.strokeB~=nil then ctx.UI_STYLE.StrokeB=clampNumber(uiStyle.strokeB,0,255,ctx.UI_STYLE.StrokeB or 255) end

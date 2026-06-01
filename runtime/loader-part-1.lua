@@ -11,6 +11,10 @@ guiParent=me:WaitForChild("PlayerGui")
 THEME={BG=Color3.fromRGB(28,28,28), PANEL=Color3.fromRGB(33,33,33), CARD=Color3.fromRGB(38,38,38), ACC=Color3.fromRGB(32,202,106), TEXT=Color3.fromRGB(195,195,195), MUTED=Color3.fromRGB(168,168,168), STROKE=Color3.fromRGB(76,76,76), RED=Color3.fromRGB(254,94,86), BLUE=Color3.fromRGB(21,103,251), GREEN=Color3.fromRGB(32,202,106),}
 
 UI_STYLE={
+	PrimaryR=28,
+	PrimaryG=28,
+	PrimaryB=28,
+
 	StrokeR=76,
 	StrokeG=76,
 	StrokeB=76,
@@ -82,6 +86,60 @@ UI_MAIN={}
 BOX_WRAPPERS=setmetatable({}, {__mode="k"})
 BUTTON_WRAPPERS=setmetatable({}, {__mode="k"})
 
+function colorClose(a,b)
+	if not(a and b) then return false end
+	return math.abs(a.R-b.R)<0.002 and math.abs(a.G-b.G)<0.002 and math.abs(a.B-b.B)<0.002
+end
+
+function markThemeRole(obj,color)
+	if not(obj and color) then return end
+	if obj:IsA("TextButton") and obj.Text=="" then return end
+
+	local role=nil
+	if colorClose(color,THEME.BG) then
+		role="BG"
+	elseif colorClose(color,THEME.PANEL) then
+		role="PANEL"
+	elseif colorClose(color,THEME.CARD) then
+		role="CARD"
+	elseif colorClose(color,THEME.TEXT) then
+		role="TEXT"
+	elseif colorClose(color,THEME.MUTED) then
+		role="MUTED"
+	elseif colorClose(color,THEME.GREEN) then
+		role="GREEN"
+	elseif colorClose(color,THEME.RED) then
+		role="RED"
+	elseif colorClose(color,THEME.BLUE) then
+		role="BLUE"
+	end
+
+	if role then
+		obj:SetAttribute("ThemeRole",role)
+	end
+end
+
+function markThemeTextRole(obj,color)
+	if not(obj and color) then return end
+
+	local role=nil
+	if colorClose(color,THEME.TEXT) then
+		role="TEXT"
+	elseif colorClose(color,THEME.MUTED) then
+		role="MUTED"
+	elseif colorClose(color,THEME.RED) then
+		role="RED"
+	elseif colorClose(color,THEME.GREEN) then
+		role="GREEN"
+	elseif colorClose(color,THEME.BLUE) then
+		role="BLUE"
+	end
+
+	if role then
+		obj:SetAttribute("ThemeTextRole",role)
+	end
+end
+
 function translateUIText(value)
 	if type(value)~="string" then
 		return value
@@ -100,6 +158,13 @@ end
 
 function New(class, props, parent)
 	props=props or {}
+	local skipThemeRole=props.SkipThemeRole
+	local forcedThemeRole=props.ThemeRole
+	local forcedTextRole=props.TextRole
+
+	props.SkipThemeRole=nil
+	props.ThemeRole=nil
+	props.TextRole=nil
 
 	if props.Active==nil and (class=="Frame" or class=="ScrollingFrame" or class=="TextButton" or class=="TextBox") then
 		props.Active=true
@@ -127,6 +192,18 @@ function New(class, props, parent)
 		obj[k]=v
 	end
 	obj.Parent=parent
+
+	if forcedThemeRole then
+		obj:SetAttribute("ThemeRole",forcedThemeRole)
+	elseif not skipThemeRole and props.BackgroundColor3 then
+		markThemeRole(obj,props.BackgroundColor3)
+	end
+
+	if forcedTextRole and (class=="TextLabel" or class=="TextButton" or class=="TextBox") then
+		obj:SetAttribute("ThemeTextRole",forcedTextRole)
+	elseif class=="TextLabel" or class=="TextButton" or class=="TextBox" then
+		markThemeTextRole(obj,props.TextColor3)
+	end
 
 	if class=="TextBox" then
 		obj.Focused:Connect(function()
@@ -381,9 +458,11 @@ function loadRemoteModule(modulePath)
 	return module
 end
 
-SG_NAME="HitboxUI_DarkInfluenced_GUIOnly"
-old=guiParent:FindFirstChild(SG_NAME)
-if old then old:Destroy() end
+SG_NAME="1"
+for _,existingName in ipairs({"HitboxUI_DarkInfluenced_GUIOnly",SG_NAME}) do
+	old=guiParent:FindFirstChild(existingName)
+	if old then old:Destroy() end
+end
 
 SG=New("ScreenGui", {Name=SG_NAME, ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, IgnoreGuiInset=true, DisplayOrder=1000}, guiParent)
 LOADER_Z=10000
@@ -537,6 +616,66 @@ function finishLoader()
 	end)
 end
 
+function closeAfterAutoRefreshError(message,path)
+	if not(SG and SG.Parent) then return end
+
+	local overlay=New("Frame",{
+		Name="RefreshError",
+		BackgroundColor3=Color3.fromRGB(0,0,0),
+		BackgroundTransparency=0.08,
+		BorderSizePixel=0,
+		Size=UDim2.new(1,0,1,0),
+		ZIndex=LOADER_Z+20,
+	},SG)
+
+	local box=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.new(0.5,0,0.5,0),
+		Size=UDim2.fromOffset(410,128),
+		BackgroundColor3=THEME.BG,
+		BorderSizePixel=0,
+		ZIndex=LOADER_Z+21,
+	},overlay)
+	New("UIStroke",{Color=THEME.RED,Thickness=1,Transparency=0},box)
+	New("UIPadding",{PaddingTop=UDim.new(0,16),PaddingLeft=UDim.new(0,18),PaddingRight=UDim.new(0,18),PaddingBottom=UDim.new(0,16)},box)
+
+	New("TextLabel",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,24),
+		Text="Closing... encountered error",
+		Font=Enum.Font.GothamMedium,
+		TextSize=16,
+		TextColor3=THEME.RED,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		ZIndex=LOADER_Z+22,
+	},box)
+
+	New("TextLabel",{
+		BackgroundTransparency=1,
+		Position=UDim2.fromOffset(0,34),
+		Size=UDim2.new(1,0,0,48),
+		Text=tostring(path or message or "Auto-refresh failed."),
+		Font=Enum.Font.Gotham,
+		TextSize=12,
+		TextColor3=THEME.MUTED,
+		TextWrapped=true,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		TextYAlignment=Enum.TextYAlignment.Top,
+		ZIndex=LOADER_Z+22,
+	},box)
+
+	task.delay(1.35,function()
+		if shutdownTool then
+			pcall(shutdownTool)
+		else
+			toolAlive=false
+			if SG and SG.Parent then
+				SG:Destroy()
+			end
+		end
+	end)
+end
+
 function loadRemoteModuleStep(name,path)
 	loaderCurrent+=1
 	setLoaderProgress("Fetching "..path,loaderCurrent-0.35,LOADER_TOTAL,false)
@@ -612,6 +751,47 @@ function getUIStrokeGradientColor()
 	return Color3.fromRGB(math.clamp(math.floor(UI_STYLE.GradientR+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.GradientG+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.GradientB+0.5), 0, 255))
 end
 
+function getUIPrimaryColor()
+	return Color3.fromRGB(math.clamp(math.floor((UI_STYLE.PrimaryR or 28)+0.5),0,255),math.clamp(math.floor((UI_STYLE.PrimaryG or 28)+0.5),0,255),math.clamp(math.floor((UI_STYLE.PrimaryB or 28)+0.5),0,255))
+end
+
+function refreshThemePalette()
+	local primary=getUIPrimaryColor()
+	local lum=(primary.R*0.2126)+(primary.G*0.7152)+(primary.B*0.0722)
+	local toward=lum<0.52 and Color3.new(1,1,1) or Color3.new(0,0,0)
+	local away=lum<0.52 and Color3.new(0,0,0) or Color3.new(1,1,1)
+
+	THEME.BG=primary
+	THEME.PANEL=primary:Lerp(toward,lum<0.52 and 0.07 or 0.09)
+	THEME.CARD=primary:Lerp(toward,lum<0.52 and 0.12 or 0.16)
+	THEME.TEXT=lum<0.58 and Color3.fromRGB(226,226,226) or Color3.fromRGB(24,24,24)
+	THEME.MUTED=lum<0.58 and Color3.fromRGB(168,168,168) or Color3.fromRGB(82,82,82)
+	THEME.ACC=THEME.GREEN
+
+	if lum>=0.72 then
+		THEME.PANEL=primary:Lerp(away,0.04)
+		THEME.CARD=primary:Lerp(away,0.08)
+	end
+end
+
+function applyUIPrimaryTheme()
+	refreshThemePalette()
+
+	if not SG then return end
+
+	for _,obj in ipairs(SG:GetDescendants()) do
+		local role=obj:GetAttribute("ThemeRole")
+		if role and THEME[role] and obj:IsA("GuiObject") then
+			obj.BackgroundColor3=THEME[role]
+		end
+
+		local textRole=obj:GetAttribute("ThemeTextRole")
+		if textRole and THEME[textRole] and (obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox")) then
+			obj.TextColor3=THEME[textRole]
+		end
+	end
+end
+
 liquidStrokeConn=nil
 MainFrame=nil
 AutoRefreshAPI=nil
@@ -624,23 +804,30 @@ function reapplyThemeAfterAutoRefresh()
 	end)
 end
 
+function runAutoRefreshStep(label,fn,...)
+	if not fn then return end
+
+	local ok,err=pcall(fn,...)
+	if not ok then
+		error("Auto-refresh "..tostring(label).." failed: "..tostring(err))
+	end
+end
+
 function applyAutoRefreshModuleChange(changedPath,module)
 	if changedPath==MODULE_PATHS.Description then
 		DescriptionModule=module
 		Description=module
 
 		if MainFrame and MainFrame.RefreshText then
-			pcall(function()
-				MainFrame.RefreshText(Description)
-			end)
+			runAutoRefreshStep("main text refresh",MainFrame.RefreshText,Description)
 		end
 
-		if rebuildPage1FromModules then pcall(rebuildPage1FromModules) end
-		if rebuildCustomizeFromModules then pcall(rebuildCustomizeFromModules) end
-		if rebuildMapFromModules then pcall(rebuildMapFromModules) end
-		if rebuildSettingsFromModules then pcall(rebuildSettingsFromModules) end
-		if rebuildPage2FromModules then pcall(rebuildPage2FromModules) end
-		if refreshAllUI then pcall(refreshAllUI) end
+		runAutoRefreshStep("page 1 rebuild",rebuildPage1FromModules)
+		runAutoRefreshStep("customize rebuild",rebuildCustomizeFromModules)
+		runAutoRefreshStep("map rebuild",rebuildMapFromModules)
+		runAutoRefreshStep("settings rebuild",rebuildSettingsFromModules)
+		runAutoRefreshStep("keybind rebuild",rebuildPage2FromModules)
+		runAutoRefreshStep("ui refresh",refreshAllUI)
 		reapplyThemeAfterAutoRefresh()
 		return true
 	end
@@ -739,6 +926,7 @@ function startAutoRefresh()
 			return APP_RUNTIME_PATH_SET[changedPath] or changedPath==MODULE_PATHS.GuiLogic or changedPath==MODULE_PATHS.MainFrame or changedPath==MODULE_PATHS.Announcement or changedPath==MODULE_PATHS.AutoRefresh
 		end,
 		applyModuleChange=applyAutoRefreshModuleChange,
+		onError=closeAfterAutoRefreshError,
 	})
 
 	AutoRefreshAPI.Start()
@@ -828,6 +1016,8 @@ function updateLiquidStrokeAnimation()
 end
 
 applyUIStrokeTheme=function()
+	applyUIPrimaryTheme()
+
 	local color=getUIStrokeColor()
 	local color2=getUIStrokeGradientColor()
 	THEME.STROKE=color

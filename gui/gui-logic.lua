@@ -8,6 +8,7 @@ function GuiLogic.new(ctx)
 	local fmtNumber=ctx.fmtNumber
 	local BOX_WRAPPERS=ctx.BOX_WRAPPERS or setmetatable({}, {__mode="k"})
 	local BUTTON_WRAPPERS=ctx.BUTTON_WRAPPERS or setmetatable({}, {__mode="k"})
+	local markThemeRole=ctx.markThemeRole or function() end
 
 	local api={}
 	local WRAP_INSET=0
@@ -57,6 +58,7 @@ function GuiLogic.new(ctx)
 		wrap.Visible=box.Visible
 		wrap.ZIndex=math.max((box.ZIndex or 2)-1,1)
 		wrap.Parent=parent
+		markThemeRole(wrap,wrap.BackgroundColor3)
 
 		local stroke=New("UIStroke",{Color=THEME.STROKE,Thickness=strokeThickness or 2,Transparency=0},wrap)
 
@@ -94,6 +96,7 @@ function GuiLogic.new(ctx)
 		wrap.Visible=button.Visible
 		wrap.ZIndex=math.max((button.ZIndex or 2)-1,1)
 		wrap.Parent=parent
+		markThemeRole(wrap,wrap.BackgroundColor3)
 
 		local stroke=New("UIStroke",{Color=THEME.STROKE,Thickness=strokeThickness or 2,Transparency=0},wrap)
 
@@ -286,13 +289,13 @@ function GuiLogic.new(ctx)
 	end
 
 	function api.buildSlider(parent,labelText,minVal,maxVal,startVal,decimals,onChange)
-		local container=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,32),ZIndex=5},parent)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.fromOffset(28,32),Text=labelText,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},container)
+		local container=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,50),ZIndex=5},parent)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(0,0),Size=UDim2.new(1,-82,0,16),Text=labelText,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},container)
 
-		local valueLabel=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,ClearTextOnFocus=true,Size=UDim2.fromOffset(72,28),Position=UDim2.new(1,-72,0.5,-14),Text=fmtNumber(startVal,decimals),Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},container)
+		local valueLabel=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,ClearTextOnFocus=true,Size=UDim2.fromOffset(72,28),Position=UDim2.new(1,-72,0,20),Text=fmtNumber(startVal,decimals),Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},container)
 		local valueWrap,valueStroke=api.wrapTextBox(valueLabel,THEME.BG,2)
 
-		local track=New("Frame",{Size=UDim2.new(1,-118,0,8),Position=UDim2.new(0,34,0.5,-4),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=6},container)
+		local track=New("Frame",{Size=UDim2.new(1,-86,0,8),Position=UDim2.new(0,0,0,30),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=6},container)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},track)
 
 		local fill=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=THEME.STROKE:Lerp(THEME.TEXT,0.18),BorderSizePixel=0,ZIndex=7},track)

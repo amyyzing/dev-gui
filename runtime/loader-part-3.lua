@@ -37,6 +37,10 @@ function buildCustomizePage()
 				UI_STYLE=UI_STYLE,
 
 				DEFAULT_UI_STYLE={
+					PrimaryR=28,
+					PrimaryG=28,
+					PrimaryB=28,
+
 					StrokeR=76,
 					StrokeG=76,
 					StrokeB=76,
@@ -65,7 +69,9 @@ function buildCustomizePage()
 
 				getUIStrokeColor=getUIStrokeColor,
 				getUIStrokeGradientColor=getUIStrokeGradientColor,
+				getUIPrimaryColor=getUIPrimaryColor,
 				applyUIStrokeTheme=applyUIStrokeTheme,
+				applyUIPrimaryTheme=applyUIPrimaryTheme,
 				tintSlider=tintSlider,
 
 				onChanged=function()

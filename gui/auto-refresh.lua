@@ -14,6 +14,33 @@ function AutoRefresh.new(ctx)
 	local getRemoteSource=ctx.getRemoteSource
 	local reloadFromSource=ctx.reloadFromSource
 	local reloading=false
+	local failed=false
+	local fetchFailures={}
+
+	local function fail(message,path,detail)
+		if failed then
+			return true
+		end
+
+		failed=true
+		enabled=false
+
+		local full=tostring(message or "Closing... encountered error")
+		if path then
+			full=full.." ("..tostring(path)..")"
+		end
+		if detail then
+			full=full..": "..tostring(detail)
+		end
+
+		warn(full)
+
+		if ctx.onError then
+			pcall(ctx.onError,full,path,detail)
+		end
+
+		return true
+	end
 
 	local function fetchSource(path)
 		if getRemoteSource then
@@ -30,19 +57,23 @@ function AutoRefresh.new(ctx)
 
 	local function runReload(path,source,changedPath,changedSource)
 		if reloadFromSource then
-			return reloadFromSource(path,source,changedPath,changedSource)
+			local ok,result=pcall(reloadFromSource,path,source,changedPath,changedSource)
+			if not ok then
+				return fail("Closing... encountered error",path,result)
+			end
+
+			return result~=false
 		end
 
-		if reloading then return end
+		if reloading then return true end
 
 		local chunk,err=loadstring(source)
 		if not chunk then
-			warn("Auto-refresh found bad source:",path,err)
 			sourceCache[path]=source
 			if changedPath and changedPath~=path and changedSource then
 				sourceCache[changedPath]=changedSource
 			end
-			return
+			return fail("Closing... encountered error",path,err)
 		end
 
 		reloading=true
@@ -53,28 +84,27 @@ function AutoRefresh.new(ctx)
 		task.defer(function()
 			local ok,reloadErr=pcall(chunk)
 			if not ok then
-				warn("Auto-refresh reload failed:",reloadErr)
+				fail("Closing... encountered error",path,reloadErr)
 			end
 		end)
+
+		return true
 	end
 
 	local function requestRefresh(changedPath,changedSource)
 		if changedPath==reloadPath then
 			warn("Auto-refreshing script after remote change:",changedPath)
-			runReload(changedPath,changedSource,changedPath,changedSource)
-			return
+			return runReload(changedPath,changedSource,changedPath,changedSource)
 		end
 
 		if shouldReloadMain(changedPath,nil) then
 			local source,sourceErr=fetchSource(reloadPath)
 			if not source then
-				warn("Auto-refresh detected a reload-required chunk change in "..changedPath..", but "..reloadPath.." could not be fetched:",sourceErr)
-				return
+				return fail("Closing... encountered error",reloadPath,sourceErr)
 			end
 
 			warn("Auto-refreshing script after runtime change:",changedPath)
-			runReload(reloadPath,source,changedPath,changedSource)
-			return
+			return runReload(reloadPath,source,changedPath,changedSource)
 		end
 
 		local module=nil
@@ -82,28 +112,31 @@ function AutoRefresh.new(ctx)
 			local err=nil
 			module,err=loadModuleFromSource(changedPath,changedSource)
 			if not module then
-				warn("Auto-refresh found bad module source:",changedPath,err)
-				return
+				return fail("Closing... encountered error",changedPath,err)
 			end
 		end
 
 		if shouldReloadMain(changedPath,module) then
 			local source,sourceErr=fetchSource(reloadPath)
 			if not source then
-				warn("Auto-refresh detected a reload-required module change in "..changedPath..", but "..reloadPath.." could not be fetched:",sourceErr)
-				return
+				return fail("Closing... encountered error",reloadPath,sourceErr)
 			end
 
 			warn("Auto-refreshing script after module change:",changedPath)
-			runReload(reloadPath,source,changedPath,changedSource)
-			return
+			return runReload(reloadPath,source,changedPath,changedSource)
 		end
 
-		if applyModuleChange(changedPath,module) then
-			return
+		local ok,applied=pcall(applyModuleChange,changedPath,module)
+		if not ok then
+			return fail("Closing... encountered error",changedPath,applied)
+		end
+
+		if applied then
+			return false
 		end
 
 		warn("Auto-refresh cached module after remote change:",changedPath)
+		return false
 	end
 
 	function api.Start()
@@ -112,22 +145,30 @@ function AutoRefresh.new(ctx)
 		task.spawn(function()
 			task.wait(interval)
 
-			while alive() do
+			while alive() and not failed do
 				for _,path in ipairs(watchPaths) do
 					if not alive() then
 						return
 					end
 
-					local source=fetchSource(path)
+					local source,sourceErr=fetchSource(path)
 					if source then
+						fetchFailures[path]=0
 						local previous=sourceCache[path]
 						if previous~=nil and previous~=source then
-							requestRefresh(path,source)
-							return
+							if requestRefresh(path,source) then
+								return
+							end
 						end
 
 						if previous==nil then
 							sourceCache[path]=source
+						end
+					else
+						fetchFailures[path]=(fetchFailures[path] or 0)+1
+						if fetchFailures[path]>=3 then
+							fail("Closing... encountered error",path,sourceErr or "remote source fetch failed")
+							return
 						end
 					end
 
