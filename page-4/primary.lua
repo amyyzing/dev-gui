@@ -71,20 +71,20 @@ function Primary.new(ctx,parent)
 
 	refs.pr=buildSlider(parent,"Primary red",0,255,UI_STYLE.PrimaryR,0,function(v)
 		UI_STYLE.PrimaryR=v
-		tintSlider(refs.pr)
 		updateEverything()
+		tintSlider(refs.pr,Color3.fromRGB(v,0,0))
 	end)
 
 	refs.pg=buildSlider(parent,"Primary green",0,255,UI_STYLE.PrimaryG,0,function(v)
 		UI_STYLE.PrimaryG=v
-		tintSlider(refs.pg)
 		updateEverything()
+		tintSlider(refs.pg,Color3.fromRGB(0,v,0))
 	end)
 
 	refs.pb=buildSlider(parent,"Primary blue",0,255,UI_STYLE.PrimaryB,0,function(v)
 		UI_STYLE.PrimaryB=v
-		tintSlider(refs.pb)
 		updateEverything()
+		tintSlider(refs.pb,Color3.fromRGB(0,0,v))
 	end)
 
 	return refs

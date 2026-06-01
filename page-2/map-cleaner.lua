@@ -196,11 +196,21 @@ function MapCleaner.new(ctx,page)
 		restoreRemoved()
 	end
 
-	local section=makeSection(page,2,"Map Cleaner","Gameplay only")
+	local section,sectionControls=makeSection(page,2,"Map Cleaner","Gameplay only",{
+		headerToggle={
+			startState=enabled,
+			onChange=function(state)
+				api.SetEnabled(state,true)
+			end,
+		},
+	})
 
-	toggle=buildToggleRow(section,"Map Cleaner",enabled,function(state)
-		api.SetEnabled(state,true)
-	end)
+	toggle=sectionControls and sectionControls.toggle
+	if not toggle then
+		toggle=buildToggleRow(section,"Map Cleaner",enabled,function(state)
+			api.SetEnabled(state,true)
+		end)
+	end
 
 	statusLabel=New("TextLabel",{
 		BackgroundTransparency=1,

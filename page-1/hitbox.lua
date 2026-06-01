@@ -2,7 +2,6 @@ local Hitbox={}
 
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
-local TweenService=game:GetService("TweenService")
 
 local me=Players.LocalPlayer
 local ZERO=Vector3.new(0,0,0)
@@ -66,8 +65,7 @@ function Hitbox.new(ctx,parent)
 	local fmtNumber=ctx.fmtNumber
 	local state=ctx.State
 	local api={}
-	local toggleWrap=nil
-	local tKnob=nil
+	local toggle=nil
 	local boxX=nil
 	local boxY=nil
 	local boxZ=nil
@@ -500,12 +498,7 @@ function Hitbox.new(ctx,parent)
 	end
 
 	local function paintToggle()
-		if not toggleWrap or not tKnob then return end
-		local ti=TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out)
-		local bg=state.hitboxOn and THEME.GREEN or THEME.RED
-		local pos=state.hitboxOn and UDim2.new(1,-22,0,2) or UDim2.fromOffset(2,2)
-		TweenService:Create(toggleWrap,ti,{BackgroundColor3=bg}):Play()
-		TweenService:Create(tKnob,ti,{Position=pos,BackgroundColor3=THEME.STROKE}):Play()
+		if toggle then toggle.set(state.hitboxOn) end
 	end
 
 	local function syncReadouts()
@@ -590,27 +583,16 @@ function Hitbox.new(ctx,parent)
 	updateCurrentModeFromWorkspace()
 	syncModeToCtx()
 
-	section=makeSection(parent,1,"Hitbox","")
-
-	local hitboxToggleRow=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},section)
-
-	toggleWrap=New("Frame",{Size=UDim2.fromOffset(58,24),Position=UDim2.new(1,-58,0.5,-12),BackgroundColor3=THEME.RED,BorderSizePixel=0,ClipsDescendants=false,ZIndex=6},hitboxToggleRow)
-	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},toggleWrap)
-
-	tKnob=New("Frame",{Size=UDim2.fromOffset(20,20),Position=UDim2.fromOffset(2,2),BackgroundColor3=THEME.STROKE,BorderSizePixel=0,ClipsDescendants=false,ZIndex=7,ThemeRole="STROKE"},toggleWrap)
-	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},tKnob)
-
-	toggleWrap.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 then
-			api.SetHitboxLock(not state.hitboxOn,true)
-		end
-	end)
-
-	tKnob.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 then
-			api.SetHitboxLock(not state.hitboxOn,true)
-		end
-	end)
+	local sectionControls=nil
+	section,sectionControls=makeSection(parent,1,"Hitbox","",{
+		headerToggle={
+			startState=state.hitboxOn,
+			onChange=function(value)
+				api.SetHitboxLock(value,true)
+			end,
+		},
+	})
+	toggle=sectionControls and sectionControls.toggle
 
 	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="HITBOX SIZE",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 

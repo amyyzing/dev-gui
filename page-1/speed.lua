@@ -139,11 +139,22 @@ function Speed.new(ctx,parent)
 		end
 	end
 
-	section=makeSection(parent,3,"Speed","")
+	local sectionControls=nil
+	section,sectionControls=makeSection(parent,3,"Speed","",{
+		headerToggle={
+			startState=state.speedEnabled,
+			onChange=function(value)
+				api.SetSpeedState(value,true,true)
+			end,
+		},
+	})
 
-	toggle=buildToggleRow(section,"Force Speed",state.speedEnabled,function(value)
-		api.SetSpeedState(value,true,true)
-	end)
+	toggle=sectionControls and sectionControls.toggle
+	if not toggle then
+		toggle=buildToggleRow(section,"Force Speed",state.speedEnabled,function(value)
+			api.SetSpeedState(value,true,true)
+		end)
+	end
 
 	slider=buildSlider(section,"S",0,100,state.speedValue,0,function(v)
 		api.SetSpeedValue(v,true)

@@ -121,40 +121,40 @@ function Secondary.new(ctx,parent)
 
 	refs.r=buildSlider(parent,"Main red",0,255,UI_STYLE.StrokeR,0,function(v)
 		UI_STYLE.StrokeR=v
-		tintSlider(refs.r)
 		updateEverything()
+		tintSlider(refs.r,Color3.fromRGB(v,0,0))
 	end)
 
 	refs.g=buildSlider(parent,"Main green",0,255,UI_STYLE.StrokeG,0,function(v)
 		UI_STYLE.StrokeG=v
-		tintSlider(refs.g)
 		updateEverything()
+		tintSlider(refs.g,Color3.fromRGB(0,v,0))
 	end)
 
 	refs.b=buildSlider(parent,"Main blue",0,255,UI_STYLE.StrokeB,0,function(v)
 		UI_STYLE.StrokeB=v
-		tintSlider(refs.b)
 		updateEverything()
+		tintSlider(refs.b,Color3.fromRGB(0,0,v))
 	end)
 
 	makeLabel(New,THEME,parent,"Gradient end colour")
 
 	refs.gr=buildSlider(parent,"Gradient red",0,255,UI_STYLE.GradientR,0,function(v)
 		UI_STYLE.GradientR=v
-		tintSlider(refs.gr)
 		updateEverything()
+		tintSlider(refs.gr,Color3.fromRGB(v,0,0))
 	end)
 
 	refs.gg=buildSlider(parent,"Gradient green",0,255,UI_STYLE.GradientG,0,function(v)
 		UI_STYLE.GradientG=v
-		tintSlider(refs.gg)
 		updateEverything()
+		tintSlider(refs.gg,Color3.fromRGB(0,v,0))
 	end)
 
 	refs.gb=buildSlider(parent,"Gradient blue",0,255,UI_STYLE.GradientB,0,function(v)
 		UI_STYLE.GradientB=v
-		tintSlider(refs.gb)
 		updateEverything()
+		tintSlider(refs.gb,Color3.fromRGB(0,0,v))
 	end)
 
 	return refs

@@ -199,11 +199,21 @@ function RemoveAds.new(ctx,page)
 		restoreAds()
 	end
 
-	local section=makeSection(page,3,"Remove Ads","Gameplay only")
+	local section,sectionControls=makeSection(page,3,"Remove Ads","Gameplay only",{
+		headerToggle={
+			startState=enabled,
+			onChange=function(state)
+				api.SetEnabled(state,true)
+			end,
+		},
+	})
 
-	toggle=buildToggleRow(section,"Remove Ads",enabled,function(state)
-		api.SetEnabled(state,true)
-	end)
+	toggle=sectionControls and sectionControls.toggle
+	if not toggle then
+		toggle=buildToggleRow(section,"Remove Ads",enabled,function(state)
+			api.SetEnabled(state,true)
+		end)
+	end
 
 	statusLabel=New("TextLabel",{
 		BackgroundTransparency=1,

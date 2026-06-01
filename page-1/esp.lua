@@ -243,12 +243,23 @@ function ESP.new(ctx,parent)
 		end
 	end
 
-	sectionBody=makeSection(parent,3,"ESP","Gameplay only")
+	local sectionControls=nil
+	sectionBody,sectionControls=makeSection(parent,3,"ESP","Gameplay only",{
+		headerToggle={
+			startState=state.actionStatusOn,
+			onChange=function(v)
+				api.SetESPState(v,true)
+			end,
+		},
+	})
 	sectionFrame=sectionBody and sectionBody.Parent or nil
 
-	toggle=buildToggleRow(sectionBody,"ESP",state.actionStatusOn,function(v)
-		api.SetESPState(v,true)
-	end)
+	toggle=sectionControls and sectionControls.toggle
+	if not toggle then
+		toggle=buildToggleRow(sectionBody,"ESP",state.actionStatusOn,function(v)
+			api.SetESPState(v,true)
+		end)
+	end
 
 	statusLabel=ctx.New("TextLabel",{
 		BackgroundTransparency=1,

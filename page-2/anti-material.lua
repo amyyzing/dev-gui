@@ -95,11 +95,21 @@ function AntiMaterial.new(ctx,page)
 		api.SetEnabled(false,false)
 	end
 
-	local section=makeSection(page,1,"Anti Material","")
+	local section,sectionControls=makeSection(page,1,"Anti Material","",{
+		headerToggle={
+			startState=worldSettings.SmoothPlastic,
+			onChange=function(state)
+				api.SetEnabled(state)
+			end,
+		},
+	})
 
-	materialToggle=buildToggleRow(section,"SmoothPlastic",worldSettings.SmoothPlastic,function(state)
-		api.SetEnabled(state)
-	end)
+	materialToggle=sectionControls and sectionControls.toggle
+	if not materialToggle then
+		materialToggle=buildToggleRow(section,"SmoothPlastic",worldSettings.SmoothPlastic,function(state)
+			api.SetEnabled(state)
+		end)
+	end
 
 	api.Refresh()
 	return api

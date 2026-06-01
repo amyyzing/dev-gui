@@ -28,7 +28,7 @@ HITBOX_ORIGINALS=HITBOX_ORIGINALS or {
 
 Description=DescriptionModule or {}
 rawMakeSection=makeSection
-function makeSection(parent,order,titleText,subtitleText)
+function makeSection(parent,order,titleText,subtitleText,options)
 	if Description and type(Description.Section)=="function" then
 		local ok,newTitle,newSubtitle=pcall(Description.Section,titleText,subtitleText)
 		if ok then
@@ -37,7 +37,7 @@ function makeSection(parent,order,titleText,subtitleText)
 		end
 	end
 
-	return rawMakeSection(parent,order,titleText,subtitleText)
+	return rawMakeSection(parent,order,titleText,subtitleText,options)
 end
 
 MainFrame=MainFrameModule.new({

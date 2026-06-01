@@ -121,7 +121,7 @@ function MainFrame.new(ctx)
 
 	local header=New("Frame",{Size=UDim2.new(1,0,0,52),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=4,LayoutOrder=1},main)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.25},header)
-	local titleLabel=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,7),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=Enum.Font.Gotham,TextSize=16,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+	local titleLabel=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,7),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=Enum.Font.GothamBold,TextSize=16,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
 
 	local modeSubtitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,26),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
 
@@ -151,12 +151,12 @@ function MainFrame.new(ctx)
 	local pageSlider=New("Frame",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(1,1),BackgroundColor3=THEME.CARD,BorderSizePixel=0,ZIndex=6},pageShell)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.45},pageSlider)
 
-	local settingsTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(1,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Main","MAIN"),Font=Enum.Font.Gotham,TextSize=10,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local mapsPageTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(107,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Maps","MAPS"),Font=Enum.Font.Gotham,TextSize=10,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local serverPageTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(213,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Server","SERVER"),Font=Enum.Font.Gotham,TextSize=10,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local uiSettingsTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(319,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Customize","CUSTOMIZE"),Font=Enum.Font.Gotham,TextSize=10,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local futureTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(425,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Keybinds","KEYBINDS"),Font=Enum.Font.Gotham,TextSize=10,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local settingsPageTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(531,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Settings","SETTINGS"),Font=Enum.Font.Gotham,TextSize=10,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
+	local settingsTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(1,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Main","MAIN"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
+	local mapsPageTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(107,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Maps","MAPS"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
+	local serverPageTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(213,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Server","SERVER"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
+	local uiSettingsTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(319,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Customize","CUSTOMIZE"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
+	local futureTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(425,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Keybinds","KEYBINDS"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
+	local settingsPageTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(531,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Settings","SETTINGS"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
 
 	local pageHost=New("ScrollingFrame",{Size=UDim2.new(1,0,0,384),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=3,LayoutOrder=3},main)
 	New("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},pageHost)
@@ -189,6 +189,12 @@ function MainFrame.new(ctx)
 		uiSettingsTab.TextColor3=activePageName=="customize" and THEME.TEXT or THEME.MUTED
 		futureTab.TextColor3=activePageName=="page2" and THEME.TEXT or THEME.MUTED
 		settingsPageTab.TextColor3=activePageName=="settings" and THEME.TEXT or THEME.MUTED
+		settingsTab.Font=activePageName=="main" and Enum.Font.GothamBold or Enum.Font.GothamMedium
+		mapsPageTab.Font=activePageName=="maps" and Enum.Font.GothamBold or Enum.Font.GothamMedium
+		serverPageTab.Font=activePageName=="server" and Enum.Font.GothamBold or Enum.Font.GothamMedium
+		uiSettingsTab.Font=activePageName=="customize" and Enum.Font.GothamBold or Enum.Font.GothamMedium
+		futureTab.Font=activePageName=="page2" and Enum.Font.GothamBold or Enum.Font.GothamMedium
+		settingsPageTab.Font=activePageName=="settings" and Enum.Font.GothamBold or Enum.Font.GothamMedium
 	end
 
 	local refreshFooterResetButton=function() end

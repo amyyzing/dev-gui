@@ -13,6 +13,55 @@ function GuiLogic.new(ctx)
 	local api={}
 	local WRAP_INSET=0
 
+	local function createSwitch(parent,startState,onChange,width,height,knobSize,pad,zIndex)
+		width=width or 48
+		height=height or 20
+		knobSize=knobSize or 16
+		pad=pad or 2
+		zIndex=zIndex or 6
+
+		local wrap=New("Frame",{Size=UDim2.fromOffset(width,height),BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0,ClipsDescendants=false,ZIndex=zIndex},parent)
+		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},wrap)
+
+		local knob=New("Frame",{Size=UDim2.fromOffset(knobSize,knobSize),Position=UDim2.fromOffset(pad,pad),BackgroundColor3=THEME.STROKE,BorderSizePixel=0,ClipsDescendants=false,ZIndex=zIndex+1,ThemeRole="STROKE"},wrap)
+		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},knob)
+
+		local state=startState and true or false
+
+		local function paint()
+			local ti=TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out)
+			local bg=state and THEME.GREEN or THEME.RED
+			local pos=state and UDim2.fromOffset(width-knobSize-pad,pad) or UDim2.fromOffset(pad,pad)
+
+			TweenService:Create(wrap,ti,{BackgroundColor3=bg}):Play()
+			TweenService:Create(knob,ti,{Position=pos,BackgroundColor3=THEME.STROKE}):Play()
+		end
+
+		local function setState(v,fire)
+			state=v and true or false
+			paint()
+
+			if fire and onChange then
+				onChange(state)
+			end
+		end
+
+		wrap.InputBegan:Connect(function(i)
+			if i.UserInputType==Enum.UserInputType.MouseButton1 then
+				setState(not state,true)
+			end
+		end)
+
+		knob.InputBegan:Connect(function(i)
+			if i.UserInputType==Enum.UserInputType.MouseButton1 then
+				setState(not state,true)
+			end
+		end)
+
+		setState(state,false)
+		return{set=function(v) setState(v,false) end,get=function() return state end,wrap=wrap,knob=knob}
+	end
+
 	local function insetSize(size)
 		return UDim2.new(size.X.Scale,size.X.Offset-(WRAP_INSET*2),size.Y.Scale,size.Y.Offset-(WRAP_INSET*2))
 	end
@@ -128,7 +177,8 @@ function GuiLogic.new(ctx)
 		end
 	end
 
-	function api.makeSection(parent,order,titleText,subtitleText)
+	function api.makeSection(parent,order,titleText,subtitleText,options)
+		options=options or {}
 		local sec=New("Frame",{BackgroundColor3=THEME.CARD,BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=4,LayoutOrder=order},parent)
 
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},sec)
@@ -136,7 +186,16 @@ function GuiLogic.new(ctx)
 		New("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},sec)
 
 		local collapsed=false
-		local titleButton=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,20),Text="[-] "..titleText,Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=5,LayoutOrder=1},sec)
+		local header=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),ZIndex=5,LayoutOrder=1},sec)
+		local controls={}
+		local titleReserve=options.headerToggle and 58 or 0
+		local titleButton=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-titleReserve,1,0),Text="[-] "..titleText,Font=Enum.Font.GothamBold,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=5},header)
+
+		if options.headerToggle then
+			local toggleOptions=options.headerToggle
+			controls.toggle=createSwitch(header,toggleOptions.startState,toggleOptions.onChange,48,20,16,2,6)
+			controls.toggle.wrap.Position=UDim2.new(1,-48,0.5,-10)
+		end
 
 		local subtitleLabel=nil
 		if subtitleText and subtitleText~="" then
@@ -268,7 +327,7 @@ function GuiLogic.new(ctx)
 		end)
 
 		paint(false)
-		return body
+		return body,controls
 	end
 
 	function api.makeBox(parent,w,txt,placeholder)
@@ -290,7 +349,7 @@ function GuiLogic.new(ctx)
 
 	function api.buildSlider(parent,labelText,minVal,maxVal,startVal,decimals,onChange)
 		local container=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,50),ZIndex=5},parent)
-		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(0,0),Size=UDim2.new(1,-82,0,16),Text=labelText,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},container)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(0,0),Size=UDim2.new(1,-82,0,16),Text=labelText,Font=Enum.Font.GothamBold,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},container)
 
 		local valueLabel=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,ClearTextOnFocus=true,Size=UDim2.fromOffset(72,28),Position=UDim2.new(1,-72,0,20),Text=fmtNumber(startVal,decimals),Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},container)
 		local valueWrap,valueStroke=api.wrapTextBox(valueLabel,THEME.BG,2)
@@ -379,51 +438,14 @@ function GuiLogic.new(ctx)
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)
 		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},parent)
-		local label=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-64,1,0),Text=labelText,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
+		local label=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-64,1,0),Text=labelText,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
 		if label.Text=="" then
 			label.Visible=false
 		end
 
-		local wrap=New("Frame",{Size=UDim2.fromOffset(48,20),Position=UDim2.new(1,-48,0.5,-10),BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0,ClipsDescendants=false,ZIndex=6},row)
-		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},wrap)
-
-		local knob=New("Frame",{Size=UDim2.fromOffset(16,16),Position=UDim2.fromOffset(2,2),BackgroundColor3=THEME.STROKE,BorderSizePixel=0,ClipsDescendants=false,ZIndex=7,ThemeRole="STROKE"},wrap)
-		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},knob)
-
-		local state=startState and true or false
-
-		local function paint()
-			local ti=TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out)
-			local bg=state and THEME.GREEN or THEME.RED
-			local pos=state and UDim2.new(1,-18,0,2) or UDim2.fromOffset(2,2)
-
-			TweenService:Create(wrap,ti,{BackgroundColor3=bg}):Play()
-			TweenService:Create(knob,ti,{Position=pos,BackgroundColor3=THEME.STROKE}):Play()
-		end
-
-		local function setState(v,fire)
-			state=v and true or false
-			paint()
-
-			if fire and onChange then
-				onChange(state)
-			end
-		end
-
-		wrap.InputBegan:Connect(function(i)
-			if i.UserInputType==Enum.UserInputType.MouseButton1 then
-				setState(not state,true)
-			end
-		end)
-
-		knob.InputBegan:Connect(function(i)
-			if i.UserInputType==Enum.UserInputType.MouseButton1 then
-				setState(not state,true)
-			end
-		end)
-
-		setState(state,false)
-		return{set=function(v) setState(v,false) end,get=function() return state end}
+		local control=createSwitch(row,startState,onChange,48,20,16,2,6)
+		control.wrap.Position=UDim2.new(1,-48,0.5,-10)
+		return control
 	end
 
 	api.BOX_WRAPPERS=BOX_WRAPPERS

@@ -185,8 +185,14 @@ function StrokeColour.new(ctx,page)
 			return
 		end
 
-		if slider and slider.fill then slider.fill.BackgroundColor3=sliderColor end
-		if slider and slider.knob then slider.knob.BackgroundColor3=sliderColor end
+		if slider and slider.fill then
+			slider.fill:SetAttribute("ThemeRole",nil)
+			slider.fill.BackgroundColor3=sliderColor
+		end
+		if slider and slider.knob then
+			slider.knob:SetAttribute("ThemeRole",nil)
+			slider.knob.BackgroundColor3=sliderColor
+		end
 	end
 
 	local function setGradientColors(grad,c1,c2)
