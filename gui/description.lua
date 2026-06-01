@@ -1,4 +1,4 @@
-local EMPTY="[EMPTY TEXT]"
+local EMPTY="Shallal dude.. get a life."
 
 local Description={}
 
