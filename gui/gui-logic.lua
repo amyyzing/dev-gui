@@ -542,16 +542,38 @@ function GuiLogic.new(ctx)
 		local trackGap=componentNumber("SliderTrackGap",8)
 		local rightPadding=componentNumber("SliderRightPadding",8)
 		local labelX=componentNumber("SliderLabelX",12)
+		local labelPlacement=tostring(componentValue("SliderLabelPlacement","inline")):lower()
+		local labelHeight=componentNumber("SliderLabelHeight",s.SliderStyle=="thin" and 12 or 14)
+		local labelY=componentNumber("SliderLabelY",0)
+		local controlGap=componentNumber("SliderControlGap",4)
+		local bottomPadding=componentNumber("SliderBottomPadding",4)
 		local trackLeft=labelX+labelWidth+trackGap
 		local trackRight=valueBoxWidth+valueBoxGap+rightPadding
+		local trackYScale=0.5
+		local trackYOffset=0
+		local labelPosition=UDim2.fromOffset(labelX,0)
+		local labelSize=UDim2.fromOffset(labelWidth,rowHeight)
+		local valueBoxYScale=0.5
+		local valueBoxYOffset=0
+
+		if labelPlacement=="above" then
+			rowHeight=math.max(rowHeight,labelY+labelHeight+controlGap+sliderHeight+bottomPadding)
+			trackLeft=labelX
+			trackYScale=0
+			trackYOffset=labelY+labelHeight+controlGap+(sliderHeight/2)
+			labelPosition=UDim2.fromOffset(labelX,labelY)
+			labelSize=UDim2.new(1,-(labelX+rightPadding),0,labelHeight)
+			valueBoxYScale=trackYScale
+			valueBoxYOffset=trackYOffset
+		end
 
 		local container=New("Frame",{BackgroundColor3=themeColor("SECTION",THEME.CARD),BackgroundTransparency=componentNumber("SliderContainerTransparency",0.12),BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole="SECTION",CornerRole="Section"},parent)
 		addCorner(container,"Section")
 		local containerStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=componentNumber("SliderContainerStrokeTransparency",0.65)},container)
 		containerStroke:SetAttribute("BaseStrokeTransparency",componentNumber("SliderContainerStrokeTransparency",0.65))
-		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(labelX,0),Size=UDim2.fromOffset(labelWidth,rowHeight),Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false},container)
+		New("TextLabel",{BackgroundTransparency=1,Position=labelPosition,Size=labelSize,Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false},container)
 
-		local track=New("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,0.5,0),BackgroundColor3=themeColor("SLIDER_BG",THEME.PANEL),BorderSizePixel=0,ClipsDescendants=rounded,ZIndex=6,ThemeRole="SLIDER_BG",CornerRole="Slider"},container)
+		local track=New("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor("SLIDER_BG",THEME.PANEL),BorderSizePixel=0,ClipsDescendants=rounded,ZIndex=6,ThemeRole="SLIDER_BG",CornerRole="Slider"},container)
 		addCorner(track,"Slider")
 		local trackStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=componentNumber("SliderTrackStrokeTransparency",0.55)},track)
 		trackStroke:SetAttribute("BaseStrokeTransparency",componentNumber("SliderTrackStrokeTransparency",0.55))
@@ -568,11 +590,13 @@ function GuiLogic.new(ctx)
 
 		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=10,AutoButtonColor=false,Selectable=false},track)
 		local valueLabel=New("TextLabel",{BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=9,Selectable=false},track)
-		local valueBox=New("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,0.5,0),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),math.max(componentNumber("TextBoxHeight",24),sliderHeight)),BackgroundColor3=themeColor("INPUT",THEME.PANEL),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole="INPUT",CornerRole="Control",Selectable=false},container)
+		local valueBoxHeight=componentNumber("SliderValueBoxHeight",math.max(componentNumber("TextBoxHeight",24),sliderHeight))
+		local valueBox=New("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor("INPUT",THEME.PANEL),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole="INPUT",CornerRole="Control",Selectable=false},container)
 		valueBox.Visible=valueBoxVisible
 		addCorner(valueBox,"Control")
-		local valueStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=componentNumber("ControlStrokeTransparency",0.65)},valueBox)
-		valueStroke:SetAttribute("BaseStrokeTransparency",componentNumber("ControlStrokeTransparency",0.65))
+		local valueStrokeTransparency=componentNumber("SliderValueBoxStrokeTransparency",componentNumber("ControlStrokeTransparency",0.65))
+		local valueStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=valueStrokeTransparency},valueBox)
+		valueStroke:SetAttribute("BaseStrokeTransparency",valueStrokeTransparency)
 		local value=startVal
 		local dragging=false
 
