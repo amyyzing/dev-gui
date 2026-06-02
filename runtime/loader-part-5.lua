@@ -164,6 +164,86 @@ function refreshAllUI()
 	if refreshActionStatus then pcall(refreshActionStatus) end
 end
 
+AUTO_REFRESH_EFFECT_RESETTING=false
+
+function resetRuntimeEffectsBeforeAutoRefresh()
+	if AUTO_REFRESH_EFFECT_RESETTING then return end
+	AUTO_REFRESH_EFFECT_RESETTING=true
+
+	local function call(apiName,method,...)
+		local api=PAGE1_APIS and PAGE1_APIS[apiName]
+		local fn=api and api[method]
+		if type(fn)=="function" then
+			pcall(fn,...)
+		end
+	end
+
+	call("Hitbox","SetHitboxLock",false,false)
+	call("Gravity","SetGravityState",false,false)
+	call("Speed","SetSpeedState",false,false,true)
+
+	if PAGE1_APIS and PAGE1_APIS.GameParams then
+		call("GameParams","SetStaminaRegenValue",10,false)
+		call("GameParams","SetStaminaDepleteValue",10,false)
+		call("GameParams","SetJumpPowerValue",53.5,false)
+		call("GameParams","SetDivePowerValue",1.9,false)
+		call("GameParams","SetGameParamsState",false,false)
+	end
+
+	call("Boost","SetJumpBoostState",false,false)
+	call("Boost","SetAlwaysBoostState",false,false)
+	call("ESP","SetESPState",false,false)
+	call("QBAim","SetQBAimState",false)
+
+	if AntiMaterialAPI and AntiMaterialAPI.SetEnabled then
+		pcall(AntiMaterialAPI.SetEnabled,false,false)
+	elseif WORLD_SETTINGS then
+		if typeof and typeof(WORLD_SETTINGS.Conn)=="RBXScriptConnection" then
+			pcall(function()
+				WORLD_SETTINGS.Conn:Disconnect()
+			end)
+		end
+
+		WORLD_SETTINGS.Conn=nil
+		if type(WORLD_SETTINGS.OriginalMaterials)=="table" then
+			for part,material in pairs(WORLD_SETTINGS.OriginalMaterials) do
+				if part and part.Parent and part:IsA("BasePart") then
+					pcall(function()
+						part.Material=material
+					end)
+				end
+			end
+			WORLD_SETTINGS.OriginalMaterials={}
+		end
+		WORLD_SETTINGS.SmoothPlastic=false
+	end
+
+	if PAGE1_STATE then
+		PAGE1_STATE.hitboxOn=false
+		PAGE1_STATE.gravityEnabled=false
+		PAGE1_STATE.gravityValue=196.2
+		PAGE1_STATE.speedEnabled=false
+		PAGE1_STATE.speedValue=18
+		PAGE1_STATE.gameParamsEnabled=false
+		PAGE1_STATE.staminaRegenValue=10
+		PAGE1_STATE.staminaDepleteValue=10
+		PAGE1_STATE.jumpPowerValue=53.5
+		PAGE1_STATE.divePowerValue=1.9
+		PAGE1_STATE.jumpBoostOn=false
+		PAGE1_STATE.jumpBoostTradeMode=false
+		PAGE1_STATE.actionStatusOn=false
+	end
+
+	pcall(function()
+		workspace.Gravity=196.2
+	end)
+
+	if syncPage1State then pcall(syncPage1State) end
+	if refreshActionStatus then pcall(refreshActionStatus) end
+
+	AUTO_REFRESH_EFFECT_RESETTING=false
+end
+
 function buildDataSaveContext()
 	return {
 		BOT_API=BOT_API,

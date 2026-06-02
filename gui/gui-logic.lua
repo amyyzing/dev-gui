@@ -55,18 +55,36 @@ function GuiLogic.new(ctx)
 		return THEME[role] or fallback
 	end
 
+	local function luminance(color)
+		if not color then
+			return 0
+		end
+
+		return (color.R*0.2126)+(color.G*0.7152)+(color.B*0.0722)
+	end
+
+	local function readableOn(color)
+		if luminance(color)<0.48 then
+			return Color3.fromRGB(245,245,245)
+		end
+
+		return Color3.fromRGB(22,22,22)
+	end
+
 	local function createSwitch(parent,startState,onChange,width,height,knobSize,pad,zIndex)
+		local s=shape()
+		local rounded=(tonumber(s.ControlRadius) or 0)>0
 		width=width or 48
 		height=height or 20
 		knobSize=knobSize or 16
 		pad=pad or 2
 		zIndex=zIndex or 6
 
-		local wrap=New("Frame",{Size=UDim2.fromOffset(width,height),BackgroundColor3=themeColor("INPUT",Color3.fromRGB(0,0,0)),BorderSizePixel=0,ClipsDescendants=false,ZIndex=zIndex,ThemeRole="INPUT",CornerRole="Control"},parent)
+		local wrap=New("Frame",{Size=UDim2.fromOffset(width,height),BackgroundColor3=themeColor("INPUT",Color3.fromRGB(0,0,0)),BorderSizePixel=0,ClipsDescendants=rounded,ZIndex=zIndex,ThemeRole="INPUT",CornerRole="Control"},parent)
 		addCorner(wrap,"Control")
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.58},wrap)
 
-		local knob=New("Frame",{Size=UDim2.fromOffset(knobSize,knobSize),Position=UDim2.fromOffset(pad,pad),BackgroundColor3=THEME.STROKE,BorderSizePixel=0,ClipsDescendants=false,ZIndex=zIndex+1,ThemeRole="STROKE",CornerRole="Control"},wrap)
+		local knob=New("Frame",{Size=UDim2.fromOffset(knobSize,knobSize),Position=UDim2.fromOffset(pad,pad),BackgroundColor3=readableOn(themeColor("INPUT",Color3.fromRGB(0,0,0))),BorderSizePixel=0,ClipsDescendants=false,ZIndex=zIndex+1,SkipThemeRole=true,CornerRole="Control"},wrap)
 		addCorner(knob,"Control")
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.55},knob)
 		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),BorderSizePixel=0,AutoButtonColor=false,ZIndex=zIndex+2},wrap)
@@ -78,9 +96,10 @@ function GuiLogic.new(ctx)
 			local bg=state and themeColor("SLIDER_FILL",THEME.GREEN) or THEME.RED
 			local pos=state and UDim2.fromOffset(width-knobSize-pad,pad) or UDim2.fromOffset(pad,pad)
 			wrap:SetAttribute("ThemeRole",state and "SLIDER_FILL" or "RED")
+			knob:SetAttribute("ThemeRole",nil)
 
 			TweenService:Create(wrap,ti,{BackgroundColor3=bg}):Play()
-			TweenService:Create(knob,ti,{Position=pos,BackgroundColor3=THEME.STROKE}):Play()
+			TweenService:Create(knob,ti,{Position=pos,BackgroundColor3=readableOn(bg)}):Play()
 		end
 
 		local function setState(v,fire)
@@ -453,27 +472,33 @@ function GuiLogic.new(ctx)
 		local s=shape()
 		local sliderHeight=s.SliderHeight or 26
 		local rowHeight=math.max(38,sliderHeight+14)
-		local trackWidth=s.SliderStyle=="thin" and 180 or 206
-		local labelReserve=trackWidth+28
+		local rounded=(tonumber(s.SliderRadius) or 0)>0
+		local valueBoxWidth=tonumber(s.SliderValueBoxWidth) or 58
+		local valueBoxGap=tonumber(s.SliderValueBoxGap) or 8
+		local trackWidth=s.SliderStyle=="thin" and 154 or 172
+		local labelReserve=trackWidth+valueBoxWidth+valueBoxGap+28
 
 		local container=New("Frame",{BackgroundColor3=themeColor("SECTION",THEME.CARD),BackgroundTransparency=0.12,BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole="SECTION",CornerRole="Section"},parent)
 		addCorner(container,"Section")
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.65},container)
-		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(12,0),Size=UDim2.new(1,-labelReserve,1,0),Text=labelText,Font=s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium,TextSize=s.SliderStyle=="thin" and 11 or 12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},container)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(12,0),Size=UDim2.new(1,-labelReserve,1,0),Text=labelText,Font=s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium,TextSize=s.SliderStyle=="thin" and 11 or 12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6,Selectable=false},container)
 
-		local track=New("Frame",{AnchorPoint=Vector2.new(1,0.5),Size=UDim2.fromOffset(trackWidth,sliderHeight),Position=UDim2.new(1,-8,0.5,0),BackgroundColor3=themeColor("SLIDER_BG",THEME.PANEL),BorderSizePixel=0,ZIndex=6,ThemeRole="SLIDER_BG",CornerRole="Slider"},container)
+		local track=New("Frame",{AnchorPoint=Vector2.new(1,0.5),Size=UDim2.fromOffset(trackWidth,sliderHeight),Position=UDim2.new(1,-(valueBoxWidth+valueBoxGap+8),0.5,0),BackgroundColor3=themeColor("SLIDER_BG",THEME.PANEL),BorderSizePixel=0,ClipsDescendants=rounded,ZIndex=6,ThemeRole="SLIDER_BG",CornerRole="Slider"},container)
 		addCorner(track,"Slider")
 		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.55},track)
 
-		local fill=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",THEME.STROKE),BorderSizePixel=0,ZIndex=7,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
+		local fill=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",THEME.STROKE),BorderSizePixel=0,ClipsDescendants=rounded,ZIndex=7,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
 		addCorner(fill,"Slider")
 
 		local knobWidth=s.SliderStyle=="windui" and 10 or (s.SliderStyle=="thin" and 2 or 3)
 		local knob=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(knobWidth,sliderHeight),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=themeColor("SLIDER_FILL",THEME.STROKE),BorderSizePixel=0,ZIndex=8,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
 		addCorner(knob,"Slider")
 
-		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=10,AutoButtonColor=false},track)
-		local valueLabel=New("TextLabel",{BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),Text=fmtNumber(startVal,decimals),Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=9},track)
+		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=10,AutoButtonColor=false,Selectable=false},track)
+		local valueLabel=New("TextLabel",{BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),Text=fmtNumber(startVal,decimals),Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=9,Selectable=false},track)
+		local valueBox=New("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-8,0.5,0),Size=UDim2.fromOffset(valueBoxWidth,math.max(24,sliderHeight)),BackgroundColor3=themeColor("INPUT",THEME.PANEL),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole="INPUT",CornerRole="Control"},container)
+		addCorner(valueBox,"Control")
+		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.65},valueBox)
 		local value=startVal
 		local dragging=false
 
@@ -487,6 +512,7 @@ function GuiLogic.new(ctx)
 			fill.Size=UDim2.new(pct,0,1,0)
 			knob.Position=UDim2.new(pct,0,0.5,0)
 			valueLabel.Text=fmtNumber(v,decimals)
+			valueBox.Text=fmtNumber(v,decimals)
 		end
 
 		local function valueFromMouseX(mx)
@@ -511,6 +537,7 @@ function GuiLogic.new(ctx)
 		local function beginDrag(i)
 			if i.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=true
+				valueBox:ReleaseFocus()
 				setValue(valueFromMouseX(UIS:GetMouseLocation().X),true)
 			end
 		end
@@ -532,8 +559,12 @@ function GuiLogic.new(ctx)
 			end
 		end)
 
+		valueBox.FocusLost:Connect(function()
+			setValue(valueBox.Text,true)
+		end)
+
 		setValue(startVal,false)
-		return{set=function(v) setValue(v,false) end,get=function() return value end,box=valueLabel,fill=fill,knob=knob,track=track}
+		return{set=function(v) setValue(v,false) end,get=function() return value end,box=valueBox,valueLabel=valueLabel,fill=fill,knob=knob,track=track}
 	end
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)

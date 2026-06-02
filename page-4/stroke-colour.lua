@@ -354,7 +354,8 @@ function StrokeColour.new(ctx,page)
 							obj.Transparency=math.clamp(math.max(baseTransparency,styleTransparency),0,1)
 
 							pcall(function()
-								obj.LineJoinMode=Enum.LineJoinMode.Miter
+								local role=obj.Parent and obj.Parent:GetAttribute("CornerRole") or "Control"
+								obj.LineJoinMode=cornerRoleRadius(role)>0 and Enum.LineJoinMode.Round or Enum.LineJoinMode.Miter
 							end)
 
 							if UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke then
@@ -679,6 +680,31 @@ function StrokeColour.new(ctx,page)
 		return fallback
 	end
 
+	local function currentLibShape()
+		local active=tostring(UI_STYLE.UILib or DEFAULTS.UILib):lower()
+
+		for _,module in ipairs(type(UILibModules)=="table" and UILibModules or {}) do
+			if type(module)=="table" and tostring(module.Id or ""):lower()==active and type(module.Shape)=="table" then
+				return module.Shape
+			end
+		end
+
+		return{}
+	end
+
+	local function cornerRoleRadius(role)
+		local shape=currentLibShape()
+		if role=="Window" then
+			return tonumber(shape.WindowRadius) or 0
+		elseif role=="Section" then
+			return tonumber(shape.SectionRadius) or 0
+		elseif role=="Slider" then
+			return tonumber(shape.SliderRadius) or 0
+		end
+
+		return tonumber(shape.ControlRadius) or 0
+	end
+
 	local function addCorner(obj,role)
 		if not obj then
 			return nil
@@ -826,9 +852,10 @@ function StrokeColour.new(ctx,page)
 			ZIndex=6,
 		},row)
 
-		local valueBox=New("TextLabel",{
+		local valueBox=New("TextBox",{
 			BackgroundColor3=themeColor("INPUT",THEME.PANEL),
 			BorderSizePixel=0,
+			ClearTextOnFocus=false,
 			Size=UDim2.fromOffset(48,24),
 			Position=UDim2.new(1,-48,0,2),
 			Text=tostring(startVal),
@@ -847,6 +874,7 @@ function StrokeColour.new(ctx,page)
 			BorderSizePixel=0,
 			Position=UDim2.fromOffset(36,9),
 			Size=UDim2.new(1,-92,0,10),
+			ClipsDescendants=true,
 			ZIndex=6,
 			ThemeRole="SLIDER_BG",
 			CornerRole="Slider",
@@ -857,6 +885,7 @@ function StrokeColour.new(ctx,page)
 			BackgroundColor3=fillColor or getUIStrokeColor(),
 			BorderSizePixel=0,
 			Size=UDim2.new(0,0,1,0),
+			ClipsDescendants=true,
 			SkipThemeRole=true,
 			ZIndex=7,
 		},track)
@@ -903,6 +932,7 @@ function StrokeColour.new(ctx,page)
 		hit.InputBegan:Connect(function(input)
 			if input.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=true
+				valueBox:ReleaseFocus()
 				setValue(valueFromMouse(),true)
 			end
 		end)
@@ -917,6 +947,10 @@ function StrokeColour.new(ctx,page)
 			if input.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=false
 			end
+		end))
+
+		trackConnection(valueBox.FocusLost:Connect(function()
+			setValue(valueBox.Text,true)
 		end))
 
 		setValue(startVal,false)

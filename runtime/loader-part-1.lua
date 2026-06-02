@@ -1126,6 +1126,13 @@ function runAutoRefreshStep(label,fn,...)
 end
 
 function applyAutoRefreshModuleChange(changedPath,module)
+	if resetRuntimeEffectsBeforeAutoRefresh then
+		local ok,err=pcall(resetRuntimeEffectsBeforeAutoRefresh,changedPath)
+		if not ok then
+			warn("Auto-refresh effect reset failed:",err)
+		end
+	end
+
 	if changedPath==MODULE_PATHS.Description then
 		DescriptionModule=module
 		Description=module
@@ -1417,6 +1424,20 @@ applyUIStrokeTheme=function()
 		return "Control"
 	end
 
+	local function strokeRoleRadius(role)
+		if role=="Window" then
+			return tonumber(libShape.WindowRadius) or 0
+		elseif role=="Section" then
+			return tonumber(libShape.SectionRadius) or 0
+		elseif role=="Slider" then
+			return tonumber(libShape.SliderRadius) or 0
+		elseif role=="Control" or role=="Accent" then
+			return tonumber(libShape.ControlRadius) or 0
+		end
+
+		return 0
+	end
+
 	local function getRoleStrokeTransparency(role,baseTransparency,styleTransparency)
 		local roleTransparency=0.82
 
@@ -1459,7 +1480,7 @@ applyUIStrokeTheme=function()
 				obj.Transparency=getRoleStrokeTransparency(role,baseTransparency,styleTransparency)
 
 				pcall(function()
-					obj.LineJoinMode=Enum.LineJoinMode.Miter
+					obj.LineJoinMode=strokeRoleRadius(role)>0 and Enum.LineJoinMode.Round or Enum.LineJoinMode.Miter
 				end)
 
 				local gradient=obj:FindFirstChild("StrokeGradient")
