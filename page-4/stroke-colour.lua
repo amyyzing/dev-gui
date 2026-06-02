@@ -1572,13 +1572,29 @@ function StrokeColour.new(ctx,page)
 		end
 	end
 
+	function api.ApplyUILib(libOrId)
+		local lib=libOrId
+		if type(libOrId)=="string" then
+			local id=tostring(libOrId):lower()
+			lib=libLookup[id]
+		end
+
+		if lib then
+			applyUILib(lib)
+			return true
+		end
+
+		return false
+	end
+
 	local libsPanel=makePanel(4)
 	makeLabel(libsPanel,"Libs",1,13,false)
 
 	local libSearchWrap=New("Frame",{
 		BackgroundColor3=themeColor("INPUT",THEME.PANEL),
 		BorderSizePixel=0,
-		Size=UDim2.new(1,0,0,30),
+		Size=UDim2.new(1,0,0,0),
+		Visible=false,
 		ZIndex=6,
 		LayoutOrder=2,
 		ThemeRole="INPUT",
@@ -1607,7 +1623,7 @@ function StrokeColour.new(ctx,page)
 		Size=UDim2.new(1,0,0,0),
 		AutomaticSize=Enum.AutomaticSize.Y,
 		ZIndex=5,
-		LayoutOrder=3,
+		LayoutOrder=2,
 	},libsPanel)
 
 	New("UIListLayout",{
@@ -1689,7 +1705,7 @@ function StrokeColour.new(ctx,page)
 
 	local function filterLibs()
 		local anyVisible=false
-		local query=libSearch.Text
+		local query=""
 
 		for _,entry in ipairs(libRows) do
 			local visible=matchesLib(entry.Lib,query)
@@ -1702,7 +1718,6 @@ function StrokeColour.new(ctx,page)
 		libList.Visible=anyVisible
 	end
 
-	libSearch:GetPropertyChangedSignal("Text"):Connect(filterLibs)
 	filterLibs()
 
 	paintChoices=function()

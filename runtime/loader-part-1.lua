@@ -42,6 +42,7 @@ boostChance=100
 ballDetectionRadius=10
 potatoMode=false
 actionStatusOn=false
+qbAimEnabled=false
 
 TOGGLE_UI_KEY=Enum.KeyCode.Unknown
 TOGGLE_HB_KEY=Enum.KeyCode.Unknown
@@ -417,6 +418,7 @@ MODULE_PATHS={
 	Announcement="announcement.lua",
 	GuiLogic="gui/gui-logic.lua",
 	MainFrame="gui/mainframe.lua",
+	ExternalRenderer="gui/external-renderer.lua",
 	AutoRefresh="gui/auto-refresh.lua",
 	Description="gui/description.lua",
 	HitboxPreset="page-5/hitbox-preset.lua",
@@ -481,6 +483,9 @@ rebuildMapFromModules=nil
 rebuildSettingsFromModules=nil
 rebuildPage2FromModules=nil
 rebuildDataSaveFromModule=nil
+refreshExternalRenderer=function() end
+ExternalRenderer=nil
+ExternalRendererModule=nil
 
 function isAllowedModulePath(modulePath)
 	return type(modulePath)=="string" and MODULE_PATH_SET[modulePath]==true
@@ -788,6 +793,7 @@ end
 
 GuiLogicModule=loadRemoteModuleStep("GuiLogic",MODULE_PATHS.GuiLogic)
 MainFrameModule=loadRemoteModuleStep("MainFrame",MODULE_PATHS.MainFrame)
+ExternalRendererModule=loadRemoteModuleStep("ExternalRenderer",MODULE_PATHS.ExternalRenderer)
 AutoRefreshModule=loadRemoteModuleStep("AutoRefresh",MODULE_PATHS.AutoRefresh)
 DescriptionModule=loadRemoteModuleStep("Description",MODULE_PATHS.Description)
 AnnouncementModule=loadRemoteModuleStep("Announcement",MODULE_PATHS.Announcement)
@@ -834,6 +840,97 @@ function runLoaderCheck()
 end
 
 runLoaderCheck()
+
+EXTERNAL_UI_LIBRARY_URLS={
+	visual="https://raw.githubusercontent.com/VisualRoblox/Roblox/main/UI-Libraries/Visual%20UI%20Library/Source.lua",
+	rayfield="https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
+	windui="https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua",
+	linoria="https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua",
+	obsidian="https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua",
+}
+EXTERNAL_UI_LIBRARY_CACHE={}
+EXTERNAL_UI_LIBRARY_SOURCES={}
+MAX_EXTERNAL_UI_LIBRARY_BYTES=750000
+
+local function fetchExternalLibrarySource(url)
+	if type(url)~="string" or url=="" then
+		return nil,"missing external URL"
+	end
+
+	if game and type(game.HttpGet)=="function" then
+		local ok,source=pcall(function()
+			return game:HttpGet(url)
+		end)
+
+		if ok and type(source)=="string" and source~="" then
+			return source,nil
+		end
+	end
+
+	local requestFn=BOT_API and BOT_API.GetRequestFunction and BOT_API.GetRequestFunction()
+	if not requestFn then
+		return nil,"No client HTTP request function found."
+	end
+
+	local ok,response=pcall(function()
+		return requestFn({
+			Url=url,
+			Method="GET",
+		})
+	end)
+
+	if not ok then
+		return nil,tostring(response)
+	end
+
+	local body=response and (response.Body or response.body)
+	if type(body)~="string" or body=="" then
+		return nil,"empty external response"
+	end
+
+	return body,nil
+end
+
+function loadExternalUILibrary(id)
+	id=tostring(id or ""):lower()
+	if id=="original" then
+		return nil,"Original does not use an external library."
+	end
+
+	if EXTERNAL_UI_LIBRARY_CACHE[id] then
+		return EXTERNAL_UI_LIBRARY_CACHE[id],nil
+	end
+
+	local url=EXTERNAL_UI_LIBRARY_URLS[id]
+	if not url then
+		return nil,"Unknown external UI library: "..tostring(id)
+	end
+
+	local source,fetchErr=fetchExternalLibrarySource(url)
+	if not source then
+		return nil,fetchErr
+	end
+
+	if #source>MAX_EXTERNAL_UI_LIBRARY_BYTES then
+		return nil,"External UI source too large: "..tostring(#source)
+	end
+
+	local chunk,compileErr=loadstring(source)
+	if not chunk then
+		EXTERNAL_UI_LIBRARY_SOURCES[id]=source
+		return nil,"Compile failed: "..tostring(compileErr)
+	end
+
+	local ok,library=pcall(chunk)
+	if not ok then
+		EXTERNAL_UI_LIBRARY_SOURCES[id]=source
+		return nil,"Run failed: "..tostring(library)
+	end
+
+	EXTERNAL_UI_LIBRARY_SOURCES[id]=source
+	EXTERNAL_UI_LIBRARY_CACHE[id]=library
+	return library,nil
+end
 
 PAGE1_RELOAD_PATHS={
 	[MODULE_PATHS.Page1Hitbox]=function(module) Page1HitboxModule=module end,
@@ -938,6 +1035,8 @@ UILibVisualModule={
 	Name="Visual",
 	Source="VisualRoblox/Roblox",
 	Url="https://github.com/VisualRoblox/Roblox",
+	Renderer="external",
+	ExternalUrl="https://raw.githubusercontent.com/VisualRoblox/Roblox/main/UI-Libraries/Visual%20UI%20Library/Source.lua",
 	Description="Blue-glow dark surfaces with wide rows and bright controls.",
 	Tags={"visual","blue","github","glow","sidebar"},
 	Style={Primary=Color3.fromRGB(18,20,26),Stroke=Color3.fromRGB(0,145,255),Gradient=Color3.fromRGB(84,196,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.76},
@@ -952,6 +1051,8 @@ UILibRayfieldModule={
 	Name="Rayfield",
 	Source="SiriusSoftwareLtd/Rayfield",
 	Url="https://github.com/SiriusSoftwareLtd/Rayfield",
+	Renderer="external",
+	ExternalUrl="https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
 	Description="Rounded dark rows, pill tabs, and blue inline controls.",
 	Tags={"rayfield","sirius","github","rounded","blue"},
 	Style={Primary=Color3.fromRGB(25,25,25),Stroke=Color3.fromRGB(48,119,177),Gradient=Color3.fromRGB(43,105,159),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.68},
@@ -966,13 +1067,15 @@ UILibWindUIModule={
 	Name="WindUI",
 	Source="Footagesus/WindUI",
 	Url="https://github.com/Footagesus/WindUI",
+	Renderer="external",
+	ExternalUrl="https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua",
 	Description="Soft rounded panels, roomy spacing, and floating blue controls.",
 	Tags={"windui","footagesus","github","soft","rounded","blue"},
 	Style={Primary=Color3.fromRGB(22,24,30),Stroke=Color3.fromRGB(86,153,255),Gradient=Color3.fromRGB(142,195,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.8},
 	Theme={BG=Color3.fromRGB(18,20,27),TOPBAR=Color3.fromRGB(25,29,38),PANEL=Color3.fromRGB(25,30,41),CARD=Color3.fromRGB(30,36,48),SECTION=Color3.fromRGB(28,34,45),BUTTON=Color3.fromRGB(35,43,58),INPUT=Color3.fromRGB(22,27,37),SLIDER_BG=Color3.fromRGB(30,39,54),SLIDER_FILL=Color3.fromRGB(86,153,255),STROKE_SOFT=Color3.fromRGB(53,63,82),TEXT=Color3.fromRGB(245,248,255),MUTED=Color3.fromRGB(159,174,197)},
 	Shape={WindowRadius=12,SectionRadius=14,ControlRadius=14,SliderRadius=14,SliderHeight=26,SliderStyle="windui",WindowStrokeTransparency=0.58,SectionStrokeTransparency=0.96,ControlStrokeTransparency=0.92,SliderStrokeTransparency=0.92,AccentStrokeTransparency=0.72},
 	Components={TextFont=Enum.Font.Gotham,TitleFont=Enum.Font.GothamSemibold,ControlFont=Enum.Font.GothamMedium,SectionMode="card",SectionPrefix=false,SectionPaddingX=16,SectionPaddingY=14,SectionGap=10,SectionHeaderHeight=22,SectionTitleSize=14,SectionSubtitleSize=11,SectionBackgroundTransparency=0.03,SectionStrokeTransparency=0.96,SectionBodyInset=0,SectionBodyGap=9,SliderLabelPlacement="above",SliderRowHeight=56,SliderTrackWidth=226,SliderLabelWidth=124,SliderLabelHeight=14,SliderLabelY=4,SliderControlGap=6,SliderBottomPadding=8,SliderValueBoxWidth=58,SliderValueBoxGap=10,SliderValueBoxHeight=28,SliderValueBoxVisible=true,SliderContainerTransparency=0.16,SliderContainerStrokeTransparency=1,SliderContainerRole="BUTTON",SliderContainerCornerRole="Control",SliderTrackStrokeTransparency=0.94,SliderValueBoxStrokeTransparency=0.96,SliderLabelX=14,SliderRightPadding=12,ToggleWidth=56,ToggleHeight=26,ToggleKnobSize=20,TogglePad=3,ToggleStyle="pill",ToggleOffRole="INPUT",ToggleStrokeTransparency=0.92,TextBoxHeight=32,ButtonHeight=34,ControlStrokeTransparency=0.9},
-	MainFrame={Window={W=760,H=540,MinW=560,MinH=380,MaxW=1220,MaxH=820,StartY=80,MinimizedH=68},Layout={RootPadding=10,MainGap=10,PageGap=10,ColumnGap=12,FooterGap=8,HeaderHeight=54,PageBarHeight=36,PageTabWidth=108,PageTabHeight=30,PageHostReserve=164,FooterHeight=36,TopButtonSize=26,TopButtonGap=6,TopButtonOuter=12,FabSize=42,NavPlacement="left",NavWidth=158,NavGap=10,NavTabGap=8,NavTabPad=12,NavTabInset=10,PageShellTransparency=0.18,PageSliderTransparency=0.08,HeaderSubtitleVisible=false,HeaderSearchVisible=true,HeaderSearchPlaceholder="Search",HeaderSearchWidth=220,HeaderSearchHeight=30,HeaderTitleY=15,HeaderTitleSize=15,RootStrokeTransparency=0.55,HeaderStrokeTransparency=0.92,PageShellStrokeTransparency=0.94,PageSliderStrokeTransparency=0.92}},
+	MainFrame={Window={W=760,H=540,MinW=560,MinH=380,MaxW=1220,MaxH=820,StartY=80,MinimizedH=68},Layout={RootPadding=10,MainGap=10,PageGap=10,ColumnGap=12,FooterGap=8,HeaderHeight=54,PageBarHeight=36,PageTabWidth=108,PageTabHeight=30,PageHostReserve=164,FooterHeight=36,TopButtonSize=26,TopButtonGap=6,TopButtonOuter=12,FabSize=42,NavPlacement="left",NavWidth=158,NavGap=10,NavTabGap=8,NavTabPad=12,NavTabInset=10,PageShellTransparency=0.18,PageSliderTransparency=0.08,HeaderSubtitleVisible=false,HeaderSearchVisible=false,HeaderSearchPlaceholder="Search",HeaderSearchWidth=220,HeaderSearchHeight=30,HeaderTitleY=15,HeaderTitleSize=15,RootStrokeTransparency=0.55,HeaderStrokeTransparency=0.92,PageShellStrokeTransparency=0.94,PageSliderStrokeTransparency=0.92}},
 	Tones={topbar=0.08,panel=0.10,card=0.16,section=0.14,button=0.20,input=0.05,sliderBg=0.12,strokeSoft=0.30},
 }
 UILibLinoriaModule={
@@ -980,6 +1083,8 @@ UILibLinoriaModule={
 	Name="Linoria",
 	Source="violin-suzutsuki/LinoriaLib",
 	Url="https://github.com/violin-suzutsuki/LinoriaLib",
+	Renderer="external",
+	ExternalUrl="https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua",
 	Description="Dense square utility panels with thin outlines and compact text.",
 	Tags={"linoria","green","github","dense","square"},
 	Style={Primary=Color3.fromRGB(18,18,18),Stroke=Color3.fromRGB(77,255,82),Gradient=Color3.fromRGB(55,203,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.36},
@@ -994,13 +1099,15 @@ UILibObsidianModule={
 	Name="Obsidian",
 	Source="deividcomsono/Obsidian",
 	Url="https://github.com/deividcomsono/Obsidian",
+	Renderer="external",
+	ExternalUrl="https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua",
 	Description="Dark sidebar panels, search-like inputs, and violet accents.",
 	Tags={"obsidian","deividcomsono","github","violet","sidebar"},
 	Style={Primary=Color3.fromRGB(15,15,20),Stroke=Color3.fromRGB(145,88,255),Gradient=Color3.fromRGB(230,92,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.64},
 	Theme={BG=Color3.fromRGB(15,15,20),TOPBAR=Color3.fromRGB(19,18,27),PANEL=Color3.fromRGB(21,20,29),CARD=Color3.fromRGB(27,25,37),SECTION=Color3.fromRGB(24,22,34),BUTTON=Color3.fromRGB(31,28,45),INPUT=Color3.fromRGB(17,16,24),SLIDER_BG=Color3.fromRGB(30,27,43),SLIDER_FILL=Color3.fromRGB(145,88,255),STROKE_SOFT=Color3.fromRGB(52,45,74),TEXT=Color3.fromRGB(242,238,255),MUTED=Color3.fromRGB(163,151,190)},
 	Shape={WindowRadius=4,SectionRadius=2,ControlRadius=2,SliderRadius=0,SliderHeight=20,SliderStyle="glow",WindowStrokeTransparency=0.52,SectionStrokeTransparency=0.78,ControlStrokeTransparency=0.72,SliderStrokeTransparency=0.72,AccentStrokeTransparency=0.52},
 	Components={TextFont=Enum.Font.Code,TitleFont=Enum.Font.GothamMedium,ControlFont=Enum.Font.Code,SectionMode="groupbox",SectionPrefix=false,SectionPaddingX=12,SectionPaddingY=10,SectionGap=6,SectionHeaderHeight=20,SectionTitleSize=13,SectionSubtitleSize=10,SectionTitleBoxWidth=150,SectionTitleBoxHeight=18,SectionTitleOffsetY=-2,SectionBackgroundTransparency=0,SectionStrokeTransparency=0.78,SectionBodyInset=0,SectionBodyGap=6,SliderLabelPlacement="above",SliderRowHeight=48,SliderTrackWidth=212,SliderLabelWidth=120,SliderLabelHeight=14,SliderLabelY=3,SliderControlGap=5,SliderBottomPadding=7,SliderValueBoxWidth=54,SliderValueBoxGap=8,SliderValueBoxHeight=26,SliderValueBoxVisible=true,SliderContainerTransparency=0.18,SliderContainerStrokeTransparency=0.86,SliderContainerRole="INPUT",SliderContainerCornerRole="Control",SliderTrackStrokeTransparency=0.78,SliderValueBoxStrokeTransparency=0.82,SliderLabelX=10,SliderRightPadding=8,ToggleWidth=16,ToggleHeight=16,ToggleKnobSize=10,TogglePad=3,ToggleStyle="checkbox",ToggleOffRole="INPUT",ToggleStrokeTransparency=0.72,ToggleRowHeight=24,TextBoxHeight=30,ButtonHeight=30,ControlStrokeTransparency=0.72},
-	MainFrame={Window={W=735,H=560,MinW=560,MinH=380,MaxW=1120,MaxH=780,StartY=72,MinimizedH=58},Layout={RootPadding=4,MainGap=6,PageGap=8,ColumnGap=8,FooterGap=6,HeaderHeight=52,PageBarHeight=34,PageTabWidth=96,PageTabHeight=30,PageHostReserve=142,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=8,FabSize=40,NavPlacement="left",NavWidth=168,NavGap=8,NavTabGap=6,NavTabPad=8,NavTabInset=8,PageShellTransparency=0,PageSliderTransparency=0,HeaderSubtitleVisible=false,HeaderSearchVisible=true,HeaderSearchPlaceholder="Search",HeaderSearchWidth=260,HeaderSearchHeight=30,HeaderTitleY=15,HeaderTitleSize=15,RootStrokeTransparency=0.34,HeaderStrokeTransparency=0.62,PageShellStrokeTransparency=0.68,PageSliderStrokeTransparency=0.62}},
+	MainFrame={Window={W=735,H=560,MinW=560,MinH=380,MaxW=1120,MaxH=780,StartY=72,MinimizedH=58},Layout={RootPadding=4,MainGap=6,PageGap=8,ColumnGap=8,FooterGap=6,HeaderHeight=52,PageBarHeight=34,PageTabWidth=96,PageTabHeight=30,PageHostReserve=142,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=8,FabSize=40,NavPlacement="left",NavWidth=168,NavGap=8,NavTabGap=6,NavTabPad=8,NavTabInset=8,PageShellTransparency=0,PageSliderTransparency=0,HeaderSubtitleVisible=false,HeaderSearchVisible=false,HeaderSearchPlaceholder="Search",HeaderSearchWidth=260,HeaderSearchHeight=30,HeaderTitleY=15,HeaderTitleSize=15,RootStrokeTransparency=0.34,HeaderStrokeTransparency=0.62,PageShellStrokeTransparency=0.68,PageSliderStrokeTransparency=0.62}},
 	Tones={topbar=0.04,panel=0.06,card=0.12,section=0.09,button=0.16,input=-0.02,sliderBg=0.10,strokeSoft=0.27},
 }
 
@@ -1019,6 +1126,8 @@ local function normalizeUILibProfile(module,base)
 	return{
 		Id=tostring(module.Id or base.Id or "original"):lower(),
 		Name=module.Name or base.Name or "Original",
+		Renderer=module.Renderer or base.Renderer,
+		ExternalUrl=module.ExternalUrl or base.ExternalUrl,
 		Style=tableField(module,"Style",base),
 		Theme=tableField(module,"Theme",base),
 		Shape=tableField(module,"Shape",base),
@@ -1626,6 +1735,10 @@ function setUIVisible(state)
 	if SG and SG.Parent then
 		SG.Enabled=uiVisible
 	end
+
+	if ExternalRenderer and ExternalRenderer.SetVisible then
+		pcall(ExternalRenderer.SetVisible,uiVisible)
+	end
 end
 
 function requireGuiModule(name,path,module)
@@ -1638,3 +1751,7 @@ end
 
 GuiLogicModule=requireGuiModule("GuiLogic",MODULE_PATHS.GuiLogic,GuiLogicModule)
 MainFrameModule=requireGuiModule("MainFrame",MODULE_PATHS.MainFrame,MainFrameModule)
+if not (ExternalRendererModule and type(ExternalRendererModule.new)=="function") then
+	warn("External renderer module unavailable; Original renderer will remain available.")
+	ExternalRendererModule=nil
+end

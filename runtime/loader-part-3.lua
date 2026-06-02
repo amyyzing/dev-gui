@@ -85,6 +85,7 @@ function buildCustomizePage()
 						if rebuildMapFromModules then pcall(rebuildMapFromModules) end
 						if rebuildSettingsFromModules then pcall(rebuildSettingsFromModules) end
 						if rebuildPage2FromModules then pcall(rebuildPage2FromModules) end
+						if refreshExternalRenderer then pcall(refreshExternalRenderer) end
 						if refreshAllUI then pcall(refreshAllUI) end
 						if applyUIStrokeTheme then pcall(applyUIStrokeTheme) end
 						if updateResponsiveLayout then pcall(updateResponsiveLayout) end

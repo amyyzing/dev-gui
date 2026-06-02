@@ -275,6 +275,7 @@ PAGE1_STATE={
 	boostChance=boostChance,
 	ballDetectionRadius=ballDetectionRadius,
 	actionStatusOn=actionStatusOn,
+	qbAimEnabled=qbAimEnabled,
 	qbAimTeamFilter=qbAimTeamFilter,
 	qbAimShowArc=qbAimShowArc,
 	qbAimLeadDelay=qbAimLeadDelay,
@@ -302,6 +303,7 @@ function syncPage1State()
 	boostChance=PAGE1_STATE.boostChance
 	ballDetectionRadius=PAGE1_STATE.ballDetectionRadius
 	actionStatusOn=PAGE1_STATE.actionStatusOn
+	qbAimEnabled=PAGE1_STATE.qbAimEnabled
 	qbAimTeamFilter=PAGE1_STATE.qbAimTeamFilter
 	qbAimShowArc=PAGE1_STATE.qbAimShowArc
 	qbAimLeadDelay=PAGE1_STATE.qbAimLeadDelay
@@ -489,6 +491,7 @@ function resetMainPageDefaults()
 	PAGE1_STATE.boostChance=100
 	PAGE1_STATE.ballDetectionRadius=10
 	PAGE1_STATE.actionStatusOn=false
+	PAGE1_STATE.qbAimEnabled=false
 	PAGE1_STATE.qbAimTeamFilter=true
 	PAGE1_STATE.qbAimShowArc=true
 	PAGE1_STATE.qbAimLeadDelay=0.75

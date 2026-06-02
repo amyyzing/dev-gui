@@ -3,6 +3,8 @@ return{
 	Name="Linoria",
 	Source="violin-suzutsuki/LinoriaLib",
 	Url="https://github.com/violin-suzutsuki/LinoriaLib",
+	Renderer="external",
+	ExternalUrl="https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/Library.lua",
 	Description="Dense square utility panels with thin outlines and compact text.",
 	Tags={"linoria","green","github","dense","square"},
 	Style={

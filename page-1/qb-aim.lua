@@ -1616,6 +1616,7 @@ function QBAim.new(ctx,parent)
 
 	local function setEnabled(value)
 		enabled=value and isAvailable() and true or false
+		state.qbAimEnabled=enabled
 		if not enabled then
 			trackedReceiver=nil
 			selectedRouteLock=nil
@@ -1633,6 +1634,37 @@ function QBAim.new(ctx,parent)
 
 	function api.SetQBAimState(value)
 		setEnabled(value)
+	end
+
+	function api.SetTeamFilterState(value,fire)
+		state.qbAimTeamFilter=value and true or false
+		if state.qbAimTeamFilter and trackedReceiver and not canTargetReceiver(trackedReceiver) then
+			trackedReceiver=nil
+			selectedRouteLock=nil
+			clearPreviewVisuals()
+			setTargetText()
+			setStatus("Target cleared")
+		end
+		syncControls()
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetShowArcState(value,fire)
+		state.qbAimShowArc=value and true or false
+		if not state.qbAimShowArc then
+			clearPreviewVisuals()
+			setStatus("Arc hidden")
+		end
+		syncControls()
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetLeadDelay(value,fire)
+		setLeadDelay(value,fire~=false)
 	end
 
 	function api.Refresh()
@@ -1680,26 +1712,11 @@ function QBAim.new(ctx,parent)
 	end
 
 	teamFilterToggle=buildToggleRow(sectionBody,"Team Filter",state.qbAimTeamFilter~=false,function(value)
-		state.qbAimTeamFilter=value and true or false
-		if state.qbAimTeamFilter and trackedReceiver and not canTargetReceiver(trackedReceiver) then
-			trackedReceiver=nil
-			selectedRouteLock=nil
-			clearPreviewVisuals()
-			setTargetText()
-			setStatus("Target cleared")
-		end
-		syncControls()
-		changed()
+		api.SetTeamFilterState(value,true)
 	end)
 
 	arcToggle=buildToggleRow(sectionBody,"Show Arc",state.qbAimShowArc~=false,function(value)
-		state.qbAimShowArc=value and true or false
-		if not state.qbAimShowArc then
-			clearPreviewVisuals()
-			setStatus("Arc hidden")
-		end
-		syncControls()
-		changed()
+		api.SetShowArcState(value,true)
 	end)
 
 	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
@@ -1707,7 +1724,7 @@ function QBAim.new(ctx,parent)
 
 	if buildSlider then
 		leadDelaySliderControl=buildSlider(sectionBody,"Lead Adjust",LEAD_DELAY_MIN,LEAD_DELAY_MAX,WR_LEAD_DELAY,2,function(value)
-			setLeadDelay(value,true)
+			api.SetLeadDelay(value,true)
 		end)
 	else
 		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)

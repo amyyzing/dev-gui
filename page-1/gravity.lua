@@ -48,6 +48,15 @@ function Gravity.new(ctx,parent)
 		end
 	end
 
+	function api.SetGravityValue(value,fire)
+		applyGravity(value)
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
+	end
+
 	normalizeState()
 	local section,sectionControls=makeSection(parent,2,"Gravity","",{
 		headerToggle={
@@ -66,8 +75,7 @@ function Gravity.new(ctx,parent)
 	end
 
 	slider=buildSlider(section,"Gravity",0,1000,state.gravityValue,1,function(v)
-		applyGravity(v)
-		changed()
+		api.SetGravityValue(v,true)
 	end)
 
 	function api.Refresh()

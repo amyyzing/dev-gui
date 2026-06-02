@@ -3,6 +3,8 @@ return{
 	Name="Rayfield",
 	Source="SiriusSoftwareLtd/Rayfield",
 	Url="https://github.com/SiriusSoftwareLtd/Rayfield",
+	Renderer="external",
+	ExternalUrl="https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
 	Description="Rounded dark rows, pill tabs, and blue inline controls.",
 	Tags={"rayfield","sirius","github","rounded","blue"},
 	Style={

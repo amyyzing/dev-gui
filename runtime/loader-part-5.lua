@@ -232,6 +232,7 @@ function resetRuntimeEffectsBeforeAutoRefresh()
 		PAGE1_STATE.jumpBoostOn=false
 		PAGE1_STATE.jumpBoostTradeMode=false
 		PAGE1_STATE.actionStatusOn=false
+		PAGE1_STATE.qbAimEnabled=false
 	end
 
 	pcall(function()

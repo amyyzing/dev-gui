@@ -3,6 +3,8 @@ return{
 	Name="Obsidian",
 	Source="deividcomsono/Obsidian",
 	Url="https://github.com/deividcomsono/Obsidian",
+	Renderer="external",
+	ExternalUrl="https://raw.githubusercontent.com/deividcomsono/Obsidian/main/Library.lua",
 	Description="Dark sidebar panels, search-like inputs, and violet accents.",
 	Tags={"obsidian","deividcomsono","github","violet","sidebar"},
 	Style={
@@ -93,7 +95,7 @@ return{
 	},
 	MainFrame={
 		Window={W=735,H=560,MinW=560,MinH=380,MaxW=1120,MaxH=780,StartY=72,MinimizedH=58},
-		Layout={RootPadding=4,MainGap=6,PageGap=8,ColumnGap=8,FooterGap=6,HeaderHeight=52,PageBarHeight=34,PageTabWidth=96,PageTabHeight=30,PageHostReserve=142,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=8,FabSize=40,NavPlacement="left",NavWidth=168,NavGap=8,NavTabGap=6,NavTabPad=8,NavTabInset=8,PageShellTransparency=0,PageSliderTransparency=0,HeaderSubtitleVisible=false,HeaderSearchVisible=true,HeaderSearchPlaceholder="Search",HeaderSearchWidth=260,HeaderSearchHeight=30,HeaderTitleY=15,HeaderTitleSize=15,RootStrokeTransparency=0.34,HeaderStrokeTransparency=0.62,PageShellStrokeTransparency=0.68,PageSliderStrokeTransparency=0.62},
+		Layout={RootPadding=4,MainGap=6,PageGap=8,ColumnGap=8,FooterGap=6,HeaderHeight=52,PageBarHeight=34,PageTabWidth=96,PageTabHeight=30,PageHostReserve=142,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=8,FabSize=40,NavPlacement="left",NavWidth=168,NavGap=8,NavTabGap=6,NavTabPad=8,NavTabInset=8,PageShellTransparency=0,PageSliderTransparency=0,HeaderSubtitleVisible=false,HeaderSearchVisible=false,HeaderSearchPlaceholder="Search",HeaderSearchWidth=260,HeaderSearchHeight=30,HeaderTitleY=15,HeaderTitleSize=15,RootStrokeTransparency=0.34,HeaderStrokeTransparency=0.62,PageShellStrokeTransparency=0.68,PageSliderStrokeTransparency=0.62},
 	},
 	Tones={
 		topbar=0.04,

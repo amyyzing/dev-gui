@@ -359,6 +359,83 @@ resetKeybindPresetPageDefaults=function()
 	requestPlayerAutosave()
 end
 
+local function getExternalRendererBindings()
+	return{
+		{label="Toggle open / hide GUI",get=function() return TOGGLE_UI_KEY end,set=function(v) TOGGLE_UI_KEY=v or Enum.KeyCode.Unknown; requestPlayerAutosave() end},
+		{label="Hitbox Toggle",get=function() return TOGGLE_HB_KEY end,set=function(v) TOGGLE_HB_KEY=v or Enum.KeyCode.Unknown; requestPlayerAutosave() end},
+		{label="Jump Boost Toggle",get=function() return TOGGLE_JB_KEY end,set=function(v) TOGGLE_JB_KEY=v or Enum.KeyCode.Unknown; requestPlayerAutosave() end},
+		{label="Always Boost Toggle",get=function() return TOGGLE_AB_KEY end,set=function(v) TOGGLE_AB_KEY=v or Enum.KeyCode.Unknown; requestPlayerAutosave() end},
+		{label="ESP Toggle",get=function() return TOGGLE_ACTION_KEY end,set=function(v) TOGGLE_ACTION_KEY=v or Enum.KeyCode.Unknown; requestPlayerAutosave() end},
+		{label="Speed Toggle",get=function() return TOGGLE_SPEED_KEY end,set=function(v) TOGGLE_SPEED_KEY=v or Enum.KeyCode.Unknown; requestPlayerAutosave() end},
+		{label="QB Aim Lock Receiver",get=function() return QB_AIM_LOCK_KEY end,set=function(v) QB_AIM_LOCK_KEY=v or Enum.KeyCode.Unknown; requestPlayerAutosave() end},
+		{label="QB Aim Throw",get=function() return QB_AIM_THROW_KEY end,set=function(v) QB_AIM_THROW_KEY=v or Enum.KeyCode.Unknown; requestPlayerAutosave() end},
+		{label="QB Aim Toggle",get=function() return QB_AIM_TOGGLE_KEY end,set=function(v) QB_AIM_TOGGLE_KEY=v or Enum.KeyCode.Unknown; requestPlayerAutosave() end},
+	}
+end
+
+local function makeExternalRendererContext()
+	return{
+		UI_STYLE=UI_STYLE,
+		MainFrame=MainFrame,
+		PAGE1_STATE=PAGE1_STATE,
+		PAGE1_APIS=PAGE1_APIS,
+		WORLD_SETTINGS=WORLD_SETTINGS,
+		AntiMaterialAPI=AntiMaterialAPI,
+		MapCleanerAPI=MapCleanerAPI,
+		RemoveAdsAPI=RemoveAdsAPI,
+		StrokeColourAPI=StrokeColourAPI,
+		PlayerDataAPI=PlayerDataAPI,
+		DiscordAPI=DiscordAPI,
+		loadExternalUILibrary=loadExternalUILibrary,
+		applyUIStrokeTheme=applyUIStrokeTheme,
+		requestPlayerAutosave=requestPlayerAutosave,
+		parseKeyCodeInput=parseKeyCodeInput,
+		GetBindings=getExternalRendererBindings,
+		onUILibChanged=function()
+			if refreshExternalRenderer then
+				task.defer(refreshExternalRenderer)
+			end
+		end,
+	}
+end
+
+refreshExternalRenderer=function()
+	if ExternalRenderer and ExternalRenderer.Destroy then
+		pcall(ExternalRenderer.Destroy)
+	end
+
+	ExternalRenderer=nil
+
+	if not ExternalRendererModule or type(ExternalRendererModule.new)~="function" then
+		if MainFrame and MainFrame.root then
+			MainFrame.root.Visible=uiVisible
+		end
+		return
+	end
+
+	local ok,result=pcall(function()
+		return ExternalRendererModule.new(makeExternalRendererContext())
+	end)
+
+	if not ok or not result then
+		warn("External renderer failed to initialize:",result)
+		if MainFrame and MainFrame.root then
+			MainFrame.root.Visible=uiVisible
+		end
+		return
+	end
+
+	ExternalRenderer=result
+	if ExternalRenderer.Refresh then
+		pcall(ExternalRenderer.Refresh)
+	end
+	if ExternalRenderer.SetVisible then
+		pcall(ExternalRenderer.SetVisible,uiVisible)
+	end
+end
+
+task.defer(refreshExternalRenderer)
+
 resetBtn.MouseButton1Click:Connect(function()
 	local activePageName=getActivePageName()
 

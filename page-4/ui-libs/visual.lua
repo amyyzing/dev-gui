@@ -3,6 +3,8 @@ return{
 	Name="Visual",
 	Source="VisualRoblox/Roblox",
 	Url="https://github.com/VisualRoblox/Roblox",
+	Renderer="external",
+	ExternalUrl="https://raw.githubusercontent.com/VisualRoblox/Roblox/main/UI-Libraries/Visual%20UI%20Library/Source.lua",
 	Description="Blue-glow dark surfaces with wide rows and bright controls.",
 	Tags={"visual","blue","github","glow","sidebar"},
 	Style={
