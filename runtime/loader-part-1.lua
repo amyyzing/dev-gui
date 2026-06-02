@@ -33,6 +33,7 @@ UI_STYLE={
 	StrokeThickness=1,
 	StrokeTransparency=0.55,
 	CornerRadius=0,
+	UILib="original",
 }
 
 UI_WINDOW={W=880, H=540, MinW=560, MinH=360, MaxW=1220, MaxH=820,}
@@ -430,6 +431,12 @@ MODULE_PATHS={
 	PrimaryColour="page-4/primary.lua",
 	SecondaryColour="page-4/secondary.lua",
 	StrokeColour="page-4/stroke-colour.lua",
+	UILibOriginal="page-4/ui-libs/original.lua",
+	UILibVisual="page-4/ui-libs/visual.lua",
+	UILibRayfield="page-4/ui-libs/rayfield.lua",
+	UILibWindUI="page-4/ui-libs/windui.lua",
+	UILibLinoria="page-4/ui-libs/linoria.lua",
+	UILibObsidian="page-4/ui-libs/obsidian.lua",
 	MapEditor="page-2/map-editor.lua",
 	AntiMaterial="page-2/anti-material.lua",
 	MapCleaner="page-2/map-cleaner.lua",
@@ -460,6 +467,12 @@ end
 OPTIONAL_MODULE_PATH_SET={
 	[MODULE_PATHS.PrimaryColour]=true,
 	[MODULE_PATHS.SecondaryColour]=true,
+	[MODULE_PATHS.UILibOriginal]=true,
+	[MODULE_PATHS.UILibVisual]=true,
+	[MODULE_PATHS.UILibRayfield]=true,
+	[MODULE_PATHS.UILibWindUI]=true,
+	[MODULE_PATHS.UILibLinoria]=true,
+	[MODULE_PATHS.UILibObsidian]=true,
 }
 MAX_REMOTE_MODULE_BYTES=300000
 REMOTE_MODULE_MARKERS={[AUTO_REFRESH_RELOAD_PATH]="HB_LOADER_V2"}
@@ -802,6 +815,12 @@ Page1QBAimModule=loadRemoteModuleStep("Page1QBAim",MODULE_PATHS.Page1QBAim)
 PrimaryColourModule=loadRemoteModuleStep("PrimaryColour",MODULE_PATHS.PrimaryColour)
 SecondaryColourModule=loadRemoteModuleStep("SecondaryColour",MODULE_PATHS.SecondaryColour)
 StrokeColourModule=loadRemoteModuleStep("StrokeColour",MODULE_PATHS.StrokeColour)
+UILibOriginalModule=loadRemoteModuleStep("UILibOriginal",MODULE_PATHS.UILibOriginal)
+UILibVisualModule=loadRemoteModuleStep("UILibVisual",MODULE_PATHS.UILibVisual)
+UILibRayfieldModule=loadRemoteModuleStep("UILibRayfield",MODULE_PATHS.UILibRayfield)
+UILibWindUIModule=loadRemoteModuleStep("UILibWindUI",MODULE_PATHS.UILibWindUI)
+UILibLinoriaModule=loadRemoteModuleStep("UILibLinoria",MODULE_PATHS.UILibLinoria)
+UILibObsidianModule=loadRemoteModuleStep("UILibObsidian",MODULE_PATHS.UILibObsidian)
 MapEditorModule=loadRemoteModuleStep("MapEditor",MODULE_PATHS.MapEditor)
 AntiMaterialModule=loadRemoteModuleStep("AntiMaterial",MODULE_PATHS.AntiMaterial)
 MapCleanerModule=loadRemoteModuleStep("MapCleaner",MODULE_PATHS.MapCleaner)
@@ -853,6 +872,17 @@ end
 
 function getUIPrimaryColor()
 	return Color3.fromRGB(math.clamp(math.floor((UI_STYLE.PrimaryR or 28)+0.5),0,255),math.clamp(math.floor((UI_STYLE.PrimaryG or 28)+0.5),0,255),math.clamp(math.floor((UI_STYLE.PrimaryB or 28)+0.5),0,255))
+end
+
+function getUILibModules()
+	return{
+		UILibOriginalModule,
+		UILibVisualModule,
+		UILibRayfieldModule,
+		UILibWindUIModule,
+		UILibLinoriaModule,
+		UILibObsidianModule,
+	}
 end
 
 function refreshThemePalette()
@@ -947,13 +977,27 @@ function applyAutoRefreshModuleChange(changedPath,module)
 		return true
 	end
 
-	if changedPath==MODULE_PATHS.StrokeColour or changedPath==MODULE_PATHS.PrimaryColour or changedPath==MODULE_PATHS.SecondaryColour then
+	if changedPath==MODULE_PATHS.StrokeColour or changedPath==MODULE_PATHS.PrimaryColour or changedPath==MODULE_PATHS.SecondaryColour
+		or changedPath==MODULE_PATHS.UILibOriginal or changedPath==MODULE_PATHS.UILibVisual or changedPath==MODULE_PATHS.UILibRayfield
+		or changedPath==MODULE_PATHS.UILibWindUI or changedPath==MODULE_PATHS.UILibLinoria or changedPath==MODULE_PATHS.UILibObsidian then
 		if changedPath==MODULE_PATHS.StrokeColour then
 			StrokeColourModule=module
 		elseif changedPath==MODULE_PATHS.PrimaryColour then
 			PrimaryColourModule=module
-		else
+		elseif changedPath==MODULE_PATHS.SecondaryColour then
 			SecondaryColourModule=module
+		elseif changedPath==MODULE_PATHS.UILibOriginal then
+			UILibOriginalModule=module
+		elseif changedPath==MODULE_PATHS.UILibVisual then
+			UILibVisualModule=module
+		elseif changedPath==MODULE_PATHS.UILibRayfield then
+			UILibRayfieldModule=module
+		elseif changedPath==MODULE_PATHS.UILibWindUI then
+			UILibWindUIModule=module
+		elseif changedPath==MODULE_PATHS.UILibLinoria then
+			UILibLinoriaModule=module
+		else
+			UILibObsidianModule=module
 		end
 
 		if rebuildCustomizeFromModules then

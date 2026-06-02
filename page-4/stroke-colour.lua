@@ -25,6 +25,7 @@ local DEFAULTS={
 	StrokeThickness=1,
 	StrokeTransparency=0.55,
 	CornerRadius=0,
+	UILib="original",
 }
 
 local function clampByte(v)
@@ -68,6 +69,7 @@ local function ensureStyleDefaults(style)
 	style.StrokeThickness=math.clamp(numberOrDefault(style.StrokeThickness,DEFAULTS.StrokeThickness),0,8)
 	style.StrokeTransparency=math.clamp(numberOrDefault(style.StrokeTransparency,DEFAULTS.StrokeTransparency),0,1)
 	style.CornerRadius=0
+	style.UILib=tostring(style.UILib or DEFAULTS.UILib)
 end
 
 local function copyDefaultStyle(style)
@@ -95,6 +97,7 @@ local function copyDefaultStyle(style)
 		StrokeThickness=math.clamp(numberOrDefault(style.StrokeThickness,DEFAULTS.StrokeThickness),0,8),
 		StrokeTransparency=math.clamp(numberOrDefault(style.StrokeTransparency,DEFAULTS.StrokeTransparency),0,1),
 		CornerRadius=0,
+		UILib=tostring(style.UILib or DEFAULTS.UILib),
 	}
 end
 
@@ -150,6 +153,7 @@ function StrokeColour.new(ctx,page)
 	local UI_STYLE=ctx.UI_STYLE
 	local SG=ctx.SG
 	local UIS=ctx.UIS or game:GetService("UserInputService")
+	local UILibModules=ctx.UILibModules
 	local externalThemeApplier=ctx.applyUIStrokeTheme~=nil
 
 	ensureStyleDefaults(UI_STYLE)
@@ -559,6 +563,7 @@ function StrokeColour.new(ctx,page)
 		UI_STYLE.StrokeThickness=defaultStyle.StrokeThickness
 		UI_STYLE.StrokeTransparency=defaultStyle.StrokeTransparency
 		UI_STYLE.CornerRadius=defaultStyle.CornerRadius
+		UI_STYLE.UILib=defaultStyle.UILib
 
 		api.Refresh()
 	end
@@ -629,7 +634,7 @@ function StrokeColour.new(ctx,page)
 	local targetButtons={}
 	local modeButtons={}
 	local themeCards={}
-	local borderChoices={}
+	local libRows={}
 	local quickChoices={}
 	local rgbSliders={}
 	local hsvSliders={}
@@ -776,10 +781,9 @@ function StrokeColour.new(ctx,page)
 			ZIndex=6,
 		},row)
 
-		local valueBox=New("TextBox",{
+		local valueBox=New("TextLabel",{
 			BackgroundColor3=THEME.PANEL,
 			BorderSizePixel=0,
-			ClearTextOnFocus=true,
 			Size=UDim2.fromOffset(48,24),
 			Position=UDim2.new(1,-48,0,2),
 			Text=tostring(startVal),
@@ -864,15 +868,6 @@ function StrokeColour.new(ctx,page)
 				dragging=false
 			end
 		end))
-
-		valueBox.FocusLost:Connect(function()
-			local n=tonumber(valueBox.Text)
-			if n then
-				setValue(n,true)
-			else
-				setVisual(value)
-			end
-		end)
 
 		setValue(startVal,false)
 
@@ -1396,41 +1391,200 @@ function StrokeColour.new(ctx,page)
 
 	applyHex.MouseButton1Click:Connect(commitHex)
 
-	local borderPanel=makePanel(4)
-	makeLabel(borderPanel,"Border",1,13,false)
+	local function normalizeLibModule(module)
+		if type(module)~="table" or type(module.Id)~="string" or type(module.Name)~="string" then
+			return nil
+		end
 
-	local borderRow=New("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,34),
-		ZIndex=5,
+		return module
+	end
+
+	local libLookup={}
+	local uiLibs={}
+	for _,module in ipairs(type(UILibModules)=="table" and UILibModules or {}) do
+		local lib=normalizeLibModule(module)
+		if lib and not libLookup[lib.Id] then
+			libLookup[lib.Id]=lib
+			uiLibs[#uiLibs+1]=lib
+		end
+	end
+
+	if #uiLibs==0 then
+		uiLibs={
+			{Id="original",Name="Original",Source="Current GUI",Url="",Description="The current simplified control-panel style.",Tags={"default","current","simple"},Style={Primary=Color3.fromRGB(28,28,28),Stroke=Color3.fromRGB(76,76,76),Gradient=Color3.fromRGB(45,45,45),GradientOn=false,StrokeThickness=1,StrokeTransparency=0.55}},
+			{Id="visual",Name="Visual",Source="VisualRoblox/Roblox",Url="https://github.com/VisualRoblox/Roblox",Description="Clean dark surfaces with a bright blue accent.",Tags={"visual","blue","github"},Style={Primary=Color3.fromRGB(18,20,26),Stroke=Color3.fromRGB(0,145,255),Gradient=Color3.fromRGB(84,196,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.58}},
+			{Id="rayfield",Name="Rayfield",Source="Sirius Rayfield",Url="https://docs.sirius.menu/rayfield",Description="Compact dark controls with blue slider emphasis.",Tags={"rayfield","sirius","slider","blue"},Style={Primary=Color3.fromRGB(25,25,25),Stroke=Color3.fromRGB(48,119,177),Gradient=Color3.fromRGB(43,105,159),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.52}},
+			{Id="windui",Name="WindUI",Source="FootageSus WindUI",Url="https://footagesus-windui.mintlify.app/",Description="Soft neutral panels with a calm sky-blue accent.",Tags={"windui","soft","docs","blue"},Style={Primary=Color3.fromRGB(22,24,30),Stroke=Color3.fromRGB(86,153,255),Gradient=Color3.fromRGB(142,195,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.62}},
+			{Id="linoria",Name="Linoria",Source="violin-suzutsuki/LinoriaLib",Url="https://github.com/violin-suzutsuki/LinoriaLib",Description="Dense utility-library look with purple-blue accents.",Tags={"linoria","purple","github","dense"},Style={Primary=Color3.fromRGB(28,27,36),Stroke=Color3.fromRGB(120,98,255),Gradient=Color3.fromRGB(76,145,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.55}},
+			{Id="obsidian",Name="Obsidian",Source="Lilith-VnK/JustHub-UI",Url="https://github.com/Lilith-VnK/JustHub-UI/",Description="High-contrast dark style with violet accent strokes.",Tags={"obsidian","justhub","violet","github"},Style={Primary=Color3.fromRGB(15,15,20),Stroke=Color3.fromRGB(145,88,255),Gradient=Color3.fromRGB(230,92,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.5}},
+		}
+
+		for _,lib in ipairs(uiLibs) do
+			libLookup[lib.Id]=lib
+		end
+	end
+
+	local function applyUILib(lib)
+		if not lib then
+			return
+		end
+
+		local style=lib.Style or {}
+		UI_STYLE.UILib=lib.Id
+		UI_STYLE.LiquidStroke=false
+
+		if style.Primary then
+			setPrimaryColour(style.Primary)
+		end
+
+		if style.Stroke then
+			setMainColour(style.Stroke)
+		end
+
+		if style.Gradient then
+			setGradientColour(style.Gradient)
+		end
+
+		UI_STYLE.StrokeGradient=style.GradientOn and true or false
+		UI_STYLE.StrokeThickness=math.clamp(numberOrDefault(style.StrokeThickness,UI_STYLE.StrokeThickness),0,8)
+		UI_STYLE.StrokeTransparency=math.clamp(numberOrDefault(style.StrokeTransparency,UI_STYLE.StrokeTransparency),0,1)
+
+		setPickerFromColor(getActiveColor())
+		syncColourControls()
+		updateEverything()
+		syncPickerControls()
+	end
+
+	local libsPanel=makePanel(4)
+	makeLabel(libsPanel,"Libs",1,13,false)
+
+	local libSearch=New("TextBox",{
+		BackgroundColor3=THEME.PANEL,
+		BorderSizePixel=0,
+		ClearTextOnFocus=false,
+		Size=UDim2.new(1,0,0,30),
+		Text="",
+		PlaceholderText="Search libraries",
+		Font=Enum.Font.GothamMedium,
+		TextSize=12,
+		TextColor3=THEME.TEXT,
+		PlaceholderColor3=THEME.MUTED,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		ZIndex=6,
 		LayoutOrder=2,
-	},borderPanel)
+		ThemeRole="PANEL",
+	},libsPanel)
+
+	local libList=New("Frame",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,0),
+		AutomaticSize=Enum.AutomaticSize.Y,
+		ZIndex=5,
+		LayoutOrder=3,
+	},libsPanel)
 
 	New("UIListLayout",{
-		FillDirection=Enum.FillDirection.Horizontal,
-		Padding=UDim.new(0,8),
+		Padding=UDim.new(0,6),
 		SortOrder=Enum.SortOrder.LayoutOrder,
-	},borderRow)
+	},libList)
 
-	local borderOptions={
-		{Name="Soft",Thickness=1,Transparency=0.72},
-		{Name="Default",Thickness=1,Transparency=0.55},
-		{Name="Strong",Thickness=2,Transparency=0.35},
-	}
+	local function matchesLib(lib,query)
+		query=tostring(query or ""):lower()
+		if query=="" then
+			return true
+		end
 
-	for i,option in ipairs(borderOptions) do
-		local button,marker=makeFlatButton(borderRow,option.Name,i)
+		local fields={lib.Id,lib.Name,lib.Source,lib.Description,lib.Url}
+		for _,tag in ipairs(type(lib.Tags)=="table" and lib.Tags or {}) do
+			fields[#fields+1]=tag
+		end
 
-		button.MouseButton1Click:Connect(function()
-			UI_STYLE.StrokeThickness=option.Thickness
-			UI_STYLE.StrokeTransparency=option.Transparency
-			syncColourControls()
-			updateEverything()
-			syncPickerControls()
+		for _,field in ipairs(fields) do
+			if tostring(field or ""):lower():find(query,1,true) then
+				return true
+			end
+		end
+
+		return false
+	end
+
+	for index,lib in ipairs(uiLibs) do
+		local row=New("TextButton",{
+			BackgroundColor3=THEME.PANEL,
+			BorderSizePixel=0,
+			Text="",
+			AutoButtonColor=false,
+			Size=UDim2.new(1,0,0,46),
+			ZIndex=6,
+			LayoutOrder=index,
+			SkipThemeRole=true,
+		},libList)
+
+		local marker=New("Frame",{
+			BackgroundColor3=getUIStrokeColor(),
+			BorderSizePixel=0,
+			Size=UDim2.fromOffset(3,46),
+			Visible=false,
+			SkipThemeRole=true,
+			ZIndex=7,
+		},row)
+
+		New("TextLabel",{
+			BackgroundTransparency=1,
+			Position=UDim2.fromOffset(12,5),
+			Size=UDim2.new(1,-24,0,18),
+			Text=lib.Name,
+			Font=Enum.Font.GothamBold,
+			TextSize=12,
+			TextColor3=THEME.TEXT,
+			TextXAlignment=Enum.TextXAlignment.Left,
+			ZIndex=7,
+		},row)
+
+		New("TextLabel",{
+			BackgroundTransparency=1,
+			Position=UDim2.fromOffset(12,24),
+			Size=UDim2.new(1,-24,0,16),
+			Text=lib.Source or lib.Url or "",
+			Font=Enum.Font.Gotham,
+			TextSize=11,
+			TextColor3=THEME.MUTED,
+			TextXAlignment=Enum.TextXAlignment.Left,
+			ZIndex=7,
+		},row)
+
+		row.MouseEnter:Connect(function()
+			row.BackgroundColor3=THEME.CARD
 		end)
 
-		borderChoices[#borderChoices+1]={Option=option,Button=button,Marker=marker}
+		row.MouseLeave:Connect(function()
+			paintChoices()
+		end)
+
+		row.MouseButton1Click:Connect(function()
+			applyUILib(lib)
+		end)
+
+		libRows[#libRows+1]={Lib=lib,Row=row,Marker=marker}
 	end
+
+	local function filterLibs()
+		local anyVisible=false
+		local query=libSearch.Text
+
+		for _,entry in ipairs(libRows) do
+			local visible=matchesLib(entry.Lib,query)
+			entry.Row.Visible=visible
+			if visible then
+				anyVisible=true
+			end
+		end
+
+		libList.Visible=anyVisible
+	end
+
+	libSearch:GetPropertyChangedSignal("Text"):Connect(filterLibs)
+	filterLibs()
 
 	paintChoices=function()
 		local primary=getUIPrimaryColor()
@@ -1473,12 +1627,9 @@ function StrokeColour.new(ctx,page)
 			entry.Marker.BackgroundColor3=readableTextColor(entry.Color)
 		end
 
-		for _,entry in ipairs(borderChoices) do
-			local option=entry.Option
-			local selected=math.abs((tonumber(UI_STYLE.StrokeThickness) or 0)-option.Thickness)<0.05
-				and math.abs((tonumber(UI_STYLE.StrokeTransparency) or 0)-option.Transparency)<0.05
-
-			entry.Button.BackgroundColor3=selected and THEME.BG or THEME.PANEL
+		for _,entry in ipairs(libRows) do
+			local selected=tostring(UI_STYLE.UILib or "original")==entry.Lib.Id
+			entry.Row.BackgroundColor3=selected and THEME.BG or THEME.PANEL
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=stroke
 		end

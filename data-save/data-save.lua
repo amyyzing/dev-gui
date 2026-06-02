@@ -461,6 +461,7 @@ function DataSave.new(ctx)
 				strokeThickness=uiStyle.StrokeThickness,
 				strokeTransparency=uiStyle.StrokeTransparency,
 				cornerRadius=0,
+				uiLib=uiStyle.UILib or "original",
 			},
 
 			workspace={
@@ -620,7 +621,8 @@ function DataSave.new(ctx)
 			if uiStyle.liquidStrokeSpeed~=nil then ctx.UI_STYLE.LiquidStrokeSpeed=clampNumber(uiStyle.liquidStrokeSpeed,0,2,ctx.UI_STYLE.LiquidStrokeSpeed or 1) end
 			if uiStyle.liquidStrokeDirection~=nil then ctx.UI_STYLE.LiquidStrokeDirection=tostring(uiStyle.liquidStrokeDirection) end
 			if uiStyle.strokeThickness~=nil then ctx.UI_STYLE.StrokeThickness=clampNumber(uiStyle.strokeThickness,0,8,ctx.UI_STYLE.StrokeThickness or 1) end
-			if uiStyle.strokeTransparency~=nil then ctx.UI_STYLE.StrokeTransparency=clampNumber(uiStyle.strokeTransparency,0,1,ctx.UI_STYLE.StrokeTransparency or 0.25) end
+			if uiStyle.strokeTransparency~=nil then ctx.UI_STYLE.StrokeTransparency=clampNumber(uiStyle.strokeTransparency,0,1,ctx.UI_STYLE.StrokeTransparency or 0.55) end
+			if uiStyle.uiLib~=nil then ctx.UI_STYLE.UILib=tostring(uiStyle.uiLib) end
 			ctx.UI_STYLE.CornerRadius=0
 		end
 

@@ -409,7 +409,7 @@ function GuiLogic.new(ctx)
 		local knob=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(2,26),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=THEME.STROKE,BorderSizePixel=0,ZIndex=8,ThemeRole="STROKE"},track)
 
 		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=8,AutoButtonColor=false},track)
-		local valueLabel=New("TextBox",{BackgroundTransparency=1,BorderSizePixel=0,ClearTextOnFocus=true,Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),Text=fmtNumber(startVal,decimals),Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=9},track)
+		local valueLabel=New("TextLabel",{BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),Text=fmtNumber(startVal,decimals),Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=9},track)
 		local value=startVal
 		local dragging=false
 
@@ -465,21 +465,6 @@ function GuiLogic.new(ctx)
 		UIS.InputEnded:Connect(function(i)
 			if i.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=false
-			end
-		end)
-
-		valueLabel.Focused:Connect(function()
-			valueLabel.TextColor3=THEME.TEXT
-		end)
-
-		valueLabel.FocusLost:Connect(function()
-			valueLabel.TextColor3=THEME.TEXT
-
-			local n=tonumber(valueLabel.Text)
-			if n then
-				setValue(n,true)
-			else
-				valueLabel.Text=fmtNumber(value,decimals)
 			end
 		end)
 

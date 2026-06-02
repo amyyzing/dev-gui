@@ -54,6 +54,10 @@ function MainFrame.new(ctx)
 			return false
 		end
 
+		if SG and SG.Enabled==false then
+			return false
+		end
+
 		local mouse=UIS:GetMouseLocation()
 		local pos=root.AbsolutePosition
 		local size=root.AbsoluteSize

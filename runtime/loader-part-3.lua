@@ -67,11 +67,13 @@ function buildCustomizePage()
 					StrokeThickness=1,
 					StrokeTransparency=0.55,
 					CornerRadius=0,
+					UILib="original",
 				},
 
 				SG=SG,
 				PrimaryColourModule=PrimaryColourModule,
 				SecondaryColourModule=SecondaryColourModule,
+				UILibModules=getUILibModules and getUILibModules() or nil,
 
 				makeSection=makeSection,
 				buildSlider=buildSlider,
