@@ -114,8 +114,9 @@ function GuiLogic.new(ctx)
 	local function createSwitch(parent,startState,onChange,width,height,knobSize,pad,zIndex)
 		local s=shape()
 		local c=components()
-		local rounded=(tonumber(s.ControlRadius) or 0)>0
 		local toggleStyle=tostring(c.ToggleStyle or "switch"):lower()
+		local checkbox=toggleStyle=="checkbox"
+		local rounded=(tonumber(s.ControlRadius) or 0)>0 and not checkbox
 		width=width or componentNumber("ToggleWidth",48)
 		height=height or componentNumber("ToggleHeight",20)
 		knobSize=knobSize or componentNumber("ToggleKnobSize",16)
@@ -143,13 +144,18 @@ function GuiLogic.new(ctx)
 			local pos=state and UDim2.fromOffset(width-knobSize-pad,pad) or UDim2.fromOffset(pad,pad)
 			local knobBg=readableOn(bg)
 
-			if toggleStyle=="block" then
+			if checkbox then
+				bg=themeColor("INPUT",Color3.fromRGB(0,0,0))
+				pos=UDim2.fromOffset(pad,pad)
+				knobBg=state and themeRoleColor(onRole,themeColor("SLIDER_FILL",THEME.GREEN)) or bg
+				knob.Visible=state
+			elseif toggleStyle=="block" then
 				bg=state and bg or themeColor("INPUT",Color3.fromRGB(0,0,0))
 				pos=state and UDim2.fromOffset(width-knobSize-pad,pad) or UDim2.fromOffset(pad,pad)
 				knobBg=state and readableOn(bg) or themeColor("MUTED",Color3.fromRGB(180,180,180))
 			end
 
-			wrap:SetAttribute("ThemeRole",state and onRole or (toggleStyle=="block" and "INPUT" or offRole))
+			wrap:SetAttribute("ThemeRole",state and (checkbox and "INPUT" or onRole) or ((toggleStyle=="block" or checkbox) and "INPUT" or offRole))
 			knob:SetAttribute("ThemeRole",nil)
 
 			TweenService:Create(wrap,ti,{BackgroundColor3=bg}):Play()
@@ -298,6 +304,7 @@ function GuiLogic.new(ctx)
 	function api.makeSection(parent,order,titleText,subtitleText,options)
 		options=options or {}
 		local c=components()
+		local sectionMode=tostring(c.SectionMode or "card"):lower()
 		local descriptionOnly=options.compact==true or options.headerOnly==true
 		local hasBody=not descriptionOnly
 		local sec=New("Frame",{BackgroundColor3=themeColor("SECTION",THEME.CARD),BackgroundTransparency=componentNumber("SectionBackgroundTransparency",0),BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=4,LayoutOrder=order,ThemeRole="SECTION",CornerRole="Section"},parent)
@@ -318,6 +325,20 @@ function GuiLogic.new(ctx)
 		local usesPrefix=componentValue("SectionPrefix",true)~=false
 		local titleButton=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-titleReserve,1,0),Text=(usesPrefix and "[-] " or "")..titleText,Font=componentFont("TitleFont",Enum.Font.GothamBold),TextSize=componentNumber("SectionTitleSize",14),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=5},header)
 		local headerRightOffset=0
+
+		if sectionMode=="groupbox" then
+			local titleWidth=componentNumber("SectionTitleBoxWidth",140)
+			local titleHeight=componentNumber("SectionTitleBoxHeight",componentNumber("SectionHeaderHeight",18))
+			titleButton.AnchorPoint=Vector2.new(0.5,0)
+			titleButton.Position=UDim2.new(0.5,0,0,componentNumber("SectionTitleOffsetY",-2))
+			titleButton.Size=UDim2.fromOffset(titleWidth,titleHeight)
+			titleButton.BackgroundColor3=themeColor("SECTION",THEME.CARD)
+			titleButton.BackgroundTransparency=componentNumber("SectionTitleBackgroundTransparency",0)
+			titleButton.TextXAlignment=Enum.TextXAlignment.Center
+			titleButton:SetAttribute("ThemeRole","SECTION")
+		elseif sectionMode=="label" then
+			titleButton.TextXAlignment=Enum.TextXAlignment.Left
+		end
 
 		if options.headerToggle then
 			local toggleOptions=options.headerToggle
@@ -488,6 +509,9 @@ function GuiLogic.new(ctx)
 
 		local function paint(animate)
 			titleButton.Text=(usesPrefix and ((collapsed and "[+] " or "[-] ")..titleText) or titleText)
+			if sectionMode=="groupbox" then
+				titleButton.Text=titleText
+			end
 			tweenTitle()
 
 			if collapsed then
@@ -567,13 +591,17 @@ function GuiLogic.new(ctx)
 			valueBoxYOffset=trackYOffset
 		end
 
-		local container=New("Frame",{BackgroundColor3=themeColor("SECTION",THEME.CARD),BackgroundTransparency=componentNumber("SliderContainerTransparency",0.12),BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole="SECTION",CornerRole="Section"},parent)
-		addCorner(container,"Section")
+		local containerRole=tostring(componentValue("SliderContainerRole","SECTION"))
+		local containerCorner=tostring(componentValue("SliderContainerCornerRole",containerRole=="BUTTON" and "Control" or "Section"))
+		local trackRole=tostring(componentValue("SliderTrackRole","SLIDER_BG"))
+		local valueRole=tostring(componentValue("SliderValueBoxRole","INPUT"))
+		local container=New("Frame",{BackgroundColor3=themeColor(containerRole,themeColor("SECTION",THEME.CARD)),BackgroundTransparency=componentNumber("SliderContainerTransparency",0.12),BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole=containerRole,CornerRole=containerCorner},parent)
+		addCorner(container,containerCorner)
 		local containerStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=componentNumber("SliderContainerStrokeTransparency",0.65)},container)
 		containerStroke:SetAttribute("BaseStrokeTransparency",componentNumber("SliderContainerStrokeTransparency",0.65))
 		New("TextLabel",{BackgroundTransparency=1,Position=labelPosition,Size=labelSize,Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false},container)
 
-		local track=New("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor("SLIDER_BG",THEME.PANEL),BorderSizePixel=0,ClipsDescendants=rounded,ZIndex=6,ThemeRole="SLIDER_BG",CornerRole="Slider"},container)
+		local track=New("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor(trackRole,THEME.PANEL),BorderSizePixel=0,ClipsDescendants=rounded,ZIndex=6,ThemeRole=trackRole,CornerRole="Slider"},container)
 		addCorner(track,"Slider")
 		local trackStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=componentNumber("SliderTrackStrokeTransparency",0.55)},track)
 		trackStroke:SetAttribute("BaseStrokeTransparency",componentNumber("SliderTrackStrokeTransparency",0.55))
@@ -591,7 +619,7 @@ function GuiLogic.new(ctx)
 		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=10,AutoButtonColor=false,Selectable=false},track)
 		local valueLabel=New("TextLabel",{BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=9,Selectable=false},track)
 		local valueBoxHeight=componentNumber("SliderValueBoxHeight",math.max(componentNumber("TextBoxHeight",24),sliderHeight))
-		local valueBox=New("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor("INPUT",THEME.PANEL),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole="INPUT",CornerRole="Control",Selectable=false},container)
+		local valueBox=New("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor(valueRole,THEME.PANEL),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole=valueRole,CornerRole="Control",Selectable=false},container)
 		valueBox.Visible=valueBoxVisible
 		addCorner(valueBox,"Control")
 		local valueStrokeTransparency=componentNumber("SliderValueBoxStrokeTransparency",componentNumber("ControlStrokeTransparency",0.65))
@@ -668,16 +696,25 @@ function GuiLogic.new(ctx)
 	end
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)
+		local c=components()
+		local toggleStyle=tostring(c.ToggleStyle or "switch"):lower()
 		local toggleW=componentNumber("ToggleWidth",48)
 		local toggleH=componentNumber("ToggleHeight",20)
-		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,math.max(30,toggleH+8)),ZIndex=5},parent)
+		local rowHeight=componentNumber("ToggleRowHeight",math.max(30,toggleH+8))
+		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5},parent)
 		local label=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-(toggleW+16),1,0),Text=labelText,Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("ToggleLabelSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
 		if label.Text=="" then
 			label.Visible=false
 		end
 
 		local control=createSwitch(row,startState,onChange,nil,nil,nil,nil,6)
-		control.wrap.Position=UDim2.new(1,-control.width,0.5,-control.height/2)
+		if toggleStyle=="checkbox" then
+			control.wrap.Position=UDim2.new(0,0,0.5,-control.height/2)
+			label.Position=UDim2.fromOffset(control.width+8,0)
+			label.Size=UDim2.new(1,-(control.width+8),1,0)
+		else
+			control.wrap.Position=UDim2.new(1,-control.width,0.5,-control.height/2)
+		end
 		return control
 	end
 

@@ -44,6 +44,7 @@ return{
 		TextFont=Enum.Font.Gotham,
 		TitleFont=Enum.Font.GothamSemibold,
 		ControlFont=Enum.Font.GothamMedium,
+		SectionMode="card",
 		SectionPrefix=false,
 		SectionPaddingX=16,
 		SectionPaddingY=14,
@@ -69,6 +70,8 @@ return{
 		SliderValueBoxVisible=true,
 		SliderContainerTransparency=0.16,
 		SliderContainerStrokeTransparency=1,
+		SliderContainerRole="BUTTON",
+		SliderContainerCornerRole="Control",
 		SliderTrackStrokeTransparency=0.94,
 		SliderValueBoxStrokeTransparency=0.96,
 		SliderLabelX=14,
@@ -86,7 +89,7 @@ return{
 	},
 	MainFrame={
 		Window={W=760,H=540,MinW=560,MinH=380,MaxW=1220,MaxH=820,StartY=80,MinimizedH=68},
-		Layout={RootPadding=10,MainGap=10,PageGap=10,ColumnGap=12,FooterGap=8,HeaderHeight=50,PageBarHeight=36,PageTabWidth=108,PageTabHeight=30,PageHostReserve=164,FooterHeight=36,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=10,FabSize=42,NavPlacement="left",NavWidth=150,NavGap=10,NavTabGap=8,NavTabPad=10,NavTabInset=10,PageShellTransparency=0.1,PageSliderTransparency=0.08},
+		Layout={RootPadding=10,MainGap=10,PageGap=10,ColumnGap=12,FooterGap=8,HeaderHeight=54,PageBarHeight=36,PageTabWidth=108,PageTabHeight=30,PageHostReserve=164,FooterHeight=36,TopButtonSize=26,TopButtonGap=6,TopButtonOuter=12,FabSize=42,NavPlacement="left",NavWidth=158,NavGap=10,NavTabGap=8,NavTabPad=12,NavTabInset=10,PageShellTransparency=0.18,PageSliderTransparency=0.08,HeaderSubtitleVisible=false,HeaderSearchVisible=true,HeaderSearchPlaceholder="Search",HeaderSearchWidth=220,HeaderSearchHeight=30,HeaderTitleY=15,HeaderTitleSize=15,RootStrokeTransparency=0.55,HeaderStrokeTransparency=0.92,PageShellStrokeTransparency=0.94,PageSliderStrokeTransparency=0.92},
 	},
 	Tones={
 		topbar=0.08,

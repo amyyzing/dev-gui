@@ -82,6 +82,8 @@ function MainFrame.new(ctx)
 	local pageHostReserve=156
 	local footerHeight=34
 	local topButtonSize=28
+	local topButtonGap=6
+	local topButtonOuter=10
 	local fabSize=42
 	local navPlacement="top"
 	local navIsLeft=false
@@ -92,6 +94,21 @@ function MainFrame.new(ctx)
 	local navTabInset=6
 	local pageShellTransparency=0
 	local pageSliderTransparency=0
+	local rootStrokeTransparency=0.15
+	local headerStrokeTransparency=0.25
+	local pageShellStrokeTransparency=0.35
+	local pageSliderStrokeTransparency=0.45
+	local headerSubtitleVisible=true
+	local headerSearchVisible=false
+	local headerSearchPlaceholder="Search"
+	local headerSearchWidth=210
+	local headerSearchHeight=28
+	local headerTitleX=16
+	local headerTitleY=7
+	local headerTitleSize=16
+	local headerSubtitleY=26
+	local headerSubtitleSize=11
+	local pageSliderVisible=true
 	local tabTextXAlignment=Enum.TextXAlignment.Center
 
 	local function loadLayoutNumbers()
@@ -109,6 +126,8 @@ function MainFrame.new(ctx)
 		pageHostReserve=layoutNumber(layoutProfile,"PageHostReserve",156)
 		footerHeight=layoutNumber(layoutProfile,"FooterHeight",34)
 		topButtonSize=layoutNumber(layoutProfile,"TopButtonSize",28)
+		topButtonGap=layoutNumber(layoutProfile,"TopButtonGap",6)
+		topButtonOuter=layoutNumber(layoutProfile,"TopButtonOuter",10)
 		fabSize=layoutNumber(layoutProfile,"FabSize",42)
 		navPlacement=tostring(layoutProfile.NavPlacement or "top"):lower()
 		navIsLeft=navPlacement=="left"
@@ -119,6 +138,21 @@ function MainFrame.new(ctx)
 		navTabInset=layoutNumber(layoutProfile,"NavTabInset",6)
 		pageShellTransparency=layoutNumber(layoutProfile,"PageShellTransparency",0)
 		pageSliderTransparency=layoutNumber(layoutProfile,"PageSliderTransparency",0)
+		rootStrokeTransparency=layoutNumber(layoutProfile,"RootStrokeTransparency",0.15)
+		headerStrokeTransparency=layoutNumber(layoutProfile,"HeaderStrokeTransparency",0.25)
+		pageShellStrokeTransparency=layoutNumber(layoutProfile,"PageShellStrokeTransparency",0.35)
+		pageSliderStrokeTransparency=layoutNumber(layoutProfile,"PageSliderStrokeTransparency",0.45)
+		headerSubtitleVisible=layoutProfile.HeaderSubtitleVisible~=false
+		headerSearchVisible=layoutProfile.HeaderSearchVisible==true
+		headerSearchPlaceholder=tostring(layoutProfile.HeaderSearchPlaceholder or "Search")
+		headerSearchWidth=layoutNumber(layoutProfile,"HeaderSearchWidth",210)
+		headerSearchHeight=layoutNumber(layoutProfile,"HeaderSearchHeight",28)
+		headerTitleX=layoutNumber(layoutProfile,"HeaderTitleX",16)
+		headerTitleY=layoutNumber(layoutProfile,"HeaderTitleY",7)
+		headerTitleSize=layoutNumber(layoutProfile,"HeaderTitleSize",16)
+		headerSubtitleY=layoutNumber(layoutProfile,"HeaderSubtitleY",26)
+		headerSubtitleSize=layoutNumber(layoutProfile,"HeaderSubtitleSize",11)
+		pageSliderVisible=layoutProfile.PageSliderVisible~=false
 		tabTextXAlignment=navIsLeft and Enum.TextXAlignment.Left or Enum.TextXAlignment.Center
 	end
 
@@ -216,7 +250,8 @@ function MainFrame.new(ctx)
 	end
 
 	New("UICorner",{CornerRadius=UDim.new(0,0)},root)
-	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.15},root)
+	local rootStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=rootStrokeTransparency},root)
+	rootStroke:SetAttribute("BaseStrokeTransparency",rootStrokeTransparency)
 	local rootPad=New("UIPadding",{PaddingTop=UDim.new(0,rootPadding),PaddingLeft=UDim.new(0,rootPadding),PaddingRight=UDim.new(0,rootPadding),PaddingBottom=UDim.new(0,rootPadding)},root)
 
 	local uiScale=New("UIScale",{Scale=1},root)
@@ -249,10 +284,11 @@ function MainFrame.new(ctx)
 
 	local header=New("Frame",{Size=UDim2.new(1,0,0,headerHeight),BackgroundColor3=THEME.TOPBAR or THEME.BG,BorderSizePixel=0,ZIndex=4,LayoutOrder=1,ThemeRole="TOPBAR",CornerRole="Section"},main)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},header)
-	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.25},header)
-	local titleLabel=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,7),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=16,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+	local headerStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=headerStrokeTransparency},header)
+	headerStroke:SetAttribute("BaseStrokeTransparency",headerStrokeTransparency)
+	local titleLabel=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerTitleY),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=headerTitleSize,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
 
-	local modeSubtitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,26),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+	local modeSubtitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerSubtitleY),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
 
 	local function makeTopButton(text,xOffset)
 		local b=New("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text=text,Font=controlFont,TextSize=17,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6,ThemeRole="BUTTON"},header)
@@ -268,13 +304,17 @@ function MainFrame.new(ctx)
 			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
 		end)
 
-		return b
+		return b,wrap
 	end
 
-	local topButtonGap=layoutNumber(layoutProfile,"TopButtonGap",6)
-	local topButtonOuter=layoutNumber(layoutProfile,"TopButtonOuter",10)
-	local miniBtn=makeTopButton("-", -(topButtonSize*2+topButtonGap+topButtonOuter))
-	local closeBtn=makeTopButton("x", -(topButtonSize+topButtonOuter))
+	local miniBtn,miniWrap=makeTopButton("-", -(topButtonSize*2+topButtonGap+topButtonOuter))
+	local closeBtn,closeWrap=makeTopButton("x", -(topButtonSize+topButtonOuter))
+
+	local headerSearch=New("Frame",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-(topButtonOuter+(topButtonSize*2)+topButtonGap+12),0.5,0),Size=UDim2.fromOffset(headerSearchWidth,headerSearchHeight),BackgroundColor3=THEME.INPUT or THEME.PANEL,BorderSizePixel=0,ZIndex=5,Visible=headerSearchVisible,ThemeRole="INPUT",CornerRole="Control"},header)
+	New("UICorner",{CornerRadius=UDim.new(0,0)},headerSearch)
+	local headerSearchStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.78},headerSearch)
+	headerSearchStroke:SetAttribute("BaseStrokeTransparency",0.78)
+	New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(12,0),Size=UDim2.new(1,-24,1,0),Text=headerSearchPlaceholder,Font=textFont,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6,TextRole="MUTED"},headerSearch)
 
 	local pageShellWidth=navIsLeft and navWidth or ((pageTabWidth*6)+2)
 	local pageArea=nil
@@ -298,11 +338,14 @@ function MainFrame.new(ctx)
 	local pageShell=New("Frame",{Size=navIsLeft and UDim2.new(1,0,1,0) or UDim2.fromOffset(pageShellWidth,pageBarHeight),BackgroundColor3=THEME.TOPBAR or THEME.BG,BackgroundTransparency=pageShellTransparency,BorderSizePixel=0,ZIndex=5,ThemeRole="TOPBAR",CornerRole="Section"},pageBar)
 	local pageShellScale=New("UIScale",{Scale=1},pageShell)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},pageShell)
-	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.35},pageShell)
+	local pageShellStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=pageShellStrokeTransparency},pageShell)
+	pageShellStroke:SetAttribute("BaseStrokeTransparency",pageShellStrokeTransparency)
 
 	local pageSlider=New("Frame",{Size=tabSize(),Position=tabPosition(1),BackgroundColor3=THEME.BUTTON or THEME.CARD,BackgroundTransparency=pageSliderTransparency,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON",CornerRole="Control"},pageShell)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},pageSlider)
-	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.45},pageSlider)
+	local pageSliderStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=pageSliderStrokeTransparency},pageSlider)
+	pageSliderStroke:SetAttribute("BaseStrokeTransparency",pageSliderStrokeTransparency)
+	pageSlider.Visible=pageSliderVisible
 
 	local settingsTab=New("TextButton",{Size=tabSize(),Position=tabPosition(1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Main","MAIN"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
 	local mapsPageTab=New("TextButton",{Size=tabSize(),Position=tabPosition(2),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Maps","MAPS"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
@@ -416,6 +459,33 @@ function MainFrame.new(ctx)
 		uiSettingsTab.Font=activePageName=="customize" and titleFont or controlFont
 		futureTab.Font=activePageName=="page2" and titleFont or controlFont
 		settingsPageTab.Font=activePageName=="settings" and titleFont or controlFont
+	end
+
+	local function applyChromeProfile()
+		rootStroke:SetAttribute("BaseStrokeTransparency",rootStrokeTransparency)
+		rootStroke.Transparency=rootStrokeTransparency
+		headerStroke:SetAttribute("BaseStrokeTransparency",headerStrokeTransparency)
+		headerStroke.Transparency=headerStrokeTransparency
+		pageShellStroke:SetAttribute("BaseStrokeTransparency",pageShellStrokeTransparency)
+		pageShellStroke.Transparency=pageShellStrokeTransparency
+		pageSliderStroke:SetAttribute("BaseStrokeTransparency",pageSliderStrokeTransparency)
+		pageSliderStroke.Transparency=pageSliderStrokeTransparency
+		pageSlider.Visible=pageSliderVisible
+
+		titleLabel.Position=UDim2.fromOffset(headerTitleX,headerTitleY)
+		titleLabel.TextSize=headerTitleSize
+		modeSubtitle.Position=UDim2.fromOffset(headerTitleX,headerSubtitleY)
+		modeSubtitle.TextSize=headerSubtitleSize
+		modeSubtitle.Visible=headerSubtitleVisible
+
+		headerSearch.Visible=headerSearchVisible
+		headerSearch.Size=UDim2.fromOffset(headerSearchWidth,headerSearchHeight)
+		headerSearch.Position=UDim2.new(1,-(topButtonOuter+(topButtonSize*2)+topButtonGap+12),0.5,0)
+		local searchText=headerSearch:FindFirstChildWhichIsA("TextLabel")
+		if searchText then
+			searchText.Text=headerSearchPlaceholder
+			searchText.Font=textFont
+		end
 	end
 
 	local refreshFooterResetButton=function() end
@@ -776,6 +846,7 @@ function MainFrame.new(ctx)
 	function api.RefreshTheme()
 		pageShell.BackgroundTransparency=pageShellTransparency
 		pageSlider.BackgroundTransparency=pageSliderTransparency
+		applyChromeProfile()
 		paintPageTabs()
 		paintResizeHandle(resizing)
 	end
@@ -799,10 +870,19 @@ function MainFrame.new(ctx)
 		mainLayout.Padding=UDim.new(0,mainGap)
 		header.Size=UDim2.new(1,0,0,headerHeight)
 		footer.Size=UDim2.new(1,0,0,footerHeight)
+		miniWrap.Size=UDim2.fromOffset(topButtonSize,topButtonSize)
+		miniWrap.Position=UDim2.new(1,-(topButtonSize*2+topButtonGap+topButtonOuter),0.5,-topButtonSize/2)
+		miniBtn.Size=UDim2.new(1,0,1,0)
+		miniBtn.Position=UDim2.fromOffset(0,0)
+		closeWrap.Size=UDim2.fromOffset(topButtonSize,topButtonSize)
+		closeWrap.Position=UDim2.new(1,-(topButtonSize+topButtonOuter),0.5,-topButtonSize/2)
+		closeBtn.Size=UDim2.new(1,0,1,0)
+		closeBtn.Position=UDim2.fromOffset(0,0)
 		titleLabel.Font=titleFont
 		modeSubtitle.Font=textFont
 		pageShell.BackgroundTransparency=pageShellTransparency
 		pageSlider.BackgroundTransparency=pageSliderTransparency
+		applyChromeProfile()
 
 		ensureNavParenting()
 		applyTabGeometry()
