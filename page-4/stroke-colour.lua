@@ -1511,10 +1511,10 @@ function StrokeColour.new(ctx,page)
 		uiLibs={
 			{Id="original",Name="Original",Source="Current GUI",Url="",Description="The current simplified control-panel style.",Tags={"default","current","simple"},Style={Primary=Color3.fromRGB(28,28,28),Stroke=Color3.fromRGB(76,76,76),Gradient=Color3.fromRGB(45,45,45),GradientOn=false,StrokeThickness=1,StrokeTransparency=0.72}},
 			{Id="visual",Name="Visual",Source="VisualRoblox/Roblox",Url="https://github.com/VisualRoblox/Roblox",Description="Clean dark surfaces with a bright blue accent.",Tags={"visual","blue","github"},Style={Primary=Color3.fromRGB(18,20,26),Stroke=Color3.fromRGB(0,145,255),Gradient=Color3.fromRGB(84,196,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.76}},
-			{Id="rayfield",Name="Rayfield",Source="Sirius Rayfield",Url="https://docs.sirius.menu/rayfield",Description="Compact dark controls with blue slider emphasis.",Tags={"rayfield","sirius","slider","blue"},Style={Primary=Color3.fromRGB(25,25,25),Stroke=Color3.fromRGB(48,119,177),Gradient=Color3.fromRGB(43,105,159),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.68}},
-			{Id="windui",Name="WindUI",Source="FootageSus WindUI",Url="https://footagesus-windui.mintlify.app/",Description="Soft neutral panels with a calm sky-blue accent.",Tags={"windui","soft","docs","blue"},Style={Primary=Color3.fromRGB(22,24,30),Stroke=Color3.fromRGB(86,153,255),Gradient=Color3.fromRGB(142,195,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.8}},
-			{Id="linoria",Name="Linoria",Source="violin-suzutsuki/LinoriaLib",Url="https://github.com/violin-suzutsuki/LinoriaLib",Description="Dense utility-library look with purple-blue accents.",Tags={"linoria","purple","github","dense"},Style={Primary=Color3.fromRGB(28,27,36),Stroke=Color3.fromRGB(120,98,255),Gradient=Color3.fromRGB(76,145,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.72}},
-			{Id="obsidian",Name="Obsidian",Source="Lilith-VnK/JustHub-UI",Url="https://github.com/Lilith-VnK/JustHub-UI/",Description="High-contrast dark style with violet accent strokes.",Tags={"obsidian","justhub","violet","github"},Style={Primary=Color3.fromRGB(15,15,20),Stroke=Color3.fromRGB(145,88,255),Gradient=Color3.fromRGB(230,92,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.76}},
+			{Id="rayfield",Name="Rayfield",Source="SiriusSoftwareLtd/Rayfield",Url="https://github.com/SiriusSoftwareLtd/Rayfield",Description="Rounded dark rows, pill tabs, and blue inline controls.",Tags={"rayfield","sirius","github","rounded","blue"},Style={Primary=Color3.fromRGB(25,25,25),Stroke=Color3.fromRGB(48,119,177),Gradient=Color3.fromRGB(43,105,159),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.68}},
+			{Id="windui",Name="WindUI",Source="Footagesus/WindUI",Url="https://github.com/Footagesus/WindUI",Description="Soft rounded panels, roomy spacing, and floating blue controls.",Tags={"windui","footagesus","github","soft","rounded","blue"},Style={Primary=Color3.fromRGB(22,24,30),Stroke=Color3.fromRGB(86,153,255),Gradient=Color3.fromRGB(142,195,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.8}},
+			{Id="linoria",Name="Linoria",Source="violin-suzutsuki/LinoriaLib",Url="https://github.com/violin-suzutsuki/LinoriaLib",Description="Dense square utility panels with thin outlines and compact text.",Tags={"linoria","green","github","dense","square"},Style={Primary=Color3.fromRGB(18,18,18),Stroke=Color3.fromRGB(77,255,82),Gradient=Color3.fromRGB(55,203,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.62}},
+			{Id="obsidian",Name="Obsidian",Source="deividcomsono/Obsidian",Url="https://github.com/deividcomsono/Obsidian",Description="Dark sidebar panels, search-like inputs, and violet accents.",Tags={"obsidian","deividcomsono","github","violet","sidebar"},Style={Primary=Color3.fromRGB(15,15,20),Stroke=Color3.fromRGB(145,88,255),Gradient=Color3.fromRGB(230,92,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.76}},
 		}
 
 		for _,lib in ipairs(uiLibs) do
@@ -1551,6 +1551,10 @@ function StrokeColour.new(ctx,page)
 		syncColourControls()
 		updateEverything()
 		syncPickerControls()
+
+		if ctx.onUILibChanged then
+			pcall(ctx.onUILibChanged,lib)
+		end
 	end
 
 	local libsPanel=makePanel(4)

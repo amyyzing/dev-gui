@@ -18,10 +18,39 @@ function MainFrame.new(ctx)
 	local getUIPrimaryColor=ctx.getUIPrimaryColor or function() return THEME.BG end
 	local getUIStrokeColor=ctx.getUIStrokeColor or function() return THEME.STROKE end
 	local getUIStrokeGradientColor=ctx.getUIStrokeGradientColor or function() return THEME.GREEN or THEME.ACC or THEME.TEXT end
+	local getCurrentUILibProfile=ctx.getCurrentUILibProfile
 	local uiProfile=type(ctx.UI_PROFILE)=="table" and ctx.UI_PROFILE or {}
-	local mainFrameProfile=type(uiProfile.MainFrame)=="table" and uiProfile.MainFrame or {}
-	local windowProfile=type(mainFrameProfile.Window)=="table" and mainFrameProfile.Window or {}
-	local layoutProfile=type(mainFrameProfile.Layout)=="table" and mainFrameProfile.Layout or {}
+	local mainFrameProfile={}
+	local windowProfile={}
+	local layoutProfile={}
+	local componentProfile={}
+	local textFont=Enum.Font.Gotham
+	local titleFont=Enum.Font.GothamBold
+	local controlFont=Enum.Font.GothamMedium
+
+	local function loadProfile(profile)
+		uiProfile=type(profile)=="table" and profile or {}
+		mainFrameProfile=type(uiProfile.MainFrame)=="table" and uiProfile.MainFrame or {}
+		windowProfile=type(mainFrameProfile.Window)=="table" and mainFrameProfile.Window or {}
+		layoutProfile=type(mainFrameProfile.Layout)=="table" and mainFrameProfile.Layout or {}
+		componentProfile=type(uiProfile.Components)=="table" and uiProfile.Components or {}
+		textFont=componentProfile.TextFont or Enum.Font.Gotham
+		titleFont=componentProfile.TitleFont or Enum.Font.GothamBold
+		controlFont=componentProfile.ControlFont or Enum.Font.GothamMedium
+	end
+
+	local function currentProfile()
+		if type(getCurrentUILibProfile)=="function" then
+			local ok,profile=pcall(getCurrentUILibProfile)
+			if ok and type(profile)=="table" then
+				return profile
+			end
+		end
+
+		return uiProfile
+	end
+
+	loadProfile(uiProfile)
 
 	local function layoutNumber(profile,key,fallback)
 		local value=tonumber(profile and profile[key])
@@ -39,24 +68,80 @@ function MainFrame.new(ctx)
 	UI_WINDOW.MaxW=tonumber(UI_WINDOW.MaxW) or layoutNumber(windowProfile,"MaxW",1220)
 	UI_WINDOW.MaxH=tonumber(UI_WINDOW.MaxH) or layoutNumber(windowProfile,"MaxH",820)
 
-	local rootStartY=layoutNumber(windowProfile,"StartY",80)
-	local minimizedRootH=layoutNumber(windowProfile,"MinimizedH",68)
-	local rootPadding=layoutNumber(layoutProfile,"RootPadding",8)
-	local mainGap=layoutNumber(layoutProfile,"MainGap",8)
-	local pageGap=layoutNumber(layoutProfile,"PageGap",8)
-	local columnGap=layoutNumber(layoutProfile,"ColumnGap",8)
-	local footerGap=layoutNumber(layoutProfile,"FooterGap",8)
-	local headerHeight=layoutNumber(layoutProfile,"HeaderHeight",52)
-	local pageBarHeight=layoutNumber(layoutProfile,"PageBarHeight",30)
-	local pageTabWidth=layoutNumber(layoutProfile,"PageTabWidth",106)
-	local pageTabHeight=layoutNumber(layoutProfile,"PageTabHeight",28)
-	local pageHostReserve=layoutNumber(layoutProfile,"PageHostReserve",156)
-	local footerHeight=layoutNumber(layoutProfile,"FooterHeight",34)
-	local topButtonSize=layoutNumber(layoutProfile,"TopButtonSize",28)
-	local fabSize=layoutNumber(layoutProfile,"FabSize",42)
+	local rootStartY=80
+	local minimizedRootH=68
+	local rootPadding=8
+	local mainGap=8
+	local pageGap=8
+	local columnGap=8
+	local footerGap=8
+	local headerHeight=52
+	local pageBarHeight=30
+	local pageTabWidth=106
+	local pageTabHeight=28
+	local pageHostReserve=156
+	local footerHeight=34
+	local topButtonSize=28
+	local fabSize=42
+	local navPlacement="top"
+	local navIsLeft=false
+	local navWidth=150
+	local navGap=8
+	local navTabGap=6
+	local navTabPad=6
+	local navTabInset=6
+	local pageShellTransparency=0
+	local pageSliderTransparency=0
+	local tabTextXAlignment=Enum.TextXAlignment.Center
+
+	local function loadLayoutNumbers()
+		rootStartY=layoutNumber(windowProfile,"StartY",80)
+		minimizedRootH=layoutNumber(windowProfile,"MinimizedH",68)
+		rootPadding=layoutNumber(layoutProfile,"RootPadding",8)
+		mainGap=layoutNumber(layoutProfile,"MainGap",8)
+		pageGap=layoutNumber(layoutProfile,"PageGap",8)
+		columnGap=layoutNumber(layoutProfile,"ColumnGap",8)
+		footerGap=layoutNumber(layoutProfile,"FooterGap",8)
+		headerHeight=layoutNumber(layoutProfile,"HeaderHeight",52)
+		pageBarHeight=layoutNumber(layoutProfile,"PageBarHeight",30)
+		pageTabWidth=layoutNumber(layoutProfile,"PageTabWidth",106)
+		pageTabHeight=layoutNumber(layoutProfile,"PageTabHeight",28)
+		pageHostReserve=layoutNumber(layoutProfile,"PageHostReserve",156)
+		footerHeight=layoutNumber(layoutProfile,"FooterHeight",34)
+		topButtonSize=layoutNumber(layoutProfile,"TopButtonSize",28)
+		fabSize=layoutNumber(layoutProfile,"FabSize",42)
+		navPlacement=tostring(layoutProfile.NavPlacement or "top"):lower()
+		navIsLeft=navPlacement=="left"
+		navWidth=layoutNumber(layoutProfile,"NavWidth",150)
+		navGap=layoutNumber(layoutProfile,"NavGap",8)
+		navTabGap=layoutNumber(layoutProfile,"NavTabGap",6)
+		navTabPad=layoutNumber(layoutProfile,"NavTabPad",6)
+		navTabInset=layoutNumber(layoutProfile,"NavTabInset",6)
+		pageShellTransparency=layoutNumber(layoutProfile,"PageShellTransparency",0)
+		pageSliderTransparency=layoutNumber(layoutProfile,"PageSliderTransparency",0)
+		tabTextXAlignment=navIsLeft and Enum.TextXAlignment.Left or Enum.TextXAlignment.Center
+	end
+
+	loadLayoutNumbers()
 
 	local function pageTabOffset(index)
 		return ((index-1)*pageTabWidth)+1
+	end
+
+	local function tabSize()
+		if navIsLeft then
+			return UDim2.fromOffset(math.max(1,navWidth-(navTabInset*2)),pageTabHeight)
+		end
+
+		return UDim2.fromOffset(pageTabWidth,pageTabHeight)
+	end
+
+	local function tabPosition(index)
+		if navIsLeft then
+			return UDim2.fromOffset(navTabInset,navTabPad+((index-1)*(pageTabHeight+navTabGap)))
+		end
+
+		return UDim2.fromOffset(pageTabOffset(index),1)
 	end
 
 	local function desc(path,fallback)
@@ -158,19 +243,19 @@ function MainFrame.new(ctx)
 	end)
 
 	local main=New("Frame",{Size=UDim2.new(1,0,1,0),AutomaticSize=Enum.AutomaticSize.None,BackgroundTransparency=1,ZIndex=3},root)
-	New("UIListLayout",{Padding=UDim.new(0,mainGap),SortOrder=Enum.SortOrder.LayoutOrder},main)
+	local mainLayout=New("UIListLayout",{Padding=UDim.new(0,mainGap),SortOrder=Enum.SortOrder.LayoutOrder},main)
 
 	attachHover=attachHover or function() end
 
 	local header=New("Frame",{Size=UDim2.new(1,0,0,headerHeight),BackgroundColor3=THEME.TOPBAR or THEME.BG,BorderSizePixel=0,ZIndex=4,LayoutOrder=1,ThemeRole="TOPBAR",CornerRole="Section"},main)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},header)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.25},header)
-	local titleLabel=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,7),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=Enum.Font.GothamBold,TextSize=16,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+	local titleLabel=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,7),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=16,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
 
-	local modeSubtitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,26),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+	local modeSubtitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,26),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
 
 	local function makeTopButton(text,xOffset)
-		local b=New("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text=text,Font=Enum.Font.Gotham,TextSize=17,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6,ThemeRole="BUTTON"},header)
+		local b=New("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text=text,Font=controlFont,TextSize=17,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6,ThemeRole="BUTTON"},header)
 		local wrap=wrapTextButton(b,THEME.BUTTON or THEME.BG,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 		wrap:SetAttribute("CornerRole","Control")
@@ -191,25 +276,50 @@ function MainFrame.new(ctx)
 	local miniBtn=makeTopButton("-", -(topButtonSize*2+topButtonGap+topButtonOuter))
 	local closeBtn=makeTopButton("x", -(topButtonSize+topButtonOuter))
 
-	local pageShellWidth=(pageTabWidth*6)+2
-	local pageBar=New("Frame",{Size=UDim2.new(1,0,0,pageBarHeight),BackgroundTransparency=1,ZIndex=4,LayoutOrder=2},main)
-	local pageShell=New("Frame",{Size=UDim2.fromOffset(pageShellWidth,pageBarHeight),BackgroundColor3=THEME.TOPBAR or THEME.BG,BorderSizePixel=0,ZIndex=5,ThemeRole="TOPBAR",CornerRole="Section"},pageBar)
+	local pageShellWidth=navIsLeft and navWidth or ((pageTabWidth*6)+2)
+	local pageArea=nil
+	local pageParent=main
+	local pageHostParent=main
+	local pageBarLayoutOrder=2
+	local pageHostLayoutOrder=3
+	local pageBarSize=UDim2.new(1,0,0,pageBarHeight)
+
+	if navIsLeft then
+		pageArea=New("Frame",{Size=UDim2.new(1,0,0,384),BackgroundTransparency=1,ZIndex=3,LayoutOrder=2},main)
+		New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,navGap),SortOrder=Enum.SortOrder.LayoutOrder,VerticalAlignment=Enum.VerticalAlignment.Top},pageArea)
+		pageParent=pageArea
+		pageHostParent=pageArea
+		pageBarLayoutOrder=1
+		pageHostLayoutOrder=2
+		pageBarSize=UDim2.fromOffset(navWidth,384)
+	end
+
+	local pageBar=New("Frame",{Size=pageBarSize,BackgroundTransparency=1,ZIndex=4,LayoutOrder=pageBarLayoutOrder},pageParent)
+	local pageShell=New("Frame",{Size=navIsLeft and UDim2.new(1,0,1,0) or UDim2.fromOffset(pageShellWidth,pageBarHeight),BackgroundColor3=THEME.TOPBAR or THEME.BG,BackgroundTransparency=pageShellTransparency,BorderSizePixel=0,ZIndex=5,ThemeRole="TOPBAR",CornerRole="Section"},pageBar)
 	local pageShellScale=New("UIScale",{Scale=1},pageShell)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},pageShell)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.35},pageShell)
 
-	local pageSlider=New("Frame",{Size=UDim2.fromOffset(pageTabWidth,pageTabHeight),Position=UDim2.fromOffset(1,1),BackgroundColor3=THEME.BUTTON or THEME.CARD,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON",CornerRole="Control"},pageShell)
+	local pageSlider=New("Frame",{Size=tabSize(),Position=tabPosition(1),BackgroundColor3=THEME.BUTTON or THEME.CARD,BackgroundTransparency=pageSliderTransparency,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON",CornerRole="Control"},pageShell)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},pageSlider)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.45},pageSlider)
 
-	local settingsTab=New("TextButton",{Size=UDim2.fromOffset(pageTabWidth,pageTabHeight),Position=UDim2.fromOffset(pageTabOffset(1),1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Main","MAIN"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local mapsPageTab=New("TextButton",{Size=UDim2.fromOffset(pageTabWidth,pageTabHeight),Position=UDim2.fromOffset(pageTabOffset(2),1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Maps","MAPS"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local serverPageTab=New("TextButton",{Size=UDim2.fromOffset(pageTabWidth,pageTabHeight),Position=UDim2.fromOffset(pageTabOffset(3),1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Server","SERVER"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local uiSettingsTab=New("TextButton",{Size=UDim2.fromOffset(pageTabWidth,pageTabHeight),Position=UDim2.fromOffset(pageTabOffset(4),1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Customize","CUSTOMIZE"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local futureTab=New("TextButton",{Size=UDim2.fromOffset(pageTabWidth,pageTabHeight),Position=UDim2.fromOffset(pageTabOffset(5),1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Keybinds","KEYBINDS"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
-	local settingsPageTab=New("TextButton",{Size=UDim2.fromOffset(pageTabWidth,pageTabHeight),Position=UDim2.fromOffset(pageTabOffset(6),1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Settings","SETTINGS"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
+	local settingsTab=New("TextButton",{Size=tabSize(),Position=tabPosition(1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Main","MAIN"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
+	local mapsPageTab=New("TextButton",{Size=tabSize(),Position=tabPosition(2),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Maps","MAPS"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
+	local serverPageTab=New("TextButton",{Size=tabSize(),Position=tabPosition(3),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Server","SERVER"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
+	local uiSettingsTab=New("TextButton",{Size=tabSize(),Position=tabPosition(4),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Customize","CUSTOMIZE"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
+	local futureTab=New("TextButton",{Size=tabSize(),Position=tabPosition(5),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Keybinds","KEYBINDS"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
+	local settingsPageTab=New("TextButton",{Size=tabSize(),Position=tabPosition(6),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Settings","SETTINGS"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
 
-	local pageHost=New("ScrollingFrame",{Size=UDim2.new(1,0,0,384),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=3,LayoutOrder=3},main)
+	if navIsLeft then
+		for _,tab in ipairs({settingsTab,mapsPageTab,serverPageTab,uiSettingsTab,futureTab,settingsPageTab}) do
+			New("UIPadding",{Name="NavPadding",PaddingLeft=UDim.new(0,10),PaddingRight=UDim.new(0,8)},tab)
+		end
+	end
+
+	local pageTabs={settingsTab,mapsPageTab,serverPageTab,uiSettingsTab,futureTab,settingsPageTab}
+
+	local pageHost=New("ScrollingFrame",{Size=navIsLeft and UDim2.new(1,-(navWidth+navGap),1,0) or UDim2.new(1,0,0,384),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=3,LayoutOrder=pageHostLayoutOrder},pageHostParent)
 	New("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},pageHost)
 	New("UIPadding",{PaddingTop=UDim.new(0,2),PaddingLeft=UDim.new(0,3),PaddingRight=UDim.new(0,7),PaddingBottom=UDim.new(0,2)},pageHost)
 
@@ -232,6 +342,60 @@ function MainFrame.new(ctx)
 	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},actualSettingsPage)
 
 	local activePageName="main"
+	local function getPageIndex(name)
+		return ({main=1,maps=2,server=3,customize=4,page2=5,settings=6})[name] or 1
+	end
+
+	local function setNavPadding(tab,enabled)
+		local existing=tab:FindFirstChild("NavPadding")
+
+		if enabled then
+			if not existing then
+				New("UIPadding",{Name="NavPadding",PaddingLeft=UDim.new(0,10),PaddingRight=UDim.new(0,8)},tab)
+			end
+		elseif existing then
+			existing:Destroy()
+		end
+	end
+
+	local function ensureNavParenting()
+		pageShellWidth=navIsLeft and navWidth or ((pageTabWidth*6)+2)
+
+		if navIsLeft then
+			if not pageArea or not pageArea.Parent then
+				pageArea=New("Frame",{Size=UDim2.new(1,0,0,384),BackgroundTransparency=1,ZIndex=3,LayoutOrder=2},main)
+				New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,navGap),SortOrder=Enum.SortOrder.LayoutOrder,VerticalAlignment=Enum.VerticalAlignment.Top},pageArea)
+			end
+
+			pageBar.Parent=pageArea
+			pageBar.LayoutOrder=1
+			pageHost.Parent=pageArea
+			pageHost.LayoutOrder=2
+		else
+			pageBar.Parent=main
+			pageBar.LayoutOrder=2
+			pageHost.Parent=main
+			pageHost.LayoutOrder=3
+
+			if pageArea and pageArea.Parent then
+				pageArea:Destroy()
+			end
+			pageArea=nil
+		end
+	end
+
+	local function applyTabGeometry()
+		for index,tab in ipairs(pageTabs) do
+			tab.Size=tabSize()
+			tab.Position=tabPosition(index)
+			tab.TextXAlignment=tabTextXAlignment
+			tab.Font=controlFont
+			setNavPadding(tab,navIsLeft)
+		end
+
+		pageSlider.Size=tabSize()
+		pageSlider.Position=tabPosition(getPageIndex(activePageName))
+	end
 
 	local function paintPageTabs()
 		settingsTab:SetAttribute("ThemeTextRole",activePageName=="main" and "TEXT" or "MUTED")
@@ -246,12 +410,12 @@ function MainFrame.new(ctx)
 		uiSettingsTab.TextColor3=activePageName=="customize" and THEME.TEXT or THEME.MUTED
 		futureTab.TextColor3=activePageName=="page2" and THEME.TEXT or THEME.MUTED
 		settingsPageTab.TextColor3=activePageName=="settings" and THEME.TEXT or THEME.MUTED
-		settingsTab.Font=activePageName=="main" and Enum.Font.GothamBold or Enum.Font.GothamMedium
-		mapsPageTab.Font=activePageName=="maps" and Enum.Font.GothamBold or Enum.Font.GothamMedium
-		serverPageTab.Font=activePageName=="server" and Enum.Font.GothamBold or Enum.Font.GothamMedium
-		uiSettingsTab.Font=activePageName=="customize" and Enum.Font.GothamBold or Enum.Font.GothamMedium
-		futureTab.Font=activePageName=="page2" and Enum.Font.GothamBold or Enum.Font.GothamMedium
-		settingsPageTab.Font=activePageName=="settings" and Enum.Font.GothamBold or Enum.Font.GothamMedium
+		settingsTab.Font=activePageName=="main" and titleFont or controlFont
+		mapsPageTab.Font=activePageName=="maps" and titleFont or controlFont
+		serverPageTab.Font=activePageName=="server" and titleFont or controlFont
+		uiSettingsTab.Font=activePageName=="customize" and titleFont or controlFont
+		futureTab.Font=activePageName=="page2" and titleFont or controlFont
+		settingsPageTab.Font=activePageName=="settings" and titleFont or controlFont
 	end
 
 	local refreshFooterResetButton=function() end
@@ -265,9 +429,8 @@ function MainFrame.new(ctx)
 		futurePage.Visible=activePageName=="page2"
 		actualSettingsPage.Visible=activePageName=="settings"
 
-		local pageIndex={main=1,maps=2,server=3,customize=4,page2=5,settings=6}
-		local sliderPos=UDim2.fromOffset(pageTabOffset(pageIndex[activePageName] or 1),1)
-		local sliderSize=UDim2.fromOffset(pageTabWidth,pageTabHeight)
+		local sliderPos=tabPosition(getPageIndex(activePageName))
+		local sliderSize=tabSize()
 
 		TweenService:Create(pageSlider,TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out),{Position=sliderPos,Size=sliderSize}):Play()
 		paintPageTabs()
@@ -300,8 +463,18 @@ function MainFrame.new(ctx)
 		root.Size=UDim2.fromOffset(UI_WINDOW.W,uiMinimized and minimizedRootH or UI_WINDOW.H)
 
 		local pageHeight=math.max(170,UI_WINDOW.H-pageHostReserve)
-		pageHost.Size=UDim2.new(1,0,0,pageHeight)
-		pageShellScale.Scale=math.min(1,math.max(0.72,(UI_WINDOW.W-16)/pageShellWidth))
+		if navIsLeft then
+			pageArea.Size=UDim2.new(1,0,0,pageHeight)
+			pageBar.Size=UDim2.fromOffset(navWidth,pageHeight)
+			pageShell.Size=UDim2.new(1,0,1,0)
+			pageHost.Size=UDim2.new(1,-(navWidth+navGap),1,0)
+			pageShellScale.Scale=1
+		else
+			pageBar.Size=UDim2.new(1,0,0,pageBarHeight)
+			pageShell.Size=UDim2.fromOffset(pageShellWidth,pageBarHeight)
+			pageHost.Size=UDim2.new(1,0,0,pageHeight)
+			pageShellScale.Scale=math.min(1,math.max(0.72,(UI_WINDOW.W-16)/pageShellWidth))
+		end
 
 		local compact=UI_WINDOW.W<720 or vp.X<1100
 		if compact then
@@ -324,7 +497,7 @@ function MainFrame.new(ctx)
 	function api.RefreshActionStatus() end
 
 	local function makeFooterBtn(text,width)
-		local b=New("TextButton",{Size=UDim2.fromOffset(width or 96,30),BackgroundColor3=THEME.BUTTON or THEME.BG,Text=string.upper(text),TextColor3=THEME.TEXT,Font=Enum.Font.Gotham,TextSize=12,AutoButtonColor=false,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON"},footer)
+		local b=New("TextButton",{Size=UDim2.fromOffset(width or 96,30),BackgroundColor3=THEME.BUTTON or THEME.BG,Text=string.upper(text),TextColor3=THEME.TEXT,Font=controlFont,TextSize=12,AutoButtonColor=false,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON"},footer)
 		local wrap=wrapTextButton(b,THEME.BUTTON or THEME.BG,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 		wrap:SetAttribute("CornerRole","Control")
@@ -351,7 +524,7 @@ function MainFrame.new(ctx)
 
 	refreshFooterResetButton()
 
-	local fab=New("TextButton",{Name="FAB",Visible=false,AutoButtonColor=false,Size=UDim2.fromOffset(fabSize,fabSize),AnchorPoint=Vector2.new(1,1),Position=UDim2.new(1,-16,1,-16),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text="[]",TextColor3=THEME.TEXT,Font=Enum.Font.Gotham,TextSize=16,ZIndex=20,ThemeRole="BUTTON",CornerRole="Control"},SG)
+	local fab=New("TextButton",{Name="FAB",Visible=false,AutoButtonColor=false,Size=UDim2.fromOffset(fabSize,fabSize),AnchorPoint=Vector2.new(1,1),Position=UDim2.new(1,-16,1,-16),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text="[]",TextColor3=THEME.TEXT,Font=controlFont,TextSize=16,ZIndex=20,ThemeRole="BUTTON",CornerRole="Control"},SG)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},fab)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},fab)
 	fab.MouseEnter:Connect(function()
@@ -486,6 +659,9 @@ function MainFrame.new(ctx)
 	end
 
 	local function setBodyVisible(visible)
+		if pageArea then
+			pageArea.Visible=visible
+		end
 		pageBar.Visible=visible
 		pageHost.Visible=visible
 		footer.Visible=visible
@@ -593,8 +769,36 @@ function MainFrame.new(ctx)
 	end
 
 	function api.RefreshTheme()
+		pageShell.BackgroundTransparency=pageShellTransparency
+		pageSlider.BackgroundTransparency=pageSliderTransparency
 		paintPageTabs()
 		paintResizeHandle(resizing)
+	end
+
+	function api.ApplyProfile(profile)
+		loadProfile(profile or currentProfile())
+		loadLayoutNumbers()
+
+		UI_WINDOW.MinW=layoutNumber(windowProfile,"MinW",UI_WINDOW.MinW or 560)
+		UI_WINDOW.MinH=layoutNumber(windowProfile,"MinH",UI_WINDOW.MinH or 360)
+		UI_WINDOW.MaxW=layoutNumber(windowProfile,"MaxW",UI_WINDOW.MaxW or 1220)
+		UI_WINDOW.MaxH=layoutNumber(windowProfile,"MaxH",UI_WINDOW.MaxH or 820)
+		UI_WINDOW.W=math.clamp(UI_WINDOW.W,UI_WINDOW.MinW,UI_WINDOW.MaxW)
+		UI_WINDOW.H=math.clamp(UI_WINDOW.H,UI_WINDOW.MinH,UI_WINDOW.MaxH)
+
+		columnHalfGap=columnGap/2
+		mainLayout.Padding=UDim.new(0,mainGap)
+		header.Size=UDim2.new(1,0,0,headerHeight)
+		footer.Size=UDim2.new(1,0,0,footerHeight)
+		titleLabel.Font=titleFont
+		modeSubtitle.Font=textFont
+		pageShell.BackgroundTransparency=pageShellTransparency
+		pageSlider.BackgroundTransparency=pageSliderTransparency
+
+		ensureNavParenting()
+		applyTabGeometry()
+		updateResponsiveLayout()
+		paintPageTabs()
 	end
 
 	function api.RefreshText(newDescription)
