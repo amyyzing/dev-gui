@@ -11,7 +11,7 @@ return{
 		Gradient=Color3.fromRGB(45,45,45),
 		GradientOn=false,
 		StrokeThickness=1,
-		StrokeTransparency=0.55,
+		StrokeTransparency=0.72,
 	},
 	Theme={},
 	Shape={
@@ -21,5 +21,10 @@ return{
 		SliderRadius=0,
 		SliderHeight=26,
 		SliderStyle="original",
+		WindowStrokeTransparency=0.42,
+		SectionStrokeTransparency=0.84,
+		ControlStrokeTransparency=0.78,
+		SliderStrokeTransparency=0.78,
+		AccentStrokeTransparency=0.58,
 	},
 }

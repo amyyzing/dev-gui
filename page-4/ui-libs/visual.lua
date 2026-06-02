@@ -11,7 +11,7 @@ return{
 		Gradient=Color3.fromRGB(84,196,255),
 		GradientOn=true,
 		StrokeThickness=1,
-		StrokeTransparency=0.58,
+		StrokeTransparency=0.76,
 	},
 	Theme={
 		BG=Color3.fromRGB(18,20,26),
@@ -23,6 +23,7 @@ return{
 		INPUT=Color3.fromRGB(19,23,31),
 		SLIDER_BG=Color3.fromRGB(19,24,34),
 		SLIDER_FILL=Color3.fromRGB(0,145,255),
+		STROKE_SOFT=Color3.fromRGB(47,56,74),
 		TEXT=Color3.fromRGB(235,242,255),
 		MUTED=Color3.fromRGB(142,156,178),
 	},
@@ -33,5 +34,10 @@ return{
 		SliderRadius=6,
 		SliderHeight=28,
 		SliderStyle="pill",
+		WindowStrokeTransparency=0.5,
+		SectionStrokeTransparency=0.9,
+		ControlStrokeTransparency=0.86,
+		SliderStrokeTransparency=0.84,
+		AccentStrokeTransparency=0.58,
 	},
 }

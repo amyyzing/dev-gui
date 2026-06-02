@@ -23,7 +23,7 @@ local DEFAULTS={
 	LiquidStrokeDirection="Right",
 
 	StrokeThickness=1,
-	StrokeTransparency=0.55,
+	StrokeTransparency=0.72,
 	CornerRadius=0,
 	UILib="original",
 }
@@ -1048,7 +1048,7 @@ function StrokeColour.new(ctx,page)
 		setPrimaryColour(preset.Primary)
 		UI_STYLE.LiquidStroke=false
 		UI_STYLE.StrokeThickness=math.clamp(numberOrDefault(currentLibStyleValue("StrokeThickness",1),1),0,8)
-		UI_STYLE.StrokeTransparency=math.clamp(numberOrDefault(currentLibStyleValue("StrokeTransparency",0.55),0.55),0,1)
+		UI_STYLE.StrokeTransparency=math.clamp(numberOrDefault(currentLibStyleValue("StrokeTransparency",0.72),0.72),0,1)
 		syncColourControls()
 		updateEverything()
 		tweenStyleTo(preset.Stroke,preset.Gradient,preset.GradientOn)
@@ -1265,7 +1265,7 @@ function StrokeColour.new(ctx,page)
 		ZIndex=9,
 	},svSquare)
 	addCorner(svCursor,"Control")
-	New("UIStroke",{Color=Color3.fromRGB(0,0,0),Thickness=1,Transparency=0.35},svCursor)
+	New("UIStroke",{Color=Color3.fromRGB(0,0,0),Thickness=1,Transparency=0.35,StrokeRole="Fixed"},svCursor)
 
 	local hueStrip=New("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
@@ -1462,12 +1462,12 @@ function StrokeColour.new(ctx,page)
 
 	if #uiLibs==0 then
 		uiLibs={
-			{Id="original",Name="Original",Source="Current GUI",Url="",Description="The current simplified control-panel style.",Tags={"default","current","simple"},Style={Primary=Color3.fromRGB(28,28,28),Stroke=Color3.fromRGB(76,76,76),Gradient=Color3.fromRGB(45,45,45),GradientOn=false,StrokeThickness=1,StrokeTransparency=0.55}},
-			{Id="visual",Name="Visual",Source="VisualRoblox/Roblox",Url="https://github.com/VisualRoblox/Roblox",Description="Clean dark surfaces with a bright blue accent.",Tags={"visual","blue","github"},Style={Primary=Color3.fromRGB(18,20,26),Stroke=Color3.fromRGB(0,145,255),Gradient=Color3.fromRGB(84,196,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.58}},
-			{Id="rayfield",Name="Rayfield",Source="Sirius Rayfield",Url="https://docs.sirius.menu/rayfield",Description="Compact dark controls with blue slider emphasis.",Tags={"rayfield","sirius","slider","blue"},Style={Primary=Color3.fromRGB(25,25,25),Stroke=Color3.fromRGB(48,119,177),Gradient=Color3.fromRGB(43,105,159),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.52}},
-			{Id="windui",Name="WindUI",Source="FootageSus WindUI",Url="https://footagesus-windui.mintlify.app/",Description="Soft neutral panels with a calm sky-blue accent.",Tags={"windui","soft","docs","blue"},Style={Primary=Color3.fromRGB(22,24,30),Stroke=Color3.fromRGB(86,153,255),Gradient=Color3.fromRGB(142,195,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.62}},
-			{Id="linoria",Name="Linoria",Source="violin-suzutsuki/LinoriaLib",Url="https://github.com/violin-suzutsuki/LinoriaLib",Description="Dense utility-library look with purple-blue accents.",Tags={"linoria","purple","github","dense"},Style={Primary=Color3.fromRGB(28,27,36),Stroke=Color3.fromRGB(120,98,255),Gradient=Color3.fromRGB(76,145,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.55}},
-			{Id="obsidian",Name="Obsidian",Source="Lilith-VnK/JustHub-UI",Url="https://github.com/Lilith-VnK/JustHub-UI/",Description="High-contrast dark style with violet accent strokes.",Tags={"obsidian","justhub","violet","github"},Style={Primary=Color3.fromRGB(15,15,20),Stroke=Color3.fromRGB(145,88,255),Gradient=Color3.fromRGB(230,92,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.5}},
+			{Id="original",Name="Original",Source="Current GUI",Url="",Description="The current simplified control-panel style.",Tags={"default","current","simple"},Style={Primary=Color3.fromRGB(28,28,28),Stroke=Color3.fromRGB(76,76,76),Gradient=Color3.fromRGB(45,45,45),GradientOn=false,StrokeThickness=1,StrokeTransparency=0.72}},
+			{Id="visual",Name="Visual",Source="VisualRoblox/Roblox",Url="https://github.com/VisualRoblox/Roblox",Description="Clean dark surfaces with a bright blue accent.",Tags={"visual","blue","github"},Style={Primary=Color3.fromRGB(18,20,26),Stroke=Color3.fromRGB(0,145,255),Gradient=Color3.fromRGB(84,196,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.76}},
+			{Id="rayfield",Name="Rayfield",Source="Sirius Rayfield",Url="https://docs.sirius.menu/rayfield",Description="Compact dark controls with blue slider emphasis.",Tags={"rayfield","sirius","slider","blue"},Style={Primary=Color3.fromRGB(25,25,25),Stroke=Color3.fromRGB(48,119,177),Gradient=Color3.fromRGB(43,105,159),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.68}},
+			{Id="windui",Name="WindUI",Source="FootageSus WindUI",Url="https://footagesus-windui.mintlify.app/",Description="Soft neutral panels with a calm sky-blue accent.",Tags={"windui","soft","docs","blue"},Style={Primary=Color3.fromRGB(22,24,30),Stroke=Color3.fromRGB(86,153,255),Gradient=Color3.fromRGB(142,195,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.8}},
+			{Id="linoria",Name="Linoria",Source="violin-suzutsuki/LinoriaLib",Url="https://github.com/violin-suzutsuki/LinoriaLib",Description="Dense utility-library look with purple-blue accents.",Tags={"linoria","purple","github","dense"},Style={Primary=Color3.fromRGB(28,27,36),Stroke=Color3.fromRGB(120,98,255),Gradient=Color3.fromRGB(76,145,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.72}},
+			{Id="obsidian",Name="Obsidian",Source="Lilith-VnK/JustHub-UI",Url="https://github.com/Lilith-VnK/JustHub-UI/",Description="High-contrast dark style with violet accent strokes.",Tags={"obsidian","justhub","violet","github"},Style={Primary=Color3.fromRGB(15,15,20),Stroke=Color3.fromRGB(145,88,255),Gradient=Color3.fromRGB(230,92,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.76}},
 		}
 
 		for _,lib in ipairs(uiLibs) do

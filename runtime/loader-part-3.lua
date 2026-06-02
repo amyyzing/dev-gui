@@ -65,7 +65,7 @@ function buildCustomizePage()
 					LiquidStrokeDirection="Right",
 
 					StrokeThickness=1,
-					StrokeTransparency=0.55,
+					StrokeTransparency=0.72,
 					CornerRadius=0,
 					UILib="original",
 				},

@@ -31,7 +31,7 @@ UI_STYLE={
 	LiquidStrokeDirection="Right",
 
 	StrokeThickness=1,
-	StrokeTransparency=0.55,
+	StrokeTransparency=0.72,
 	CornerRadius=0,
 	UILib="original",
 }
@@ -117,6 +117,8 @@ function markThemeRole(obj,color)
 		role="RED"
 	elseif colorClose(color,THEME.BLUE) then
 		role="BLUE"
+	elseif THEME.STROKE_SOFT and colorClose(color,THEME.STROKE_SOFT) then
+		role="STROKE_SOFT"
 	elseif THEME.TOPBAR and colorClose(color,THEME.TOPBAR) then
 		role="TOPBAR"
 	elseif THEME.SECTION and colorClose(color,THEME.SECTION) then
@@ -178,11 +180,13 @@ function New(class, props, parent)
 	local skipThemeRole=props.SkipThemeRole
 	local forcedThemeRole=props.ThemeRole
 	local forcedTextRole=props.TextRole
+	local forcedStrokeRole=props.StrokeRole
 	local forcedCornerRole=props.CornerRole
 
 	props.SkipThemeRole=nil
 	props.ThemeRole=nil
 	props.TextRole=nil
+	props.StrokeRole=nil
 	props.CornerRole=nil
 
 	if props.Active==nil and (class=="Frame" or class=="ScrollingFrame" or class=="TextButton" or class=="TextBox") then
@@ -226,6 +230,10 @@ function New(class, props, parent)
 
 	if forcedCornerRole then
 		obj:SetAttribute("CornerRole",forcedCornerRole)
+	end
+
+	if forcedStrokeRole then
+		obj:SetAttribute("StrokeRole",forcedStrokeRole)
 	end
 
 	if class=="TextBox" then
@@ -909,7 +917,7 @@ function getUILibRuntimeStyle(id)
 	local styles={
 		original={
 			Theme={},
-			Shape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original"},
+			Shape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original",WindowStrokeTransparency=0.42,SectionStrokeTransparency=0.84,ControlStrokeTransparency=0.78,SliderStrokeTransparency=0.78,AccentStrokeTransparency=0.58},
 		},
 		visual={
 			Theme={
@@ -922,10 +930,11 @@ function getUILibRuntimeStyle(id)
 				INPUT=Color3.fromRGB(19,23,31),
 				SLIDER_BG=Color3.fromRGB(19,24,34),
 				SLIDER_FILL=Color3.fromRGB(0,145,255),
+				STROKE_SOFT=Color3.fromRGB(47,56,74),
 				TEXT=Color3.fromRGB(235,242,255),
 				MUTED=Color3.fromRGB(142,156,178),
 			},
-			Shape={WindowRadius=8,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=28,SliderStyle="pill"},
+			Shape={WindowRadius=8,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=28,SliderStyle="pill",WindowStrokeTransparency=0.5,SectionStrokeTransparency=0.9,ControlStrokeTransparency=0.86,SliderStrokeTransparency=0.84,AccentStrokeTransparency=0.58},
 		},
 		rayfield={
 			Theme={
@@ -938,10 +947,11 @@ function getUILibRuntimeStyle(id)
 				INPUT=Color3.fromRGB(30,30,30),
 				SLIDER_BG=Color3.fromRGB(43,105,159),
 				SLIDER_FILL=Color3.fromRGB(43,105,159),
+				STROKE_SOFT=Color3.fromRGB(55,55,55),
 				TEXT=Color3.fromRGB(240,240,240),
 				MUTED=Color3.fromRGB(178,178,178),
 			},
-			Shape={WindowRadius=6,SectionRadius=5,ControlRadius=4,SliderRadius=4,SliderHeight=26,SliderStyle="rayfield"},
+			Shape={WindowRadius=6,SectionRadius=5,ControlRadius=4,SliderRadius=4,SliderHeight=26,SliderStyle="rayfield",WindowStrokeTransparency=0.48,SectionStrokeTransparency=0.88,ControlStrokeTransparency=0.82,SliderStrokeTransparency=0.78,AccentStrokeTransparency=0.52},
 		},
 		windui={
 			Theme={
@@ -954,10 +964,11 @@ function getUILibRuntimeStyle(id)
 				INPUT=Color3.fromRGB(22,27,37),
 				SLIDER_BG=Color3.fromRGB(30,39,54),
 				SLIDER_FILL=Color3.fromRGB(86,153,255),
+				STROKE_SOFT=Color3.fromRGB(53,63,82),
 				TEXT=Color3.fromRGB(245,248,255),
 				MUTED=Color3.fromRGB(159,174,197),
 			},
-			Shape={WindowRadius=12,SectionRadius=10,ControlRadius=8,SliderRadius=10,SliderHeight=24,SliderStyle="windui"},
+			Shape={WindowRadius=12,SectionRadius=10,ControlRadius=8,SliderRadius=10,SliderHeight=24,SliderStyle="windui",WindowStrokeTransparency=0.58,SectionStrokeTransparency=0.92,ControlStrokeTransparency=0.88,SliderStrokeTransparency=0.86,AccentStrokeTransparency=0.62},
 		},
 		linoria={
 			Theme={
@@ -970,10 +981,11 @@ function getUILibRuntimeStyle(id)
 				INPUT=Color3.fromRGB(25,24,35),
 				SLIDER_BG=Color3.fromRGB(35,34,50),
 				SLIDER_FILL=Color3.fromRGB(120,98,255),
+				STROKE_SOFT=Color3.fromRGB(60,56,82),
 				TEXT=Color3.fromRGB(235,232,255),
 				MUTED=Color3.fromRGB(164,159,196),
 			},
-			Shape={WindowRadius=3,SectionRadius=2,ControlRadius=2,SliderRadius=2,SliderHeight=22,SliderStyle="thin"},
+			Shape={WindowRadius=3,SectionRadius=2,ControlRadius=2,SliderRadius=2,SliderHeight=22,SliderStyle="thin",WindowStrokeTransparency=0.5,SectionStrokeTransparency=0.82,ControlStrokeTransparency=0.78,SliderStrokeTransparency=0.76,AccentStrokeTransparency=0.56},
 		},
 		obsidian={
 			Theme={
@@ -986,10 +998,11 @@ function getUILibRuntimeStyle(id)
 				INPUT=Color3.fromRGB(17,16,24),
 				SLIDER_BG=Color3.fromRGB(30,27,43),
 				SLIDER_FILL=Color3.fromRGB(145,88,255),
+				STROKE_SOFT=Color3.fromRGB(52,45,74),
 				TEXT=Color3.fromRGB(242,238,255),
 				MUTED=Color3.fromRGB(163,151,190),
 			},
-			Shape={WindowRadius=9,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=24,SliderStyle="glow"},
+			Shape={WindowRadius=9,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=24,SliderStyle="glow",WindowStrokeTransparency=0.52,SectionStrokeTransparency=0.9,ControlStrokeTransparency=0.86,SliderStrokeTransparency=0.84,AccentStrokeTransparency=0.58},
 		},
 	}
 
@@ -1039,12 +1052,49 @@ function refreshThemePalette()
 	THEME.INPUT=THEME.PANEL
 	THEME.SLIDER_BG=THEME.PANEL
 	THEME.SLIDER_FILL=THEME.STROKE
+	THEME.STROKE_SOFT=THEME.CARD:Lerp(toward,lum<0.52 and 0.18 or 0.12)
 
-	local libStyle=getUILibRuntimeStyle(UI_STYLE.UILib)
+	local libId=tostring(UI_STYLE.UILib or "original"):lower()
+	local libStyle=getUILibRuntimeStyle(libId)
 	local libTheme=libStyle and libStyle.Theme or {}
 
 	for role,color in pairs(libTheme) do
 		THEME[role]=color
+	end
+
+	local libTones={
+		visual={topbar=0.04,panel=0.07,card=0.11,section=0.09,button=0.14,input=-0.02,sliderBg=-0.05,strokeSoft=0.28},
+		rayfield={topbar=0.08,panel=0.04,card=0.10,section=0.10,button=0.10,input=0.04,sliderBg=0.04,sliderAccent=true,sliderBlend=0.45,strokeSoft=0.24},
+		windui={topbar=0.08,panel=0.10,card=0.16,section=0.14,button=0.20,input=0.05,sliderBg=0.12,strokeSoft=0.30},
+		linoria={topbar=0.04,panel=0.07,card=0.10,section=0.06,button=0.13,input=0.02,sliderBg=0.11,strokeSoft=0.25},
+		obsidian={topbar=0.04,panel=0.06,card=0.12,section=0.09,button=0.16,input=-0.02,sliderBg=0.10,strokeSoft=0.27},
+	}
+
+	local tones=libTones[libId]
+	if tones then
+		local accent=getUIStrokeColor()
+		local function surface(amount)
+			if amount>=0 then
+				return primary:Lerp(toward,amount)
+			end
+
+			return primary:Lerp(away,-amount)
+		end
+
+		THEME.BG=surface(0)
+		THEME.TOPBAR=surface(tones.topbar)
+		THEME.PANEL=surface(tones.panel)
+		THEME.CARD=surface(tones.card)
+		THEME.SECTION=surface(tones.section)
+		THEME.BUTTON=surface(tones.button)
+		THEME.INPUT=surface(tones.input)
+		THEME.SLIDER_BG=tones.sliderAccent and accent:Lerp(primary,tones.sliderBlend or 0.5) or surface(tones.sliderBg)
+		THEME.SLIDER_FILL=accent
+		THEME.STROKE_SOFT=surface(tones.strokeSoft)
+
+		local textLum=(THEME.BG.R*0.2126)+(THEME.BG.G*0.7152)+(THEME.BG.B*0.0722)
+		THEME.TEXT=textLum<0.58 and Color3.fromRGB(236,238,246) or Color3.fromRGB(20,22,28)
+		THEME.MUTED=textLum<0.58 and THEME.TEXT:Lerp(THEME.BG,0.42) or THEME.TEXT:Lerp(THEME.BG,0.5)
 	end
 
 	THEME.ACC=THEME.SLIDER_FILL or THEME.GREEN
@@ -1349,49 +1399,105 @@ applyUIStrokeTheme=function()
 
 	if not SG then return end
 
+	local libShape=(getUILibRuntimeStyle(UI_STYLE.UILib) or {}).Shape or {}
+	local function getStrokeRole(stroke)
+		local explicit=stroke:GetAttribute("StrokeRole")
+		if explicit then
+			return explicit
+		end
+
+		local parent=stroke.Parent
+		local themeRole=parent and parent:GetAttribute("ThemeRole") or nil
+		local cornerRole=parent and parent:GetAttribute("CornerRole") or nil
+
+		if cornerRole=="Window" then
+			return "Window"
+		elseif themeRole=="SLIDER_FILL" or themeRole=="RED" or themeRole=="GREEN" or themeRole=="BLUE" then
+			return "Accent"
+		elseif themeRole=="SLIDER_BG" or cornerRole=="Slider" then
+			return "Slider"
+		elseif themeRole=="SECTION" or themeRole=="TOPBAR" or cornerRole=="Section" then
+			return "Section"
+		elseif themeRole=="BUTTON" or themeRole=="INPUT" or cornerRole=="Control" then
+			return "Control"
+		end
+
+		return "Control"
+	end
+
+	local function getRoleStrokeTransparency(role,baseTransparency,styleTransparency)
+		local roleTransparency=0.82
+
+		if role=="Window" then
+			roleTransparency=libShape.WindowStrokeTransparency or 0.42
+		elseif role=="Section" then
+			roleTransparency=libShape.SectionStrokeTransparency or 0.86
+		elseif role=="Control" then
+			roleTransparency=libShape.ControlStrokeTransparency or 0.82
+		elseif role=="Slider" then
+			roleTransparency=libShape.SliderStrokeTransparency or 0.8
+		elseif role=="Accent" then
+			roleTransparency=libShape.AccentStrokeTransparency or 0.58
+		elseif role=="Hidden" then
+			roleTransparency=1
+		end
+
+		if role=="Window" or role=="Accent" then
+			return math.clamp(math.max(baseTransparency,roleTransparency),0,1)
+		end
+
+		return math.clamp(math.max(baseTransparency,styleTransparency,roleTransparency),0,1)
+	end
+
 	for _,obj in ipairs(SG:GetDescendants()) do
 		if obj:IsA("UIStroke") then
-			obj.Color=color
-			obj.Thickness=math.clamp(tonumber(UI_STYLE.StrokeThickness) or obj.Thickness,0,8)
-			if obj:GetAttribute("BaseStrokeTransparency")==nil then
-				obj:SetAttribute("BaseStrokeTransparency",obj.Transparency)
-			end
+			local role=getStrokeRole(obj)
+			if role~="Fixed" then
+				local accentRole=role=="Window" or role=="Accent"
+				local softColor=THEME.STROKE_SOFT or (THEME.CARD and THEME.CARD:Lerp(THEME.TEXT or color,0.12)) or color
 
-			local baseTransparency=tonumber(obj:GetAttribute("BaseStrokeTransparency")) or obj.Transparency
-			local styleTransparency=tonumber(UI_STYLE.StrokeTransparency) or 0.55
-			obj.Transparency=math.clamp(math.max(baseTransparency,styleTransparency),0,1)
-
-			pcall(function()
-				obj.LineJoinMode=Enum.LineJoinMode.Miter
-			end)
-
-			local gradient=obj:FindFirstChild("StrokeGradient")
-
-			if UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke then
-				if not gradient then
-					gradient=Instance.new("UIGradient")
-					gradient.Name="StrokeGradient"
-					gradient.Parent=obj
+				obj.Color=accentRole and color or softColor
+				obj.Thickness=math.clamp(tonumber(UI_STYLE.StrokeThickness) or obj.Thickness,0,8)
+				if obj:GetAttribute("BaseStrokeTransparency")==nil then
+					obj:SetAttribute("BaseStrokeTransparency",obj.Transparency)
 				end
 
-				if UI_STYLE.LiquidStroke then
-					gradient.Color=ColorSequence.new({
-						ColorSequenceKeypoint.new(0,color),
-						ColorSequenceKeypoint.new(0.45,color2),
-						ColorSequenceKeypoint.new(0.55,color2),
-						ColorSequenceKeypoint.new(1,color),
-					})
+				local baseTransparency=tonumber(obj:GetAttribute("BaseStrokeTransparency")) or obj.Transparency
+				local styleTransparency=tonumber(UI_STYLE.StrokeTransparency) or 0.72
+				obj.Transparency=getRoleStrokeTransparency(role,baseTransparency,styleTransparency)
+
+				pcall(function()
+					obj.LineJoinMode=Enum.LineJoinMode.Miter
+				end)
+
+				local gradient=obj:FindFirstChild("StrokeGradient")
+
+				if (UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke) and accentRole then
+					if not gradient then
+						gradient=Instance.new("UIGradient")
+						gradient.Name="StrokeGradient"
+						gradient.Parent=obj
+					end
+
+					if UI_STYLE.LiquidStroke then
+						gradient.Color=ColorSequence.new({
+							ColorSequenceKeypoint.new(0,color),
+							ColorSequenceKeypoint.new(0.45,color2),
+							ColorSequenceKeypoint.new(0.55,color2),
+							ColorSequenceKeypoint.new(1,color),
+						})
+					else
+						gradient.Rotation=0
+						gradient.Offset=Vector2.new(0,0)
+						gradient.Color=ColorSequence.new({
+							ColorSequenceKeypoint.new(0,color),
+							ColorSequenceKeypoint.new(1,color2),
+						})
+					end
 				else
-					gradient.Rotation=0
-					gradient.Offset=Vector2.new(0,0)
-					gradient.Color=ColorSequence.new({
-						ColorSequenceKeypoint.new(0,color),
-						ColorSequenceKeypoint.new(1,color2),
-					})
-				end
-			else
-				if gradient then
-					gradient:Destroy()
+					if gradient then
+						gradient:Destroy()
+					end
 				end
 			end
 
