@@ -570,6 +570,39 @@ end
 
 SG=New("ScreenGui", {Name=SG_NAME, ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, IgnoreGuiInset=true, DisplayOrder=1000}, guiParent)
 LOADER_Z=10000
+loaderAlive=true
+
+function playLoaderKeyframes(sequence,asynchronous)
+	local function run()
+		for _,step in ipairs(sequence or {}) do
+			if not loaderAlive then return end
+
+			if type(step)=="number" then
+				task.wait(step)
+			elseif type(step)=="function" then
+				pcall(step)
+			elseif type(step)=="table" then
+				local instance=step[1]
+				local direction=step[2] or Enum.EasingDirection.Out
+				local style=step[3] or Enum.EasingStyle.Quad
+				local duration=tonumber(step[4]) or 0.15
+				local properties=step[5] or {}
+
+				if instance and instance.Parent then
+					local tween=TweenService:Create(instance,TweenInfo.new(duration,style,direction),properties)
+					tween:Play()
+					tween.Completed:Wait()
+				end
+			end
+		end
+	end
+
+	if asynchronous then
+		task.spawn(run)
+	else
+		run()
+	end
+end
 
 LOADER_TOTAL=0
 for _ in pairs(MODULE_PATHS) do
@@ -586,6 +619,26 @@ loaderOverlay=New("Frame",{
 	ZIndex=LOADER_Z,
 },SG)
 
+loaderBackdropA=New("Frame",{
+	AnchorPoint=Vector2.new(0.5,0.5),
+	Position=UDim2.new(0.5,-160,0.5,-96),
+	Size=UDim2.fromOffset(2,2),
+	BackgroundColor3=THEME.GREEN,
+	BackgroundTransparency=1,
+	BorderSizePixel=0,
+	ZIndex=LOADER_Z,
+},loaderOverlay)
+
+loaderBackdropB=New("Frame",{
+	AnchorPoint=Vector2.new(0.5,0.5),
+	Position=UDim2.new(0.5,180,0.5,94),
+	Size=UDim2.fromOffset(2,2),
+	BackgroundColor3=THEME.BLUE,
+	BackgroundTransparency=1,
+	BorderSizePixel=0,
+	ZIndex=LOADER_Z,
+},loaderOverlay)
+
 loaderBox=New("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,0,0.5,0),
@@ -596,8 +649,18 @@ loaderBox=New("Frame",{
 	ZIndex=LOADER_Z+1,
 },loaderOverlay)
 
+loaderBoxScale=New("UIScale",{Scale=0.92},loaderBox)
 loaderBoxStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=1},loaderBox)
 New("UIPadding",{PaddingTop=UDim.new(0,16),PaddingLeft=UDim.new(0,18),PaddingRight=UDim.new(0,18),PaddingBottom=UDim.new(0,16)},loaderBox)
+
+loaderAccent=New("Frame",{
+	BackgroundColor3=THEME.GREEN,
+	BackgroundTransparency=1,
+	BorderSizePixel=0,
+	Position=UDim2.new(0,0,0,0),
+	Size=UDim2.new(0,0,0,2),
+	ZIndex=LOADER_Z+2,
+},loaderBox)
 
 loaderTitle=New("TextLabel",{
 	BackgroundTransparency=1,
@@ -644,6 +707,33 @@ loaderFill=New("Frame",{
 	ZIndex=LOADER_Z+3,
 },loaderTrack)
 
+loaderScan=New("Frame",{
+	BackgroundColor3=Color3.fromRGB(255,255,255),
+	BackgroundTransparency=1,
+	BorderSizePixel=0,
+	Position=UDim2.new(0,-72,0,0),
+	Size=UDim2.fromOffset(72,10),
+	ZIndex=LOADER_Z+4,
+},loaderTrack)
+
+New("UIGradient",{
+	Transparency=NumberSequence.new({
+		NumberSequenceKeypoint.new(0,1),
+		NumberSequenceKeypoint.new(0.45,0.34),
+		NumberSequenceKeypoint.new(1,1),
+	}),
+},loaderScan)
+
+loaderPulse=New("Frame",{
+	AnchorPoint=Vector2.new(0.5,0.5),
+	Position=UDim2.new(0.5,0,0.5,0),
+	Size=UDim2.fromOffset(430,150),
+	BackgroundColor3=THEME.GREEN,
+	BackgroundTransparency=1,
+	BorderSizePixel=0,
+	ZIndex=LOADER_Z,
+},loaderOverlay)
+
 loaderPercent=New("TextLabel",{
 	BackgroundTransparency=1,
 	Position=UDim2.fromOffset(0,100),
@@ -660,9 +750,22 @@ loaderPercent=New("TextLabel",{
 function showLoader()
 	if not loaderOverlay or not loaderOverlay.Parent then return end
 
+	playLoaderKeyframes({
+		{loaderOverlay,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.18,{BackgroundTransparency=0}},
+	},true)
+
+	playLoaderKeyframes({
+		function()
+			if loaderBoxScale then loaderBoxScale.Scale=0.92 end
+			if loaderAccent then loaderAccent.Size=UDim2.new(0,0,0,2) end
+		end,
+		{loaderBackdropA,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.24,{BackgroundTransparency=0.92,Size=UDim2.fromOffset(520,260)}},
+		{loaderBackdropB,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.24,{BackgroundTransparency=0.94,Size=UDim2.fromOffset(460,220)}},
+		{loaderBox,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.18,{BackgroundTransparency=0}},
+		{loaderBoxScale,Enum.EasingDirection.Out,Enum.EasingStyle.Back,0.22,{Scale=1}},
+	},true)
+
 	local ti=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
-	TweenService:Create(loaderOverlay,ti,{BackgroundTransparency=0}):Play()
-	TweenService:Create(loaderBox,ti,{BackgroundTransparency=0}):Play()
 	TweenService:Create(loaderBoxStroke,ti,{Transparency=0}):Play()
 	TweenService:Create(loaderTitle,ti,{TextTransparency=0}):Play()
 	TweenService:Create(loaderStatus,ti,{TextTransparency=0}):Play()
@@ -670,6 +773,18 @@ function showLoader()
 	TweenService:Create(loaderTrack,ti,{BackgroundTransparency=0}):Play()
 	TweenService:Create(loaderTrackStroke,ti,{Transparency=0}):Play()
 	TweenService:Create(loaderFill,ti,{BackgroundTransparency=0}):Play()
+	TweenService:Create(loaderAccent,TweenInfo.new(0.34,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundTransparency=0,Size=UDim2.new(1,0,0,2)}):Play()
+
+	task.spawn(function()
+		while loaderAlive and loaderOverlay and loaderOverlay.Parent and loaderScan and loaderScan.Parent do
+			loaderScan.Position=UDim2.new(0,-72,0,0)
+			loaderScan.BackgroundTransparency=0.74
+			local scanTween=TweenService:Create(loaderScan,TweenInfo.new(0.9,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut),{Position=UDim2.new(1,72,0,0)})
+			scanTween:Play()
+			scanTween.Completed:Wait()
+			task.wait(0.1)
+		end
+	end)
 end
 
 showLoader()
@@ -686,6 +801,26 @@ function setLoaderProgress(text,current,total,isProblem)
 	loaderPercent.Text=math.floor(pct*100+0.5).."%"
 	loaderFill.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
 	TweenService:Create(loaderFill,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
+
+	if loaderAccent then
+		loaderAccent.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
+	end
+
+	if loaderPulse then
+		loaderPulse.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
+		loaderPulse.BackgroundTransparency=0.94
+		loaderPulse.Size=UDim2.fromOffset(410,132)
+		TweenService:Create(loaderPulse,TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+			BackgroundTransparency=1,
+			Size=UDim2.fromOffset(470,170),
+		}):Play()
+	end
+
+	if isProblem and loaderBoxStroke then
+		TweenService:Create(loaderBoxStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=THEME.RED,Transparency=0}):Play()
+	else
+		TweenService:Create(loaderBoxStroke,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=THEME.STROKE,Transparency=0}):Play()
+	end
 end
 
 function finishLoader()
@@ -694,8 +829,14 @@ function finishLoader()
 	loaderTitle.Text="Welcome, "..me.Name.."!"
 	setLoaderProgress("Everything is loaded and up to date.",LOADER_TOTAL,LOADER_TOTAL,false)
 
-	task.delay(0.35,function()
+	playLoaderKeyframes({
+		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.18,{BackgroundTransparency=0.88,Size=UDim2.fromOffset(520,190)}},
+		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.28,{BackgroundTransparency=1,Size=UDim2.fromOffset(620,240)}},
+	},true)
+
+	task.delay(0.48,function()
 		if not loaderOverlay or not loaderOverlay.Parent then return end
+		loaderAlive=false
 
 		local ti=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 		TweenService:Create(loaderOverlay,ti,{BackgroundTransparency=1}):Play()
@@ -914,7 +1055,7 @@ local function fallbackOriginalUILibProfile()
 			ButtonHeight=30,
 			ControlStrokeTransparency=0.55,
 		},
-		Defaults={PrimaryR=28,PrimaryG=28,PrimaryB=28,StrokeR=76,StrokeG=76,StrokeB=76,GradientR=45,GradientG=45,GradientB=45,StrokeGradient=false,LiquidStroke=false,LiquidStrokeSpeed=1,LiquidStrokeDirection="Right",StrokeThickness=1,StrokeTransparency=0.72,CornerRadius=0,UILib="original"},
+		Defaults={PrimaryR=28,PrimaryG=28,PrimaryB=28,StrokeR=76,StrokeG=76,StrokeB=76,GradientR=45,GradientG=45,GradientB=45,StrokeGradient=false,LiquidStroke=false,LiquidStrokeSpeed=1,LiquidStrokeDirection="Right",StrokeThickness=1,StrokeTransparency=0.72,CornerRadius=0,UILib="original",ThemePanelExpanded=false,ColoursPanelExpanded=false},
 		MainFrame={
 			Window={W=880,H=540,MinW=560,MinH=360,MaxW=1220,MaxH=820,StartY=80,MinimizedH=68},
 			Layout={RootPadding=8,MainGap=8,PageGap=8,ColumnGap=8,FooterGap=8,HeaderHeight=52,PageBarHeight=30,PageTabWidth=106,PageTabHeight=28,PageHostReserve=156,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=10,FabSize=42},

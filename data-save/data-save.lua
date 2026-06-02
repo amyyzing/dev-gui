@@ -25,6 +25,8 @@ local FALLBACK_UI_STYLE={
 	StrokeTransparency=0.72,
 	CornerRadius=0,
 	UILib="original",
+	ThemePanelExpanded=false,
+	ColoursPanelExpanded=false,
 }
 
 local KEYBIND_FIELDS={
@@ -505,6 +507,8 @@ function DataSave.new(ctx)
 				strokeTransparency=uiStyle.StrokeTransparency,
 				cornerRadius=0,
 				uiLib=tostring(uiStyle.UILib or "")~="" and uiStyle.UILib or defaultUIStyle.UILib or "original",
+				themePanelExpanded=uiStyle.ThemePanelExpanded and true or false,
+				coloursPanelExpanded=uiStyle.ColoursPanelExpanded and true or false,
 			},
 
 			workspace={
@@ -681,6 +685,11 @@ function DataSave.new(ctx)
 			if uiStyle.liquidStrokeDirection~=nil then ctx.UI_STYLE.LiquidStrokeDirection=tostring(uiStyle.liquidStrokeDirection) end
 			if uiStyle.strokeThickness~=nil then ctx.UI_STYLE.StrokeThickness=clampNumber(uiStyle.strokeThickness,0,8,ctx.UI_STYLE.StrokeThickness or 1) end
 			if uiStyle.strokeTransparency~=nil then ctx.UI_STYLE.StrokeTransparency=clampNumber(uiStyle.strokeTransparency,0,1,ctx.UI_STYLE.StrokeTransparency or 0.55) end
+			if uiStyle.themePanelExpanded~=nil then ctx.UI_STYLE.ThemePanelExpanded=uiStyle.themePanelExpanded and true or false end
+			if uiStyle.ThemePanelExpanded~=nil then ctx.UI_STYLE.ThemePanelExpanded=uiStyle.ThemePanelExpanded and true or false end
+			if uiStyle.coloursPanelExpanded~=nil then ctx.UI_STYLE.ColoursPanelExpanded=uiStyle.coloursPanelExpanded and true or false end
+			if uiStyle.ColorsPanelExpanded~=nil then ctx.UI_STYLE.ColoursPanelExpanded=uiStyle.ColorsPanelExpanded and true or false end
+			if uiStyle.ColoursPanelExpanded~=nil then ctx.UI_STYLE.ColoursPanelExpanded=uiStyle.ColoursPanelExpanded and true or false end
 			if uiStyle.uiLib~=nil and tostring(uiStyle.uiLib)~="" then
 				ctx.UI_STYLE.UILib=tostring(uiStyle.uiLib)
 			else

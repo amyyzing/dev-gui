@@ -26,6 +26,8 @@ local DEFAULTS={
 	StrokeTransparency=0.72,
 	CornerRadius=0,
 	UILib="original",
+	ThemePanelExpanded=false,
+	ColoursPanelExpanded=false,
 }
 
 local function clampByte(v)
@@ -82,6 +84,8 @@ local function ensureStyleDefaults(style)
 	style.StrokeTransparency=math.clamp(numberOrDefault(style.StrokeTransparency,DEFAULTS.StrokeTransparency),0,1)
 	style.CornerRadius=0
 	style.UILib=DEFAULTS.UILib
+	style.ThemePanelExpanded=boolOrDefault(style.ThemePanelExpanded,DEFAULTS.ThemePanelExpanded)
+	style.ColoursPanelExpanded=boolOrDefault(style.ColoursPanelExpanded,DEFAULTS.ColoursPanelExpanded)
 end
 
 local function copyDefaultStyle(style)
@@ -110,6 +114,8 @@ local function copyDefaultStyle(style)
 		StrokeTransparency=math.clamp(numberOrDefault(style.StrokeTransparency,DEFAULTS.StrokeTransparency),0,1),
 		CornerRadius=0,
 		UILib=DEFAULTS.UILib,
+		ThemePanelExpanded=boolOrDefault(style.ThemePanelExpanded,DEFAULTS.ThemePanelExpanded),
+		ColoursPanelExpanded=boolOrDefault(style.ColoursPanelExpanded,DEFAULTS.ColoursPanelExpanded),
 	}
 end
 
@@ -178,16 +184,16 @@ function StrokeColour.new(ctx,page)
 	local grSlider,ggSlider,gbSlider
 	local speedSlider,thicknessSlider,transparencySlider
 	local gradientToggle,liquidToggle
-	local previewBox,previewStroke,previewText
 	local colourTweenToken=0
 	local liquidConn=nil
 	local liquidClock=0
-	local updatePreview=nil
+	local updatePreview=function() end
 	local paintChoices=function() end
 	local syncPickerControls=function() paintChoices() end
 	local setPickerFromColor=function() end
 	local getActiveColor=function() return colorFromStyle(UI_STYLE,"Primary") end
 	local connections={}
+	local collapsiblePanels={}
 
 	local function getUIStrokeColor()
 		if ctx.getUIStrokeColor then
@@ -300,9 +306,7 @@ function StrokeColour.new(ctx,page)
 				end
 			end
 
-			if updatePreview then
-				updatePreview()
-			end
+			updatePreview()
 		end)
 	end
 
@@ -383,48 +387,6 @@ function StrokeColour.new(ctx,page)
 		for _,child in ipairs(page:GetChildren()) do
 			if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
 				child:Destroy()
-			end
-		end
-	end
-
-	updatePreview=function()
-		if not previewBox then return end
-
-		local c1=getUIStrokeColor()
-		local c2=getUIStrokeGradientColor()
-
-		local primary=getUIPrimaryColor()
-		previewBox.BackgroundColor3=primary
-
-		if previewText then
-			local luminance=(primary.R*0.2126)+(primary.G*0.7152)+(primary.B*0.0722)
-			previewText.TextColor3=luminance<0.55 and Color3.fromRGB(245,245,245) or Color3.fromRGB(18,18,18)
-		end
-
-		if previewStroke then
-			previewStroke.Color=getPulseColor()
-			previewStroke.Thickness=UI_STYLE.StrokeThickness
-			previewStroke.Transparency=math.clamp(UI_STYLE.StrokeTransparency+(getPulseAlpha()*0.08),0,1)
-		end
-
-		local oldFillGradient=previewBox:FindFirstChild("PreviewGradient")
-		if oldFillGradient then
-			oldFillGradient:Destroy()
-		end
-
-		local grad=previewStroke and previewStroke:FindFirstChild("PreviewGradient")
-
-		if UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke then
-			if not grad then
-				grad=Instance.new("UIGradient")
-				grad.Name="PreviewGradient"
-				grad.Parent=previewStroke
-			end
-
-			setGradientColors(grad,c1,c2)
-		else
-			if grad then
-				grad:Destroy()
 			end
 		end
 	end
@@ -538,6 +500,11 @@ function StrokeColour.new(ctx,page)
 	function api.Refresh()
 		colourTweenToken=colourTweenToken+1
 		ensureStyleDefaults(UI_STYLE)
+
+		for _,panelApi in ipairs(collapsiblePanels) do
+			panelApi.setExpanded(UI_STYLE[panelApi.stateKey],false,false)
+		end
+
 		syncColourControls()
 		updateEverything()
 		syncPickerControls()
@@ -577,6 +544,8 @@ function StrokeColour.new(ctx,page)
 		UI_STYLE.StrokeTransparency=defaultStyle.StrokeTransparency
 		UI_STYLE.CornerRadius=defaultStyle.CornerRadius
 		UI_STYLE.UILib=defaultStyle.UILib
+		UI_STYLE.ThemePanelExpanded=defaultStyle.ThemePanelExpanded
+		UI_STYLE.ColoursPanelExpanded=defaultStyle.ColoursPanelExpanded
 
 		api.Refresh()
 	end
@@ -745,7 +714,7 @@ function StrokeColour.new(ctx,page)
 		},parent)
 	end
 
-	local function makePanel(order)
+	local function makePanel(order,title,stateKey)
 		local panel=New("Frame",{
 			BackgroundColor3=themeColor("SECTION",THEME.CARD),
 			BackgroundTransparency=0.12,
@@ -771,7 +740,154 @@ function StrokeColour.new(ctx,page)
 			SortOrder=Enum.SortOrder.LayoutOrder,
 		},panel)
 
-		return panel
+		local expanded=UI_STYLE[stateKey] and true or false
+		local header=New("Frame",{
+			BackgroundTransparency=1,
+			Size=UDim2.new(1,0,0,24),
+			ZIndex=5,
+			LayoutOrder=1,
+		},panel)
+
+		local titleButton=New("TextButton",{
+			BackgroundTransparency=1,
+			Size=UDim2.new(1,-54,1,0),
+			Text="",
+			Font=Enum.Font.GothamBold,
+			TextSize=13,
+			TextColor3=THEME.TEXT,
+			TextXAlignment=Enum.TextXAlignment.Left,
+			AutoButtonColor=false,
+			ZIndex=6,
+		},header)
+
+		local stateLabel=New("TextLabel",{
+			BackgroundTransparency=1,
+			AnchorPoint=Vector2.new(1,0.5),
+			Position=UDim2.new(1,0,0.5,0),
+			Size=UDim2.fromOffset(48,18),
+			Text="",
+			Font=Enum.Font.GothamMedium,
+			TextSize=11,
+			TextColor3=THEME.MUTED,
+			TextXAlignment=Enum.TextXAlignment.Right,
+			ZIndex=6,
+		},header)
+
+		local body=New("Frame",{
+			BackgroundTransparency=1,
+			Size=UDim2.new(1,0,0,0),
+			AutomaticSize=expanded and Enum.AutomaticSize.Y or Enum.AutomaticSize.None,
+			Visible=expanded,
+			ClipsDescendants=true,
+			ZIndex=5,
+			LayoutOrder=2,
+		},panel)
+
+		local bodyLayout=New("UIListLayout",{
+			Padding=UDim.new(0,8),
+			SortOrder=Enum.SortOrder.LayoutOrder,
+		},body)
+
+		local bodyTween=nil
+		local lastHeight=0
+
+		local function cancelTween()
+			if bodyTween then
+				bodyTween:Cancel()
+				bodyTween=nil
+			end
+		end
+
+		local function paint()
+			titleButton.Text=(expanded and "[-] " or "[+] ")..title
+			stateLabel.Text=expanded and "Hide" or "Show"
+			panel.BackgroundColor3=expanded and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
+		end
+
+		local function targetHeight()
+			return math.max(lastHeight,math.floor(bodyLayout.AbsoluteContentSize.Y+0.5))
+		end
+
+		local function setExpanded(nextExpanded,animate,fire)
+			expanded=nextExpanded and true or false
+			UI_STYLE[stateKey]=expanded
+			paint()
+			cancelTween()
+
+			if expanded then
+				body.Visible=true
+				body.AutomaticSize=Enum.AutomaticSize.None
+				body.Size=UDim2.new(1,0,0,0)
+
+				task.defer(function()
+					if not expanded or not body.Parent then return end
+
+					local height=targetHeight()
+					lastHeight=height
+
+					if animate then
+						bodyTween=TweenService:Create(body,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(1,0,0,height)})
+						bodyTween:Play()
+						bodyTween.Completed:Connect(function()
+							if expanded and body.Parent then
+								body.AutomaticSize=Enum.AutomaticSize.Y
+								body.Size=UDim2.new(1,0,0,0)
+							end
+						end)
+					else
+						body.AutomaticSize=Enum.AutomaticSize.Y
+						body.Size=UDim2.new(1,0,0,0)
+					end
+				end)
+			else
+				lastHeight=targetHeight()
+				body.AutomaticSize=Enum.AutomaticSize.None
+				body.Visible=true
+				body.Size=UDim2.new(1,0,0,lastHeight)
+
+				if animate then
+					bodyTween=TweenService:Create(body,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Size=UDim2.new(1,0,0,0)})
+					bodyTween:Play()
+					bodyTween.Completed:Connect(function()
+						if not expanded and body.Parent then
+							body.Visible=false
+						end
+					end)
+				else
+					body.Visible=false
+					body.Size=UDim2.new(1,0,0,0)
+				end
+			end
+
+			if fire and ctx.onChanged then
+				pcall(ctx.onChanged,UI_STYLE)
+			end
+		end
+
+		titleButton.MouseButton1Click:Connect(function()
+			setExpanded(not expanded,true,true)
+		end)
+
+		header.InputBegan:Connect(function(input)
+			if input.UserInputType==Enum.UserInputType.MouseButton1 then
+				setExpanded(not expanded,true,true)
+			end
+		end)
+
+		body:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+			if expanded then
+				lastHeight=targetHeight()
+			end
+		end)
+
+		collapsiblePanels[#collapsiblePanels+1]={
+			stateKey=stateKey,
+			setExpanded=setExpanded,
+		}
+
+		paint()
+
+		return body
 	end
 
 	local function makeFlatButton(parent,text,order,scale)
@@ -991,9 +1107,9 @@ function StrokeColour.new(ctx,page)
 		syncPickerControls()
 	end
 
-	local previewRow=New("Frame",{
+	local introRow=New("Frame",{
 		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,60),
+		Size=UDim2.new(1,0,0,46),
 		ZIndex=5,
 		LayoutOrder=1,
 	},page)
@@ -1001,65 +1117,34 @@ function StrokeColour.new(ctx,page)
 	New("TextLabel",{
 		BackgroundTransparency=1,
 		Position=UDim2.fromOffset(4,6),
-		Size=UDim2.new(1,-128,0,22),
+		Size=UDim2.new(1,-8,0,22),
 		Text="Appearance",
 		Font=Enum.Font.GothamBold,
 		TextSize=18,
 		TextColor3=THEME.TEXT,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
-	},previewRow)
+	},introRow)
 
 	New("TextLabel",{
 		BackgroundTransparency=1,
 		Position=UDim2.fromOffset(4,30),
-		Size=UDim2.new(1,-128,0,16),
-		Text="Small theme controls with softer borders.",
+		Size=UDim2.new(1,-8,0,16),
+		Text="Open only the controls you need.",
 		Font=Enum.Font.Gotham,
 		TextSize=12,
 		TextColor3=THEME.MUTED,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
-	},previewRow)
+	},introRow)
 
-	previewBox=New("Frame",{
-		AnchorPoint=Vector2.new(1,0.5),
-		Size=UDim2.fromOffset(104,44),
-		Position=UDim2.new(1,-4,0.5,0),
-		BackgroundColor3=getUIPrimaryColor(),
-		BorderSizePixel=0,
-		ClipsDescendants=true,
-		SkipThemeRole=true,
-		ZIndex=6,
-	},previewRow)
-	addCorner(previewBox,"Section")
-
-	previewStroke=New("UIStroke",{
-		Color=getUIStrokeColor(),
-		Thickness=UI_STYLE.StrokeThickness,
-		Transparency=UI_STYLE.StrokeTransparency,
-	},previewBox)
-
-	previewText=New("TextLabel",{
-		BackgroundTransparency=1,
-		Position=UDim2.fromOffset(10,0),
-		Size=UDim2.new(1,-20,1,0),
-		Text="Preview",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=Color3.fromRGB(0,0,0),
-		TextTruncate=Enum.TextTruncate.AtEnd,
-		ZIndex=7,
-	},previewBox)
-
-	local themePanel=makePanel(2)
-	makeLabel(themePanel,"Theme",1,13,false)
+	local themePanel=makePanel(2,"Theme","ThemePanelExpanded")
 
 	local themeGrid=New("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,92),
 		ZIndex=5,
-		LayoutOrder=2,
+		LayoutOrder=1,
 	},themePanel)
 
 	New("UIGridLayout",{
@@ -1135,14 +1220,13 @@ function StrokeColour.new(ctx,page)
 		themeCards[#themeCards+1]={Preset=preset,Card=card,Marker=marker}
 	end
 
-	local colorPanel=makePanel(3)
-	makeLabel(colorPanel,"Colours",1,13,false)
+	local colorPanel=makePanel(3,"Colours","ColoursPanelExpanded")
 
 	local targetRow=New("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,28),
 		ZIndex=5,
-		LayoutOrder=2,
+		LayoutOrder=1,
 	},colorPanel)
 
 	New("UIListLayout",{
@@ -1164,7 +1248,7 @@ function StrokeColour.new(ctx,page)
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,28),
 		ZIndex=5,
-		LayoutOrder=3,
+		LayoutOrder=2,
 	},colorPanel)
 
 	New("UIListLayout",{
@@ -1186,7 +1270,7 @@ function StrokeColour.new(ctx,page)
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,26),
 		ZIndex=5,
-		LayoutOrder=4,
+		LayoutOrder=3,
 	},colorPanel)
 
 	New("UIListLayout",{
@@ -1243,7 +1327,7 @@ function StrokeColour.new(ctx,page)
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,128),
 		ZIndex=5,
-		LayoutOrder=5,
+		LayoutOrder=4,
 	},colorPanel)
 
 	for _,mode in ipairs({"Square","RGB","HSV","Hex"}) do

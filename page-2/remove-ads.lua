@@ -1,4 +1,5 @@
 local RemoveAds={}
+local TweenService=game:GetService("TweenService")
 
 local function safeDisconnect(conn)
 	if conn and typeof(conn)=="RBXScriptConnection" then
@@ -12,6 +13,179 @@ local function firstChild(parent)
 	if not parent then return nil end
 	local children=parent:GetChildren()
 	return children[1]
+end
+
+local function createPowerSwitch(New,THEME,parent,startState,onChange)
+	local width,height=52,28
+	local switch=New("Frame",{
+		AnchorPoint=Vector2.new(1,0.5),
+		Position=UDim2.new(1,0,0.5,0),
+		Size=UDim2.fromOffset(width,height),
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		ZIndex=7,
+	},parent)
+
+	local glow=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.new(0.5,0,0.5,0),
+		Size=UDim2.fromOffset(24,24),
+		BackgroundColor3=THEME.GREEN,
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		ZIndex=7,
+	},switch)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},glow)
+
+	local circle=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.new(0.5,0,0.5,2),
+		Size=UDim2.fromOffset(24,24),
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		ZIndex=9,
+	},switch)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},circle)
+
+	local circleStroke=New("UIStroke",{
+		Color=THEME.MUTED,
+		Thickness=2,
+		Transparency=0.28,
+	},circle)
+
+	local progress=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.new(0.5,0,0.5,2),
+		Size=UDim2.fromOffset(24,24),
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		Rotation=-80,
+		ZIndex=10,
+	},switch)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},progress)
+
+	local progressStroke=New("UIStroke",{
+		Color=THEME.GREEN,
+		Thickness=3,
+		Transparency=1,
+	},progress)
+
+	local progressGradient=New("UIGradient",{
+		Rotation=0,
+		Transparency=NumberSequence.new({
+			NumberSequenceKeypoint.new(0,0),
+			NumberSequenceKeypoint.new(0.62,0),
+			NumberSequenceKeypoint.new(0.64,1),
+			NumberSequenceKeypoint.new(1,1),
+		}),
+	},progressStroke)
+
+	local line=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0),
+		Position=UDim2.new(0.5,0,0,2),
+		Size=UDim2.fromOffset(4,13),
+		BackgroundColor3=THEME.MUTED,
+		BackgroundTransparency=0.2,
+		BorderSizePixel=0,
+		ZIndex=11,
+	},switch)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},line)
+
+	local hit=New("TextButton",{
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		Text="",
+		AutoButtonColor=false,
+		Size=UDim2.new(1,0,1,0),
+		ZIndex=12,
+	},switch)
+
+	local state=startState and true or false
+	local animToken=0
+
+	local function tween(obj,duration,props,style,direction)
+		if obj and obj.Parent then
+			TweenService:Create(obj,TweenInfo.new(duration,style or Enum.EasingStyle.Quad,direction or Enum.EasingDirection.Out),props):Play()
+		end
+	end
+
+	local function paint(animate)
+		animToken+=1
+		local token=animToken
+		local accent=THEME.GREEN
+		local off=THEME.MUTED
+
+		if state then
+			progress.Rotation=-80
+			progressGradient.Rotation=0
+			progressStroke.Transparency=animate and 1 or 0
+			glow.BackgroundTransparency=animate and 1 or 0.82
+			glow.Size=UDim2.fromOffset(24,24)
+
+			tween(circleStroke,0.16,{Color=accent,Transparency=0.2})
+			tween(line,0.18,{BackgroundColor3=accent,BackgroundTransparency=0})
+			tween(progressStroke,0.16,{Transparency=0})
+			tween(progress,0.38,{Rotation=280},Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+			tween(progressGradient,0.38,{Rotation=360},Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+			tween(glow,0.24,{BackgroundTransparency=0.82,Size=UDim2.fromOffset(42,42)})
+
+			if animate then
+				tween(switch,0.08,{Size=UDim2.fromOffset(width-4,height-2)})
+				task.delay(0.08,function()
+					if token==animToken then
+						tween(switch,0.16,{Size=UDim2.fromOffset(width,height)},Enum.EasingStyle.Back,Enum.EasingDirection.Out)
+					end
+				end)
+				task.delay(0.18,function()
+					if token==animToken then
+						tween(line,0.12,{Position=UDim2.new(0.5,0,0,-1)})
+					end
+				end)
+				task.delay(0.3,function()
+					if token==animToken then
+						tween(line,0.14,{Position=UDim2.new(0.5,0,0,2)})
+					end
+				end)
+			end
+		else
+			tween(circleStroke,0.16,{Color=off,Transparency=0.28})
+			tween(line,0.16,{BackgroundColor3=off,BackgroundTransparency=0.2,Position=UDim2.new(0.5,0,0,2)})
+			tween(progressStroke,0.14,{Transparency=1})
+			tween(glow,0.18,{BackgroundTransparency=1,Size=UDim2.fromOffset(24,24)})
+			tween(switch,0.12,{Size=UDim2.fromOffset(width,height)})
+			progress.Rotation=-80
+			progressGradient.Rotation=0
+		end
+	end
+
+	local function setState(value,fire,animate)
+		local nextState=value and true or false
+		local changed=nextState~=state
+		state=nextState
+		paint(animate and changed)
+
+		if fire and onChange then
+			onChange(state)
+		end
+	end
+
+	hit.MouseButton1Click:Connect(function()
+		setState(not state,true,true)
+	end)
+
+	paint(false)
+
+	return{
+		set=function(value)
+			setState(value,false,true)
+		end,
+		get=function()
+			return state
+		end,
+		wrap=switch,
+		width=width,
+		height=height,
+	}
 end
 
 function RemoveAds.new(ctx,page)
@@ -199,17 +373,41 @@ function RemoveAds.new(ctx,page)
 		restoreAds()
 	end
 
+	local function findHeader(section)
+		if not section then return nil end
+
+		for _,child in ipairs(section:GetChildren()) do
+			if child:IsA("Frame") and child.LayoutOrder==1 then
+				return child
+			end
+		end
+
+		return nil
+	end
+
+	local function reserveHeaderSpace(header,width)
+		if not header then return end
+
+		for _,child in ipairs(header:GetChildren()) do
+			if child:IsA("TextButton") and tostring(child.Text or "")~="" then
+				child.Size=UDim2.new(1,-width,1,0)
+				return
+			end
+		end
+	end
+
 	local section,sectionControls=makeSection(page,3,"Remove Ads","Gameplay only",{
-		headerToggle={
-			startState=enabled,
-			onChange=function(state)
-				api.SetEnabled(state,true)
-			end,
-		},
 		compact=true,
 	})
 
-	toggle=sectionControls and sectionControls.toggle
+	local header=findHeader(sectionControls and sectionControls.section or section)
+	if header then
+		toggle=createPowerSwitch(New,THEME,header,enabled,function(state)
+			api.SetEnabled(state,true)
+		end)
+		reserveHeaderSpace(header,(toggle.width or 52)+10)
+	end
+
 	if not toggle then
 		toggle=buildToggleRow(section,"Remove Ads",enabled,function(state)
 			api.SetEnabled(state,true)
