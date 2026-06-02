@@ -81,7 +81,7 @@ local function ensureStyleDefaults(style)
 	style.StrokeThickness=math.clamp(numberOrDefault(style.StrokeThickness,DEFAULTS.StrokeThickness),0,8)
 	style.StrokeTransparency=math.clamp(numberOrDefault(style.StrokeTransparency,DEFAULTS.StrokeTransparency),0,1)
 	style.CornerRadius=0
-	style.UILib=tostring(style.UILib or DEFAULTS.UILib)
+	style.UILib=DEFAULTS.UILib
 end
 
 local function copyDefaultStyle(style)
@@ -109,7 +109,7 @@ local function copyDefaultStyle(style)
 		StrokeThickness=math.clamp(numberOrDefault(style.StrokeThickness,DEFAULTS.StrokeThickness),0,8),
 		StrokeTransparency=math.clamp(numberOrDefault(style.StrokeTransparency,DEFAULTS.StrokeTransparency),0,1),
 		CornerRadius=0,
-		UILib=tostring(style.UILib or DEFAULTS.UILib),
+		UILib=DEFAULTS.UILib,
 	}
 end
 
@@ -165,7 +165,6 @@ function StrokeColour.new(ctx,page)
 	local UI_STYLE=ctx.UI_STYLE
 	local SG=ctx.SG
 	local UIS=ctx.UIS or game:GetService("UserInputService")
-	local UILibModules=ctx.UILibModules
 	local externalThemeApplier=ctx.applyUIStrokeTheme~=nil
 
 	applyDefaultOverrides(ctx.DEFAULT_UI_STYLE)
@@ -648,7 +647,6 @@ function StrokeColour.new(ctx,page)
 	local targetButtons={}
 	local modeButtons={}
 	local themeCards={}
-	local libRows={}
 	local quickChoices={}
 	local rgbSliders={}
 	local hsvSliders={}
@@ -666,29 +664,10 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function currentLibStyleValue(key,fallback)
-		local active=tostring(UI_STYLE.UILib or DEFAULTS.UILib):lower()
-
-		for _,module in ipairs(type(UILibModules)=="table" and UILibModules or {}) do
-			if type(module)=="table" and tostring(module.Id or ""):lower()==active then
-				local style=module.Style
-				if type(style)=="table" and style[key]~=nil then
-					return style[key]
-				end
-			end
-		end
-
 		return fallback
 	end
 
 	local function currentLibShape()
-		local active=tostring(UI_STYLE.UILib or DEFAULTS.UILib):lower()
-
-		for _,module in ipairs(type(UILibModules)=="table" and UILibModules or {}) do
-			if type(module)=="table" and tostring(module.Id or ""):lower()==active and type(module.Shape)=="table" then
-				return module.Shape
-			end
-		end
-
 		return{}
 	end
 
@@ -1504,222 +1483,6 @@ function StrokeColour.new(ctx,page)
 
 	applyHex.MouseButton1Click:Connect(commitHex)
 
-	local function normalizeLibModule(module)
-		if type(module)~="table" or type(module.Id)~="string" or type(module.Name)~="string" then
-			return nil
-		end
-
-		return module
-	end
-
-	local libLookup={}
-	local uiLibs={}
-	for _,module in ipairs(type(UILibModules)=="table" and UILibModules or {}) do
-		local lib=normalizeLibModule(module)
-		if lib and not libLookup[lib.Id] then
-			libLookup[lib.Id]=lib
-			uiLibs[#uiLibs+1]=lib
-		end
-	end
-
-	if #uiLibs==0 then
-		uiLibs={
-			{Id="original",Name="Original",Source="Current GUI",Url="",Description="The current simplified control-panel style.",Tags={"default","current","simple"},Style={Primary=Color3.fromRGB(28,28,28),Stroke=Color3.fromRGB(76,76,76),Gradient=Color3.fromRGB(45,45,45),GradientOn=false,StrokeThickness=1,StrokeTransparency=0.72}},
-			{Id="visual",Name="Visual",Source="VisualRoblox/Roblox",Url="https://github.com/VisualRoblox/Roblox",Description="Clean dark surfaces with a bright blue accent.",Tags={"visual","blue","github"},Style={Primary=Color3.fromRGB(18,20,26),Stroke=Color3.fromRGB(0,145,255),Gradient=Color3.fromRGB(84,196,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.76}},
-			{Id="rayfield",Name="Rayfield",Source="SiriusSoftwareLtd/Rayfield",Url="https://github.com/SiriusSoftwareLtd/Rayfield",Description="Rounded dark rows, pill tabs, and blue inline controls.",Tags={"rayfield","sirius","github","rounded","blue"},Style={Primary=Color3.fromRGB(25,25,25),Stroke=Color3.fromRGB(48,119,177),Gradient=Color3.fromRGB(43,105,159),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.68}},
-			{Id="windui",Name="WindUI",Source="Footagesus/WindUI",Url="https://github.com/Footagesus/WindUI",Description="Soft rounded panels, roomy spacing, and floating blue controls.",Tags={"windui","footagesus","github","soft","rounded","blue"},Style={Primary=Color3.fromRGB(22,24,30),Stroke=Color3.fromRGB(86,153,255),Gradient=Color3.fromRGB(142,195,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.8}},
-			{Id="linoria",Name="Linoria",Source="violin-suzutsuki/LinoriaLib",Url="https://github.com/violin-suzutsuki/LinoriaLib",Description="Dense square utility panels with thin outlines and compact text.",Tags={"linoria","green","github","dense","square"},Style={Primary=Color3.fromRGB(18,18,18),Stroke=Color3.fromRGB(77,255,82),Gradient=Color3.fromRGB(55,203,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.36}},
-			{Id="obsidian",Name="Obsidian",Source="deividcomsono/Obsidian",Url="https://github.com/deividcomsono/Obsidian",Description="Dark sidebar panels, search-like inputs, and violet accents.",Tags={"obsidian","deividcomsono","github","violet","sidebar"},Style={Primary=Color3.fromRGB(15,15,20),Stroke=Color3.fromRGB(145,88,255),Gradient=Color3.fromRGB(230,92,255),GradientOn=true,StrokeThickness=1,StrokeTransparency=0.64}},
-		}
-
-		for _,lib in ipairs(uiLibs) do
-			libLookup[lib.Id]=lib
-		end
-	end
-
-	local function applyUILib(lib)
-		if not lib then
-			return
-		end
-
-		local style=lib.Style or {}
-		UI_STYLE.UILib=lib.Id
-		UI_STYLE.LiquidStroke=false
-
-		if style.Primary then
-			setPrimaryColour(style.Primary)
-		end
-
-		if style.Stroke then
-			setMainColour(style.Stroke)
-		end
-
-		if style.Gradient then
-			setGradientColour(style.Gradient)
-		end
-
-		UI_STYLE.StrokeGradient=style.GradientOn and true or false
-		UI_STYLE.StrokeThickness=math.clamp(numberOrDefault(style.StrokeThickness,UI_STYLE.StrokeThickness),0,8)
-		UI_STYLE.StrokeTransparency=math.clamp(numberOrDefault(style.StrokeTransparency,UI_STYLE.StrokeTransparency),0,1)
-
-		setPickerFromColor(getActiveColor())
-		syncColourControls()
-		updateEverything()
-		syncPickerControls()
-
-		if ctx.onUILibChanged then
-			pcall(ctx.onUILibChanged,lib)
-		end
-	end
-
-	function api.ApplyUILib(libOrId)
-		local lib=libOrId
-		if type(libOrId)=="string" then
-			local id=tostring(libOrId):lower()
-			lib=libLookup[id]
-		end
-
-		if lib then
-			applyUILib(lib)
-			return true
-		end
-
-		return false
-	end
-
-	local libsPanel=makePanel(4)
-	makeLabel(libsPanel,"Libs",1,13,false)
-
-	local libSearchWrap=New("Frame",{
-		BackgroundColor3=themeColor("INPUT",THEME.PANEL),
-		BorderSizePixel=0,
-		Size=UDim2.new(1,0,0,0),
-		Visible=false,
-		ZIndex=6,
-		LayoutOrder=2,
-		ThemeRole="INPUT",
-		CornerRole="Control",
-	},libsPanel)
-	addCorner(libSearchWrap,"Control")
-
-	local libSearch=New("TextBox",{
-		BackgroundTransparency=1,
-		BorderSizePixel=0,
-		ClearTextOnFocus=false,
-		Position=UDim2.fromOffset(10,0),
-		Size=UDim2.new(1,-20,1,0),
-		Text="",
-		PlaceholderText="Search libraries",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=THEME.TEXT,
-		PlaceholderColor3=THEME.MUTED,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=7,
-	},libSearchWrap)
-
-	local libList=New("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,0),
-		AutomaticSize=Enum.AutomaticSize.Y,
-		ZIndex=5,
-		LayoutOrder=2,
-	},libsPanel)
-
-	New("UIListLayout",{
-		Padding=UDim.new(0,6),
-		SortOrder=Enum.SortOrder.LayoutOrder,
-	},libList)
-
-	local function matchesLib(lib,query)
-		query=tostring(query or ""):lower()
-		if query=="" then
-			return true
-		end
-
-		local fields={lib.Id,lib.Name,lib.Source,lib.Description,lib.Url}
-		for _,tag in ipairs(type(lib.Tags)=="table" and lib.Tags or {}) do
-			fields[#fields+1]=tag
-		end
-
-		for _,field in ipairs(fields) do
-			if tostring(field or ""):lower():find(query,1,true) then
-				return true
-			end
-		end
-
-		return false
-	end
-
-	for index,lib in ipairs(uiLibs) do
-		local row=New("TextButton",{
-			BackgroundColor3=themeColor("BUTTON",THEME.PANEL),
-			BorderSizePixel=0,
-			Text="",
-			AutoButtonColor=false,
-			Size=UDim2.new(1,0,0,32),
-			ZIndex=6,
-			LayoutOrder=index,
-			ThemeRole="BUTTON",
-			CornerRole="Control",
-		},libList)
-		addCorner(row,"Control")
-
-		local marker=New("Frame",{
-			BackgroundColor3=getUIStrokeColor(),
-			BorderSizePixel=0,
-			Size=UDim2.fromOffset(3,32),
-			Visible=false,
-			SkipThemeRole=true,
-			ZIndex=7,
-		},row)
-
-		New("TextLabel",{
-			BackgroundTransparency=1,
-			Position=UDim2.fromOffset(12,0),
-			Size=UDim2.new(1,-24,1,0),
-			Text=lib.Name,
-			Font=Enum.Font.GothamBold,
-			TextSize=12,
-			TextColor3=THEME.TEXT,
-			TextXAlignment=Enum.TextXAlignment.Left,
-			TextYAlignment=Enum.TextYAlignment.Center,
-			TextTruncate=Enum.TextTruncate.AtEnd,
-			ZIndex=7,
-		},row)
-
-		row.MouseEnter:Connect(function()
-			row.BackgroundColor3=themeColor("SECTION",THEME.CARD)
-		end)
-
-		row.MouseLeave:Connect(function()
-			paintChoices()
-		end)
-
-		row.MouseButton1Click:Connect(function()
-			applyUILib(lib)
-		end)
-
-		libRows[#libRows+1]={Lib=lib,Row=row,Marker=marker}
-	end
-
-	local function filterLibs()
-		local anyVisible=false
-		local query=""
-
-		for _,entry in ipairs(libRows) do
-			local visible=matchesLib(entry.Lib,query)
-			entry.Row.Visible=visible
-			if visible then
-				anyVisible=true
-			end
-		end
-
-		libList.Visible=anyVisible
-	end
-
-	filterLibs()
-
 	paintChoices=function()
 		local primary=getUIPrimaryColor()
 		local stroke=getUIStrokeColor()
@@ -1761,23 +1524,12 @@ function StrokeColour.new(ctx,page)
 			entry.Marker.BackgroundColor3=readableTextColor(entry.Color)
 		end
 
-		for _,entry in ipairs(libRows) do
-			local selected=tostring(UI_STYLE.UILib or "original")==entry.Lib.Id
-			entry.Row.BackgroundColor3=selected and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
-			entry.Marker.Visible=selected
-			entry.Marker.BackgroundColor3=stroke
-		end
-
 		if applyHex then
 			applyHex.BackgroundColor3=themeColor("BUTTON",THEME.PANEL)
 		end
 
 		if hexBox then
 			hexBox.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
-		end
-
-		if libSearchWrap then
-			libSearchWrap.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
 		end
 	end
 

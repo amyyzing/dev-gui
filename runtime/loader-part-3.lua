@@ -50,7 +50,6 @@ function buildCustomizePage()
 				SG=SG,
 				PrimaryColourModule=PrimaryColourModule,
 				SecondaryColourModule=SecondaryColourModule,
-				UILibModules=getUILibModules and getUILibModules() or nil,
 
 				makeSection=makeSection,
 				buildSlider=buildSlider,
@@ -67,31 +66,7 @@ function buildCustomizePage()
 				onChanged=function()
 					applyUIStrokeTheme()
 					requestPlayerAutosave()
-				end,
-				onUILibChanged=function()
-					task.defer(function()
-						if resetRuntimeEffectsBeforeAutoRefresh then
-							pcall(resetRuntimeEffectsBeforeAutoRefresh,"ui-lib-change")
-						end
-
-						if MainFrame and MainFrame.ApplyProfile and getCurrentUILibProfile then
-							local okProfile,profile=pcall(getCurrentUILibProfile)
-							if okProfile then
-								pcall(MainFrame.ApplyProfile,profile)
-							end
-						end
-						if rebuildPage1FromModules then pcall(rebuildPage1FromModules) end
-						if rebuildCustomizeFromModules then pcall(rebuildCustomizeFromModules) end
-						if rebuildMapFromModules then pcall(rebuildMapFromModules) end
-						if rebuildSettingsFromModules then pcall(rebuildSettingsFromModules) end
-						if rebuildPage2FromModules then pcall(rebuildPage2FromModules) end
-						if refreshExternalRenderer then pcall(refreshExternalRenderer) end
-						if refreshAllUI then pcall(refreshAllUI) end
-						if applyUIStrokeTheme then pcall(applyUIStrokeTheme) end
-						if updateResponsiveLayout then pcall(updateResponsiveLayout) end
-						requestPlayerAutosave()
-					end)
-				end,
+				end
 			},uiSettingsPage)
 		end)
 
