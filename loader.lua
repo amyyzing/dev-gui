@@ -355,6 +355,50 @@ function inspector.guiTree(maxDepth)
 	return table.concat(lines,"\n")
 end
 
+function inspector.snapshot(maxDepth)
+	return table.concat({
+		"HB_INSPECTOR_BEGIN",
+		inspector.report(),
+		"runtime modules:",
+		inspector.modules(),
+		"gui tree:",
+		inspector.guiTree(maxDepth or 5),
+		"HB_INSPECTOR_END",
+	},"\n")
+end
+
+function inspector.dumpToOutput(maxDepth)
+	local text=inspector.snapshot(maxDepth)
+	local chunkSize=3200
+	local index=1
+	local total=math.max(1,math.ceil(#text/chunkSize))
+
+	for offset=1,#text,chunkSize do
+		warn("[HB inspector dump "..tostring(index).."/"..tostring(total).."]\n"..text:sub(offset,offset+chunkSize-1))
+		index=index+1
+	end
+
+	return text
+end
+
+function inspector.dumpToFile(path,maxDepth)
+	if type(writefile)~="function" then
+		return false,"writefile is not available."
+	end
+
+	path=tostring(path or "hb_loader_inspector.txt")
+	local text=inspector.snapshot(maxDepth)
+	local ok,err=pcall(function()
+		writefile(path,text)
+	end)
+
+	if not ok then
+		return false,tostring(err)
+	end
+
+	return true,path
+end
+
 function inspector.report()
 	local loaded=0
 	for _,path in ipairs(RUNTIME_PATHS) do
@@ -426,4 +470,15 @@ recordRuntimeEvent("loader","runtime","complete")
 
 if sharedEnv.HB_LOADER_DEBUG==true then
 	warn(inspector.report())
+end
+
+if sharedEnv.HB_LOADER_DEBUG_DUMP==true then
+	inspector.dumpToOutput(sharedEnv.HB_LOADER_DEBUG_TREE_DEPTH or 5)
+end
+
+if sharedEnv.HB_LOADER_DEBUG_WRITEFILE==true then
+	local ok,result=inspector.dumpToFile(sharedEnv.HB_LOADER_DEBUG_FILE or "hb_loader_inspector.txt",sharedEnv.HB_LOADER_DEBUG_TREE_DEPTH or 5)
+	if sharedEnv.HB_LOADER_DEBUG==true then
+		warn("[HB loader] writefile dump",ok and "ok" or "failed",result or "")
+	end
 end
