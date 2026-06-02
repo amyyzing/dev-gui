@@ -8,7 +8,8 @@ DiscordAPI=nil
 function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	local modal=New("Frame", {BackgroundColor3=Color3.fromRGB(0, 0, 0), BackgroundTransparency=0.25, BorderSizePixel=0, Size=UDim2.new(1, 0, 1, 0), ZIndex=100}, SG)
 
-	local box=New("Frame", {AnchorPoint=Vector2.new(0.5, 0.5), Position=UDim2.new(0.5, 0, 0.5, 0), Size=UDim2.fromOffset(390, 170), BackgroundColor3=THEME.BG, BorderSizePixel=0, ZIndex=101}, modal)
+	local box=New("Frame", {AnchorPoint=Vector2.new(0.5, 0.5), Position=UDim2.new(0.5, 0, 0.5, 0), Size=UDim2.fromOffset(390, 170), BackgroundColor3=THEME.SECTION or THEME.BG, BorderSizePixel=0, ZIndex=101, ThemeRole="SECTION", CornerRole="Section"}, modal)
+	New("UICorner", {CornerRadius=UDim.new(0, 0)}, box)
 
 	New("UIStroke", {Color=THEME.STROKE, Thickness=2, Transparency=0}, box)
 
@@ -17,9 +18,9 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	New("TextLabel", {BackgroundTransparency=1, Position=UDim2.fromOffset(16, 48), Size=UDim2.new(1, -32, 0, 54), Text=bodyText, Font=Enum.Font.Gotham, TextSize=12, TextWrapped=true, TextColor3=THEME.MUTED, TextXAlignment=Enum.TextXAlignment.Left, TextYAlignment=Enum.TextYAlignment.Top, ZIndex=102}, box)
 
 	local function modalButton(text, x, danger)
-		local normalBg=danger and THEME.RED or THEME.BG
+		local normalBg=danger and THEME.RED or (THEME.BUTTON or THEME.BG)
 		local hoverBg=danger and Color3.fromRGB(255,124,118) or THEME.CARD
-		local leaveBg=danger and THEME.RED or THEME.PANEL
+		local leaveBg=danger and THEME.RED or (THEME.BUTTON or THEME.BG)
 		local textColor=danger and Color3.fromRGB(0,0,0) or THEME.TEXT
 		local b=New("TextButton", {Position=UDim2.fromOffset(x, 120), Size=UDim2.fromOffset(104, 30), BackgroundColor3=normalBg, BorderSizePixel=0, Text=text, Font=Enum.Font.Gotham, TextSize=12, TextColor3=textColor, AutoButtonColor=false, ZIndex=102}, box)
 
@@ -27,7 +28,10 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 		wrap.BackgroundColor3=normalBg
 		if danger then
 			wrap:SetAttribute("ThemeRole","RED")
+		else
+			wrap:SetAttribute("ThemeRole","BUTTON")
 		end
+		wrap:SetAttribute("CornerRole","Control")
 
 		b.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=hoverBg

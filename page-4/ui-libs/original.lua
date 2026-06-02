@@ -13,4 +13,13 @@ return{
 		StrokeThickness=1,
 		StrokeTransparency=0.55,
 	},
+	Theme={},
+	Shape={
+		WindowRadius=0,
+		SectionRadius=0,
+		ControlRadius=0,
+		SliderRadius=0,
+		SliderHeight=26,
+		SliderStyle="original",
+	},
 }

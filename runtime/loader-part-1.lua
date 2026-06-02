@@ -117,6 +117,18 @@ function markThemeRole(obj,color)
 		role="RED"
 	elseif colorClose(color,THEME.BLUE) then
 		role="BLUE"
+	elseif THEME.TOPBAR and colorClose(color,THEME.TOPBAR) then
+		role="TOPBAR"
+	elseif THEME.SECTION and colorClose(color,THEME.SECTION) then
+		role="SECTION"
+	elseif THEME.BUTTON and colorClose(color,THEME.BUTTON) then
+		role="BUTTON"
+	elseif THEME.INPUT and colorClose(color,THEME.INPUT) then
+		role="INPUT"
+	elseif THEME.SLIDER_BG and colorClose(color,THEME.SLIDER_BG) then
+		role="SLIDER_BG"
+	elseif THEME.SLIDER_FILL and colorClose(color,THEME.SLIDER_FILL) then
+		role="SLIDER_FILL"
 	end
 
 	if role then
@@ -166,10 +178,12 @@ function New(class, props, parent)
 	local skipThemeRole=props.SkipThemeRole
 	local forcedThemeRole=props.ThemeRole
 	local forcedTextRole=props.TextRole
+	local forcedCornerRole=props.CornerRole
 
 	props.SkipThemeRole=nil
 	props.ThemeRole=nil
 	props.TextRole=nil
+	props.CornerRole=nil
 
 	if props.Active==nil and (class=="Frame" or class=="ScrollingFrame" or class=="TextButton" or class=="TextBox") then
 		props.Active=true
@@ -208,6 +222,10 @@ function New(class, props, parent)
 		obj:SetAttribute("ThemeTextRole",forcedTextRole)
 	elseif class=="TextLabel" or class=="TextButton" or class=="TextBox" then
 		markThemeTextRole(obj,props.TextColor3)
+	end
+
+	if forcedCornerRole then
+		obj:SetAttribute("CornerRole",forcedCornerRole)
 	end
 
 	if class=="TextBox" then
@@ -885,6 +903,118 @@ function getUILibModules()
 	}
 end
 
+function getUILibRuntimeStyle(id)
+	id=tostring(id or "original"):lower()
+
+	local styles={
+		original={
+			Theme={},
+			Shape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original"},
+		},
+		visual={
+			Theme={
+				BG=Color3.fromRGB(18,20,26),
+				TOPBAR=Color3.fromRGB(22,25,32),
+				PANEL=Color3.fromRGB(24,28,36),
+				CARD=Color3.fromRGB(29,34,44),
+				SECTION=Color3.fromRGB(27,31,40),
+				BUTTON=Color3.fromRGB(31,39,52),
+				INPUT=Color3.fromRGB(19,23,31),
+				SLIDER_BG=Color3.fromRGB(19,24,34),
+				SLIDER_FILL=Color3.fromRGB(0,145,255),
+				TEXT=Color3.fromRGB(235,242,255),
+				MUTED=Color3.fromRGB(142,156,178),
+			},
+			Shape={WindowRadius=8,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=28,SliderStyle="pill"},
+		},
+		rayfield={
+			Theme={
+				BG=Color3.fromRGB(25,25,25),
+				TOPBAR=Color3.fromRGB(34,34,34),
+				PANEL=Color3.fromRGB(30,30,30),
+				CARD=Color3.fromRGB(35,35,35),
+				SECTION=Color3.fromRGB(35,35,35),
+				BUTTON=Color3.fromRGB(35,35,35),
+				INPUT=Color3.fromRGB(30,30,30),
+				SLIDER_BG=Color3.fromRGB(43,105,159),
+				SLIDER_FILL=Color3.fromRGB(43,105,159),
+				TEXT=Color3.fromRGB(240,240,240),
+				MUTED=Color3.fromRGB(178,178,178),
+			},
+			Shape={WindowRadius=6,SectionRadius=5,ControlRadius=4,SliderRadius=4,SliderHeight=26,SliderStyle="rayfield"},
+		},
+		windui={
+			Theme={
+				BG=Color3.fromRGB(18,20,27),
+				TOPBAR=Color3.fromRGB(25,29,38),
+				PANEL=Color3.fromRGB(25,30,41),
+				CARD=Color3.fromRGB(30,36,48),
+				SECTION=Color3.fromRGB(28,34,45),
+				BUTTON=Color3.fromRGB(35,43,58),
+				INPUT=Color3.fromRGB(22,27,37),
+				SLIDER_BG=Color3.fromRGB(30,39,54),
+				SLIDER_FILL=Color3.fromRGB(86,153,255),
+				TEXT=Color3.fromRGB(245,248,255),
+				MUTED=Color3.fromRGB(159,174,197),
+			},
+			Shape={WindowRadius=12,SectionRadius=10,ControlRadius=8,SliderRadius=10,SliderHeight=24,SliderStyle="windui"},
+		},
+		linoria={
+			Theme={
+				BG=Color3.fromRGB(24,24,34),
+				TOPBAR=Color3.fromRGB(28,27,39),
+				PANEL=Color3.fromRGB(31,30,43),
+				CARD=Color3.fromRGB(34,33,48),
+				SECTION=Color3.fromRGB(30,29,42),
+				BUTTON=Color3.fromRGB(38,36,54),
+				INPUT=Color3.fromRGB(25,24,35),
+				SLIDER_BG=Color3.fromRGB(35,34,50),
+				SLIDER_FILL=Color3.fromRGB(120,98,255),
+				TEXT=Color3.fromRGB(235,232,255),
+				MUTED=Color3.fromRGB(164,159,196),
+			},
+			Shape={WindowRadius=3,SectionRadius=2,ControlRadius=2,SliderRadius=2,SliderHeight=22,SliderStyle="thin"},
+		},
+		obsidian={
+			Theme={
+				BG=Color3.fromRGB(15,15,20),
+				TOPBAR=Color3.fromRGB(19,18,27),
+				PANEL=Color3.fromRGB(21,20,29),
+				CARD=Color3.fromRGB(27,25,37),
+				SECTION=Color3.fromRGB(24,22,34),
+				BUTTON=Color3.fromRGB(31,28,45),
+				INPUT=Color3.fromRGB(17,16,24),
+				SLIDER_BG=Color3.fromRGB(30,27,43),
+				SLIDER_FILL=Color3.fromRGB(145,88,255),
+				TEXT=Color3.fromRGB(242,238,255),
+				MUTED=Color3.fromRGB(163,151,190),
+			},
+			Shape={WindowRadius=9,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=24,SliderStyle="glow"},
+		},
+	}
+
+	for _,module in ipairs({
+		UILibOriginalModule,
+		UILibVisualModule,
+		UILibRayfieldModule,
+		UILibWindUIModule,
+		UILibLinoriaModule,
+		UILibObsidianModule,
+	}) do
+		if type(module)=="table" and type(module.Id)=="string" then
+			local key=tostring(module.Id):lower()
+			local base=styles[key] or styles.original
+
+			styles[key]={
+				Theme=type(module.Theme)=="table" and module.Theme or base.Theme,
+				Shape=type(module.Shape)=="table" and module.Shape or base.Shape,
+			}
+		end
+	end
+
+	return styles[id] or styles.original
+end
+
 function refreshThemePalette()
 	local primary=getUIPrimaryColor()
 	local lum=(primary.R*0.2126)+(primary.G*0.7152)+(primary.B*0.0722)
@@ -902,6 +1032,23 @@ function refreshThemePalette()
 		THEME.PANEL=primary:Lerp(away,0.04)
 		THEME.CARD=primary:Lerp(away,0.08)
 	end
+
+	THEME.TOPBAR=THEME.BG
+	THEME.SECTION=THEME.CARD
+	THEME.BUTTON=THEME.PANEL
+	THEME.INPUT=THEME.PANEL
+	THEME.SLIDER_BG=THEME.PANEL
+	THEME.SLIDER_FILL=THEME.STROKE
+
+	local libStyle=getUILibRuntimeStyle(UI_STYLE.UILib)
+	local libTheme=libStyle and libStyle.Theme or {}
+
+	for role,color in pairs(libTheme) do
+		THEME[role]=color
+	end
+
+	THEME.ACC=THEME.SLIDER_FILL or THEME.GREEN
+	UI_STYLE.CornerRadius=(libStyle.Shape and libStyle.Shape.WindowRadius) or 0
 end
 
 function applyUIPrimaryTheme()
@@ -1249,7 +1396,19 @@ applyUIStrokeTheme=function()
 			end
 
 		elseif obj:IsA("UICorner") then
-			obj.CornerRadius=UDim.new(0,0)
+			local shape=(getUILibRuntimeStyle(UI_STYLE.UILib) or {}).Shape or {}
+			local role=obj.Parent and obj.Parent:GetAttribute("CornerRole") or "Control"
+			local radius=shape.ControlRadius or 0
+
+			if role=="Window" then
+				radius=shape.WindowRadius or radius
+			elseif role=="Section" then
+				radius=shape.SectionRadius or radius
+			elseif role=="Slider" then
+				radius=shape.SliderRadius or radius
+			end
+
+			obj.CornerRadius=UDim.new(0,radius)
 		end
 	end
 

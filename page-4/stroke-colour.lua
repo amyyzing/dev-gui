@@ -647,6 +647,34 @@ function StrokeColour.new(ctx,page)
 		return conn
 	end
 
+	local function themeColor(role,fallback)
+		return THEME[role] or fallback
+	end
+
+	local function currentLibStyleValue(key,fallback)
+		local active=tostring(UI_STYLE.UILib or DEFAULTS.UILib):lower()
+
+		for _,module in ipairs(type(UILibModules)=="table" and UILibModules or {}) do
+			if type(module)=="table" and tostring(module.Id or ""):lower()==active then
+				local style=module.Style
+				if type(style)=="table" and style[key]~=nil then
+					return style[key]
+				end
+			end
+		end
+
+		return fallback
+	end
+
+	local function addCorner(obj,role)
+		if not obj then
+			return nil
+		end
+
+		obj:SetAttribute("CornerRole",role or "Control")
+		return New("UICorner",{CornerRadius=UDim.new(0,0)},obj)
+	end
+
 	local function toHSV(color)
 		local ok,h,s,v=pcall(function()
 			return Color3.toHSV(color)
@@ -701,15 +729,17 @@ function StrokeColour.new(ctx,page)
 
 	local function makePanel(order)
 		local panel=New("Frame",{
-			BackgroundColor3=THEME.CARD,
+			BackgroundColor3=themeColor("SECTION",THEME.CARD),
 			BackgroundTransparency=0.12,
 			BorderSizePixel=0,
 			Size=UDim2.new(1,0,0,0),
 			AutomaticSize=Enum.AutomaticSize.Y,
 			ZIndex=4,
 			LayoutOrder=order,
-			ThemeRole="CARD",
+			ThemeRole="SECTION",
+			CornerRole="Section",
 		},page)
+		addCorner(panel,"Section")
 
 		New("UIPadding",{
 			PaddingTop=UDim.new(0,12),
@@ -728,7 +758,7 @@ function StrokeColour.new(ctx,page)
 
 	local function makeFlatButton(parent,text,order,scale)
 		local button=New("TextButton",{
-			BackgroundColor3=THEME.PANEL,
+			BackgroundColor3=themeColor("BUTTON",THEME.PANEL),
 			BorderSizePixel=0,
 			Text=text,
 			Font=Enum.Font.GothamMedium,
@@ -738,8 +768,10 @@ function StrokeColour.new(ctx,page)
 			Size=UDim2.new(scale or 0.333,-6,1,0),
 			ZIndex=6,
 			LayoutOrder=order,
-			SkipThemeRole=true,
+			ThemeRole="BUTTON",
+			CornerRole="Control",
 		},parent)
+		addCorner(button,"Control")
 
 		local marker=New("Frame",{
 			BackgroundColor3=getUIStrokeColor(),
@@ -752,7 +784,7 @@ function StrokeColour.new(ctx,page)
 		},button)
 
 		button.MouseEnter:Connect(function()
-			button.BackgroundColor3=THEME.CARD
+			button.BackgroundColor3=themeColor("SECTION",THEME.CARD)
 		end)
 
 		button.MouseLeave:Connect(function()
@@ -782,7 +814,7 @@ function StrokeColour.new(ctx,page)
 		},row)
 
 		local valueBox=New("TextLabel",{
-			BackgroundColor3=THEME.PANEL,
+			BackgroundColor3=themeColor("INPUT",THEME.PANEL),
 			BorderSizePixel=0,
 			Size=UDim2.fromOffset(48,24),
 			Position=UDim2.new(1,-48,0,2),
@@ -792,17 +824,21 @@ function StrokeColour.new(ctx,page)
 			TextColor3=THEME.TEXT,
 			TextXAlignment=Enum.TextXAlignment.Center,
 			ZIndex=6,
-			ThemeRole="PANEL",
+			ThemeRole="INPUT",
+			CornerRole="Control",
 		},row)
+		addCorner(valueBox,"Control")
 
 		local track=New("Frame",{
-			BackgroundColor3=THEME.BG,
+			BackgroundColor3=themeColor("SLIDER_BG",THEME.BG),
 			BorderSizePixel=0,
 			Position=UDim2.fromOffset(36,9),
 			Size=UDim2.new(1,-92,0,10),
 			ZIndex=6,
-			ThemeRole="BG",
+			ThemeRole="SLIDER_BG",
+			CornerRole="Slider",
 		},row)
+		addCorner(track,"Slider")
 
 		local fill=New("Frame",{
 			BackgroundColor3=fillColor or getUIStrokeColor(),
@@ -811,6 +847,7 @@ function StrokeColour.new(ctx,page)
 			SkipThemeRole=true,
 			ZIndex=7,
 		},track)
+		addCorner(fill,"Slider")
 
 		local hit=New("TextButton",{
 			BackgroundTransparency=1,
@@ -964,6 +1001,7 @@ function StrokeColour.new(ctx,page)
 		SkipThemeRole=true,
 		ZIndex=6,
 	},previewRow)
+	addCorner(previewBox,"Section")
 
 	previewStroke=New("UIStroke",{
 		Color=getUIStrokeColor(),
@@ -1009,8 +1047,8 @@ function StrokeColour.new(ctx,page)
 	local function applyThemePreset(preset)
 		setPrimaryColour(preset.Primary)
 		UI_STYLE.LiquidStroke=false
-		UI_STYLE.StrokeThickness=1
-		UI_STYLE.StrokeTransparency=0.55
+		UI_STYLE.StrokeThickness=math.clamp(numberOrDefault(currentLibStyleValue("StrokeThickness",1),1),0,8)
+		UI_STYLE.StrokeTransparency=math.clamp(numberOrDefault(currentLibStyleValue("StrokeTransparency",0.55),0.55),0,1)
 		syncColourControls()
 		updateEverything()
 		tweenStyleTo(preset.Stroke,preset.Gradient,preset.GradientOn)
@@ -1029,6 +1067,7 @@ function StrokeColour.new(ctx,page)
 			ZIndex=6,
 			LayoutOrder=i,
 		},themeGrid)
+		addCorner(card,"Control")
 
 		local marker=New("Frame",{
 			BackgroundColor3=preset.Stroke,
@@ -1140,6 +1179,7 @@ function StrokeColour.new(ctx,page)
 			ZIndex=6,
 			LayoutOrder=i,
 		},quickRow)
+		addCorner(swatch,"Control")
 
 		local marker=New("Frame",{
 			BackgroundColor3=readableTextColor(color),
@@ -1184,6 +1224,7 @@ function StrokeColour.new(ctx,page)
 		ZIndex=6,
 	},squareBody)
 	svBase=svSquare
+	addCorner(svSquare,"Section")
 
 	local whiteOverlay=New("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
@@ -1192,6 +1233,7 @@ function StrokeColour.new(ctx,page)
 		SkipThemeRole=true,
 		ZIndex=7,
 	},svSquare)
+	addCorner(whiteOverlay,"Section")
 	New("UIGradient",{
 		Transparency=NumberSequence.new({
 			NumberSequenceKeypoint.new(0,0),
@@ -1206,6 +1248,7 @@ function StrokeColour.new(ctx,page)
 		SkipThemeRole=true,
 		ZIndex=8,
 	},svSquare)
+	addCorner(blackOverlay,"Section")
 	New("UIGradient",{
 		Rotation=90,
 		Transparency=NumberSequence.new({
@@ -1221,6 +1264,7 @@ function StrokeColour.new(ctx,page)
 		SkipThemeRole=true,
 		ZIndex=9,
 	},svSquare)
+	addCorner(svCursor,"Control")
 	New("UIStroke",{Color=Color3.fromRGB(0,0,0),Thickness=1,Transparency=0.35},svCursor)
 
 	local hueStrip=New("Frame",{
@@ -1231,6 +1275,7 @@ function StrokeColour.new(ctx,page)
 		SkipThemeRole=true,
 		ZIndex=6,
 	},squareBody)
+	addCorner(hueStrip,"Slider")
 	New("UIGradient",{
 		Rotation=90,
 		Color=ColorSequence.new({
@@ -1251,6 +1296,7 @@ function StrokeColour.new(ctx,page)
 		SkipThemeRole=true,
 		ZIndex=8,
 	},hueStrip)
+	addCorner(hueCursor,"Slider")
 
 	colorPreview=New("Frame",{
 		BackgroundColor3=getActiveColor(),
@@ -1260,6 +1306,7 @@ function StrokeColour.new(ctx,page)
 		SkipThemeRole=true,
 		ZIndex=6,
 	},squareBody)
+	addCorner(colorPreview,"Control")
 
 	previewHex=New("TextLabel",{
 		BackgroundTransparency=1,
@@ -1347,7 +1394,7 @@ function StrokeColour.new(ctx,page)
 
 	local hexBody=modeBodies.Hex
 	hexBox=New("TextBox",{
-		BackgroundColor3=THEME.PANEL,
+		BackgroundColor3=themeColor("INPUT",THEME.PANEL),
 		BorderSizePixel=0,
 		ClearTextOnFocus=false,
 		Position=UDim2.fromOffset(0,8),
@@ -1358,11 +1405,13 @@ function StrokeColour.new(ctx,page)
 		TextColor3=THEME.TEXT,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
-		ThemeRole="PANEL",
+		ThemeRole="INPUT",
+		CornerRole="Control",
 	},hexBody)
+	addCorner(hexBox,"Control")
 
 	local applyHex=New("TextButton",{
-		BackgroundColor3=THEME.PANEL,
+		BackgroundColor3=themeColor("BUTTON",THEME.PANEL),
 		BorderSizePixel=0,
 		Position=UDim2.new(1,-96,0,8),
 		Size=UDim2.fromOffset(96,32),
@@ -1372,8 +1421,10 @@ function StrokeColour.new(ctx,page)
 		TextColor3=THEME.TEXT,
 		AutoButtonColor=false,
 		ZIndex=6,
-		SkipThemeRole=true,
+		ThemeRole="BUTTON",
+		CornerRole="Control",
 	},hexBody)
+	addCorner(applyHex,"Control")
 
 	local function commitHex()
 		local color=parseHex(hexBox.Text)
@@ -1459,7 +1510,7 @@ function StrokeColour.new(ctx,page)
 	makeLabel(libsPanel,"Libs",1,13,false)
 
 	local libSearch=New("TextBox",{
-		BackgroundColor3=THEME.PANEL,
+		BackgroundColor3=themeColor("INPUT",THEME.PANEL),
 		BorderSizePixel=0,
 		ClearTextOnFocus=false,
 		Size=UDim2.new(1,0,0,30),
@@ -1472,8 +1523,10 @@ function StrokeColour.new(ctx,page)
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
 		LayoutOrder=2,
-		ThemeRole="PANEL",
+		ThemeRole="INPUT",
+		CornerRole="Control",
 	},libsPanel)
+	addCorner(libSearch,"Control")
 
 	local libList=New("Frame",{
 		BackgroundTransparency=1,
@@ -1510,15 +1563,17 @@ function StrokeColour.new(ctx,page)
 
 	for index,lib in ipairs(uiLibs) do
 		local row=New("TextButton",{
-			BackgroundColor3=THEME.PANEL,
+			BackgroundColor3=themeColor("BUTTON",THEME.PANEL),
 			BorderSizePixel=0,
 			Text="",
 			AutoButtonColor=false,
 			Size=UDim2.new(1,0,0,46),
 			ZIndex=6,
 			LayoutOrder=index,
-			SkipThemeRole=true,
+			ThemeRole="BUTTON",
+			CornerRole="Control",
 		},libList)
+		addCorner(row,"Control")
 
 		local marker=New("Frame",{
 			BackgroundColor3=getUIStrokeColor(),
@@ -1554,7 +1609,7 @@ function StrokeColour.new(ctx,page)
 		},row)
 
 		row.MouseEnter:Connect(function()
-			row.BackgroundColor3=THEME.CARD
+			row.BackgroundColor3=themeColor("SECTION",THEME.CARD)
 		end)
 
 		row.MouseLeave:Connect(function()
@@ -1610,14 +1665,14 @@ function StrokeColour.new(ctx,page)
 
 		for key,entry in pairs(targetButtons) do
 			local selected=key==activeTarget
-			entry.Button.BackgroundColor3=selected and THEME.BG or THEME.PANEL
+			entry.Button.BackgroundColor3=selected and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=stroke
 		end
 
 		for key,entry in pairs(modeButtons) do
 			local selected=key==activeMode
-			entry.Button.BackgroundColor3=selected and THEME.BG or THEME.PANEL
+			entry.Button.BackgroundColor3=selected and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=stroke
 		end
@@ -1629,13 +1684,21 @@ function StrokeColour.new(ctx,page)
 
 		for _,entry in ipairs(libRows) do
 			local selected=tostring(UI_STYLE.UILib or "original")==entry.Lib.Id
-			entry.Row.BackgroundColor3=selected and THEME.BG or THEME.PANEL
+			entry.Row.BackgroundColor3=selected and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=stroke
 		end
 
 		if applyHex then
-			applyHex.BackgroundColor3=THEME.PANEL
+			applyHex.BackgroundColor3=themeColor("BUTTON",THEME.PANEL)
+		end
+
+		if hexBox then
+			hexBox.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
+		end
+
+		if libSearch then
+			libSearch.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
 		end
 	end
 

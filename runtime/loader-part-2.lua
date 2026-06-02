@@ -3,12 +3,14 @@
 GuiLogic=GuiLogicModule.new({
 	New=New,
 	THEME=THEME,
+	UI_STYLE=UI_STYLE,
 	UIS=UIS,
 	TweenService=TweenService,
 	fmtNumber=fmtNumber,
 	BOX_WRAPPERS=BOX_WRAPPERS,
 	BUTTON_WRAPPERS=BUTTON_WRAPPERS,
 	markThemeRole=markThemeRole,
+	getUILibRuntimeStyle=getUILibRuntimeStyle,
 })
 
 attachHover=GuiLogic.attachHover

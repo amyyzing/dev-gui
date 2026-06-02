@@ -44,7 +44,7 @@ function MainFrame.new(ctx)
 	local api={}
 	local MINIMIZED_ROOT_H=68
 
-	local root=New("Frame",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,80),Size=UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),AutomaticSize=Enum.AutomaticSize.None,ClipsDescendants=true,BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=2,Visible=true},SG)
+	local root=New("Frame",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,80),Size=UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),AutomaticSize=Enum.AutomaticSize.None,ClipsDescendants=true,BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=2,Visible=true,CornerRole="Window"},SG)
 	local uiMinimized=false
 	local rootSizeTween=nil
 	local rootPositionTween=nil
@@ -123,22 +123,25 @@ function MainFrame.new(ctx)
 
 	attachHover=attachHover or function() end
 
-	local header=New("Frame",{Size=UDim2.new(1,0,0,52),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=4,LayoutOrder=1},main)
+	local header=New("Frame",{Size=UDim2.new(1,0,0,52),BackgroundColor3=THEME.TOPBAR or THEME.BG,BorderSizePixel=0,ZIndex=4,LayoutOrder=1,ThemeRole="TOPBAR",CornerRole="Section"},main)
+	New("UICorner",{CornerRadius=UDim.new(0,0)},header)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.25},header)
 	local titleLabel=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,7),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=Enum.Font.GothamBold,TextSize=16,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
 
 	local modeSubtitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,26),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
 
 	local function makeTopButton(text,xOffset)
-		local b=New("TextButton",{Size=UDim2.fromOffset(28,28),Position=UDim2.new(1,xOffset,0.5,-14),BackgroundColor3=THEME.BG,BorderSizePixel=0,Text=text,Font=Enum.Font.Gotham,TextSize=17,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6},header)
-		local wrap=wrapTextButton(b,THEME.BG,2)
+		local b=New("TextButton",{Size=UDim2.fromOffset(28,28),Position=UDim2.new(1,xOffset,0.5,-14),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text=text,Font=Enum.Font.Gotham,TextSize=17,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6,ThemeRole="BUTTON"},header)
+		local wrap=wrapTextButton(b,THEME.BUTTON or THEME.BG,2)
+		wrap:SetAttribute("ThemeRole","BUTTON")
+		wrap:SetAttribute("CornerRole","Control")
 
 		b.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=THEME.CARD
 		end)
 
 		b.MouseLeave:Connect(function()
-			wrap.BackgroundColor3=THEME.PANEL
+			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
 		end)
 
 		return b
@@ -148,11 +151,13 @@ function MainFrame.new(ctx)
 	local closeBtn=makeTopButton("x", -38)
 
 	local pageBar=New("Frame",{Size=UDim2.new(1,0,0,30),BackgroundTransparency=1,ZIndex=4,LayoutOrder=2},main)
-	local pageShell=New("Frame",{Size=UDim2.fromOffset(638,30),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=5},pageBar)
+	local pageShell=New("Frame",{Size=UDim2.fromOffset(638,30),BackgroundColor3=THEME.TOPBAR or THEME.BG,BorderSizePixel=0,ZIndex=5,ThemeRole="TOPBAR",CornerRole="Section"},pageBar)
 	local pageShellScale=New("UIScale",{Scale=1},pageShell)
+	New("UICorner",{CornerRadius=UDim.new(0,0)},pageShell)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.35},pageShell)
 
-	local pageSlider=New("Frame",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(1,1),BackgroundColor3=THEME.CARD,BorderSizePixel=0,ZIndex=6},pageShell)
+	local pageSlider=New("Frame",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(1,1),BackgroundColor3=THEME.BUTTON or THEME.CARD,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON",CornerRole="Control"},pageShell)
+	New("UICorner",{CornerRadius=UDim.new(0,0)},pageSlider)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.45},pageSlider)
 
 	local settingsTab=New("TextButton",{Size=UDim2.fromOffset(106,28),Position=UDim2.fromOffset(1,1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Main","MAIN"),Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=7},pageShell)
@@ -292,15 +297,17 @@ function MainFrame.new(ctx)
 	function api.RefreshActionStatus() end
 
 	local function makeFooterBtn(text,width)
-		local b=New("TextButton",{Size=UDim2.fromOffset(width or 96,30),BackgroundColor3=THEME.BG,Text=string.upper(text),TextColor3=THEME.TEXT,Font=Enum.Font.Gotham,TextSize=12,AutoButtonColor=false,BorderSizePixel=0,ZIndex=6},footer)
-		local wrap=wrapTextButton(b,THEME.BG,2)
+		local b=New("TextButton",{Size=UDim2.fromOffset(width or 96,30),BackgroundColor3=THEME.BUTTON or THEME.BG,Text=string.upper(text),TextColor3=THEME.TEXT,Font=Enum.Font.Gotham,TextSize=12,AutoButtonColor=false,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON"},footer)
+		local wrap=wrapTextButton(b,THEME.BUTTON or THEME.BG,2)
+		wrap:SetAttribute("ThemeRole","BUTTON")
+		wrap:SetAttribute("CornerRole","Control")
 
 		b.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=THEME.CARD
 		end)
 
 		b.MouseLeave:Connect(function()
-			wrap.BackgroundColor3=THEME.PANEL
+			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
 		end)
 
 		return b,wrap
@@ -317,9 +324,16 @@ function MainFrame.new(ctx)
 
 	refreshFooterResetButton()
 
-	local fab=New("TextButton",{Name="FAB",Visible=false,AutoButtonColor=false,Size=UDim2.fromOffset(42,42),AnchorPoint=Vector2.new(1,1),Position=UDim2.new(1,-16,1,-16),BackgroundColor3=THEME.BG,BorderSizePixel=0,Text="[]",TextColor3=THEME.TEXT,Font=Enum.Font.Gotham,TextSize=16,ZIndex=20},SG)
+	local fab=New("TextButton",{Name="FAB",Visible=false,AutoButtonColor=false,Size=UDim2.fromOffset(42,42),AnchorPoint=Vector2.new(1,1),Position=UDim2.new(1,-16,1,-16),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text="[]",TextColor3=THEME.TEXT,Font=Enum.Font.Gotham,TextSize=16,ZIndex=20,ThemeRole="BUTTON",CornerRole="Control"},SG)
+	New("UICorner",{CornerRadius=UDim.new(0,0)},fab)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},fab)
-	attachHover(fab,THEME.BG,THEME.CARD,THEME.TEXT,THEME.TEXT)
+	fab.MouseEnter:Connect(function()
+		fab.BackgroundColor3=THEME.CARD
+	end)
+
+	fab.MouseLeave:Connect(function()
+		fab.BackgroundColor3=THEME.BUTTON or THEME.BG
+	end)
 
 	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=THEME.CARD,BackgroundTransparency=0.02,BorderSizePixel=0,Text="",ZIndex=30,ThemeRole="CARD"},root)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},resizeHandle)
