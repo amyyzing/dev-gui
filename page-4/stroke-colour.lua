@@ -796,9 +796,11 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function makeFlatButton(parent,text,order,scale)
+		local rounded=cornerRoleRadius("Control")>0
 		local button=New("TextButton",{
 			BackgroundColor3=themeColor("BUTTON",THEME.PANEL),
 			BorderSizePixel=0,
+			ClipsDescendants=rounded,
 			Text=text,
 			Font=Enum.Font.GothamMedium,
 			TextSize=12,
@@ -815,12 +817,14 @@ function StrokeColour.new(ctx,page)
 		local marker=New("Frame",{
 			BackgroundColor3=getUIStrokeColor(),
 			BorderSizePixel=0,
-			Size=UDim2.new(1,0,0,3),
-			Position=UDim2.new(0,0,1,-3),
+			Size=rounded and UDim2.new(1,-24,0,2) or UDim2.new(1,0,0,3),
+			Position=rounded and UDim2.new(0,12,1,-4) or UDim2.new(0,0,1,-3),
 			Visible=false,
 			SkipThemeRole=true,
 			ZIndex=7,
+			CornerRole="Slider",
 		},button)
+		addCorner(marker,"Slider")
 
 		button.MouseEnter:Connect(function()
 			button.BackgroundColor3=themeColor("SECTION",THEME.CARD)
@@ -1041,10 +1045,11 @@ function StrokeColour.new(ctx,page)
 
 	previewBox=New("Frame",{
 		AnchorPoint=Vector2.new(1,0.5),
-		Size=UDim2.fromOffset(92,44),
+		Size=UDim2.fromOffset(104,44),
 		Position=UDim2.new(1,-4,0.5,0),
 		BackgroundColor3=getUIPrimaryColor(),
 		BorderSizePixel=0,
+		ClipsDescendants=true,
 		SkipThemeRole=true,
 		ZIndex=6,
 	},previewRow)
@@ -1058,11 +1063,13 @@ function StrokeColour.new(ctx,page)
 
 	previewText=New("TextLabel",{
 		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,1,0),
+		Position=UDim2.fromOffset(10,0),
+		Size=UDim2.new(1,-20,1,0),
 		Text="Preview",
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
 		TextColor3=Color3.fromRGB(0,0,0),
+		TextTruncate=Enum.TextTruncate.AtEnd,
 		ZIndex=7,
 	},previewBox)
 
@@ -1105,9 +1112,11 @@ function StrokeColour.new(ctx,page)
 
 	for i,preset in ipairs(themePresets) do
 		local textColor=readableTextColor(preset.Primary)
+		local rounded=cornerRoleRadius("Control")>0
 		local card=New("TextButton",{
 			BackgroundColor3=preset.Primary,
 			BorderSizePixel=0,
+			ClipsDescendants=rounded,
 			Text="",
 			AutoButtonColor=false,
 			SkipThemeRole=true,
@@ -1119,12 +1128,14 @@ function StrokeColour.new(ctx,page)
 		local marker=New("Frame",{
 			BackgroundColor3=preset.Stroke,
 			BorderSizePixel=0,
-			Size=UDim2.new(1,0,0,3),
-			Position=UDim2.new(0,0,1,-3),
+			Size=rounded and UDim2.new(1,-22,0,2) or UDim2.new(1,0,0,3),
+			Position=rounded and UDim2.new(0,11,1,-5) or UDim2.new(0,0,1,-3),
 			Visible=false,
 			SkipThemeRole=true,
 			ZIndex=8,
+			CornerRole="Slider",
 		},card)
+		addCorner(marker,"Slider")
 
 		New("TextLabel",{
 			BackgroundTransparency=1,
@@ -1216,12 +1227,14 @@ function StrokeColour.new(ctx,page)
 		Color3.fromRGB(255,210,0),
 		Color3.fromRGB(0,210,210),
 	}) do
+		local rounded=cornerRoleRadius("Control")>0
 		local swatch=New("TextButton",{
 			BackgroundColor3=color,
 			BorderSizePixel=0,
 			Text="",
 			AutoButtonColor=false,
 			SkipThemeRole=true,
+			ClipsDescendants=rounded,
 			Size=UDim2.fromOffset(30,24),
 			ZIndex=6,
 			LayoutOrder=i,
@@ -1231,12 +1244,14 @@ function StrokeColour.new(ctx,page)
 		local marker=New("Frame",{
 			BackgroundColor3=readableTextColor(color),
 			BorderSizePixel=0,
-			Size=UDim2.new(1,0,0,3),
-			Position=UDim2.new(0,0,1,-3),
+			Size=rounded and UDim2.new(1,-10,0,2) or UDim2.new(1,0,0,3),
+			Position=rounded and UDim2.new(0,5,1,-4) or UDim2.new(0,0,1,-3),
 			Visible=false,
 			SkipThemeRole=true,
 			ZIndex=7,
+			CornerRole="Slider",
 		},swatch)
+		addCorner(marker,"Slider")
 
 		swatch.MouseButton1Click:Connect(function()
 			applyActiveColor(color,false)

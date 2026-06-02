@@ -106,16 +106,18 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			return ctx.makeBox(parent,w,txt,placeholder)
 		end
 
-		local b=New("TextBox",{Size=UDim2.fromOffset(w,28),BackgroundColor3=THEME.PANEL,BorderSizePixel=0,ClearTextOnFocus=false,Text=txt or"",PlaceholderText=placeholder or"",Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,PlaceholderColor3=THEME.MUTED,ZIndex=6},parent)
-		local wrap,stroke=wrapTextBox(b,THEME.PANEL,2)
+		local normalBg=THEME.INPUT or THEME.PANEL
+		local b=New("TextBox",{Size=UDim2.fromOffset(w,28),BackgroundColor3=normalBg,BorderSizePixel=0,ClearTextOnFocus=false,Text=txt or"",PlaceholderText=placeholder or"",Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,PlaceholderColor3=THEME.MUTED,ZIndex=6,ThemeRole="INPUT"},parent)
+		local wrap,stroke=wrapTextBox(b,normalBg,2)
+		wrap:SetAttribute("ThemeRole","INPUT")
 
 		b.Focused:Connect(function()
-			wrap.BackgroundColor3=THEME.PANEL
+			wrap.BackgroundColor3=THEME.INPUT or THEME.PANEL
 			stroke.Thickness=2
 		end)
 
 		b.FocusLost:Connect(function()
-			wrap.BackgroundColor3=THEME.PANEL
+			wrap.BackgroundColor3=THEME.INPUT or THEME.PANEL
 			stroke.Thickness=2
 		end)
 
@@ -244,7 +246,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 
 			if not(active and active.button==item.keyBtn) then
 				item.keyBtn.Text=bindingToLabel(p.key)
-				setWrappedButtonBg(item.keyBtn,THEME.BG)
+				setWrappedButtonBg(item.keyBtn,THEME.BUTTON or THEME.BG)
 				item.keyBtn.TextColor3=THEME.TEXT
 			end
 

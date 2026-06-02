@@ -57,6 +57,7 @@ return{
 		SectionBodyGap=7,
 		SliderRowHeight=38,
 		SliderTrackWidth=220,
+		SliderLabelWidth=126,
 		SliderValueBoxWidth=58,
 		SliderValueBoxVisible=true,
 		SliderContainerTransparency=0,

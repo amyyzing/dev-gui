@@ -123,15 +123,17 @@ function HitboxPreset.new(ctx,ownedSection)
 	end
 
 	local function makePresetActionButton(parent,label)
-		local btn=New("TextButton",{Size=UDim2.fromOffset(92,26),BackgroundColor3=THEME.BG,BorderSizePixel=0,Text=label,Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=9},parent)
-		local wrap=wrapTextButton(btn,THEME.BG,2)
+		local normalBg=THEME.BUTTON or THEME.BG
+		local btn=New("TextButton",{Size=UDim2.fromOffset(92,26),BackgroundColor3=normalBg,BorderSizePixel=0,Text=label,Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=9,ThemeRole="BUTTON"},parent)
+		local wrap=wrapTextButton(btn,normalBg,2)
+		wrap:SetAttribute("ThemeRole","BUTTON")
 
 		btn.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=THEME.CARD
 		end)
 
 		btn.MouseLeave:Connect(function()
-			wrap.BackgroundColor3=THEME.PANEL
+			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
 		end)
 
 		return btn
@@ -244,15 +246,17 @@ function HitboxPreset.new(ctx,ownedSection)
 	end
 
 	local function modalButton(parent,text,x)
-		local btn=New("TextButton",{Size=UDim2.fromOffset(96,30),Position=UDim2.fromOffset(x,118),BackgroundColor3=THEME.BG,BorderSizePixel=0,Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=101},parent)
-		local wrap=wrapTextButton(btn,THEME.BG,2)
+		local normalBg=THEME.BUTTON or THEME.BG
+		local btn=New("TextButton",{Size=UDim2.fromOffset(96,30),Position=UDim2.fromOffset(x,118),BackgroundColor3=normalBg,BorderSizePixel=0,Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=101,ThemeRole="BUTTON"},parent)
+		local wrap=wrapTextButton(btn,normalBg,2)
+		wrap:SetAttribute("ThemeRole","BUTTON")
 
 		btn.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=THEME.CARD
 		end)
 
 		btn.MouseLeave:Connect(function()
-			wrap.BackgroundColor3=THEME.PANEL
+			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
 		end)
 
 		return btn

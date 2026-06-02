@@ -217,7 +217,7 @@ function MainFrame.new(ctx)
 
 	New("UICorner",{CornerRadius=UDim.new(0,0)},root)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.15},root)
-	New("UIPadding",{PaddingTop=UDim.new(0,rootPadding),PaddingLeft=UDim.new(0,rootPadding),PaddingRight=UDim.new(0,rootPadding),PaddingBottom=UDim.new(0,rootPadding)},root)
+	local rootPad=New("UIPadding",{PaddingTop=UDim.new(0,rootPadding),PaddingLeft=UDim.new(0,rootPadding),PaddingRight=UDim.new(0,rootPadding),PaddingBottom=UDim.new(0,rootPadding)},root)
 
 	local uiScale=New("UIScale",{Scale=1},root)
 	local updateResponsiveLayout
@@ -462,7 +462,12 @@ function MainFrame.new(ctx)
 		UI_WINDOW.H=math.clamp(UI_WINDOW.H,UI_WINDOW.MinH,math.min(UI_WINDOW.MaxH,math.max(360,vp.Y-120)))
 		root.Size=UDim2.fromOffset(UI_WINDOW.W,uiMinimized and minimizedRootH or UI_WINDOW.H)
 
-		local pageHeight=math.max(170,UI_WINDOW.H-pageHostReserve)
+		local contentHeight=math.max(0,UI_WINDOW.H-(rootPadding*2))
+		local usedHeight=headerHeight+footerHeight+(mainGap*2)
+		if not navIsLeft then
+			usedHeight=usedHeight+pageBarHeight+mainGap
+		end
+		local pageHeight=math.max(150,contentHeight-usedHeight)
 		if navIsLeft then
 			pageArea.Size=UDim2.new(1,0,0,pageHeight)
 			pageBar.Size=UDim2.fromOffset(navWidth,pageHeight)
@@ -787,6 +792,10 @@ function MainFrame.new(ctx)
 		UI_WINDOW.H=math.clamp(UI_WINDOW.H,UI_WINDOW.MinH,UI_WINDOW.MaxH)
 
 		columnHalfGap=columnGap/2
+		rootPad.PaddingTop=UDim.new(0,rootPadding)
+		rootPad.PaddingLeft=UDim.new(0,rootPadding)
+		rootPad.PaddingRight=UDim.new(0,rootPadding)
+		rootPad.PaddingBottom=UDim.new(0,rootPadding)
 		mainLayout.Padding=UDim.new(0,mainGap)
 		header.Size=UDim2.new(1,0,0,headerHeight)
 		footer.Size=UDim2.new(1,0,0,footerHeight)

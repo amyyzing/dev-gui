@@ -109,8 +109,10 @@ function KeybindSettings.new(ctx,bindSection)
 	end
 
 	function api.MakeBindButton(parent,x,y,w)
-		local btn=New("TextButton",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w or 122,28),Text="NIL",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6},parent)
-		local wrap=wrapTextButton(btn,THEME.BG,2)
+		local normalBg=THEME.BUTTON or THEME.BG
+		local btn=New("TextButton",{BackgroundColor3=normalBg,BorderSizePixel=0,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w or 122,28),Text="NIL",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6,ThemeRole="BUTTON"},parent)
+		local wrap=wrapTextButton(btn,normalBg,2)
+		wrap:SetAttribute("ThemeRole","BUTTON")
 
 		btn.MouseEnter:Connect(function()
 			if activeCapture and activeCapture.button==btn then return end
@@ -119,7 +121,7 @@ function KeybindSettings.new(ctx,bindSection)
 
 		btn.MouseLeave:Connect(function()
 			if activeCapture and activeCapture.button==btn then return end
-			wrap.BackgroundColor3=THEME.PANEL
+			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
 		end)
 
 		return btn
@@ -127,13 +129,13 @@ function KeybindSettings.new(ctx,bindSection)
 
 	local function setButtonCaptureState(btn,waiting)
 		btn.Text=waiting and"PRESS..." or btn.Text
-		setWrappedButtonBg(btn,THEME.BG)
+		setWrappedButtonBg(btn,THEME.BUTTON or THEME.BG)
 		btn.TextColor3=THEME.TEXT
 	end
 
 	function api.StartCapture(btn,getter,setter)
 		if activeCapture and activeCapture.button and activeCapture.button~=btn then
-			setWrappedButtonBg(activeCapture.button,THEME.BG)
+			setWrappedButtonBg(activeCapture.button,THEME.BUTTON or THEME.BG)
 			activeCapture.button.TextColor3=THEME.TEXT
 			if activeCapture.getter then
 				activeCapture.button.Text=bindingToLabel(activeCapture.getter())
@@ -184,7 +186,7 @@ function KeybindSettings.new(ctx,bindSection)
 		for _,item in ipairs(bindRows) do
 			if not(activeCapture and activeCapture.button==item.button) then
 				item.button.Text=bindingToLabel(item.getter())
-				setWrappedButtonBg(item.button,THEME.BG)
+				setWrappedButtonBg(item.button,THEME.BUTTON or THEME.BG)
 				item.button.TextColor3=THEME.TEXT
 			end
 		end
