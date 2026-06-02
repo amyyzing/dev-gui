@@ -7,6 +7,26 @@ local DEFAULT_ROOT={
 	modes={},
 }
 
+local FALLBACK_UI_STYLE={
+	PrimaryR=28,
+	PrimaryG=28,
+	PrimaryB=28,
+	StrokeR=76,
+	StrokeG=76,
+	StrokeB=76,
+	GradientR=45,
+	GradientG=45,
+	GradientB=45,
+	StrokeGradient=false,
+	LiquidStroke=false,
+	LiquidStrokeSpeed=1,
+	LiquidStrokeDirection="Right",
+	StrokeThickness=1,
+	StrokeTransparency=0.72,
+	CornerRadius=0,
+	UILib="original",
+}
+
 local KEYBIND_FIELDS={
 	{"toggleUI","TOGGLE_UI_KEY"},
 	{"toggleHitbox","TOGGLE_HB_KEY"},
@@ -34,6 +54,28 @@ local function clampNumber(value,min,max,fallback)
 	local n=tonumber(value)
 	if not n then return fallback end
 	return math.clamp(n,min,max)
+end
+
+local function getDefaultUIStyle(ctx)
+	if ctx and type(ctx.getDefaultUIStyle)=="function" then
+		local ok,result=pcall(ctx.getDefaultUIStyle)
+		if ok and type(result)=="table" then
+			local copy={}
+			for key,value in pairs(result) do
+				copy[key]=value
+			end
+
+			copy.UILib=tostring(copy.UILib or FALLBACK_UI_STYLE.UILib)
+			return copy
+		end
+	end
+
+	local copy={}
+	for key,value in pairs(FALLBACK_UI_STYLE) do
+		copy[key]=value
+	end
+
+	return copy
 end
 
 local function clampStaminaDeplete(value)
@@ -383,6 +425,7 @@ function DataSave.new(ctx)
 		local pos=rootFrame and rootFrame.Position or UDim2.new(0.5,0,0,80)
 
 		local uiStyle=ctx.UI_STYLE or {}
+		local defaultUIStyle=getDefaultUIStyle(ctx)
 		local uiWindow=ctx.UI_WINDOW or {}
 		local worldSettings=ctx.WORLD_SETTINGS or {}
 
@@ -461,7 +504,7 @@ function DataSave.new(ctx)
 				strokeThickness=uiStyle.StrokeThickness,
 				strokeTransparency=uiStyle.StrokeTransparency,
 				cornerRadius=0,
-				uiLib=uiStyle.UILib or "original",
+				uiLib=tostring(uiStyle.UILib or "")~="" and uiStyle.UILib or defaultUIStyle.UILib or "original",
 			},
 
 			workspace={
@@ -605,8 +648,24 @@ function DataSave.new(ctx)
 
 		applyPresetEditor(ctx,settings.presetEditor or settings.PresetEditor)
 
-		local uiStyle=settings.uiStyle or {}
+		local hasSavedUIStyle=type(settings.uiStyle)=="table"
+		local uiStyle=hasSavedUIStyle and settings.uiStyle or {}
+		if hasSavedUIStyle then
+			hasSavedUIStyle=false
+			for _ in pairs(uiStyle) do
+				hasSavedUIStyle=true
+				break
+			end
+		end
+
+		local defaultUIStyle=getDefaultUIStyle(ctx)
 		if ctx.UI_STYLE then
+			for key,value in pairs(defaultUIStyle) do
+				if not hasSavedUIStyle or ctx.UI_STYLE[key]==nil then
+					ctx.UI_STYLE[key]=value
+				end
+			end
+
 			if uiStyle.primaryR~=nil then ctx.UI_STYLE.PrimaryR=clampNumber(uiStyle.primaryR,0,255,ctx.UI_STYLE.PrimaryR or 28) end
 			if uiStyle.primaryG~=nil then ctx.UI_STYLE.PrimaryG=clampNumber(uiStyle.primaryG,0,255,ctx.UI_STYLE.PrimaryG or 28) end
 			if uiStyle.primaryB~=nil then ctx.UI_STYLE.PrimaryB=clampNumber(uiStyle.primaryB,0,255,ctx.UI_STYLE.PrimaryB or 28) end
@@ -622,7 +681,11 @@ function DataSave.new(ctx)
 			if uiStyle.liquidStrokeDirection~=nil then ctx.UI_STYLE.LiquidStrokeDirection=tostring(uiStyle.liquidStrokeDirection) end
 			if uiStyle.strokeThickness~=nil then ctx.UI_STYLE.StrokeThickness=clampNumber(uiStyle.strokeThickness,0,8,ctx.UI_STYLE.StrokeThickness or 1) end
 			if uiStyle.strokeTransparency~=nil then ctx.UI_STYLE.StrokeTransparency=clampNumber(uiStyle.strokeTransparency,0,1,ctx.UI_STYLE.StrokeTransparency or 0.55) end
-			if uiStyle.uiLib~=nil then ctx.UI_STYLE.UILib=tostring(uiStyle.uiLib) end
+			if uiStyle.uiLib~=nil and tostring(uiStyle.uiLib)~="" then
+				ctx.UI_STYLE.UILib=tostring(uiStyle.uiLib)
+			else
+				ctx.UI_STYLE.UILib=tostring(defaultUIStyle.UILib or "original")
+			end
 			ctx.UI_STYLE.CornerRadius=0
 		end
 

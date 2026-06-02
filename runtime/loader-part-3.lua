@@ -45,30 +45,7 @@ function buildCustomizePage()
 				UI_STYLE=UI_STYLE,
 				UIS=UIS,
 
-				DEFAULT_UI_STYLE={
-					PrimaryR=28,
-					PrimaryG=28,
-					PrimaryB=28,
-
-					StrokeR=76,
-					StrokeG=76,
-					StrokeB=76,
-
-					GradientR=45,
-					GradientG=45,
-					GradientB=45,
-
-					StrokeGradient=false,
-					LiquidStroke=false,
-
-					LiquidStrokeSpeed=1,
-					LiquidStrokeDirection="Right",
-
-					StrokeThickness=1,
-					StrokeTransparency=0.72,
-					CornerRadius=0,
-					UILib="original",
-				},
+				DEFAULT_UI_STYLE=getDefaultUIStyle and getDefaultUIStyle() or UI_STYLE,
 
 				SG=SG,
 				PrimaryColourModule=PrimaryColourModule,

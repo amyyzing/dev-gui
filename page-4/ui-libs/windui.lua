@@ -40,4 +40,14 @@ return{
 		SliderStrokeTransparency=0.86,
 		AccentStrokeTransparency=0.62,
 	},
+	Tones={
+		topbar=0.08,
+		panel=0.10,
+		card=0.16,
+		section=0.14,
+		button=0.20,
+		input=0.05,
+		sliderBg=0.12,
+		strokeSoft=0.30,
+	},
 }

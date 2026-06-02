@@ -11,32 +11,9 @@ guiParent=me:WaitForChild("PlayerGui")
 
 THEME={BG=Color3.fromRGB(28,28,28), PANEL=Color3.fromRGB(33,33,33), CARD=Color3.fromRGB(38,38,38), ACC=Color3.fromRGB(32,202,106), TEXT=Color3.fromRGB(195,195,195), MUTED=Color3.fromRGB(168,168,168), STROKE=Color3.fromRGB(76,76,76), RED=Color3.fromRGB(254,94,86), BLUE=Color3.fromRGB(21,103,251), GREEN=Color3.fromRGB(32,202,106),}
 
-UI_STYLE={
-	PrimaryR=28,
-	PrimaryG=28,
-	PrimaryB=28,
+UI_STYLE={}
 
-	StrokeR=76,
-	StrokeG=76,
-	StrokeB=76,
-
-	GradientR=45,
-	GradientG=45,
-	GradientB=45,
-
-	StrokeGradient=false,
-	LiquidStroke=false,
-
-	LiquidStrokeSpeed=1,
-	LiquidStrokeDirection="Right",
-
-	StrokeThickness=1,
-	StrokeTransparency=0.72,
-	CornerRadius=0,
-	UILib="original",
-}
-
-UI_WINDOW={W=880, H=540, MinW=560, MinH=360, MaxW=1220, MaxH=820,}
+UI_WINDOW={}
 
 WORLD_SETTINGS={SmoothPlastic=false, OriginalMaterials=setmetatable({}, {__mode="k"})}
 
@@ -911,122 +888,138 @@ function getUILibModules()
 	}
 end
 
-function getUILibRuntimeStyle(id)
-	id=tostring(id or "original"):lower()
-
-	local styles={
-		original={
-			Theme={},
-			Shape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original",WindowStrokeTransparency=0.42,SectionStrokeTransparency=0.84,ControlStrokeTransparency=0.78,SliderStrokeTransparency=0.78,AccentStrokeTransparency=0.58},
+local function fallbackOriginalUILibProfile()
+	return{
+		Id="original",
+		Name="Original",
+		Style={
+			Primary=Color3.fromRGB(28,28,28),
+			Stroke=Color3.fromRGB(76,76,76),
+			Gradient=Color3.fromRGB(45,45,45),
+			GradientOn=false,
+			StrokeThickness=1,
+			StrokeTransparency=0.72,
 		},
-		visual={
-			Theme={
-				BG=Color3.fromRGB(18,20,26),
-				TOPBAR=Color3.fromRGB(22,25,32),
-				PANEL=Color3.fromRGB(24,28,36),
-				CARD=Color3.fromRGB(29,34,44),
-				SECTION=Color3.fromRGB(27,31,40),
-				BUTTON=Color3.fromRGB(31,39,52),
-				INPUT=Color3.fromRGB(19,23,31),
-				SLIDER_BG=Color3.fromRGB(19,24,34),
-				SLIDER_FILL=Color3.fromRGB(0,145,255),
-				STROKE_SOFT=Color3.fromRGB(47,56,74),
-				TEXT=Color3.fromRGB(235,242,255),
-				MUTED=Color3.fromRGB(142,156,178),
-			},
-			Shape={WindowRadius=8,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=28,SliderStyle="pill",WindowStrokeTransparency=0.5,SectionStrokeTransparency=0.9,ControlStrokeTransparency=0.86,SliderStrokeTransparency=0.84,AccentStrokeTransparency=0.58},
-		},
-		rayfield={
-			Theme={
-				BG=Color3.fromRGB(25,25,25),
-				TOPBAR=Color3.fromRGB(34,34,34),
-				PANEL=Color3.fromRGB(30,30,30),
-				CARD=Color3.fromRGB(35,35,35),
-				SECTION=Color3.fromRGB(35,35,35),
-				BUTTON=Color3.fromRGB(35,35,35),
-				INPUT=Color3.fromRGB(30,30,30),
-				SLIDER_BG=Color3.fromRGB(43,105,159),
-				SLIDER_FILL=Color3.fromRGB(43,105,159),
-				STROKE_SOFT=Color3.fromRGB(55,55,55),
-				TEXT=Color3.fromRGB(240,240,240),
-				MUTED=Color3.fromRGB(178,178,178),
-			},
-			Shape={WindowRadius=6,SectionRadius=5,ControlRadius=4,SliderRadius=4,SliderHeight=26,SliderStyle="rayfield",WindowStrokeTransparency=0.48,SectionStrokeTransparency=0.88,ControlStrokeTransparency=0.82,SliderStrokeTransparency=0.78,AccentStrokeTransparency=0.52},
-		},
-		windui={
-			Theme={
-				BG=Color3.fromRGB(18,20,27),
-				TOPBAR=Color3.fromRGB(25,29,38),
-				PANEL=Color3.fromRGB(25,30,41),
-				CARD=Color3.fromRGB(30,36,48),
-				SECTION=Color3.fromRGB(28,34,45),
-				BUTTON=Color3.fromRGB(35,43,58),
-				INPUT=Color3.fromRGB(22,27,37),
-				SLIDER_BG=Color3.fromRGB(30,39,54),
-				SLIDER_FILL=Color3.fromRGB(86,153,255),
-				STROKE_SOFT=Color3.fromRGB(53,63,82),
-				TEXT=Color3.fromRGB(245,248,255),
-				MUTED=Color3.fromRGB(159,174,197),
-			},
-			Shape={WindowRadius=12,SectionRadius=10,ControlRadius=8,SliderRadius=10,SliderHeight=24,SliderStyle="windui",WindowStrokeTransparency=0.58,SectionStrokeTransparency=0.92,ControlStrokeTransparency=0.88,SliderStrokeTransparency=0.86,AccentStrokeTransparency=0.62},
-		},
-		linoria={
-			Theme={
-				BG=Color3.fromRGB(24,24,34),
-				TOPBAR=Color3.fromRGB(28,27,39),
-				PANEL=Color3.fromRGB(31,30,43),
-				CARD=Color3.fromRGB(34,33,48),
-				SECTION=Color3.fromRGB(30,29,42),
-				BUTTON=Color3.fromRGB(38,36,54),
-				INPUT=Color3.fromRGB(25,24,35),
-				SLIDER_BG=Color3.fromRGB(35,34,50),
-				SLIDER_FILL=Color3.fromRGB(120,98,255),
-				STROKE_SOFT=Color3.fromRGB(60,56,82),
-				TEXT=Color3.fromRGB(235,232,255),
-				MUTED=Color3.fromRGB(164,159,196),
-			},
-			Shape={WindowRadius=3,SectionRadius=2,ControlRadius=2,SliderRadius=2,SliderHeight=22,SliderStyle="thin",WindowStrokeTransparency=0.5,SectionStrokeTransparency=0.82,ControlStrokeTransparency=0.78,SliderStrokeTransparency=0.76,AccentStrokeTransparency=0.56},
-		},
-		obsidian={
-			Theme={
-				BG=Color3.fromRGB(15,15,20),
-				TOPBAR=Color3.fromRGB(19,18,27),
-				PANEL=Color3.fromRGB(21,20,29),
-				CARD=Color3.fromRGB(27,25,37),
-				SECTION=Color3.fromRGB(24,22,34),
-				BUTTON=Color3.fromRGB(31,28,45),
-				INPUT=Color3.fromRGB(17,16,24),
-				SLIDER_BG=Color3.fromRGB(30,27,43),
-				SLIDER_FILL=Color3.fromRGB(145,88,255),
-				STROKE_SOFT=Color3.fromRGB(52,45,74),
-				TEXT=Color3.fromRGB(242,238,255),
-				MUTED=Color3.fromRGB(163,151,190),
-			},
-			Shape={WindowRadius=9,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=24,SliderStyle="glow",WindowStrokeTransparency=0.52,SectionStrokeTransparency=0.9,ControlStrokeTransparency=0.86,SliderStrokeTransparency=0.84,AccentStrokeTransparency=0.58},
+		Theme={},
+		Shape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original",WindowStrokeTransparency=0.42,SectionStrokeTransparency=0.84,ControlStrokeTransparency=0.78,SliderStrokeTransparency=0.78,AccentStrokeTransparency=0.58},
+		Defaults={PrimaryR=28,PrimaryG=28,PrimaryB=28,StrokeR=76,StrokeG=76,StrokeB=76,GradientR=45,GradientG=45,GradientB=45,StrokeGradient=false,LiquidStroke=false,LiquidStrokeSpeed=1,LiquidStrokeDirection="Right",StrokeThickness=1,StrokeTransparency=0.72,CornerRadius=0,UILib="original"},
+		MainFrame={
+			Window={W=880,H=540,MinW=560,MinH=360,MaxW=1220,MaxH=820,StartY=80,MinimizedH=68},
+			Layout={RootPadding=8,MainGap=8,PageGap=8,ColumnGap=8,FooterGap=8,HeaderHeight=52,PageBarHeight=30,PageTabWidth=106,PageTabHeight=28,PageHostReserve=156,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=10,FabSize=42},
 		},
 	}
+end
 
-	for _,module in ipairs({
-		UILibOriginalModule,
-		UILibVisualModule,
-		UILibRayfieldModule,
-		UILibWindUIModule,
-		UILibLinoriaModule,
-		UILibObsidianModule,
-	}) do
+local function tableField(module,key,base)
+	if type(module)=="table" and type(module[key])=="table" then
+		return module[key]
+	end
+
+	return base and base[key] or {}
+end
+
+local function normalizeUILibProfile(module,base)
+	base=base or fallbackOriginalUILibProfile()
+	module=type(module)=="table" and module or {}
+
+	return{
+		Id=tostring(module.Id or base.Id or "original"):lower(),
+		Name=module.Name or base.Name or "Original",
+		Style=tableField(module,"Style",base),
+		Theme=tableField(module,"Theme",base),
+		Shape=tableField(module,"Shape",base),
+		Tones=tableField(module,"Tones",base),
+		Defaults=tableField(module,"Defaults",base),
+		MainFrame=tableField(module,"MainFrame",base),
+	}
+end
+
+function getDefaultUILibProfile()
+	return normalizeUILibProfile(UILibOriginalModule,fallbackOriginalUILibProfile())
+end
+
+function getDefaultUILibId()
+	local profile=getDefaultUILibProfile()
+	return tostring(profile.Id or "original"):lower()
+end
+
+function getUILibRuntimeStyle(id)
+	id=tostring(id or getDefaultUILibId()):lower()
+
+	local original=getDefaultUILibProfile()
+	local styles={[tostring(original.Id or "original"):lower()]=original}
+
+	for _,module in ipairs(getUILibModules()) do
 		if type(module)=="table" and type(module.Id)=="string" then
 			local key=tostring(module.Id):lower()
-			local base=styles[key] or styles.original
-
-			styles[key]={
-				Theme=type(module.Theme)=="table" and module.Theme or base.Theme,
-				Shape=type(module.Shape)=="table" and module.Shape or base.Shape,
-			}
+			styles[key]=normalizeUILibProfile(module,original)
 		end
 	end
 
-	return styles[id] or styles.original
+	return styles[id] or original
 end
+
+function getCurrentUILibProfile()
+	return getUILibRuntimeStyle(UI_STYLE and UI_STYLE.UILib or getDefaultUILibId())
+end
+
+function getDefaultUIStyle()
+	local defaults=(getDefaultUILibProfile() or {}).Defaults or fallbackOriginalUILibProfile().Defaults
+	local result={}
+
+	for k,v in pairs(defaults) do
+		result[k]=v
+	end
+
+	result.UILib=tostring(result.UILib or getDefaultUILibId())
+	return result
+end
+
+function getDefaultUIWindow()
+	local profile=getDefaultUILibProfile() or fallbackOriginalUILibProfile()
+	local mainFrame=type(profile.MainFrame)=="table" and profile.MainFrame or {}
+	local window=type(mainFrame.Window)=="table" and mainFrame.Window or fallbackOriginalUILibProfile().MainFrame.Window
+	local result={}
+
+	for k,v in pairs(window) do
+		result[k]=v
+	end
+
+	return result
+end
+
+function applyDefaultUIStyleFields(style,force)
+	style=style or UI_STYLE
+	local defaults=getDefaultUIStyle()
+
+	for k,v in pairs(defaults) do
+		if force or style[k]==nil then
+			style[k]=v
+		end
+	end
+
+	if style.UILib==nil or tostring(style.UILib)=="" then
+		style.UILib=defaults.UILib or getDefaultUILibId()
+	end
+
+	return style
+end
+
+function applyDefaultUIWindowFields(window,force)
+	window=window or UI_WINDOW
+	local defaults=getDefaultUIWindow()
+
+	for k,v in pairs(defaults) do
+		if force or window[k]==nil then
+			window[k]=v
+		end
+	end
+
+	return window
+end
+
+applyDefaultUIStyleFields(UI_STYLE,false)
+applyDefaultUIWindowFields(UI_WINDOW,false)
 
 function refreshThemePalette()
 	local primary=getUIPrimaryColor()
@@ -1062,16 +1055,8 @@ function refreshThemePalette()
 		THEME[role]=color
 	end
 
-	local libTones={
-		visual={topbar=0.04,panel=0.07,card=0.11,section=0.09,button=0.14,input=-0.02,sliderBg=-0.05,strokeSoft=0.28},
-		rayfield={topbar=0.08,panel=0.04,card=0.10,section=0.10,button=0.10,input=0.04,sliderBg=0.04,sliderAccent=true,sliderBlend=0.45,strokeSoft=0.24},
-		windui={topbar=0.08,panel=0.10,card=0.16,section=0.14,button=0.20,input=0.05,sliderBg=0.12,strokeSoft=0.30},
-		linoria={topbar=0.04,panel=0.07,card=0.10,section=0.06,button=0.13,input=0.02,sliderBg=0.11,strokeSoft=0.25},
-		obsidian={topbar=0.04,panel=0.06,card=0.12,section=0.09,button=0.16,input=-0.02,sliderBg=0.10,strokeSoft=0.27},
-	}
-
-	local tones=libTones[libId]
-	if tones then
+	local tones=libStyle and libStyle.Tones
+	if type(tones)=="table" and tones.topbar~=nil then
 		local accent=getUIStrokeColor()
 		local function surface(amount)
 			if amount>=0 then
@@ -1195,6 +1180,13 @@ function applyAutoRefreshModuleChange(changedPath,module)
 			UILibLinoriaModule=module
 		else
 			UILibObsidianModule=module
+		end
+
+		if applyDefaultUIStyleFields then
+			applyDefaultUIStyleFields(UI_STYLE,false)
+		end
+		if applyDefaultUIWindowFields then
+			applyDefaultUIWindowFields(UI_WINDOW,false)
 		end
 
 		if rebuildCustomizeFromModules then

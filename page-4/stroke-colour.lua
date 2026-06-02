@@ -47,6 +47,18 @@ local function boolOrDefault(v,default)
 	return v and true or false
 end
 
+local function applyDefaultOverrides(style)
+	if type(style)~="table" then
+		return
+	end
+
+	for key,value in pairs(style) do
+		if DEFAULTS[key]~=nil then
+			DEFAULTS[key]=value
+		end
+	end
+end
+
 local function ensureStyleDefaults(style)
 	style.PrimaryR=numberOrDefault(style.PrimaryR,DEFAULTS.PrimaryR)
 	style.PrimaryG=numberOrDefault(style.PrimaryG,DEFAULTS.PrimaryG)
@@ -156,6 +168,7 @@ function StrokeColour.new(ctx,page)
 	local UILibModules=ctx.UILibModules
 	local externalThemeApplier=ctx.applyUIStrokeTheme~=nil
 
+	applyDefaultOverrides(ctx.DEFAULT_UI_STYLE)
 	ensureStyleDefaults(UI_STYLE)
 
 	local defaultStyle=copyDefaultStyle(ctx.DEFAULT_UI_STYLE or UI_STYLE)

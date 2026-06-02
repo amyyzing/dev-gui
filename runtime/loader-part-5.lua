@@ -184,6 +184,7 @@ function buildDataSaveContext()
 		UI_WINDOW=UI_WINDOW,
 		WORLD_SETTINGS=WORLD_SETTINGS,
 		root=root,
+		getDefaultUIStyle=getDefaultUIStyle,
 
 		RefreshAll=refreshAllUI,
 		refreshPage2UI=function() if refreshPage2UI then refreshPage2UI() end end,

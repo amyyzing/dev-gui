@@ -47,6 +47,7 @@ MainFrame=MainFrameModule.new({
 	THEME=THEME,
 	Description=Description,
 	UI_WINDOW=UI_WINDOW,
+	UI_PROFILE=getCurrentUILibProfile and getCurrentUILibProfile() or nil,
 	SG=SG,
 	UIS=UIS,
 	TweenService=TweenService,
