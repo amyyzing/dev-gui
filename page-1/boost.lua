@@ -309,15 +309,15 @@ function Boost.new(ctx,parent)
 		api.SetAlwaysBoostState(value,true)
 	end)
 
-	forceSlider=buildSlider(section,"F",10,100,state.boostForceY,1,function(v)
+	forceSlider=buildSlider(section,"Force",10,100,state.boostForceY,1,function(v)
 		api.SetBoostForceY(v,true)
 	end)
 
-	chanceSlider=buildSlider(section,"C",0,100,state.boostChance,0,function(v)
+	chanceSlider=buildSlider(section,"Chance",0,100,state.boostChance,0,function(v)
 		api.SetBoostChance(v,true)
 	end)
 
-	radiusSlider=buildSlider(section,"R",1,50,state.ballDetectionRadius,1,function(v)
+	radiusSlider=buildSlider(section,"Radius",1,50,state.ballDetectionRadius,1,function(v)
 		api.SetBallDetectionRadius(v,true)
 	end)
 

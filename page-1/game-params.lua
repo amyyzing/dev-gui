@@ -359,19 +359,19 @@ function GameParams.new(ctx,parent)
 		end)
 	end
 
-	staminaRegenSlider=buildSlider(section,"SR",0,50,state.staminaRegenValue,1,function(v)
+	staminaRegenSlider=buildSlider(section,"Stamina Regeneration",0,50,state.staminaRegenValue,1,function(v)
 		api.SetStaminaRegenValue(v,true)
 	end)
 
-	staminaDepleteSlider=buildSlider(section,"SD",0,50,state.staminaDepleteValue,0,function(v)
+	staminaDepleteSlider=buildSlider(section,"Stamina Depletion",0,50,state.staminaDepleteValue,0,function(v)
 		api.SetStaminaDepleteValue(v,true)
 	end)
 
-	jumpSlider=buildSlider(section,"J",0,300,state.jumpPowerValue,1,function(v)
+	jumpSlider=buildSlider(section,"Jump",0,300,state.jumpPowerValue,1,function(v)
 		api.SetJumpPowerValue(v,true)
 	end)
 
-	diveSlider=buildSlider(section,"D",0,15,state.divePowerValue,2,function(v)
+	diveSlider=buildSlider(section,"Dive",0,15,state.divePowerValue,2,function(v)
 		api.SetDivePowerValue(v,true)
 	end)
 

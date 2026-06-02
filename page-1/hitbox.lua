@@ -609,7 +609,7 @@ function Hitbox.new(ctx,parent)
 
 	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="TRANSPARENCY",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 
-	transparencySlider=buildSlider(section,"A",0,1,state.targetTransparency,2,function(value)
+	transparencySlider=buildSlider(section,"Alpha",0,1,state.targetTransparency,2,function(value)
 		api.SetTransparency(value,true)
 	end)
 

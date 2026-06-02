@@ -156,7 +156,7 @@ function Speed.new(ctx,parent)
 		end)
 	end
 
-	slider=buildSlider(section,"S",0,100,state.speedValue,0,function(v)
+	slider=buildSlider(section,"Speed",0,100,state.speedValue,0,function(v)
 		api.SetSpeedValue(v,true)
 	end)
 

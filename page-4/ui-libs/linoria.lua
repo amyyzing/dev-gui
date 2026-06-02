@@ -85,8 +85,8 @@ return{
 		ControlStrokeTransparency=0.38,
 	},
 	MainFrame={
-		Window={W=760,H=560,MinW=560,MinH=380,MaxW=1120,MaxH=760,StartY=70,MinimizedH=48},
-		Layout={RootPadding=6,MainGap=4,PageGap=6,ColumnGap=6,FooterGap=6,HeaderHeight=30,PageBarHeight=26,PageTabWidth=92,PageTabHeight=22,PageHostReserve=108,FooterHeight=28,TopButtonSize=22,TopButtonGap=4,TopButtonOuter=8,FabSize=36,PageShellTransparency=0,PageSliderTransparency=0},
+		Window={W=760,H=560,MinW=560,MinH=380,MaxW=1120,MaxH=760,StartY=70,MinimizedH=54},
+		Layout={RootPadding=6,MainGap=6,PageGap=6,ColumnGap=6,FooterGap=6,HeaderHeight=42,PageBarHeight=28,PageTabWidth=92,PageTabHeight=24,PageHostReserve=120,FooterHeight=28,TopButtonSize=24,TopButtonGap=4,TopButtonOuter=8,FabSize=36,PageShellTransparency=0,PageSliderTransparency=0},
 	},
 	Tones={
 		topbar=0.04,

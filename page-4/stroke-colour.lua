@@ -1575,11 +1575,23 @@ function StrokeColour.new(ctx,page)
 	local libsPanel=makePanel(4)
 	makeLabel(libsPanel,"Libs",1,13,false)
 
-	local libSearch=New("TextBox",{
+	local libSearchWrap=New("Frame",{
 		BackgroundColor3=themeColor("INPUT",THEME.PANEL),
 		BorderSizePixel=0,
-		ClearTextOnFocus=false,
 		Size=UDim2.new(1,0,0,30),
+		ZIndex=6,
+		LayoutOrder=2,
+		ThemeRole="INPUT",
+		CornerRole="Control",
+	},libsPanel)
+	addCorner(libSearchWrap,"Control")
+
+	local libSearch=New("TextBox",{
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		ClearTextOnFocus=false,
+		Position=UDim2.fromOffset(10,0),
+		Size=UDim2.new(1,-20,1,0),
 		Text="",
 		PlaceholderText="Search libraries",
 		Font=Enum.Font.GothamMedium,
@@ -1587,12 +1599,8 @@ function StrokeColour.new(ctx,page)
 		TextColor3=THEME.TEXT,
 		PlaceholderColor3=THEME.MUTED,
 		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-		LayoutOrder=2,
-		ThemeRole="INPUT",
-		CornerRole="Control",
-	},libsPanel)
-	addCorner(libSearch,"Control")
+		ZIndex=7,
+	},libSearchWrap)
 
 	local libList=New("Frame",{
 		BackgroundTransparency=1,
@@ -1633,7 +1641,7 @@ function StrokeColour.new(ctx,page)
 			BorderSizePixel=0,
 			Text="",
 			AutoButtonColor=false,
-			Size=UDim2.new(1,0,0,46),
+			Size=UDim2.new(1,0,0,32),
 			ZIndex=6,
 			LayoutOrder=index,
 			ThemeRole="BUTTON",
@@ -1644,7 +1652,7 @@ function StrokeColour.new(ctx,page)
 		local marker=New("Frame",{
 			BackgroundColor3=getUIStrokeColor(),
 			BorderSizePixel=0,
-			Size=UDim2.fromOffset(3,46),
+			Size=UDim2.fromOffset(3,32),
 			Visible=false,
 			SkipThemeRole=true,
 			ZIndex=7,
@@ -1652,25 +1660,15 @@ function StrokeColour.new(ctx,page)
 
 		New("TextLabel",{
 			BackgroundTransparency=1,
-			Position=UDim2.fromOffset(12,5),
-			Size=UDim2.new(1,-24,0,18),
+			Position=UDim2.fromOffset(12,0),
+			Size=UDim2.new(1,-24,1,0),
 			Text=lib.Name,
 			Font=Enum.Font.GothamBold,
 			TextSize=12,
 			TextColor3=THEME.TEXT,
 			TextXAlignment=Enum.TextXAlignment.Left,
-			ZIndex=7,
-		},row)
-
-		New("TextLabel",{
-			BackgroundTransparency=1,
-			Position=UDim2.fromOffset(12,24),
-			Size=UDim2.new(1,-24,0,16),
-			Text=lib.Source or lib.Url or "",
-			Font=Enum.Font.Gotham,
-			TextSize=11,
-			TextColor3=THEME.MUTED,
-			TextXAlignment=Enum.TextXAlignment.Left,
+			TextYAlignment=Enum.TextYAlignment.Center,
+			TextTruncate=Enum.TextTruncate.AtEnd,
 			ZIndex=7,
 		},row)
 
@@ -1763,8 +1761,8 @@ function StrokeColour.new(ctx,page)
 			hexBox.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
 		end
 
-		if libSearch then
-			libSearch.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
+		if libSearchWrap then
+			libSearchWrap.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
 		end
 	end
 

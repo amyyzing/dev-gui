@@ -65,7 +65,7 @@ function Gravity.new(ctx,parent)
 		end)
 	end
 
-	slider=buildSlider(section,"G",0,1000,state.gravityValue,1,function(v)
+	slider=buildSlider(section,"Gravity",0,1000,state.gravityValue,1,function(v)
 		applyGravity(v)
 		changed()
 	end)
