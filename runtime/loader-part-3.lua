@@ -43,6 +43,7 @@ function buildCustomizePage()
 				New=New,
 				THEME=THEME,
 				UI_STYLE=UI_STYLE,
+				UIS=UIS,
 
 				DEFAULT_UI_STYLE={
 					PrimaryR=28,
@@ -64,7 +65,7 @@ function buildCustomizePage()
 					LiquidStrokeDirection="Right",
 
 					StrokeThickness=1,
-					StrokeTransparency=0.25,
+					StrokeTransparency=0.55,
 					CornerRadius=0,
 				},
 

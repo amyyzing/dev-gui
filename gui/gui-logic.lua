@@ -104,7 +104,7 @@ function GuiLogic.new(ctx)
 		wrap.Parent=parent
 		markThemeRole(wrap,wrap.BackgroundColor3)
 
-		local stroke=New("UIStroke",{Color=THEME.STROKE,Thickness=strokeThickness or 2,Transparency=0},wrap)
+		local stroke=New("UIStroke",{Color=THEME.STROKE,Thickness=math.min(strokeThickness or 1,1),Transparency=0.55},wrap)
 
 		box.Parent=wrap
 		box.BackgroundTransparency=1
@@ -142,7 +142,7 @@ function GuiLogic.new(ctx)
 		wrap.Parent=parent
 		markThemeRole(wrap,wrap.BackgroundColor3)
 
-		local stroke=New("UIStroke",{Color=THEME.STROKE,Thickness=strokeThickness or 2,Transparency=0},wrap)
+		local stroke=New("UIStroke",{Color=THEME.STROKE,Thickness=math.min(strokeThickness or 1,1),Transparency=0.55},wrap)
 
 		button.Parent=wrap
 		button.BackgroundTransparency=1
@@ -178,7 +178,7 @@ function GuiLogic.new(ctx)
 		local hasBody=not descriptionOnly
 		local sec=New("Frame",{BackgroundColor3=THEME.CARD,BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=4,LayoutOrder=order},parent)
 
-		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},sec)
+		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.62},sec)
 		New("UIPadding",{PaddingTop=UDim.new(0,10),PaddingLeft=UDim.new(0,12),PaddingRight=UDim.new(0,12),PaddingBottom=UDim.new(0,10)},sec)
 		New("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},sec)
 
@@ -386,32 +386,30 @@ function GuiLogic.new(ctx)
 
 		b.Focused:Connect(function()
 			wrap.BackgroundColor3=THEME.PANEL
-			stroke.Thickness=2
+			stroke.Thickness=1
 		end)
 
 		b.FocusLost:Connect(function()
 			wrap.BackgroundColor3=THEME.PANEL
-			stroke.Thickness=2
+			stroke.Thickness=1
 		end)
 
 		return b
 	end
 
 	function api.buildSlider(parent,labelText,minVal,maxVal,startVal,decimals,onChange)
-		local container=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,50),ZIndex=5},parent)
-		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(0,0),Size=UDim2.new(1,-82,0,16),Text=labelText,Font=Enum.Font.GothamBold,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},container)
+		local container=New("Frame",{BackgroundColor3=THEME.CARD,BackgroundTransparency=0.12,BorderSizePixel=0,Size=UDim2.new(1,0,0,40),ZIndex=5,ThemeRole="CARD"},parent)
+		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.65},container)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(12,0),Size=UDim2.new(1,-232,1,0),Text=labelText,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},container)
 
-		local valueLabel=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,ClearTextOnFocus=true,Size=UDim2.fromOffset(72,28),Position=UDim2.new(1,-72,0,20),Text=fmtNumber(startVal,decimals),Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},container)
-		local valueWrap,valueStroke=api.wrapTextBox(valueLabel,THEME.BG,2)
-
-		local track=New("Frame",{Size=UDim2.new(1,-86,0,8),Position=UDim2.new(0,0,0,30),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=6},container)
-		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},track)
+		local track=New("Frame",{AnchorPoint=Vector2.new(1,0.5),Size=UDim2.fromOffset(206,26),Position=UDim2.new(1,-8,0.5,0),BackgroundColor3=THEME.PANEL,BorderSizePixel=0,ZIndex=6,ThemeRole="PANEL"},container)
+		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.55},track)
 
 		local fill=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=THEME.STROKE,BorderSizePixel=0,ZIndex=7,ThemeRole="STROKE"},track)
-		local knob=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(14,14),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=THEME.STROKE,BorderSizePixel=0,ZIndex=8,ThemeRole="STROKE"},track)
-		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},knob)
+		local knob=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(2,26),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=THEME.STROKE,BorderSizePixel=0,ZIndex=8,ThemeRole="STROKE"},track)
 
-		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,8),Position=UDim2.new(0,0,-0.5,-4),ZIndex=9,AutoButtonColor=false},track)
+		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=8,AutoButtonColor=false},track)
+		local valueLabel=New("TextBox",{BackgroundTransparency=1,BorderSizePixel=0,ClearTextOnFocus=true,Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),Text=fmtNumber(startVal,decimals),Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=9},track)
 		local value=startVal
 		local dragging=false
 
@@ -446,12 +444,17 @@ function GuiLogic.new(ctx)
 			end
 		end
 
-		hit.InputBegan:Connect(function(i)
+		local function beginDrag(i)
 			if i.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=true
 				setValue(valueFromMouseX(UIS:GetMouseLocation().X),true)
 			end
-		end)
+		end
+
+		hit.InputBegan:Connect(beginDrag)
+		track.InputBegan:Connect(beginDrag)
+		fill.InputBegan:Connect(beginDrag)
+		valueLabel.InputBegan:Connect(beginDrag)
 
 		UIS.InputChanged:Connect(function(i)
 			if dragging and i.UserInputType==Enum.UserInputType.MouseMovement then
@@ -466,13 +469,11 @@ function GuiLogic.new(ctx)
 		end)
 
 		valueLabel.Focused:Connect(function()
-			valueWrap.BackgroundColor3=THEME.BG
-			valueStroke.Thickness=2
+			valueLabel.TextColor3=THEME.TEXT
 		end)
 
 		valueLabel.FocusLost:Connect(function()
-			valueWrap.BackgroundColor3=THEME.BG
-			valueStroke.Thickness=2
+			valueLabel.TextColor3=THEME.TEXT
 
 			local n=tonumber(valueLabel.Text)
 			if n then

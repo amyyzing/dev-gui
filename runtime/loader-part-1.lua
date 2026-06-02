@@ -31,7 +31,7 @@ UI_STYLE={
 	LiquidStrokeDirection="Right",
 
 	StrokeThickness=1,
-	StrokeTransparency=0.25,
+	StrokeTransparency=0.55,
 	CornerRadius=0,
 }
 
@@ -1162,7 +1162,13 @@ applyUIStrokeTheme=function()
 		if obj:IsA("UIStroke") then
 			obj.Color=color
 			obj.Thickness=math.clamp(tonumber(UI_STYLE.StrokeThickness) or obj.Thickness,0,8)
-			obj.Transparency=math.clamp(tonumber(UI_STYLE.StrokeTransparency) or obj.Transparency,0,1)
+			if obj:GetAttribute("BaseStrokeTransparency")==nil then
+				obj:SetAttribute("BaseStrokeTransparency",obj.Transparency)
+			end
+
+			local baseTransparency=tonumber(obj:GetAttribute("BaseStrokeTransparency")) or obj.Transparency
+			local styleTransparency=tonumber(UI_STYLE.StrokeTransparency) or 0.55
+			obj.Transparency=math.clamp(math.max(baseTransparency,styleTransparency),0,1)
 
 			pcall(function()
 				obj.LineJoinMode=Enum.LineJoinMode.Miter
