@@ -42,7 +42,11 @@ local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
 local ARC_LANDING_Y=0.5
 local ARC_MAX_CURVE=400
-local PREVIEW_SMOOTH=0.28
+local PREVIEW_SMOOTH=0.18
+local PREVIEW_SNAP_C1=58
+local PREVIEW_SNAP_C3=82
+local PREVIEW_BEAM_ROLL=CFrame.Angles(math.rad(90),0,0)
+local PREVIEW_MISSING_BALL_GRACE=0.22
 local C1_MARKER_ENABLED=true
 local C1_MARKER_SIZE=1.65
 local C3_INFO_GUI_ENABLED=false
@@ -374,6 +378,10 @@ local function xAxisCFrame(position,xVector)
 	return CFrame.fromMatrix(position,xVector,y,z)
 end
 
+local function beamCFrame(position,xVector)
+	return xAxisCFrame(position,xVector)*PREVIEW_BEAM_ROLL
+end
+
 local function prepPreviewObject(object)
 	if not object then return end
 
@@ -384,6 +392,7 @@ local function prepPreviewObject(object)
 			descendant.CanTouch=false
 			descendant.CanQuery=false
 		elseif descendant:IsA("Beam") then
+			descendant.Segments=math.max(descendant.Segments,24)
 			descendant.Enabled=true
 		end
 	end
@@ -473,9 +482,10 @@ function QBAim.new(ctx,parent)
 	local selectedRouteLock=nil
 	local receiverData={}
 	local receiverTrackElapsed=0
-	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil}
+	local preview={last=0,smoothLast=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
+	local previewMissingBallSince=0
 	local connections={}
 	local sectionBody=nil
 	local sectionFrame=nil
@@ -1335,7 +1345,9 @@ function QBAim.new(ctx,parent)
 
 	local function clearPreviewVisuals()
 		previewFrozen=false
+		previewMissingBallSince=0
 		preview.p1,preview.p2,preview.p3=nil,nil,nil
+		preview.smoothLast=0
 		hideQBTrailPreview()
 
 		if preview.center and preview.center.Parent then
@@ -1359,6 +1371,7 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
+		previewMissingBallSince=0
 		local c2,c1,c3,beam=arcRig()
 		if not(c2 and c1 and c3 and beam) then return end
 
@@ -1370,23 +1383,27 @@ function QBAim.new(ctx,parent)
 		local p2=startPoint
 		local p1=plan.target
 		local p3=endPoint
+		local now=os.clock()
+		local smoothDt=preview.smoothLast>0 and math.clamp(now-preview.smoothLast,ARC_PREVIEW_UPDATE_INTERVAL,0.14) or ARC_PREVIEW_UPDATE_INTERVAL
+		local smoothAlpha=1-((1-PREVIEW_SMOOTH)^(smoothDt/ARC_PREVIEW_UPDATE_INTERVAL))
+		preview.smoothLast=now
 
 		if preview.p2 then
-			p2=preview.p2:Lerp(p2,PREVIEW_SMOOTH)
+			p2=preview.p2:Lerp(p2,smoothAlpha)
 		end
 
-		if preview.p1 and (p1-preview.p1).Magnitude<=28 then
-			p1=preview.p1:Lerp(p1,PREVIEW_SMOOTH)
+		if preview.p1 and (p1-preview.p1).Magnitude<=PREVIEW_SNAP_C1 then
+			p1=preview.p1:Lerp(p1,smoothAlpha)
 		end
 
-		if preview.p3 and (p3-preview.p3).Magnitude<=45 then
-			p3=preview.p3:Lerp(p3,PREVIEW_SMOOTH)
+		if preview.p3 and (p3-preview.p3).Magnitude<=PREVIEW_SNAP_C3 then
+			p3=preview.p3:Lerp(p3,smoothAlpha)
 		end
 
 		preview.p1,preview.p2,preview.p3=p1,p2,p3
-		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity))
-		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*plan.time))
-		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity))
+		setAttachmentCFrame(c2,beamCFrame(p2,plan.velocity))
+		setAttachmentCFrame(c1,beamCFrame(p1,plan.velocity+G*plan.time))
+		setAttachmentCFrame(c3,beamCFrame(p3,endVelocity))
 		updateC1AndC3Info(plan,p1,p3)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
@@ -1418,6 +1435,7 @@ function QBAim.new(ctx,parent)
 		end
 		previewFrozen=true
 		previewFreezeStarted=os.clock()
+		previewMissingBallSince=0
 	end
 
 	local function buildPlan(receiver,ballPower)
@@ -1584,6 +1602,7 @@ function QBAim.new(ctx,parent)
 			trackedReceiver=best
 			selectedRouteLock=lockRoute(best)
 			previewFrozen=false
+			previewMissingBallSince=0
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			setTargetText()
 			setStatus("Locked "..best.Name)
@@ -1599,6 +1618,7 @@ function QBAim.new(ctx,parent)
 			trackedReceiver=nil
 			selectedRouteLock=nil
 			previewFrozen=false
+			previewMissingBallSince=0
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			hideQBTrailPreview()
 		end
@@ -1767,17 +1787,23 @@ function QBAim.new(ctx,parent)
 		local now=os.clock()
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
 			local holdingBall=hasHeldBallForPreview()
-			if not holdingBall then
-				clearPreviewForMissingBall()
-				return
-			end
-
 			if previewFrozen then
 				if now-previewFreezeStarted<PREVIEW_POST_THROW_FREEZE_MIN then
 					return
 				end
 				previewFrozen=false
 			end
+
+			if not holdingBall then
+				if previewMissingBallSince==0 then
+					previewMissingBallSince=now
+				elseif now-previewMissingBallSince>=PREVIEW_MISSING_BALL_GRACE then
+					clearPreviewForMissingBall()
+				end
+				return
+			end
+
+			previewMissingBallSince=0
 		end
 
 		if not trackedReceiver then return end
