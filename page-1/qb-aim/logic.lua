@@ -30,43 +30,37 @@ The ball is modeled with:
 	position(t) = origin + velocity * t + 0.5 * gravity * t^2
 
 Here `gravity` is `G = Vector3.new(0, -BALL_G, 0)`, so only Y curves downward.
-If the solver wants the ball to pass through a target at a chosen time, the
-formula is rearranged into:
+The old solver asked "what velocity would hit this target at time t?" The fixed
+speed solver now asks "for what time t does the needed velocity have magnitude
+95?" That keeps the local physics speed separate from the remote/display power.
 
-	velocityNeeded = (target - origin - 0.5 * G * t^2) / t
+	r = receiverCatchPoint - origin
+	relVel = receiverVelocityXZ - QB_INHERITANCE * qbVelocityXZ
+	w(t) = r + relVel * t - 0.5 * G * t^2
+	F(t) = |w(t)|^2 - MODEL_BALL_SPEED^2 * t^2
 
-That tells us the exact launch velocity that would hit that target at that time.
-The game throw has a fixed useful speed (`MODEL_BALL_SPEED`, currently 95), so
-the solver checks many possible times and prefers the one whose required speed
-and arc angle best match the game's throw.
+When F(t) is zero, `w(t) / t` is exactly the throw velocity needed for a
+95-speed ball to meet the receiver at that time.
 
 Why the solver loops through time
 ---------------------------------
-There is no single perfect time because the receiver is moving, the throw speed
-is fixed, and different distances need different arc angles. The solver tests
-times from `MIN_T` to `MAX_T` in `DT` steps. For each time it:
+There may be zero, one, or multiple valid arcs. The solver scans from `MIN_T`
+to `MAX_T`, brackets sign changes in F(t), then refines those brackets with
+bisection. It also tracks the nearest speed residual so grazing near-roots are
+not missed.
 
-1. Predicts the catch point using the receiver's velocity and route shape.
-2. Computes the velocity needed to hit that point at that time.
-3. Converts that velocity into an angle and compares it to preferred limits.
-4. Scores the result using catch error, speed error, preferred angle, flight
-   time, and penalties for throws that are too low or still rising at catch.
-
-The lowest score becomes the selected throw plan.
+Only real or near-real 95-speed intercepts are accepted. If no valid intercept
+exists, the solver returns nil instead of falling back to a least-bad throw.
 
 Receiver lead math
 ------------------
-The target lead is split into two parts:
-- Flight lead: how far the receiver moves during the ball's flight time.
-- Extra lead: small radial/tangent adjustments for route behavior.
+Lead now comes directly from the receiver's horizontal velocity:
 
-Radial movement is movement toward or away from the QB. Tangent movement is
-sideways movement across the QB's line of sight. Splitting the route this way
-lets crossing, streaking, and running-away routes get different lead amounts
-without hardcoding every route by name.
+	receiver(t) = receiverCatchPoint + receiverVelocityXZ * t
 
-The C1/catch target uses `WR_MAX_Y`, which estimates a practical receiver catch
-height from jump power and player gravity:
+This makes directly-away, diagonal-away, and crossing routes all the same kind
+of vector problem. The C1/catch target uses `WR_MAX_Y`, which estimates a
+practical receiver catch height from jump power and player gravity:
 
 	max jump height ~= jumpPower^2 / (2 * gravity)
 
@@ -88,9 +82,9 @@ Important tuning knobs
 ----------------------
 - `MODEL_BALL_SPEED`: speed used by the local prediction model.
 - `BALL_G`: downward acceleration used by the local ball model.
-- `WR_LEAD_DELAY`: extra receiver lead bias.
 - `MIN_T`, `MAX_T`, `DT`: search range and precision for flight time.
-- `preferredAngle`, `minimumAngle`, `maximumAngle`: distance-based arc limits.
+- `SPEED_TOLERANCE` and `CATCH_TOLERANCE`: near-root acceptance limits.
+- `QB_INHERITANCE`: optional QB velocity inheritance calibration.
 - `PREVIEW_SMOOTH` and `PREVIEW_MISSING_BALL_GRACE`: preview stability.
 ]]
 
@@ -102,13 +96,18 @@ local ReplicatedStorage=game:GetService("ReplicatedStorage")
 
 local LP=Players.LocalPlayer
 
-local YARDS_TO_STUDS=3
 local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local MODEL_BALL_SPEED=95
 local REMOTE_DISPLAY_POWER=100 -- send to remote; server converts incoming UpdateFootball Power to 95
 local GAMEPLAY_BALL_POWER=MODEL_BALL_SPEED
 local SQUADS_BALL_POWER=MODEL_BALL_SPEED
+local QB_INHERITANCE=0
+local INTERCEPT_BISECTION_STEPS=12
+local SPEED_TOLERANCE=1.25
+local CATCH_TOLERANCE=2.0
+local GLOBAL_MIN_ANGLE=-5
+local GLOBAL_MAX_ANGLE=55
 local PLAYER_G=196.2
 local JUMP_POWER=53.5
 local WR_MAX_Y=6+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
@@ -153,22 +152,6 @@ local STABLE_HOLD=0.55
 local STABLE_STOP_SPEED=1.75
 local STABLE_DOT_REPLACE=0.72
 local STABLE_BLEND=0.18
-local CIRCLE_RADIUS_FULL_LEAD=180
-local CIRCLE_DISTANCE_SCALE_MIN=0.35
-local CIRCLE_DISTANCE_SCALE_MAX=1.00
-local CIRCLE_RADIAL_EXTRA_BASE=0.55
-local CIRCLE_RADIAL_EXTRA_GAIN=0.45
-local CIRCLE_RADIAL_EXTRA_MIN=0.25
-local CIRCLE_RADIAL_EXTRA_MAX=1
-local CIRCLE_TANGENT_EXTRA_BASE=0.25
-local CIRCLE_TANGENT_EXTRA_GAIN=0.50
-local CIRCLE_TANGENT_EXTRA_MIN=0.15
-local CIRCLE_TANGENT_EXTRA_MAX=0.70
-local CIRCLE_LOS_RATE_GAIN=6
-local CIRCLE_LOS_RATE_EPSILON=1.00
-local CIRCLE_EXTRA_LEAD_TIME_MAX=0.78
-local CIRCLE_BALANCE_LEAD_SCALE_MIN=0.72
-local CIRCLE_BALANCE_LEAD_SCALE_MAX=1.00
 local DIAG_STREAK_SIDE_RATIO_MIN=0.30
 local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
@@ -1064,10 +1047,6 @@ function QBAim.new(ctx,parent)
 		return Vector3.new(basePosition.X+horizontal.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+horizontal.Z)
 	end
 
-	local function velocityNeeded(originPosition,targetPosition,time)
-		return(targetPosition-originPosition-0.5*G*time*time)/time
-	end
-
 	local function ballAt(originPosition,velocity,time)
 		return originPosition+velocity*time+0.5*G*time*time
 	end
@@ -1082,162 +1061,142 @@ function QBAim.new(ctx,parent)
 		return ballAt(originPosition,velocity,time),time
 	end
 
-	local function preferredAngle(distance)
-		local yards=distance/YARDS_TO_STUDS
-		if yards<15 then return 24 elseif yards<25 then return 22 elseif yards<40 then return 19 elseif yards<55 then return 16 elseif yards<70 then return 14 elseif yards<85 then return 17 end
-		return 22
+	local function interceptVector(time,offset,relativeVelocity)
+		return offset+relativeVelocity*time-0.5*G*time*time
 	end
 
-	local function minimumAngle(distance)
-		local yards=distance/YARDS_TO_STUDS
-		if yards<15 then return 14 elseif yards<25 then return 17 elseif yards<40 then return 16 elseif yards<55 then return 11 end
-		return 0
+	local function interceptF(time,offset,relativeVelocity,ballSpeed)
+		local w=interceptVector(time,offset,relativeVelocity)
+		return w:Dot(w)-ballSpeed*ballSpeed*time*time
 	end
 
-	local function maximumAngle(distance)
-		if distance<45 then return 42 elseif distance<75 then return 38 elseif distance<120 then return 34 elseif distance<170 then return 32 end
-		return 35
-	end
+	local function refineInterceptRoot(lowTime,highTime,offset,relativeVelocity,ballSpeed)
+		local lowValue=interceptF(lowTime,offset,relativeVelocity,ballSpeed)
+		for _=1,INTERCEPT_BISECTION_STEPS do
+			local midTime=(lowTime+highTime)*0.5
+			local midValue=interceptF(midTime,offset,relativeVelocity,ballSpeed)
+			if math.abs(midValue)<1e-6 then
+				return midTime
+			elseif (lowValue<=0 and midValue>=0) or (lowValue>=0 and midValue<=0) then
+				highTime=midTime
+			else
+				lowTime=midTime
+				lowValue=midValue
+			end
+		end
 
-	local function maximumTime(distance)
-		if distance<45 then return 1.35 elseif distance<75 then return 1.85 elseif distance<120 then return 2.45 elseif distance<170 then return 3.25 elseif distance<230 then return 4.25 end
-		return MAX_T
-	end
-
-	local function c1Target(receiverRoot,originPosition,targetVelocity,flightTime)
-		local result=components(originPosition,receiverRoot.Position,targetVelocity)
-		local radius=distXZ(originPosition,receiverRoot.Position)
-		local speed=math.max(result.speed,1e-6)
-
-		local awayShare=math.clamp(result.away/speed,-1,1)
-		local positiveAwayShare=math.clamp(result.away/speed,0,1)
-		local radialShareAbs=math.clamp(result.awayAbs/speed,0,1)
-		local lateralShare=math.clamp(result.sideAbs/speed,0,1)
-		local routeBalance=1-math.abs(radialShareAbs-lateralShare)
-		local balanceLeadScale=CIRCLE_BALANCE_LEAD_SCALE_MIN+(CIRCLE_BALANCE_LEAD_SCALE_MAX-CIRCLE_BALANCE_LEAD_SCALE_MIN)*routeBalance
-
-		local distanceScale=math.clamp(radius/CIRCLE_RADIUS_FULL_LEAD,CIRCLE_DISTANCE_SCALE_MIN,CIRCLE_DISTANCE_SCALE_MAX)
-
-		local radialGain=math.clamp(
-			CIRCLE_RADIAL_EXTRA_BASE+CIRCLE_RADIAL_EXTRA_GAIN*positiveAwayShare,
-			CIRCLE_RADIAL_EXTRA_MIN,
-			CIRCLE_RADIAL_EXTRA_MAX
-		)
-
-		local tangentGain=math.clamp(
-			CIRCLE_TANGENT_EXTRA_BASE+CIRCLE_TANGENT_EXTRA_GAIN*positiveAwayShare,
-			CIRCLE_TANGENT_EXTRA_MIN,
-			CIRCLE_TANGENT_EXTRA_MAX
-		)
-
-		local losRate=result.sideAbs/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
-		local losDamping=1/(1+losRate*CIRCLE_LOS_RATE_GAIN)
-
-		local radialExtraTime=math.min(WR_LEAD_DELAY*distanceScale*radialGain*balanceLeadScale,CIRCLE_EXTRA_LEAD_TIME_MAX)
-		local tangentExtraTime=math.min(WR_LEAD_DELAY*distanceScale*tangentGain*losDamping*balanceLeadScale,CIRCLE_EXTRA_LEAD_TIME_MAX)
-
-		local flightLead=flat(targetVelocity)*flightTime
-		local radialExtraLead=result.awayDir*result.away*radialExtraTime
-		local tangentExtraLead=result.sideDir*result.side*tangentExtraTime
-		local extraLead=radialExtraLead+tangentExtraLead
-		local effectiveExtraTime=result.speed>1e-6 and extraLead.Magnitude/result.speed or 0
-		local targetFlat=flat(receiverRoot.Position)+flightLead+extraLead
-
-		return Vector3.new(targetFlat.X,WR_MAX_Y,targetFlat.Z),{
-			flightLeadXZ=flightLead,
-			extraLeadXZ=extraLead,
-			radialExtraLeadXZ=radialExtraLead,
-			tangentExtraLeadXZ=tangentExtraLead,
-			extraLeadTime=effectiveExtraTime,
-			radialExtraTime=radialExtraTime,
-			tangentExtraTime=tangentExtraTime,
-			distanceXZNow=radius,
-			distanceScale=distanceScale,
-			awayShare=awayShare,
-			positiveAwayShare=positiveAwayShare,
-			radialShareAbs=radialShareAbs,
-			lateralShare=lateralShare,
-			routeBalance=routeBalance,
-			balanceLeadScale=balanceLeadScale,
-			radialGain=radialGain,
-			tangentGain=tangentGain,
-			losRate=losRate,
-			losDamping=losDamping,
-			routeAway=result.away,
-			routeSide=result.side,
-			routeSpeed=result.speed,
-		}
+		return(lowTime+highTime)*0.5
 	end
 
 	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower)
-		ballPower=ballPower or GAMEPLAY_BALL_POWER
+		local ballSpeed=MODEL_BALL_SPEED
 		local originPosition=origin(qbRoot,ball)
-		local startTarget=receiverMax(receiverRoot)
-		local distance=distXZ(originPosition,startTarget)
-		local preferred=preferredAngle(distance)
-		local minAngle=minimumAngle(distance)
-		local maxAngle=maximumAngle(distance)
-		local maxTime=maximumTime(distance)
+		local receiverCatchPoint=receiverMax(receiverRoot)
+		local receiverVelocity=flat(targetVelocity or Vector3.zero)
+		local qbVelocity=flat(qbRoot.AssemblyLinearVelocity or Vector3.zero)
+		local relativeVelocity=receiverVelocity-qbVelocity*QB_INHERITANCE
+		local offset=receiverCatchPoint-originPosition
+		local distance=distXZ(originPosition,receiverCatchPoint)
 		local best=nil
+		local bestNear=nil
 
-		for time=MIN_T,MAX_T,DT do
-			if time<=maxTime then
-				local target,leadInfo=c1Target(receiverRoot,originPosition,targetVelocity,time)
-				local needed=velocityNeeded(originPosition,target,time)
-				local requiredSpeed=needed.Magnitude
+		local function candidateAt(time,source)
+			if time<MIN_T or time>MAX_T then return nil end
 
-				if requiredSpeed>0 then
-					local direction=needed.Unit
-					local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
-					if angle<=maxAngle then
-						local finalVelocity=direction*ballPower
-						local catchPosition=ballAt(originPosition,finalVelocity,time)
-						local speedError=math.abs(ballPower-requiredSpeed)
-						local verticalVelocity=finalVelocity.Y+G.Y*time
-						local upwardPenalty=verticalVelocity>4 and verticalVelocity*2 or 0
-						local lowPenalty=angle<minAngle and (minAngle-angle)*8 or 0
-						local score=(catchPosition-target).Magnitude*5+speedError*2+math.abs(angle-preferred)*0.85+time*0.55+upwardPenalty+lowPenalty
+			local w=interceptVector(time,offset,relativeVelocity)
+			local requiredVelocity=w/time
+			local requiredSpeed=requiredVelocity.Magnitude
+			if requiredSpeed<1e-6 then return nil end
 
-						if angle>30 then
-							score=score+(angle-30)*(leadInfo.lateralShare or 0)*0.35
-						end
-
-						if distance>130 and angle<16 and (leadInfo.awayShare or 0)>0 then
-							score=score+(16-angle)*leadInfo.awayShare*0.35
-						end
-
-						if not best or score<best.score then
-							local landingPosition,landingTime=landing(originPosition,finalVelocity)
-							best={
-								score=score,
-								time=time,
-								totalLeadTime=time+(leadInfo.extraLeadTime or 0),
-								origin=originPosition,
-								target=target,
-								c1Point=target,
-								requiredVelocity=needed,
-								requiredSpeed=requiredSpeed,
-								direction=direction,
-								velocity=finalVelocity,
-								speed=ballPower,
-								aimPoint=originPosition+direction*AIM_SCALE,
-								angleDeg=angle,
-								preferredAngle=preferred,
-								minDesiredAngle=minAngle,
-								maxAngle=maxAngle,
-								totalErr=(catchPosition-target).Magnitude,
-								speedError=speedError,
-								ballAtCatch=catchPosition,
-								landing=landingPosition,
-								landingTime=landingTime,
-								flatDistNow=distance,
-								movementShape=shape,
-								leadInfo=leadInfo,
-							}
-						end
-					end
-				end
+			local throwDirection=requiredVelocity.Unit
+			local angle=math.deg(math.asin(math.clamp(throwDirection.Y,-1,1)))
+			if angle<GLOBAL_MIN_ANGLE or angle>GLOBAL_MAX_ANGLE then
+				return nil
 			end
+
+			local speedError=math.abs(requiredSpeed-ballSpeed)
+			local missEstimate=speedError*time
+			local throwVelocity=throwDirection*ballSpeed
+			local worldVelocity=throwVelocity+qbVelocity*QB_INHERITANCE
+			local target=receiverCatchPoint+receiverVelocity*time
+			local catchPosition=ballAt(originPosition,worldVelocity,time)
+			local totalError=(catchPosition-target).Magnitude
+			local verticalVelocityAtCatch=worldVelocity.Y+G.Y*time
+			local landingPosition,landingTime=landing(originPosition,worldVelocity)
+			local interceptResidual=math.abs(interceptF(time,offset,relativeVelocity,ballSpeed))
+			local risingPenalty=verticalVelocityAtCatch>0 and verticalVelocityAtCatch*2 or 0
+			local anglePenalty=angle<0 and -angle*2 or math.max(angle-40,0)*0.25
+			local score=speedError*100+missEstimate*50+risingPenalty+anglePenalty+time*0.1
+
+			return{
+				score=score,
+				time=time,
+				origin=originPosition,
+				target=target,
+				c1Point=target,
+				requiredVelocity=requiredVelocity,
+				requiredSpeed=requiredSpeed,
+				direction=throwDirection,
+				throwVelocity=throwVelocity,
+				worldVelocity=worldVelocity,
+				velocity=worldVelocity,
+				speed=ballSpeed,
+				aimPoint=originPosition+throwDirection*AIM_SCALE,
+				angleDeg=angle,
+				totalErr=totalError,
+				speedError=speedError,
+				ballAtCatch=catchPosition,
+				landing=landingPosition,
+				landingTime=landingTime,
+				flatDistNow=distance,
+				movementShape=shape,
+				verticalVelocityAtCatch=verticalVelocityAtCatch,
+				interceptResidual=interceptResidual,
+				missEstimate=missEstimate,
+				interceptSource=source,
+			}
+		end
+
+		local function isAcceptable(candidate)
+			return candidate and (candidate.speedError<=SPEED_TOLERANCE or candidate.missEstimate<=CATCH_TOLERANCE)
+		end
+
+		local function considerRoot(time)
+			local candidate=candidateAt(time,"root")
+			if isAcceptable(candidate) and (not best or candidate.score<best.score) then
+				best=candidate
+			end
+		end
+
+		local function considerNear(time)
+			local candidate=candidateAt(time,"near")
+			if candidate and (not bestNear or candidate.missEstimate<bestNear.missEstimate) then
+				bestNear=candidate
+			end
+		end
+
+		local previousTime=MIN_T
+		local previousValue=interceptF(previousTime,offset,relativeVelocity,ballSpeed)
+		considerNear(previousTime)
+
+		for time=MIN_T+DT,MAX_T,DT do
+			local value=interceptF(time,offset,relativeVelocity,ballSpeed)
+			considerNear(time)
+
+			if previousValue==0 then
+				considerRoot(previousTime)
+			elseif value==0 then
+				considerRoot(time)
+			elseif (previousValue<0 and value>0) or (previousValue>0 and value<0) then
+				considerRoot(refineInterceptRoot(previousTime,time,offset,relativeVelocity,ballSpeed))
+			end
+
+			previousTime=time
+			previousValue=value
+		end
+
+		if not best and isAcceptable(bestNear) then
+			best=bestNear
 		end
 
 		return best
@@ -1559,14 +1518,13 @@ function QBAim.new(ctx,parent)
 
 		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
 		local latestPlan=nil
-		local latestBall=nil
 
 		while os.clock()<endAt do
 			if not getHeldBall() then
 				return nil,nil
 			end
 
-			latestPlan,latestBall=buildPlan(receiver,ballPower)
+			latestPlan=buildPlan(receiver,ballPower)
 			if latestPlan then
 				previewPlan(latestPlan)
 			end
@@ -1578,7 +1536,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		local finalPlan,finalBall=buildPlan(receiver,ballPower)
-		return finalPlan or latestPlan,finalBall or latestBall
+		return finalPlan,finalBall
 	end
 
 	local function fireGameplayThrow(plan)
@@ -1913,6 +1871,8 @@ function QBAim.new(ctx,parent)
 		local plan=buildPlan(trackedReceiver)
 		if plan then
 			previewPlan(plan)
+		else
+			hideQBTrailPreview()
 		end
 	end))
 
