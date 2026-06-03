@@ -8,6 +8,7 @@ local ReplicatedStorage=game:GetService("ReplicatedStorage")
 
 local LP=Players.LocalPlayer
 
+local YARDS_TO_STUDS=3
 local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local MODEL_BALL_SPEED=95
@@ -20,7 +21,7 @@ local WR_MAX_Y=6+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
 local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
-local ROUTE_LOCK_MAX_AGE=0 -- unused: no locked route tangent age
+local ROUTE_LOCK_MAX_AGE=1.5
 local WR_LEAD_DELAY=0.75
 local QB_RELEASE_DELAY=0.25
 local QB_XZ_RELEASE_FACTOR=0
@@ -36,7 +37,7 @@ local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
 local ARC_PREVIEW_USE_C2_Y=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
-local RECEIVER_TRACK_INTERVAL=0.03
+local RECEIVER_TRACK_INTERVAL=0.05
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
 local ARC_LANDING_Y=0.5
@@ -106,9 +107,14 @@ local function root(character)
 end
 
 local function routeSpeed(speed)
-	-- Exact movement model: receiver/QB route speed is either 0 or 21 studs/sec.
-	-- The measured value only decides moving vs stopped; it is never used as a partial speed.
-	return (speed or 0)>=ROUTE_LOCK_MIN_SPEED and MAX_RUN_SPEED or 0
+	local clamped=math.clamp(speed,0,MAX_RUN_SPEED)
+	if clamped<ROUTE_LOCK_MIN_SPEED then
+		return 0
+	elseif clamped>=NORMAL_ROUTE_MIN_SPEED then
+		return MAX_RUN_SPEED
+	end
+
+	return clamped
 end
 
 local function getModeKey(ctx)
@@ -464,28 +470,8 @@ end
 function QBAim.new(ctx,parent)
 	local New=ctx.New
 	local THEME=ctx.THEME
-	local safeDisconnect=ctx.safeDisconnect or function(conn)
-		if conn and typeof(conn)=="RBXScriptConnection" then
-			pcall(function()
-				conn:Disconnect()
-			end)
-		end
-	end
-	local inputToBinding=ctx.inputToBinding or function(input)
-		local key=input.KeyCode
-		if key and key~=Enum.KeyCode.Unknown then
-			return key
-		end
-
-		local uiType=tostring(input.UserInputType)
-		if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
-		if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
-		if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
-
-		local name=uiType:gsub("Enum.UserInputType%.","")
-		if name:match("^Gamepad") then return name end
-		return nil
-	end
+	local safeDisconnect=ctx.safeDisconnect
+	local inputToBinding=ctx.inputToBinding
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
 	local buildSlider=ctx.buildSlider
@@ -765,29 +751,89 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function historyVector(data,now)
-		-- Kept only for compatibility with older helper calls. The live solver is reactive.
-		return nil,0,0
+		if not(data and data.ph and #data.ph>=2) then
+			return nil,0,0
+		end
+
+		local latest=data.ph[#data.ph]
+		local earliest=data.ph[1]
+		for i=#data.ph,1,-1 do
+			if now-data.ph[i].t>=STABLE_WINDOW then
+				earliest=data.ph[i]
+				break
+			end
+		end
+
+		local dt=latest.t-earliest.t
+		if dt<=0 then
+			return nil,0,0
+		end
+
+		local movement=flat(latest.pos-earliest.pos)
+		local distance=movement.Magnitude
+		local speed=distance/dt
+		if distance<STABLE_MIN_DIST or speed<STABLE_MIN_SPEED then
+			return nil,speed,distance
+		end
+
+		return movement,speed,distance
 	end
 
 	local function updateStable(data)
-		-- Pure reactive movement state: no held tangent, no age, no blended route memory.
-		-- Direction comes from the most recent X/Z motion sample; speed is exactly 21 or 0.
 		if not data then return nil,0,"none" end
 
+		local now=os.clock()
+		local historyVelocity,historySpeed=historyVector(data,now)
 		local measuredVelocity=flat(data.vel or Vector3.zero)
-		if measuredVelocity.Magnitude<ROUTE_LOCK_MIN_SPEED then
+		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
+			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
+		end
+
+		local measuredSpeed=measuredVelocity.Magnitude
+		if measuredSpeed<=STABLE_STOP_SPEED then
 			data.sdir=nil
 			data.sspeed=0
+			data.stime=now
 			data.src="stopped"
 			return nil,0,"stopped"
 		end
 
-		local direction=measuredVelocity.Unit
-		data.sdir=direction
-		data.sspeed=MAX_RUN_SPEED
-		data.stime=os.clock()
-		data.src="reactive"
-		return direction,MAX_RUN_SPEED,"reactive"
+		local candidateDirection=nil
+		local candidateSpeed=0
+		local source="hold"
+		if historyVelocity and historyVelocity.Magnitude>0 then
+			candidateDirection=historyVelocity.Unit
+			candidateSpeed=routeSpeed(historySpeed)
+			source="history"
+		elseif measuredSpeed>=STABLE_MIN_SPEED then
+			candidateDirection=measuredVelocity.Unit
+			candidateSpeed=routeSpeed(measuredSpeed)
+			source="measured"
+		end
+
+		if candidateDirection and candidateSpeed>0 then
+			if data.sdir and data.sdir.Magnitude>0 then
+				local dot=math.clamp(data.sdir:Dot(candidateDirection),-1,1)
+				if dot>=STABLE_DOT_REPLACE then
+					data.sdir=unit(data.sdir:Lerp(candidateDirection,STABLE_BLEND),candidateDirection)
+				else
+					data.sdir=candidateDirection
+				end
+			else
+				data.sdir=candidateDirection
+			end
+
+			data.sspeed=candidateSpeed
+			data.stime=now
+			data.src=source
+			return data.sdir,data.sspeed,source
+		end
+
+		if data.sdir and now-(data.stime or 0)<=STABLE_HOLD then
+			return data.sdir,data.sspeed or 0,"held"
+		end
+
+		return nil,0,"none"
 	end
 
 	local function basis(origin,position)
@@ -833,22 +879,68 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function lockRoute(receiver)
-		-- H only selects the receiver now. No tangent/direction is locked.
-		if not receiver or not receiver.Character then return nil end
 		local receiverRoot=receiver.Character and root(receiver.Character)
-		if not receiverRoot then return nil end
-		return {player=receiver,createdAt=os.clock()}
+		local data=receiverData[receiver]
+		if not(receiverRoot and data) then return nil end
+
+		local measuredVelocity=flat(data.vel)
+		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
+			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
+		end
+
+		local stableDirection,stableSpeed,stableSource=updateStable(data)
+		local speed=stableSpeed>0 and stableSpeed or routeSpeed(measuredVelocity.Magnitude)
+		if not stableDirection and (measuredVelocity.Magnitude<ROUTE_LOCK_MIN_SPEED or speed<=0) then
+			return nil
+		end
+
+		local ball=getHeldBall()
+		local characterRoot=LP.Character and root(LP.Character)
+		local qbPosition=(ball and ball.Position) or (characterRoot and characterRoot.Position) or receiverRoot.Position
+		local direction=stableDirection or measuredVelocity.Unit
+
+		return{
+			player=receiver,
+			createdAt=os.clock(),
+			routeDir=direction,
+			routeSpeed=speed,
+			routeVelocity=direction*speed,
+			stableSource=stableSource,
+			shape=movementShape(qbPosition,receiverRoot.Position,direction*speed),
+		}
 	end
 
 	local function routeVelocity(receiver,data,origin,receiverRoot,routeLock)
-		-- Pure reactive tangent: current moving state only. No route-lock age, no stable hold.
-		local measuredVelocity=data and flat(data.vel or Vector3.zero) or Vector3.zero
-		if measuredVelocity.Magnitude<ROUTE_LOCK_MIN_SPEED then
-			return Vector3.zero,"standing","REACTIVE_STOPPED",nil,Vector3.zero
+		local measuredVelocity=data and flat(data.vel) or Vector3.zero
+		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
+			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
 		end
 
-		local velocity=measuredVelocity.Unit*MAX_RUN_SPEED
-		return velocity,movementShape(origin,receiverRoot.Position,velocity),"REACTIVE_21",nil,measuredVelocity
+		local measuredSpeed=measuredVelocity.Magnitude
+		local adjustedSpeed=routeSpeed(measuredSpeed)
+		local stableDirection,stableSpeed=updateStable(data)
+
+		if routeLock and routeLock.player==receiver and routeLock.routeDir and os.clock()-routeLock.createdAt<=ROUTE_LOCK_MAX_AGE then
+			local speed=stableSpeed>0 and stableSpeed or adjustedSpeed
+			if speed<=0 then
+				speed=routeLock.routeSpeed or MAX_RUN_SPEED
+			end
+
+			local velocity=routeLock.routeDir*speed
+			return velocity,movementShape(origin,receiverRoot.Position,velocity)
+		end
+
+		if stableDirection and stableSpeed>0 then
+			local velocity=stableDirection*stableSpeed
+			return velocity,movementShape(origin,receiverRoot.Position,velocity)
+		end
+
+		if measuredSpeed>=ROUTE_LOCK_MIN_SPEED and adjustedSpeed>0 then
+			local velocity=measuredVelocity.Unit*adjustedSpeed
+			return velocity,movementShape(origin,receiverRoot.Position,velocity)
+		end
+
+		return Vector3.zero,"standing"
 	end
 
 	local function receiverMax(receiverRoot)
@@ -897,14 +989,14 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function preferredAngle(distance)
-		-- distance is in studs; all throw math stays in studs/sec.
-		if distance<45 then return 24 elseif distance<75 then return 22 elseif distance<120 then return 19 elseif distance<165 then return 16 elseif distance<210 then return 14 elseif distance<255 then return 17 end
+		local yards=distance/YARDS_TO_STUDS
+		if yards<15 then return 24 elseif yards<25 then return 22 elseif yards<40 then return 19 elseif yards<55 then return 16 elseif yards<70 then return 14 elseif yards<85 then return 17 end
 		return 22
 	end
 
 	local function minimumAngle(distance)
-		-- distance is in studs; thresholds are yard values converted once: yards*3.
-		if distance<45 then return 14 elseif distance<75 then return 17 elseif distance<120 then return 16 elseif distance<165 then return 11 end
+		local yards=distance/YARDS_TO_STUDS
+		if yards<15 then return 14 elseif yards<25 then return 17 elseif yards<40 then return 16 elseif yards<55 then return 11 end
 		return 0
 	end
 
@@ -1508,7 +1600,7 @@ function QBAim.new(ctx,parent)
 		if best then
 			ensureReceiverData(best,best.Character and root(best.Character))
 			trackedReceiver=best
-			selectedRouteLock=nil
+			selectedRouteLock=lockRoute(best)
 			previewFrozen=false
 			previewMissingBallSince=0
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
@@ -1664,19 +1756,25 @@ function QBAim.new(ctx,parent)
 
 					local dt=math.min(now-data.t,0.1)
 					if dt>0 then
-						local deltaXZ=flat(receiverRoot.Position-data.pos)
-						local measuredSpeed=deltaXZ.Magnitude/dt
-
-						if measuredSpeed>=ROUTE_LOCK_MIN_SPEED and deltaXZ.Magnitude>1e-6 then
-							data.vel=deltaXZ.Unit*MAX_RUN_SPEED
-						else
-							data.vel=Vector3.zero
+						local movement=(receiverRoot.Position-data.pos)/dt
+						table.insert(data.vh,movement)
+						if #data.vh>5 then
+							table.remove(data.vh,1)
 						end
 
-						data.rawSpeed=measuredSpeed
+						local average=Vector3.zero
+						for _,velocity in ipairs(data.vh) do
+							average=average+velocity
+						end
+
+						data.vel=average/#data.vh
 						data.pos=receiverRoot.Position
 						data.t=now
-						data.ph={{t=now,pos=receiverRoot.Position}}
+						table.insert(data.ph,{t=now,pos=receiverRoot.Position})
+
+						while #data.ph>0 and now-data.ph[1].t>1.25 do
+							table.remove(data.ph,1)
+						end
 					end
 				end
 			end
