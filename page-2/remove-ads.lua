@@ -16,21 +16,24 @@ local function firstChild(parent)
 	return children[1]
 end
 
+
 local function createPowerSwitch(New,THEME,parent,startState,onChange)
-	local switchCollapsedSize=34
+	local switchBaseSize=34
 	local switchExpandedSize=44
-	local holderCollapsedSize=30
-	local holderExpandedSize=38
-	local outerCollapsedSize=16
-	local outerExpandedSize=28
-	local innerCollapsedSize=2
-	local innerExpandedSize=21
+	local categoryExpandedScale=1.22
+	local holderSize=32
+	local outerCoreSize=24
+	local innerOffSize=10
 	local strokeThickness=2
-	local glowThickness=7
+	local glowNearThickness=4
+	local glowFarThickness=7
 
 	local accent=THEME.GREEN or Color3.fromRGB(74,208,128)
 	local muted=THEME.MUTED or Color3.fromRGB(150,150,160)
 	local white=THEME.WHITE or THEME.TEXT or Color3.fromRGB(245,245,245)
+	local dark=THEME.BACKGROUND or THEME.DARK or Color3.fromRGB(12,14,18)
+	local inactiveFill=muted:Lerp(dark,0.18)
+	local outerInactive=muted:Lerp(white,0.28)
 
 	local switch=New("Frame",{
 		AnchorPoint=Vector2.new(1,0.5),
@@ -47,14 +50,14 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	},switch)
 
 	New("UISizeConstraint",{
-		MinSize=Vector2.new(switchCollapsedSize,switchCollapsedSize),
+		MinSize=Vector2.new(switchBaseSize,switchBaseSize),
 		MaxSize=Vector2.new(switchExpandedSize,switchExpandedSize),
 	},switch)
 
 	local holder=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
 		Position=UDim2.fromScale(0.5,0.5),
-		Size=UDim2.fromOffset(holderExpandedSize,holderExpandedSize),
+		Size=UDim2.fromOffset(holderSize,holderSize),
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		ClipsDescendants=false,
@@ -65,15 +68,44 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		AspectRatio=1,
 	},holder)
 
-	New("UISizeConstraint",{
-		MinSize=Vector2.new(holderCollapsedSize,holderCollapsedSize),
-		MaxSize=Vector2.new(holderExpandedSize,holderExpandedSize),
+	local holderScale=New("UIScale",{
+		Scale=categoryExpandedScale,
 	},holder)
 
-	local outerSquare=New("Frame",{
+	local outerCore=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
 		Position=UDim2.fromScale(0.5,0.5),
-		Size=UDim2.fromOffset(startState and outerExpandedSize or outerCollapsedSize,startState and outerExpandedSize or outerCollapsedSize),
+		Size=UDim2.fromOffset(outerCoreSize,outerCoreSize),
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		Rotation=0,
+		ZIndex=9,
+	},holder)
+
+	New("UICorner",{
+		CornerRadius=UDim.new(0,2),
+	},outerCore)
+
+	New("UIAspectRatioConstraint",{
+		AspectRatio=1,
+	},outerCore)
+
+	New("UISizeConstraint",{
+		MinSize=Vector2.new(outerCoreSize,outerCoreSize),
+		MaxSize=Vector2.new(outerCoreSize,outerCoreSize),
+	},outerCore)
+
+	local outerStroke=New("UIStroke",{
+		Color=startState and white or outerInactive,
+		Thickness=strokeThickness,
+		Transparency=startState and 0.02 or 0.18,
+		LineJoinMode=Enum.LineJoinMode.Miter,
+	},outerCore)
+
+	local innerGlowFar=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.fromScale(0.5,0.5),
+		Size=UDim2.fromOffset(startState and outerCoreSize or innerOffSize,startState and outerCoreSize or innerOffSize),
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		Rotation=startState and 45 or 0,
@@ -82,26 +114,25 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 
 	New("UICorner",{
 		CornerRadius=UDim.new(0,2),
-	},outerSquare)
+	},innerGlowFar)
 
 	New("UIAspectRatioConstraint",{
 		AspectRatio=1,
-	},outerSquare)
+	},innerGlowFar)
 
 	New("UISizeConstraint",{
-		MinSize=Vector2.new(outerCollapsedSize,outerCollapsedSize),
-		MaxSize=Vector2.new(outerExpandedSize,outerExpandedSize),
-	},outerSquare)
+		MinSize=Vector2.new(innerOffSize,innerOffSize),
+		MaxSize=Vector2.new(outerCoreSize,outerCoreSize),
+	},innerGlowFar)
 
-	local outerGlowStroke=New("UIStroke",{
+	local innerGlowFarStroke=New("UIStroke",{
 		Color=accent,
-		Thickness=glowThickness,
-		Transparency=startState and 0.66 or 1,
+		Thickness=glowFarThickness,
+		Transparency=startState and 0.78 or 1,
 		LineJoinMode=Enum.LineJoinMode.Miter,
-		ZIndex=0,
-	},outerSquare)
+	},innerGlowFar)
 
-	local outerGlowGradient=New("UIGradient",{
+	local innerGlowFarGradient=New("UIGradient",{
 		Rotation=0,
 		Color=ColorSequence.new({
 			ColorSequenceKeypoint.new(0,accent),
@@ -109,37 +140,65 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 			ColorSequenceKeypoint.new(1,accent),
 		}),
 		Transparency=NumberSequence.new({
-			NumberSequenceKeypoint.new(0,0.82),
-			NumberSequenceKeypoint.new(0.5,0.08),
-			NumberSequenceKeypoint.new(1,0.82),
+			NumberSequenceKeypoint.new(0,0.86),
+			NumberSequenceKeypoint.new(0.5,0.14),
+			NumberSequenceKeypoint.new(1,0.86),
 		}),
-	},outerGlowStroke)
+	},innerGlowFarStroke)
 
-	local outerStroke=New("UIStroke",{
-		Color=startState and accent or muted,
-		Thickness=strokeThickness,
-		Transparency=startState and 0 or 0.36,
+	local innerGlowNear=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.fromScale(0.5,0.5),
+		Size=UDim2.fromOffset(startState and outerCoreSize or innerOffSize,startState and outerCoreSize or innerOffSize),
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		Rotation=startState and 45 or 0,
+		ZIndex=11,
+	},holder)
+
+	New("UICorner",{
+		CornerRadius=UDim.new(0,2),
+	},innerGlowNear)
+
+	New("UIAspectRatioConstraint",{
+		AspectRatio=1,
+	},innerGlowNear)
+
+	New("UISizeConstraint",{
+		MinSize=Vector2.new(innerOffSize,innerOffSize),
+		MaxSize=Vector2.new(outerCoreSize,outerCoreSize),
+	},innerGlowNear)
+
+	local innerGlowNearStroke=New("UIStroke",{
+		Color=accent,
+		Thickness=glowNearThickness,
+		Transparency=startState and 0.58 or 1,
 		LineJoinMode=Enum.LineJoinMode.Miter,
-		ZIndex=2,
-	},outerSquare)
+	},innerGlowNear)
 
-	local outerStrokeGradient=New("UIGradient",{
-		Rotation=0,
+	local innerGlowNearGradient=New("UIGradient",{
+		Rotation=180,
 		Color=ColorSequence.new({
 			ColorSequenceKeypoint.new(0,accent),
-			ColorSequenceKeypoint.new(0.75,accent),
-			ColorSequenceKeypoint.new(1,white),
+			ColorSequenceKeypoint.new(0.6,white),
+			ColorSequenceKeypoint.new(1,accent),
 		}),
-	},outerStroke)
+		Transparency=NumberSequence.new({
+			NumberSequenceKeypoint.new(0,0.74),
+			NumberSequenceKeypoint.new(0.5,0.08),
+			NumberSequenceKeypoint.new(1,0.74),
+		}),
+	},innerGlowNearStroke)
 
 	local innerSquare=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
 		Position=UDim2.fromScale(0.5,0.5),
-		Size=UDim2.fromOffset(startState and innerExpandedSize or innerCollapsedSize,startState and innerExpandedSize or innerCollapsedSize),
-		BackgroundTransparency=1,
+		Size=UDim2.fromOffset(startState and outerCoreSize or innerOffSize,startState and outerCoreSize or innerOffSize),
+		BackgroundColor3=startState and accent or inactiveFill,
+		BackgroundTransparency=startState and 1 or 0.04,
 		BorderSizePixel=0,
-		Rotation=0,
-		ZIndex=11,
+		Rotation=startState and 45 or 0,
+		ZIndex=12,
 	},holder)
 
 	New("UICorner",{
@@ -151,39 +210,25 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	},innerSquare)
 
 	New("UISizeConstraint",{
-		MinSize=Vector2.new(innerCollapsedSize,innerCollapsedSize),
-		MaxSize=Vector2.new(innerExpandedSize,innerExpandedSize),
+		MinSize=Vector2.new(innerOffSize,innerOffSize),
+		MaxSize=Vector2.new(outerCoreSize,outerCoreSize),
 	},innerSquare)
-
-	local innerGlowStroke=New("UIStroke",{
-		Color=white,
-		Thickness=glowThickness-2,
-		Transparency=startState and 0.78 or 1,
-		LineJoinMode=Enum.LineJoinMode.Miter,
-		ZIndex=0,
-	},innerSquare)
-
-	local innerGlowGradient=New("UIGradient",{
-		Rotation=180,
-		Color=ColorSequence.new({
-			ColorSequenceKeypoint.new(0,white),
-			ColorSequenceKeypoint.new(0.5,accent),
-			ColorSequenceKeypoint.new(1,white),
-		}),
-		Transparency=NumberSequence.new({
-			NumberSequenceKeypoint.new(0,0.86),
-			NumberSequenceKeypoint.new(0.5,0.16),
-			NumberSequenceKeypoint.new(1,0.86),
-		}),
-	},innerGlowStroke)
 
 	local innerStroke=New("UIStroke",{
-		Color=startState and white or muted,
+		Color=startState and accent or muted,
 		Thickness=strokeThickness,
-		Transparency=startState and 0.04 or 1,
+		Transparency=startState and 0.02 or 1,
 		LineJoinMode=Enum.LineJoinMode.Miter,
-		ZIndex=2,
 	},innerSquare)
+
+	local innerStrokeGradient=New("UIGradient",{
+		Rotation=0,
+		Color=ColorSequence.new({
+			ColorSequenceKeypoint.new(0,accent),
+			ColorSequenceKeypoint.new(0.75,accent),
+			ColorSequenceKeypoint.new(1,white),
+		}),
+	},innerStroke)
 
 	local hit=New("TextButton",{
 		BackgroundTransparency=1,
@@ -217,106 +262,124 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		return tw
 	end
 
-	local function setGradientColors(outerColor,innerColor)
-		outerGlowGradient.Color=ColorSequence.new({
-			ColorSequenceKeypoint.new(0,outerColor),
-			ColorSequenceKeypoint.new(0.5,innerColor),
-			ColorSequenceKeypoint.new(1,outerColor),
+	local function setGradientColors(activeColor,highlightColor)
+		innerGlowFarGradient.Color=ColorSequence.new({
+			ColorSequenceKeypoint.new(0,activeColor),
+			ColorSequenceKeypoint.new(0.5,highlightColor),
+			ColorSequenceKeypoint.new(1,activeColor),
 		})
 
-		outerStrokeGradient.Color=ColorSequence.new({
-			ColorSequenceKeypoint.new(0,outerColor),
-			ColorSequenceKeypoint.new(0.75,outerColor),
-			ColorSequenceKeypoint.new(1,innerColor),
+		innerGlowNearGradient.Color=ColorSequence.new({
+			ColorSequenceKeypoint.new(0,activeColor),
+			ColorSequenceKeypoint.new(0.6,highlightColor),
+			ColorSequenceKeypoint.new(1,activeColor),
 		})
 
-		innerGlowGradient.Color=ColorSequence.new({
-			ColorSequenceKeypoint.new(0,innerColor),
-			ColorSequenceKeypoint.new(0.5,outerColor),
-			ColorSequenceKeypoint.new(1,innerColor),
+		innerStrokeGradient.Color=ColorSequence.new({
+			ColorSequenceKeypoint.new(0,activeColor),
+			ColorSequenceKeypoint.new(0.75,activeColor),
+			ColorSequenceKeypoint.new(1,highlightColor),
 		})
 	end
 
 	local function applyVisuals(animate)
 		cancelTweens()
 
-		local expanded=state or categoryExpanded
-		local activeOuterColor=state and accent or muted
-		local activeInnerColor=state and white or muted
-		local targetSwitchSize=categoryExpanded and switchExpandedSize or switchCollapsedSize
-		local targetHolderSize=categoryExpanded and holderExpandedSize or holderCollapsedSize
-		local targetOuterSize=expanded and outerExpandedSize or outerCollapsedSize
-		local targetInnerSize=expanded and innerExpandedSize or innerCollapsedSize
-		local targetRotation=expanded and 45 or 0
-		local targetOuterStrokeTransparency=expanded and (state and 0 or 0.28) or 0.36
-		local targetInnerStrokeTransparency=expanded and (state and 0.04 or 0.42) or 1
-		local targetOuterGlowTransparency=state and expanded and 0.66 or 1
-		local targetInnerGlowTransparency=state and expanded and 0.78 or 1
+		local scale=categoryExpanded and categoryExpandedScale or 1
+		local targetSwitchSize=categoryExpanded and switchExpandedSize or switchBaseSize
+		local targetInnerSize=state and outerCoreSize or innerOffSize
+		local targetInnerRotation=state and 45 or 0
+		local targetInnerColor=state and accent or inactiveFill
+		local targetOuterColor=state and white or outerInactive
+		local targetFillTransparency=state and 1 or 0.04
+		local targetInnerStrokeTransparency=state and 0.02 or 1
+		local targetOuterStrokeTransparency=state and 0.02 or 0.18
+		local targetGlowNearTransparency=state and 0.58 or 1
+		local targetGlowFarTransparency=state and 0.78 or 1
 
-		setGradientColors(activeOuterColor,activeInnerColor)
-		outerGlowGradient.Enabled=state
-		outerStrokeGradient.Enabled=state
-		innerGlowGradient.Enabled=state
+		setGradientColors(accent,white)
+		innerGlowFarGradient.Enabled=state
+		innerGlowNearGradient.Enabled=state
+		innerStrokeGradient.Enabled=state
 
 		if not animate then
 			switch.Size=UDim2.fromOffset(targetSwitchSize,targetSwitchSize)
-			holder.Size=UDim2.fromOffset(targetHolderSize,targetHolderSize)
-			outerSquare.Size=UDim2.fromOffset(targetOuterSize,targetOuterSize)
-			outerSquare.Rotation=targetRotation
-			innerSquare.Size=UDim2.fromOffset(targetInnerSize,targetInnerSize)
-			innerSquare.Rotation=0
-			outerStroke.Color=activeOuterColor
+			holderScale.Scale=scale
+			outerCore.Size=UDim2.fromOffset(outerCoreSize,outerCoreSize)
+			outerCore.Rotation=0
+			outerStroke.Color=targetOuterColor
 			outerStroke.Transparency=targetOuterStrokeTransparency
-			outerGlowStroke.Color=activeOuterColor
-			outerGlowStroke.Transparency=targetOuterGlowTransparency
-			innerStroke.Color=activeInnerColor
+			innerGlowFar.Size=UDim2.fromOffset(targetInnerSize,targetInnerSize)
+			innerGlowFar.Rotation=targetInnerRotation
+			innerGlowFarStroke.Color=accent
+			innerGlowFarStroke.Transparency=targetGlowFarTransparency
+			innerGlowNear.Size=UDim2.fromOffset(targetInnerSize,targetInnerSize)
+			innerGlowNear.Rotation=targetInnerRotation
+			innerGlowNearStroke.Color=accent
+			innerGlowNearStroke.Transparency=targetGlowNearTransparency
+			innerSquare.Size=UDim2.fromOffset(targetInnerSize,targetInnerSize)
+			innerSquare.Rotation=targetInnerRotation
+			innerSquare.BackgroundColor3=targetInnerColor
+			innerSquare.BackgroundTransparency=targetFillTransparency
+			innerStroke.Color=accent
 			innerStroke.Transparency=targetInnerStrokeTransparency
-			innerGlowStroke.Color=activeInnerColor
-			innerGlowStroke.Transparency=targetInnerGlowTransparency
 			return
 		end
 
-		local shapeInfo=expanded
+		local toggleInfo=state
 			and TweenInfo.new(0.32,Enum.EasingStyle.Back,Enum.EasingDirection.Out)
 			or TweenInfo.new(0.24,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut)
+		local scaleInfo=TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 		local softInfo=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 
-		playTween(switch,softInfo,{
+		playTween(switch,scaleInfo,{
 			Size=UDim2.fromOffset(targetSwitchSize,targetSwitchSize),
 		})
 
-		playTween(holder,shapeInfo,{
-			Size=UDim2.fromOffset(targetHolderSize,targetHolderSize),
+		playTween(holderScale,scaleInfo,{
+			Scale=scale,
 		})
 
-		playTween(outerSquare,shapeInfo,{
-			Size=UDim2.fromOffset(targetOuterSize,targetOuterSize),
-			Rotation=targetRotation,
-		})
-
-		playTween(innerSquare,shapeInfo,{
-			Size=UDim2.fromOffset(targetInnerSize,targetInnerSize),
+		playTween(outerCore,scaleInfo,{
+			Size=UDim2.fromOffset(outerCoreSize,outerCoreSize),
 			Rotation=0,
 		})
 
 		playTween(outerStroke,softInfo,{
-			Color=activeOuterColor,
+			Color=targetOuterColor,
 			Transparency=targetOuterStrokeTransparency,
 		})
 
-		playTween(outerGlowStroke,softInfo,{
-			Color=activeOuterColor,
-			Transparency=targetOuterGlowTransparency,
+		playTween(innerGlowFar,toggleInfo,{
+			Size=UDim2.fromOffset(targetInnerSize,targetInnerSize),
+			Rotation=targetInnerRotation,
+		})
+
+		playTween(innerGlowNear,toggleInfo,{
+			Size=UDim2.fromOffset(targetInnerSize,targetInnerSize),
+			Rotation=targetInnerRotation,
+		})
+
+		playTween(innerSquare,toggleInfo,{
+			Size=UDim2.fromOffset(targetInnerSize,targetInnerSize),
+			Rotation=targetInnerRotation,
+			BackgroundColor3=targetInnerColor,
+			BackgroundTransparency=targetFillTransparency,
 		})
 
 		playTween(innerStroke,softInfo,{
-			Color=activeInnerColor,
+			Color=accent,
 			Transparency=targetInnerStrokeTransparency,
 		})
 
-		playTween(innerGlowStroke,softInfo,{
-			Color=activeInnerColor,
-			Transparency=targetInnerGlowTransparency,
+		playTween(innerGlowFarStroke,softInfo,{
+			Color=accent,
+			Transparency=targetGlowFarTransparency,
+		})
+
+		playTween(innerGlowNearStroke,softInfo,{
+			Color=accent,
+			Transparency=targetGlowNearTransparency,
 		})
 	end
 
@@ -355,9 +418,9 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 
 		if state then
 			glowRotation=(glowRotation+(dt*90))%360
-			outerGlowGradient.Rotation=glowRotation
-			outerStrokeGradient.Rotation=(glowRotation*0.75)%360
-			innerGlowGradient.Rotation=(360-glowRotation)%360
+			innerGlowFarGradient.Rotation=glowRotation
+			innerGlowNearGradient.Rotation=(360-glowRotation)%360
+			innerStrokeGradient.Rotation=(glowRotation*0.75)%360
 		end
 	end)
 
