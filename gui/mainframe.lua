@@ -19,6 +19,7 @@ function MainFrame.new(ctx)
 	local getUIStrokeColor=ctx.getUIStrokeColor or function() return THEME.STROKE end
 	local getUIStrokeGradientColor=ctx.getUIStrokeGradientColor or function() return THEME.GREEN or THEME.ACC or THEME.TEXT end
 	local getCurrentUILibProfile=ctx.getCurrentUILibProfile
+	local onPageActivated=ctx.onPageActivated
 	local uiProfile=type(ctx.UI_PROFILE)=="table" and ctx.UI_PROFILE or {}
 	local mainFrameProfile={}
 	local windowProfile={}
@@ -505,6 +506,14 @@ function MainFrame.new(ctx)
 		TweenService:Create(pageSlider,TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out),{Position=sliderPos,Size=sliderSize}):Play()
 		paintPageTabs()
 		refreshFooterResetButton()
+		if type(onPageActivated)=="function" then
+			local activatedPage=activePageName
+			task.defer(function()
+				if activePageName==activatedPage then
+					onPageActivated(activatedPage)
+				end
+			end)
+		end
 	end
 
 	settingsTab.MouseButton1Click:Connect(function() setActivePage("main") end)

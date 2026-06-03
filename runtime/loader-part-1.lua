@@ -326,6 +326,7 @@ TRUSTED_API_URL="https://lint-bot-production.up.railway.app"
 
 API_ALLOWED_PATHS={
 	["/module/get"]=true,
+	["/module/batch"]=true,
 	["/module/manifest"]=true,
 	["/player/save"]=true,
 	["/player/load"]=true,
@@ -372,7 +373,7 @@ function BOT_API.Post(path,body)
 		return{ok=false,error="Module path blocked: "..tostring(body and body.path)}
 	end
 
-	if path=="/module/manifest" and isAllowedModulePath and type(body)=="table" and type(body.paths)=="table" then
+	if (path=="/module/manifest" or path=="/module/batch") and isAllowedModulePath and type(body)=="table" and type(body.paths)=="table" then
 		for _,modulePath in ipairs(body.paths) do
 			if not isAllowedModulePath(modulePath) then
 				return{ok=false,error="Module path blocked: "..tostring(modulePath)}
@@ -590,6 +591,63 @@ function loadRemoteModule(modulePath)
 	end
 
 	return module
+end
+
+function modulePathList()
+	local paths={}
+
+	for _,path in pairs(MODULE_PATHS) do
+		table.insert(paths,path)
+	end
+
+	table.sort(paths)
+	return paths
+end
+
+function loadRemoteModuleBatch(paths)
+	if type(paths)~="table" or #paths==0 then
+		return false,"No module paths requested."
+	end
+
+	setLoaderProgress("Fetching remote module batch...",0.2,LOADER_TOTAL,false)
+
+	local result=BOT_API.Post("/module/batch",{paths=paths})
+	if not(result and result.ok and type(result.modules)=="table") then
+		return false,result and result.error or "Module batch unavailable."
+	end
+
+	local loaded=0
+	local failed=0
+
+	for index,modulePath in ipairs(paths) do
+		local item=result.modules[modulePath]
+		local module=nil
+		local err=nil
+
+		if item and type(item.source)=="string" then
+			module,err=loadModuleFromSource(modulePath,item.source)
+		else
+			err=result.errors and result.errors[modulePath] or "Module source missing from batch."
+		end
+
+		if module then
+			loaded+=1
+		else
+			failed+=1
+			REMOTE_MODULE_SOURCES[modulePath]=false
+			if OPTIONAL_MODULE_PATH_SET[modulePath] then
+				warn("Optional batched module unavailable:",modulePath,err)
+			else
+				warn("Batched module failed while loading:",modulePath,err)
+			end
+		end
+
+		if index%8==0 or index==#paths then
+			setLoaderProgress("Loaded remote module batch ("..tostring(loaded).."/"..tostring(#paths)..")",math.min(index,LOADER_TOTAL),LOADER_TOTAL,failed>0)
+		end
+	end
+
+	return loaded>0,nil
 end
 
 SG_NAME="HitboxUI"
@@ -959,6 +1017,11 @@ function loadRemoteModuleStep(name,path)
 	local module=loadRemoteModule(path)
 	setLoaderProgress((module and "Loaded " or "Missing ")..path,loaderCurrent,LOADER_TOTAL,not module)
 	return module
+end
+
+local batchLoaded,batchErr=loadRemoteModuleBatch(modulePathList())
+if not batchLoaded then
+	warn("Module batch unavailable; falling back to individual loads:",batchErr)
 end
 
 GuiLogicModule=loadRemoteModuleStep("GuiLogic",MODULE_PATHS.GuiLogic)

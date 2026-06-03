@@ -42,6 +42,21 @@ function makeSection(parent,order,titleText,subtitleText,options)
 	return rawMakeSection(parent,order,titleText,subtitleText,options)
 end
 
+LAZY_PAGE_BUILDERS={}
+LAZY_PAGE_BUILT={}
+function ensureRuntimePageBuilt(name)
+	name=tostring(name or "main")
+	local builder=LAZY_PAGE_BUILDERS[name]
+	if not builder or LAZY_PAGE_BUILT[name] then return end
+
+	LAZY_PAGE_BUILT[name]=true
+	local ok,err=pcall(builder)
+	if not ok then
+		LAZY_PAGE_BUILT[name]=false
+		warn("Lazy page build failed:",name,err)
+	end
+end
+
 MainFrame=MainFrameModule.new({
 	New=New,
 	THEME=THEME,
@@ -65,6 +80,7 @@ MainFrame=MainFrameModule.new({
 	getModeLabel=function()
 		return CURRENT_MODE_LABEL
 	end,
+	onPageActivated=ensureRuntimePageBuilt,
 })
 
 root=MainFrame.root

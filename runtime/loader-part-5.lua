@@ -328,6 +328,10 @@ function rebuildDataSaveFromModule(loadRemoteData)
 			DataSaveAPI.Load()
 			DataSaveAPI.LoadOwnedPresets()
 		end)
+
+		if WORLD_SETTINGS and WORLD_SETTINGS.SmoothPlastic and ensureRuntimePageBuilt then
+			pcall(ensureRuntimePageBuilt,"maps")
+		end
 	end
 
 	refreshAllUI()

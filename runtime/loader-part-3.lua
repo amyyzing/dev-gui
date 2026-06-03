@@ -120,10 +120,25 @@ function buildCustomizePage()
 end
 
 rebuildCustomizeFromModules=function()
-	buildCustomizePage()
+	if getActivePageName and getActivePageName()=="customize" then
+		LAZY_PAGE_BUILT.customize=false
+		ensureRuntimePageBuilt("customize")
+		return
+	end
+
+	if StrokeColourAPI and StrokeColourAPI.Destroy then
+		pcall(function()
+			StrokeColourAPI.Destroy()
+		end)
+	end
+
+	StrokeColourAPI=nil
+	resetCustomizePageDefaults=function() end
+	clearCustomizePage()
+	LAZY_PAGE_BUILT.customize=false
 end
 
-buildCustomizePage()
+LAZY_PAGE_BUILDERS.customize=buildCustomizePage
 
 MapEditorAPI=nil
 AntiMaterialAPI=nil
@@ -290,7 +305,42 @@ function buildMapPage()
 end
 
 rebuildMapFromModules=function()
-	buildMapPage()
+	if getActivePageName and getActivePageName()=="maps" then
+		LAZY_PAGE_BUILT.maps=false
+		ensureRuntimePageBuilt("maps")
+		return
+	end
+
+	if MapEditorAPI and MapEditorAPI.Destroy then
+		pcall(function()
+			MapEditorAPI.Destroy()
+		end)
+	end
+
+	if AntiMaterialAPI and AntiMaterialAPI.Destroy then
+		pcall(function()
+			AntiMaterialAPI.Destroy()
+		end)
+	end
+
+	if MapCleanerAPI and MapCleanerAPI.Destroy then
+		pcall(function()
+			MapCleanerAPI.Destroy()
+		end)
+	end
+
+	if RemoveAdsAPI and RemoveAdsAPI.Destroy then
+		pcall(function()
+			RemoveAdsAPI.Destroy()
+		end)
+	end
+
+	MapEditorAPI=nil
+	AntiMaterialAPI=nil
+	MapCleanerAPI=nil
+	RemoveAdsAPI=nil
+	clearMapPage()
+	LAZY_PAGE_BUILT.maps=false
 end
 
-buildMapPage()
+LAZY_PAGE_BUILDERS.maps=buildMapPage

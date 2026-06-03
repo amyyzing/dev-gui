@@ -161,7 +161,7 @@ function buildActualSettingsPage()
 	refreshSettingsPage()
 end
 
-buildActualSettingsPage()
+LAZY_PAGE_BUILDERS.settings=buildActualSettingsPage
 
 function clearActualSettingsPage()
 	for _,child in ipairs(actualSettingsPage:GetChildren()) do
@@ -187,7 +187,11 @@ rebuildSettingsFromModules=function()
 	PlayerDataAPI=nil
 	DiscordAPI=nil
 	clearActualSettingsPage()
-	buildActualSettingsPage()
+	LAZY_PAGE_BUILT.settings=false
+
+	if getActivePageName and getActivePageName()=="settings" then
+		ensureRuntimePageBuilt("settings")
+	end
 end
 
 activeCapture=nil
@@ -327,12 +331,15 @@ end
 rebuildPage2FromModules=function()
 	activeCapture=nil
 	clearPage2()
-	buildPage2()
+	LAZY_PAGE_BUILT.page2=false
+	if getActivePageName and getActivePageName()=="page2" then
+		ensureRuntimePageBuilt("page2")
+	end
 	if refreshFooterResetButton then pcall(refreshFooterResetButton) end
 	if applyUIStrokeTheme then pcall(applyUIStrokeTheme) end
 end
 
-buildPage2()
+LAZY_PAGE_BUILDERS.page2=buildPage2
 refreshFooterResetButton()
 
 resetKeybindPresetPageDefaults=function()
