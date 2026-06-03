@@ -27,6 +27,32 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		ZIndex=7,
 	},parent)
 
+	local outerGlow=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.new(0.5,0,0.5,0),
+		Size=UDim2.fromOffset(30,30),
+		BackgroundColor3=THEME.GREEN,
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		ZIndex=6,
+	},switch)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},outerGlow)
+
+	local halo=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.new(0.5,0,0.5,0),
+		Size=UDim2.fromOffset(31,31),
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		ZIndex=8,
+	},switch)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},halo)
+	local haloStroke=New("UIStroke",{
+		Color=THEME.GREEN,
+		Thickness=1.4,
+		Transparency=1,
+	},halo)
+
 	local glow=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
 		Position=UDim2.new(0.5,0,0.5,0),
@@ -38,6 +64,16 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	},switch)
 	New("UICorner",{CornerRadius=UDim.new(1,0)},glow)
 
+	local ringClip=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.new(0.5,0,0.5,0),
+		Size=UDim2.fromOffset(28,28),
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		ClipsDescendants=true,
+		ZIndex=9,
+	},switch)
+
 	local fillValue=Instance.new("NumberValue")
 	fillValue.Name="FillProgress"
 	fillValue.Parent=switch
@@ -48,7 +84,7 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	for i=1,segmentCount do
 		local degrees=-88+((i-1)/segmentCount)*360
 		local radians=math.rad(degrees)
-		local radius=12
+		local radius=11.5
 		local x=math.cos(radians)*radius
 		local y=math.sin(radians)*radius
 
@@ -61,19 +97,19 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 			BorderSizePixel=0,
 			Rotation=degrees+90,
 			ZIndex=9,
-		},switch)
+		},ringClip)
 		New("UICorner",{CornerRadius=UDim.new(1,0)},base)
 
 		local fill=New("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
 			Position=UDim2.new(0.5,x,0.5,y),
-			Size=UDim2.fromOffset(2,5),
+			Size=UDim2.fromOffset(2,4),
 			BackgroundColor3=THEME.GREEN,
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
 			Rotation=degrees+90,
 			ZIndex=10,
-		},switch)
+		},ringClip)
 		New("UICorner",{CornerRadius=UDim.new(1,0)},fill)
 
 		segments[i]={base=base,fill=fill}
@@ -122,6 +158,10 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 			end
 			glow.BackgroundTransparency=animate and 1 or 0.84
 			glow.Size=UDim2.fromOffset(20,20)
+			outerGlow.BackgroundTransparency=animate and 1 or 0.93
+			outerGlow.Size=UDim2.fromOffset(30,30)
+			haloStroke.Transparency=animate and 1 or 0.48
+			haloStroke.Thickness=animate and 1.4 or 2
 
 			for _,segment in ipairs(segments) do
 				segment.base.BackgroundColor3=off
@@ -131,6 +171,8 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 			fillTween=TweenService:Create(fillValue,TweenInfo.new(0.44,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Value=1})
 			fillTween:Play()
 			tween(glow,0.24,{BackgroundTransparency=0.84,Size=UDim2.fromOffset(38,38)})
+			tween(outerGlow,0.28,{BackgroundTransparency=0.9,Size=UDim2.fromOffset(44,44)})
+			tween(haloStroke,0.22,{Transparency=0.34,Thickness=2.4})
 		else
 			if not animate then
 				fillValue.Value=0
@@ -142,6 +184,8 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 			fillTween=TweenService:Create(fillValue,TweenInfo.new(0.34,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Value=0})
 			fillTween:Play()
 			tween(glow,0.18,{BackgroundTransparency=1,Size=UDim2.fromOffset(20,20)})
+			tween(outerGlow,0.2,{BackgroundTransparency=1,Size=UDim2.fromOffset(30,30)})
+			tween(haloStroke,0.16,{Transparency=1,Thickness=1.4})
 		end
 
 		updateSegments(fillValue.Value)
