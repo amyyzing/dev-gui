@@ -621,23 +621,25 @@ loaderOverlay=New("Frame",{
 
 loaderBackdropA=New("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
-	Position=UDim2.new(0.5,-160,0.5,-96),
+	Position=UDim2.new(0.5,-44,0.5,-28),
 	Size=UDim2.fromOffset(2,2),
 	BackgroundColor3=THEME.GREEN,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ZIndex=LOADER_Z,
 },loaderOverlay)
+New("UICorner",{CornerRadius=UDim.new(1,0)},loaderBackdropA)
 
 loaderBackdropB=New("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
-	Position=UDim2.new(0.5,180,0.5,94),
+	Position=UDim2.new(0.5,52,0.5,34),
 	Size=UDim2.fromOffset(2,2),
 	BackgroundColor3=THEME.BLUE,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ZIndex=LOADER_Z,
 },loaderOverlay)
+New("UICorner",{CornerRadius=UDim.new(1,0)},loaderBackdropB)
 
 loaderBox=New("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
@@ -694,6 +696,7 @@ loaderTrack=New("Frame",{
 	BackgroundColor3=THEME.PANEL,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
+	ClipsDescendants=true,
 	ZIndex=LOADER_Z+2,
 },loaderBox)
 
@@ -759,8 +762,8 @@ function showLoader()
 			if loaderBoxScale then loaderBoxScale.Scale=0.92 end
 			if loaderAccent then loaderAccent.Size=UDim2.new(0,0,0,2) end
 		end,
-		{loaderBackdropA,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.24,{BackgroundTransparency=0.92,Size=UDim2.fromOffset(520,260)}},
-		{loaderBackdropB,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.24,{BackgroundTransparency=0.94,Size=UDim2.fromOffset(460,220)}},
+		{loaderBackdropA,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.24,{BackgroundTransparency=0.965,Size=UDim2.fromOffset(360,170)}},
+		{loaderBackdropB,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.24,{BackgroundTransparency=0.972,Size=UDim2.fromOffset(320,150)}},
 		{loaderBox,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.18,{BackgroundTransparency=0}},
 		{loaderBoxScale,Enum.EasingDirection.Out,Enum.EasingStyle.Back,0.22,{Scale=1}},
 	},true)
