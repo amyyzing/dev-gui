@@ -32,6 +32,7 @@ local QB_AIRBORNE_VY_EPSILON=2
 local QB_Y_RISE_FACTOR=0
 local QB_Y_FALL_FACTOR=0
 local QB_Y_MAX_CORRECTION=4.25
+local C2_GROUND_FALLBACK_MARGIN=2.5
 local MIN_T,MAX_T,DT=0.35,6,0.01
 local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
@@ -950,7 +951,9 @@ function QBAim.new(ctx,parent)
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
 		local horizontal=Vector3.new(rootVelocity.X,0,rootVelocity.Z)*QB_RELEASE_DELAY*QB_XZ_RELEASE_FACTOR
 		local basePosition=ball and ball.Position or qbRoot.Position
-		local y=c2Y() or basePosition.Y
+		local baseY=basePosition.Y
+		local centerY=c2Y()
+		local y=centerY and centerY>=baseY-C2_GROUND_FALLBACK_MARGIN and centerY or baseY
 
 		return Vector3.new(basePosition.X+horizontal.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+horizontal.Z)
 	end
