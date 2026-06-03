@@ -27,36 +27,6 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		ZIndex=7,
 	},parent)
 
-	local softHalo=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.new(0.5,0,0.5,0),
-		Size=UDim2.fromOffset(33,33),
-		BackgroundTransparency=1,
-		BorderSizePixel=0,
-		ZIndex=6,
-	},switch)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},softHalo)
-	local softHaloStroke=New("UIStroke",{
-		Color=THEME.GREEN,
-		Thickness=2.2,
-		Transparency=1,
-	},softHalo)
-
-	local halo=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.new(0.5,0,0.5,0),
-		Size=UDim2.fromOffset(31,31),
-		BackgroundTransparency=1,
-		BorderSizePixel=0,
-		ZIndex=8,
-	},switch)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},halo)
-	local haloStroke=New("UIStroke",{
-		Color=THEME.GREEN,
-		Thickness=1.4,
-		Transparency=1,
-	},halo)
-
 	local ringClip=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
 		Position=UDim2.new(0.5,0,0.5,0),
@@ -80,6 +50,7 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		local radius=11.5
 		local x=math.cos(radians)*radius
 		local y=math.sin(radians)*radius
+		local revealStart=math.clamp((y+radius)/(radius*2),0,1)*0.82
 
 		local base=New("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
@@ -105,7 +76,7 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		},base)
 		New("UICorner",{CornerRadius=UDim.new(1,0)},fill)
 
-		segments[i]={base=base,fill=fill}
+		segments[i]={base=base,fill=fill,revealStart=revealStart}
 	end
 
 	local hit=New("TextButton",{
@@ -121,18 +92,12 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 
 	local function updateSegments(progress)
 		progress=math.clamp(tonumber(progress) or 0,0,1)
-		local scaled=progress*segmentCount
+		local revealBand=0.18
 
-		for i,segment in ipairs(segments) do
-			local visible=math.clamp(scaled-(i-1),0,1)
+		for _,segment in ipairs(segments) do
+			local visible=math.clamp((progress-segment.revealStart)/revealBand,0,1)
 			segment.fill.BackgroundTransparency=1-(visible*0.94)
 			segment.base.BackgroundTransparency=state and 0.62 or 0.48
-		end
-	end
-
-	local function tween(obj,duration,props,style,direction)
-		if obj and obj.Parent then
-			TweenService:Create(obj,TweenInfo.new(duration,style or Enum.EasingStyle.Quad,direction or Enum.EasingDirection.Out),props):Play()
 		end
 	end
 
@@ -149,10 +114,6 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 			if not animate then
 				fillValue.Value=1
 			end
-			softHaloStroke.Transparency=animate and 1 or 0.76
-			softHaloStroke.Thickness=animate and 2.2 or 3.2
-			haloStroke.Transparency=animate and 1 or 0.48
-			haloStroke.Thickness=animate and 1.4 or 2
 
 			for _,segment in ipairs(segments) do
 				segment.base.BackgroundColor3=off
@@ -161,8 +122,6 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 
 			fillTween=TweenService:Create(fillValue,TweenInfo.new(0.44,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Value=1})
 			fillTween:Play()
-			tween(softHaloStroke,0.28,{Transparency=0.68,Thickness=4.2})
-			tween(haloStroke,0.22,{Transparency=0.34,Thickness=2.4})
 		else
 			if not animate then
 				fillValue.Value=0
@@ -173,8 +132,6 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 
 			fillTween=TweenService:Create(fillValue,TweenInfo.new(0.34,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Value=0})
 			fillTween:Play()
-			tween(softHaloStroke,0.18,{Transparency=1,Thickness=2.2})
-			tween(haloStroke,0.16,{Transparency=1,Thickness=1.4})
 		end
 
 		updateSegments(fillValue.Value)
