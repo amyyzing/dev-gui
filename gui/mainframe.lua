@@ -779,35 +779,25 @@ function MainFrame.new(ctx)
 
 	fab.MouseButton1Click:Connect(restore)
 
+	local dragConn=nil
+
 	do
 		local dragging=false
 		local startMouse,startPos
 		local lastDragTween=0
 		local lastDragTarget=nil
 
-		header.InputBegan:Connect(function(i)
-			if i.UserInputType==Enum.UserInputType.MouseButton1 then
-				dragging=true
-				startMouse=UIS:GetMouseLocation()
-				startPos=root.Position
-				lastDragTween=0
-				lastDragTarget=nil
+		local function stopDrag()
+			dragging=false
+			safeDisconnect(dragConn)
+			dragConn=nil
+		end
 
-				if rootPositionTween then
-					rootPositionTween:Cancel()
-					rootPositionTween=nil
-				end
+		local function updateDrag()
+			if not isAlive() then
+				stopDrag()
+				return
 			end
-		end)
-
-		UIS.InputEnded:Connect(function(i)
-			if i.UserInputType==Enum.UserInputType.MouseButton1 then
-				dragging=false
-			end
-		end)
-
-		RunService.RenderStepped:Connect(function()
-			if not isAlive() or not dragging then return end
 
 			local cur=UIS:GetMouseLocation()
 			local scale=uiScale.Scale
@@ -823,6 +813,30 @@ function MainFrame.new(ctx)
 					lastDragTarget=target
 					tweenRootPosition(target,0.075)
 				end
+			end
+		end
+
+		header.InputBegan:Connect(function(i)
+			if i.UserInputType==Enum.UserInputType.MouseButton1 then
+				dragging=true
+				startMouse=UIS:GetMouseLocation()
+				startPos=root.Position
+				lastDragTween=0
+				lastDragTarget=nil
+
+				if rootPositionTween then
+					rootPositionTween:Cancel()
+					rootPositionTween=nil
+				end
+
+				safeDisconnect(dragConn)
+				dragConn=RunService.RenderStepped:Connect(updateDrag)
+			end
+		end)
+
+		UIS.InputEnded:Connect(function(i)
+			if i.UserInputType==Enum.UserInputType.MouseButton1 and dragging then
+				stopDrag()
 			end
 		end)
 	end
@@ -905,6 +919,8 @@ function MainFrame.new(ctx)
 	end
 
 	function api.Destroy()
+		safeDisconnect(dragConn)
+		dragConn=nil
 		pcall(function()
 			ContextActionService:UnbindAction("HitboxUI_MouseInputSink")
 		end)
