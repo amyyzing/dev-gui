@@ -17,6 +17,7 @@ end
 
 local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	local width,height=34,34
+	local segmentCount=32
 	local switch=New("Frame",{
 		AnchorPoint=Vector2.new(1,0.5),
 		Position=UDim2.new(1,0,0.5,0),
@@ -37,60 +38,46 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	},switch)
 	New("UICorner",{CornerRadius=UDim.new(1,0)},glow)
 
-	local baseRing=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.new(0.5,0,0.5,0),
-		Size=UDim2.fromOffset(26,26),
-		BackgroundColor3=THEME.MUTED,
-		BackgroundTransparency=0.4,
-		BorderSizePixel=0,
-		ZIndex=9,
-	},switch)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},baseRing)
+	local fillValue=Instance.new("NumberValue")
+	fillValue.Name="FillProgress"
+	fillValue.Parent=switch
+	fillValue.Value=startState and 1 or 0
+	local fillTween=nil
+	local segments={}
 
-	local baseCutout=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.new(0.5,0,0.5,0),
-		Size=UDim2.fromOffset(16,16),
-		BackgroundColor3=THEME.CARD or THEME.BG,
-		BorderSizePixel=0,
-		ZIndex=10,
-		ThemeRole="SECTION",
-	},baseRing)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},baseCutout)
+	for i=1,segmentCount do
+		local degrees=-88+((i-1)/segmentCount)*360
+		local radians=math.rad(degrees)
+		local radius=12
+		local x=math.cos(radians)*radius
+		local y=math.sin(radians)*radius
 
-	local fillRing=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.new(0.5,0,0.5,0),
-		Size=UDim2.fromOffset(26,26),
-		BackgroundColor3=THEME.GREEN,
-		BackgroundTransparency=1,
-		BorderSizePixel=0,
-		Rotation=-90,
-		ZIndex=11,
-	},switch)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},fillRing)
+		local base=New("Frame",{
+			AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.new(0.5,x,0.5,y),
+			Size=UDim2.fromOffset(2,5),
+			BackgroundColor3=THEME.MUTED,
+			BackgroundTransparency=0.48,
+			BorderSizePixel=0,
+			Rotation=degrees+90,
+			ZIndex=9,
+		},switch)
+		New("UICorner",{CornerRadius=UDim.new(1,0)},base)
 
-	local fillGradient=New("UIGradient",{
-		Rotation=0,
-		Transparency=NumberSequence.new({
-			NumberSequenceKeypoint.new(0,0),
-			NumberSequenceKeypoint.new(0.08,0),
-			NumberSequenceKeypoint.new(0.1,1),
-			NumberSequenceKeypoint.new(1,1),
-		}),
-	},fillRing)
+		local fill=New("Frame",{
+			AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.new(0.5,x,0.5,y),
+			Size=UDim2.fromOffset(2,5),
+			BackgroundColor3=THEME.GREEN,
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			Rotation=degrees+90,
+			ZIndex=10,
+		},switch)
+		New("UICorner",{CornerRadius=UDim.new(1,0)},fill)
 
-	local fillCutout=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.new(0.5,0,0.5,0),
-		Size=UDim2.fromOffset(16,16),
-		BackgroundColor3=THEME.CARD or THEME.BG,
-		BorderSizePixel=0,
-		ZIndex=12,
-		ThemeRole="SECTION",
-	},fillRing)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},fillCutout)
+		segments[i]={base=base,fill=fill}
+	end
 
 	local hit=New("TextButton",{
 		BackgroundTransparency=1,
@@ -102,7 +89,17 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	},switch)
 
 	local state=startState and true or false
-	local animToken=0
+
+	local function updateSegments(progress)
+		progress=math.clamp(tonumber(progress) or 0,0,1)
+		local scaled=progress*segmentCount
+
+		for i,segment in ipairs(segments) do
+			local visible=math.clamp(scaled-(i-1),0,1)
+			segment.fill.BackgroundTransparency=1-(visible*0.94)
+			segment.base.BackgroundTransparency=state and 0.62 or 0.48
+		end
+	end
 
 	local function tween(obj,duration,props,style,direction)
 		if obj and obj.Parent then
@@ -111,50 +108,46 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	end
 
 	local function paint(animate)
-		animToken+=1
-		local token=animToken
 		local accent=THEME.GREEN
 		local off=THEME.MUTED
 
+		if fillTween then
+			fillTween:Cancel()
+			fillTween=nil
+		end
+
 		if state then
-			fillRing.Rotation=animate and -90 or 270
-			fillGradient.Rotation=animate and 0 or 360
-			fillGradient.Enabled=animate
-			fillRing.BackgroundTransparency=animate and 1 or 0
+			if not animate then
+				fillValue.Value=1
+			end
 			glow.BackgroundTransparency=animate and 1 or 0.84
 			glow.Size=UDim2.fromOffset(20,20)
 
-			tween(baseRing,0.16,{BackgroundColor3=off,BackgroundTransparency=0.55})
-			tween(fillRing,0.16,{BackgroundTransparency=0})
-			tween(fillRing,0.42,{Rotation=270},Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
-			tween(fillGradient,0.42,{Rotation=360},Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
-			tween(glow,0.24,{BackgroundTransparency=0.84,Size=UDim2.fromOffset(38,38)})
-
-			task.delay(0.42,function()
-				if token==animToken and state and fillGradient then
-					fillGradient.Enabled=false
-				end
-			end)
-
-			if animate then
-				tween(switch,0.08,{Size=UDim2.fromOffset(width-3,height-3)})
-				task.delay(0.08,function()
-					if token==animToken then
-						tween(switch,0.16,{Size=UDim2.fromOffset(width,height)},Enum.EasingStyle.Back,Enum.EasingDirection.Out)
-					end
-				end)
+			for _,segment in ipairs(segments) do
+				segment.base.BackgroundColor3=off
+				segment.fill.BackgroundColor3=accent
 			end
+
+			fillTween=TweenService:Create(fillValue,TweenInfo.new(0.44,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Value=1})
+			fillTween:Play()
+			tween(glow,0.24,{BackgroundTransparency=0.84,Size=UDim2.fromOffset(38,38)})
 		else
-			fillRing.Rotation=animate and 270 or -90
-			fillGradient.Rotation=animate and 360 or 0
-			fillGradient.Enabled=true
-			tween(baseRing,0.16,{BackgroundColor3=off,BackgroundTransparency=0.4})
-			tween(fillRing,0.28,{Rotation=-90,BackgroundTransparency=1},Enum.EasingStyle.Quart,Enum.EasingDirection.InOut)
-			tween(fillGradient,0.28,{Rotation=0},Enum.EasingStyle.Quart,Enum.EasingDirection.InOut)
+			if not animate then
+				fillValue.Value=0
+			end
+			for _,segment in ipairs(segments) do
+				segment.base.BackgroundColor3=off
+			end
+
+			fillTween=TweenService:Create(fillValue,TweenInfo.new(0.34,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Value=0})
+			fillTween:Play()
 			tween(glow,0.18,{BackgroundTransparency=1,Size=UDim2.fromOffset(20,20)})
-			tween(switch,0.12,{Size=UDim2.fromOffset(width,height)})
 		end
+
+		updateSegments(fillValue.Value)
 	end
+
+	fillValue.Changed:Connect(updateSegments)
 
 	local function setState(value,fire,animate)
 		local nextState=value and true or false

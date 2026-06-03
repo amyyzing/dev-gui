@@ -2,6 +2,7 @@ local KeybindSettings={}
 
 local UIS=game:GetService("UserInputService")
 local TweenService=game:GetService("TweenService")
+local TextService=game:GetService("TextService")
 
 local function inputToBinding(input)
 	local uiType=tostring(input.UserInputType)
@@ -181,6 +182,21 @@ function KeybindSettings.new(ctx,bindSection)
 		},labelButton)
 
 		local hoverTween=nil
+		local function strikeWidth()
+			local measured=TextService:GetTextSize(
+				tostring(labelButton.Text or ""),
+				labelButton.TextSize,
+				labelButton.Font,
+				Vector2.new(1000,math.max(labelButton.AbsoluteSize.Y,30))
+			).X
+
+			if labelButton.AbsoluteSize.X>0 then
+				measured=math.min(measured,labelButton.AbsoluteSize.X)
+			end
+
+			return math.max(0,math.floor(measured+0.5))
+		end
+
 		local function tweenLabel(props)
 			if hoverTween then
 				hoverTween:Cancel()
@@ -193,7 +209,7 @@ function KeybindSettings.new(ctx,bindSection)
 			strike.BackgroundColor3=THEME.STROKE or THEME.GREEN
 			tweenLabel({TextColor3=THEME.STROKE or THEME.GREEN})
 			TweenService:Create(strike,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
-				Size=UDim2.new(1,0,0,1),
+				Size=UDim2.fromOffset(strikeWidth(),1),
 				BackgroundTransparency=0.08,
 			}):Play()
 		end)
@@ -201,7 +217,7 @@ function KeybindSettings.new(ctx,bindSection)
 		labelButton.MouseLeave:Connect(function()
 			tweenLabel({TextColor3=THEME.TEXT})
 			TweenService:Create(strike,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
-				Size=UDim2.new(0,0,0,1),
+				Size=UDim2.fromOffset(0,1),
 				BackgroundTransparency=0.18,
 			}):Play()
 		end)
