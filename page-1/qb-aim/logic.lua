@@ -71,6 +71,10 @@ local CIRCLE_LOS_RATE_EPSILON=1.00
 local CIRCLE_EXTRA_LEAD_TIME_MAX=0.78
 local CIRCLE_BALANCE_LEAD_SCALE_MIN=0.72
 local CIRCLE_BALANCE_LEAD_SCALE_MAX=1.00
+local CIRCLE_TANGENT_REACTIVE_LEAD=0.58
+local CIRCLE_TANGENT_REACTIVE_LOS_GAIN=1.25
+local CIRCLE_TANGENT_ALIGNMENT_BOOST=0.30
+local CIRCLE_TANGENT_BALANCE_BOOST=0.35
 local DIAG_STREAK_SIDE_RATIO_MIN=0.30
 local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
@@ -103,39 +107,12 @@ local function root(character)
 end
 
 local function routeSpeed(speed)
-	local clamped=math.clamp(speed or 0,0,MAX_RUN_SPEED)
+	local clamped=math.clamp(speed,0,MAX_RUN_SPEED)
 	if clamped<ROUTE_LOCK_MIN_SPEED then
 		return 0
 	end
 
 	return MAX_RUN_SPEED
-end
-
-local function safeDisconnectFallback(conn)
-	if conn and typeof(conn)=="RBXScriptConnection" then
-		pcall(function()
-			conn:Disconnect()
-		end)
-	end
-end
-
-local function inputToBindingFallback(input)
-	local key=input.KeyCode
-	if key and key~=Enum.KeyCode.Unknown then
-		return key
-	end
-
-	local uiType=tostring(input.UserInputType)
-	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
-	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
-	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
-	if uiType=="Enum.UserInputType.MouseButton4" then return"MouseButton4" end
-	if uiType=="Enum.UserInputType.MouseButton5" then return"MouseButton5" end
-
-	local name=uiType:gsub("Enum.UserInputType%.","")
-	if name:match("^Gamepad") then return name end
-
-	return nil
 end
 
 local function getModeKey(ctx)
@@ -491,8 +468,8 @@ end
 function QBAim.new(ctx,parent)
 	local New=ctx.New
 	local THEME=ctx.THEME
-	local safeDisconnect=ctx.safeDisconnect or safeDisconnectFallback
-	local inputToBinding=ctx.inputToBinding or inputToBindingFallback
+	local safeDisconnect=ctx.safeDisconnect
+	local inputToBinding=ctx.inputToBinding
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
 	local buildSlider=ctx.buildSlider
@@ -720,6 +697,8 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function c2Y()
+		-- Use the game's original Center.C2 only as a release-height reference.
+		-- Do not read from the cloned preview C2 here, because that creates stale/self-referential C2 values.
 		local center=originalCenter()
 		local c2=center and center:FindFirstChild("C2",true)
 		local cf=c2 and attachmentCFrame(c2)
@@ -940,21 +919,59 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function lockRoute(receiver)
-		-- H locks the receiver only. Route direction is kept reactive at solve time.
-		return nil
+		local receiverRoot=receiver.Character and root(receiver.Character)
+		local data=receiverData[receiver]
+		if not(receiverRoot and data) then return nil end
+
+		local measuredVelocity=flat(data.vel)
+		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
+			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
+		end
+
+		local stableDirection,stableSpeed,stableSource=updateStable(data)
+		local speed=stableSpeed>0 and stableSpeed or routeSpeed(measuredVelocity.Magnitude)
+		if not stableDirection and (measuredVelocity.Magnitude<ROUTE_LOCK_MIN_SPEED or speed<=0) then
+			return nil
+		end
+
+		local ball=getHeldBall()
+		local characterRoot=LP.Character and root(LP.Character)
+		local qbPosition=(ball and ball.Position) or (characterRoot and characterRoot.Position) or receiverRoot.Position
+		local direction=stableDirection or measuredVelocity.Unit
+
+		return{
+			player=receiver,
+			createdAt=os.clock(),
+			routeDir=direction,
+			routeSpeed=speed,
+			routeVelocity=direction*speed,
+			stableSource=stableSource,
+			shape=movementShape(qbPosition,receiverRoot.Position,direction*speed),
+		}
 	end
 
 	local function routeVelocity(receiver,data,origin,receiverRoot,routeLock)
 		local measuredVelocity=data and flat(data.vel) or Vector3.zero
-		local measuredSpeed=measuredVelocity.Magnitude
-
-		if measuredSpeed<ROUTE_LOCK_MIN_SPEED then
-			return Vector3.zero,"standing"
+		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
+			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
 		end
 
-		local direction=measuredVelocity.Unit
-		local velocity=direction*MAX_RUN_SPEED
-		return velocity,movementShape(origin,receiverRoot.Position,velocity)
+		local measuredSpeed=measuredVelocity.Magnitude
+		local adjustedSpeed=routeSpeed(measuredSpeed)
+		local stableDirection,stableSpeed=updateStable(data)
+
+		-- H locks the receiver only. Route direction stays reactive and uses current tracked movement.
+		if stableDirection and stableSpeed>0 then
+			local velocity=stableDirection*stableSpeed
+			return velocity,movementShape(origin,receiverRoot.Position,velocity)
+		end
+
+		if measuredSpeed>=ROUTE_LOCK_MIN_SPEED and adjustedSpeed>0 then
+			local velocity=measuredVelocity.Unit*adjustedSpeed
+			return velocity,movementShape(origin,receiverRoot.Position,velocity)
+		end
+
+		return Vector3.zero,"standing"
 	end
 
 	local function receiverMax(receiverRoot)
@@ -976,10 +993,13 @@ function QBAim.new(ctx,parent)
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
 		local horizontal=Vector3.new(rootVelocity.X,0,rootVelocity.Z)*QB_RELEASE_DELAY*QB_XZ_RELEASE_FACTOR
 		local basePosition=ball and ball.Position or qbRoot.Position
+
+		-- Dynamic C2/release origin:
+		-- QB can jump, so C2 must follow the held football/QB release height instead of a stale/grounded preview attachment.
+		-- Original Center.C2 is only accepted if it is sane relative to the currently held ball.
 		local baseY=basePosition.Y
 		local centerY=c2Y()
 		local y=baseY
-
 		if centerY and centerY>=baseY-C2_GROUND_FALLBACK_MARGIN and centerY<=baseY+C2_MAX_ABOVE_BALL then
 			y=centerY
 		end
@@ -1029,20 +1049,66 @@ function QBAim.new(ctx,parent)
 
 	local function c1Target(receiverRoot,originPosition,targetVelocity,flightTime)
 		local result=components(originPosition,receiverRoot.Position,targetVelocity)
+		local radius=distXZ(originPosition,receiverRoot.Position)
 		local speed=math.max(result.speed,1e-6)
+		local velocityXZ=flat(targetVelocity or Vector3.zero)
+
 		local awayShare=math.clamp(result.away/speed,-1,1)
 		local positiveAwayShare=math.clamp(result.away/speed,0,1)
 		local radialShareAbs=math.clamp(result.awayAbs/speed,0,1)
 		local lateralShare=math.clamp(result.sideAbs/speed,0,1)
+		local routeBalance=1-math.abs(radialShareAbs-lateralShare)
+		local balanceLeadScale=CIRCLE_BALANCE_LEAD_SCALE_MIN+(CIRCLE_BALANCE_LEAD_SCALE_MAX-CIRCLE_BALANCE_LEAD_SCALE_MIN)*routeBalance
 
-		-- Universal moving-target intercept base:
-		-- C1 = WR current max point + WR velocity * flightTime.
-		-- Lead Adjust is optional positive radial/depth bias only; tangent/slant lead stays pure.
-		local flightLead=flat(targetVelocity)*flightTime
-		local radialExtraTime=WR_LEAD_DELAY*positiveAwayShare
-		local radialExtraLead=result.awayDir*math.max(result.away,0)*radialExtraTime
-		local tangentExtraLead=Vector3.zero
-		local extraLead=radialExtraLead
+		local distanceScale=math.clamp(radius/CIRCLE_RADIUS_FULL_LEAD,CIRCLE_DISTANCE_SCALE_MIN,CIRCLE_DISTANCE_SCALE_MAX)
+
+		local radialGain=math.clamp(
+			CIRCLE_RADIAL_EXTRA_BASE+CIRCLE_RADIAL_EXTRA_GAIN*positiveAwayShare,
+			CIRCLE_RADIAL_EXTRA_MIN,
+			CIRCLE_RADIAL_EXTRA_MAX
+		)
+
+		local tangentGain=math.clamp(
+			CIRCLE_TANGENT_EXTRA_BASE+CIRCLE_TANGENT_EXTRA_GAIN*positiveAwayShare,
+			CIRCLE_TANGENT_EXTRA_MIN,
+			CIRCLE_TANGENT_EXTRA_MAX
+		)
+
+		local losRate=result.sideAbs/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
+		local losDamping=1/(1+losRate*CIRCLE_LOS_RATE_GAIN)
+		local reactiveLosDamping=1/(1+losRate*CIRCLE_TANGENT_REACTIVE_LOS_GAIN)
+
+		local tangentAlignment=0
+		if velocityXZ.Magnitude>1e-6 then
+			tangentAlignment=math.abs(velocityXZ.Unit:Dot(result.sideDir))
+		end
+
+		local tangentAlignmentBoost=1+CIRCLE_TANGENT_ALIGNMENT_BOOST*tangentAlignment
+		local tangentBalanceBoost=1+CIRCLE_TANGENT_BALANCE_BOOST*routeBalance
+
+		local radialExtraTime=math.min(
+			WR_LEAD_DELAY*distanceScale*radialGain*balanceLeadScale,
+			CIRCLE_EXTRA_LEAD_TIME_MAX
+		)
+
+		local tangentBaseTime=0
+		local tangentReactiveTime=
+			CIRCLE_TANGENT_REACTIVE_LEAD
+			*distanceScale
+			*lateralShare
+			*reactiveLosDamping
+			*tangentAlignmentBoost
+			*tangentBalanceBoost
+
+		local tangentExtraTime=math.min(
+			tangentReactiveTime,
+			CIRCLE_EXTRA_LEAD_TIME_MAX
+		)
+
+		local flightLead=velocityXZ*flightTime
+		local radialExtraLead=result.awayDir*result.away*radialExtraTime
+		local tangentExtraLead=result.sideDir*result.side*tangentExtraTime
+		local extraLead=radialExtraLead+tangentExtraLead
 		local effectiveExtraTime=result.speed>1e-6 and extraLead.Magnitude/result.speed or 0
 		local targetFlat=flat(receiverRoot.Position)+flightLead+extraLead
 
@@ -1053,19 +1119,25 @@ function QBAim.new(ctx,parent)
 			tangentExtraLeadXZ=tangentExtraLead,
 			extraLeadTime=effectiveExtraTime,
 			radialExtraTime=radialExtraTime,
-			tangentExtraTime=0,
-			distanceXZNow=distXZ(originPosition,receiverRoot.Position),
-			distanceScale=1,
+			tangentExtraTime=tangentExtraTime,
+			tangentBaseTime=tangentBaseTime,
+			tangentReactiveTime=tangentReactiveTime,
+			distanceXZNow=radius,
+			distanceScale=distanceScale,
 			awayShare=awayShare,
 			positiveAwayShare=positiveAwayShare,
 			radialShareAbs=radialShareAbs,
 			lateralShare=lateralShare,
-			routeBalance=1-math.abs(radialShareAbs-lateralShare),
-			balanceLeadScale=1,
-			radialGain=positiveAwayShare,
-			tangentGain=0,
-			losRate=0,
-			losDamping=1,
+			routeBalance=routeBalance,
+			balanceLeadScale=balanceLeadScale,
+			radialGain=radialGain,
+			tangentGain=tangentGain,
+			losRate=losRate,
+			losDamping=losDamping,
+			reactiveLosDamping=reactiveLosDamping,
+			tangentAlignment=tangentAlignment,
+			tangentAlignmentBoost=tangentAlignmentBoost,
+			tangentBalanceBoost=tangentBalanceBoost,
 			routeAway=result.away,
 			routeSide=result.side,
 			routeSpeed=result.speed,
