@@ -41,16 +41,21 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	fillValue.Name="FillProgress"
 	fillValue.Parent=switch
 	fillValue.Value=startState and 1 or 0
+
 	local fillTween=nil
 	local segments={}
 
 	for i=1,segmentCount do
-		local degrees=-88+((i-1)/segmentCount)*360
+		local alpha=(i-1)/segmentCount
+		local degrees=-90+(alpha*360)
 		local radians=math.rad(degrees)
 		local radius=11.5
 		local x=math.cos(radians)*radius
 		local y=math.sin(radians)*radius
-		local revealStart=math.clamp((y+radius)/(radius*2),0,1)*0.82
+
+		-- The old version used the segment's Y position as revealStart.
+		-- That made left/right segments reveal together. This uses circular order instead.
+		local revealStart=alpha
 
 		local base=New("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
@@ -92,7 +97,9 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 
 	local function updateSegments(progress)
 		progress=math.clamp(tonumber(progress) or 0,0,1)
-		local revealBand=0.18
+
+		-- A small feather keeps each segment from popping in too harshly.
+		local revealBand=1/segmentCount
 
 		for _,segment in ipairs(segments) do
 			local visible=math.clamp((progress-segment.revealStart)/revealBand,0,1)
@@ -104,48 +111,51 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	local function paint(animate)
 		local accent=THEME.GREEN
 		local off=THEME.MUTED
+		local target=state and 1 or 0
 
 		if fillTween then
 			fillTween:Cancel()
 			fillTween=nil
 		end
 
-		if state then
-			if not animate then
-				fillValue.Value=1
-			end
-
-			for _,segment in ipairs(segments) do
-				segment.base.BackgroundColor3=off
-				segment.fill.BackgroundColor3=accent
-			end
-
-			fillTween=TweenService:Create(fillValue,TweenInfo.new(0.44,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Value=1})
-			fillTween:Play()
-		else
-			if not animate then
-				fillValue.Value=0
-			end
-			for _,segment in ipairs(segments) do
-				segment.base.BackgroundColor3=off
-			end
-
-			fillTween=TweenService:Create(fillValue,TweenInfo.new(0.34,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Value=0})
-			fillTween:Play()
+		for _,segment in ipairs(segments) do
+			segment.base.BackgroundColor3=off
+			segment.fill.BackgroundColor3=accent
 		end
 
-		updateSegments(fillValue.Value)
+		if not animate then
+			fillValue.Value=target
+			updateSegments(target)
+			return
+		end
+
+		local duration=state and 0.44 or 0.34
+		local direction=state and Enum.EasingDirection.Out or Enum.EasingDirection.InOut
+
+		fillTween=TweenService:Create(
+			fillValue,
+			TweenInfo.new(duration,Enum.EasingStyle.Quad,direction),
+			{Value=target}
+		)
+		fillTween:Play()
 	end
 
-	fillValue.Changed:Connect(updateSegments)
+	local fillChangedConn=fillValue.Changed:Connect(updateSegments)
 
-	local function setState(value,fire,animate)
+	local function setState(value,fire,animate,force)
 		local nextState=value and true or false
 		local changed=nextState~=state
-		state=nextState
-		paint(animate and changed)
 
-		if fire and onChange then
+		-- Avoid repainting when the value is already correct.
+		-- This prevents api.SetEnabled -> toggle.set from cancelling the click animation.
+		if not changed and not force then
+			return
+		end
+
+		state=nextState
+		paint((animate~=false) and changed)
+
+		if fire and changed and onChange then
 			onChange(state)
 		end
 	end
@@ -162,6 +172,16 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		end,
 		get=function()
 			return state
+		end,
+		destroy=function()
+			if fillTween then
+				fillTween:Cancel()
+				fillTween=nil
+			end
+			safeDisconnect(fillChangedConn)
+			if switch then
+				switch:Destroy()
+			end
 		end,
 		wrap=switch,
 		width=width,
@@ -211,6 +231,18 @@ function RemoveAds.new(ctx,page)
 		if not statusLabel then return end
 		statusLabel.Text=text
 		statusLabel.TextColor3=color or THEME.MUTED
+	end
+
+	local function syncToggleVisual(value)
+		if not toggle then return end
+
+		if toggle.get and toggle.get()==(value and true or false) then
+			return
+		end
+
+		if toggle.set then
+			toggle.set(value)
+		end
 	end
 
 	local function removeInstance(inst,parent)
@@ -311,10 +343,7 @@ function RemoveAds.new(ctx,page)
 
 	function api.SetEnabled(state,fire)
 		enabled=state and isGameplay() or false
-
-		if toggle then
-			toggle.set(enabled)
-		end
+		syncToggleVisual(enabled)
 
 		if enabled then
 			watchAdsFolder()
@@ -336,9 +365,7 @@ function RemoveAds.new(ctx,page)
 			return
 		end
 
-		if toggle then
-			toggle.set(enabled)
-		end
+		syncToggleVisual(enabled)
 
 		if enabled then
 			watchAdsFolder()
@@ -352,6 +379,10 @@ function RemoveAds.new(ctx,page)
 		enabled=false
 		disconnectWatchers()
 		restoreAds()
+		if toggle and toggle.destroy then
+			toggle.destroy()
+		end
+		toggle=nil
 	end
 
 	local function findHeader(section)
