@@ -1,93 +1,5 @@
 local QBAim={}
 
---[[
-QB Aim module synopsis
-
-Goal
-----
-This module predicts where a locked receiver will be when the football arrives,
-then sends the game a far-away aim point in that direction. It also draws the
-preview beam so the user can see the calculated arc before throwing.
-
-The script does not try to simulate every server detail. Instead, it uses a
-small projectile model that matches the useful parts of the football behavior:
-a fixed launch speed, a fixed downward gravity value, and a receiver lead based
-on recent movement.
-
-Coordinate model
-----------------
-Roblox positions are Vector3 values:
-- X and Z are horizontal field movement.
-- Y is vertical height.
-
-Most route math uses only X/Z. The helper `flat(v)` removes Y so receiver speed
-and receiver direction are not polluted by jumping, falling, or animation bob.
-
-Projectile math
----------------
-The ball is modeled with:
-
-	position(t) = origin + velocity * t + 0.5 * gravity * t^2
-
-Here `gravity` is `G = Vector3.new(0, -BALL_G, 0)`, so only Y curves downward.
-The old solver asked "what velocity would hit this target at time t?" The fixed
-speed solver now asks "for what time t does the needed velocity have magnitude
-95?" That keeps the local physics speed separate from the remote/display power.
-
-	r = receiverCatchPoint - origin
-	relVel = receiverVelocityXZ - QB_INHERITANCE * qbVelocityXZ
-	w(t) = r + relVel * t - 0.5 * G * t^2
-	F(t) = |w(t)|^2 - MODEL_BALL_SPEED^2 * t^2
-
-When F(t) is zero, `w(t) / t` is exactly the throw velocity needed for a
-95-speed ball to meet the receiver at that time.
-
-Why the solver loops through time
----------------------------------
-There may be zero, one, or multiple valid arcs. The solver scans from `MIN_T`
-to `MAX_T`, brackets sign changes in F(t), then refines those brackets with
-bisection. It also tracks the nearest speed residual so grazing near-roots are
-not missed.
-
-Only real or near-real 95-speed intercepts are accepted. If no valid intercept
-exists, the solver returns nil instead of falling back to a least-bad throw.
-
-Receiver lead math
-------------------
-Lead now comes directly from the receiver's horizontal velocity:
-
-	receiver(t) = receiverCatchPoint + receiverVelocityXZ * t
-
-This makes directly-away, diagonal-away, and crossing routes all the same kind
-of vector problem. The C1/catch target uses `WR_MAX_Y`, which estimates a
-practical receiver catch height from jump power and player gravity:
-
-	max jump height ~= jumpPower^2 / (2 * gravity)
-
-Preview beam math
------------------
-The preview uses three attachment points:
-- C2: throw origin.
-- C1: predicted catch/target point.
-- C3: landing point after the catch-time arc continues downward.
-
-The beam attachments are pointed along the ball velocity so the Roblox Beam
-curves in the same direction as the predicted throw. `PREVIEW_BEAM_ROLL` rotates
-the beam ribbon 90 degrees for visual orientation only; it does not change the
-throw math. Preview point lerping is time-based so different frame rates do not
-make the arc feel more or less jumpy. A short missing-ball grace window prevents
-the preview from flickering when the held-ball detection misses for a frame.
-
-Important tuning knobs
-----------------------
-- `MODEL_BALL_SPEED`: speed used by the local prediction model.
-- `BALL_G`: downward acceleration used by the local ball model.
-- `MIN_T`, `MAX_T`, `DT`: search range and precision for flight time.
-- `SPEED_TOLERANCE` and `CATCH_TOLERANCE`: near-root acceptance limits.
-- `QB_INHERITANCE`: optional QB velocity inheritance calibration.
-- `PREVIEW_SMOOTH` and `PREVIEW_MISSING_BALL_GRACE`: preview stability.
-]]
-
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
 local UIS=game:GetService("UserInputService")
@@ -99,10 +11,10 @@ local LP=Players.LocalPlayer
 local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local MODEL_BALL_SPEED=95
-local REMOTE_DISPLAY_POWER=100 -- send to remote; server converts incoming UpdateFootball Power to 95
+local REMOTE_DISPLAY_POWER=100
 local GAMEPLAY_BALL_POWER=MODEL_BALL_SPEED
 local SQUADS_BALL_POWER=MODEL_BALL_SPEED
-local QB_INHERITANCE=0
+local POINT_A_VELOCITY_INHERITANCE=0
 local INTERCEPT_BISECTION_STEPS=12
 local SPEED_TOLERANCE=1.25
 local CATCH_TOLERANCE=2.0
@@ -1047,34 +959,34 @@ function QBAim.new(ctx,parent)
 		return Vector3.new(basePosition.X+horizontal.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+horizontal.Z)
 	end
 
-	local function ballAt(originPosition,velocity,time)
-		return originPosition+velocity*time+0.5*G*time*time
+	local function ballAt(pointA,velocity,time)
+		return pointA+velocity*time+0.5*G*time*time
 	end
 
-	local function landing(originPosition,velocity)
-		local discriminant=velocity.Y*velocity.Y+2*BALL_G*originPosition.Y
+	local function landing(pointA,velocity)
+		local discriminant=velocity.Y*velocity.Y+2*BALL_G*pointA.Y
 		if discriminant<0 then return nil,nil end
 
 		local time=(velocity.Y+math.sqrt(discriminant))/BALL_G
 		if time<=0 then return nil,nil end
 
-		return ballAt(originPosition,velocity,time),time
+		return ballAt(pointA,velocity,time),time
 	end
 
-	local function interceptVector(time,offset,relativeVelocity)
-		return offset+relativeVelocity*time-0.5*G*time*time
+	local function radarVector(time,pointAToPointB,pointBRelativeVelocity)
+		return pointAToPointB+pointBRelativeVelocity*time-0.5*G*time*time
 	end
 
-	local function interceptF(time,offset,relativeVelocity,ballSpeed)
-		local w=interceptVector(time,offset,relativeVelocity)
-		return w:Dot(w)-ballSpeed*ballSpeed*time*time
+	local function radarInterceptF(time,pointAToPointB,pointBRelativeVelocity,ballSpeed)
+		local radarPath=radarVector(time,pointAToPointB,pointBRelativeVelocity)
+		return radarPath:Dot(radarPath)-ballSpeed*ballSpeed*time*time
 	end
 
-	local function refineInterceptRoot(lowTime,highTime,offset,relativeVelocity,ballSpeed)
-		local lowValue=interceptF(lowTime,offset,relativeVelocity,ballSpeed)
+	local function refineRadarRoot(lowTime,highTime,pointAToPointB,pointBRelativeVelocity,ballSpeed)
+		local lowValue=radarInterceptF(lowTime,pointAToPointB,pointBRelativeVelocity,ballSpeed)
 		for _=1,INTERCEPT_BISECTION_STEPS do
 			local midTime=(lowTime+highTime)*0.5
-			local midValue=interceptF(midTime,offset,relativeVelocity,ballSpeed)
+			local midValue=radarInterceptF(midTime,pointAToPointB,pointBRelativeVelocity,ballSpeed)
 			if math.abs(midValue)<1e-6 then
 				return midTime
 			elseif (lowValue<=0 and midValue>=0) or (lowValue>=0 and midValue<=0) then
@@ -1088,42 +1000,42 @@ function QBAim.new(ctx,parent)
 		return(lowTime+highTime)*0.5
 	end
 
-	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower)
+	local function solve(qbRoot,ball,receiverRoot,pointBVelocityInput,shape,ballPower)
 		local ballSpeed=MODEL_BALL_SPEED
-		local originPosition=origin(qbRoot,ball)
-		local receiverCatchPoint=receiverMax(receiverRoot)
-		local receiverVelocity=flat(targetVelocity or Vector3.zero)
-		local qbVelocity=flat(qbRoot.AssemblyLinearVelocity or Vector3.zero)
-		local relativeVelocity=receiverVelocity-qbVelocity*QB_INHERITANCE
-		local offset=receiverCatchPoint-originPosition
-		local distance=distXZ(originPosition,receiverCatchPoint)
-		local best=nil
-		local bestNear=nil
+		local pointA=origin(qbRoot,ball)
+		local pointB=receiverMax(receiverRoot)
+		local pointBVelocity=flat(pointBVelocityInput or Vector3.zero)
+		local pointAVelocity=flat(qbRoot.AssemblyLinearVelocity or Vector3.zero)
+		local pointBRelativeVelocity=pointBVelocity-pointAVelocity*POINT_A_VELOCITY_INHERITANCE
+		local pointAToPointB=pointB-pointA
+		local pointADistance=distXZ(pointA,pointB)
+		local bestPlan=nil
+		local bestNearPlan=nil
 
-		local function candidateAt(time,source)
+		local function planAt(time,source)
 			if time<MIN_T or time>MAX_T then return nil end
 
-			local w=interceptVector(time,offset,relativeVelocity)
-			local requiredVelocity=w/time
-			local requiredSpeed=requiredVelocity.Magnitude
-			if requiredSpeed<1e-6 then return nil end
+			local radarPath=radarVector(time,pointAToPointB,pointBRelativeVelocity)
+			local neededBallVelocity=radarPath/time
+			local neededBallSpeed=neededBallVelocity.Magnitude
+			if neededBallSpeed<1e-6 then return nil end
 
-			local throwDirection=requiredVelocity.Unit
-			local angle=math.deg(math.asin(math.clamp(throwDirection.Y,-1,1)))
+			local aimDirection=neededBallVelocity.Unit
+			local angle=math.deg(math.asin(math.clamp(aimDirection.Y,-1,1)))
 			if angle<GLOBAL_MIN_ANGLE or angle>GLOBAL_MAX_ANGLE then
 				return nil
 			end
 
-			local speedError=math.abs(requiredSpeed-ballSpeed)
+			local speedError=math.abs(neededBallSpeed-ballSpeed)
 			local missEstimate=speedError*time
-			local throwVelocity=throwDirection*ballSpeed
-			local worldVelocity=throwVelocity+qbVelocity*QB_INHERITANCE
-			local target=receiverCatchPoint+receiverVelocity*time
-			local catchPosition=ballAt(originPosition,worldVelocity,time)
-			local totalError=(catchPosition-target).Magnitude
+			local throwVelocity=aimDirection*ballSpeed
+			local worldVelocity=throwVelocity+pointAVelocity*POINT_A_VELOCITY_INHERITANCE
+			local futurePointB=pointB+pointBVelocity*time
+			local ballPointAtTime=ballAt(pointA,worldVelocity,time)
+			local missDistance=(ballPointAtTime-futurePointB).Magnitude
 			local verticalVelocityAtCatch=worldVelocity.Y+G.Y*time
-			local landingPosition,landingTime=landing(originPosition,worldVelocity)
-			local interceptResidual=math.abs(interceptF(time,offset,relativeVelocity,ballSpeed))
+			local landingPosition,landingTime=landing(pointA,worldVelocity)
+			local interceptResidual=math.abs(radarInterceptF(time,pointAToPointB,pointBRelativeVelocity,ballSpeed))
 			local risingPenalty=verticalVelocityAtCatch>0 and verticalVelocityAtCatch*2 or 0
 			local anglePenalty=angle<0 and -angle*2 or math.max(angle-40,0)*0.25
 			local score=speedError*100+missEstimate*50+risingPenalty+anglePenalty+time*0.1
@@ -1131,24 +1043,24 @@ function QBAim.new(ctx,parent)
 			return{
 				score=score,
 				time=time,
-				origin=originPosition,
-				target=target,
-				c1Point=target,
-				requiredVelocity=requiredVelocity,
-				requiredSpeed=requiredSpeed,
-				direction=throwDirection,
+				origin=pointA,
+				target=futurePointB,
+				c1Point=futurePointB,
+				requiredVelocity=neededBallVelocity,
+				requiredSpeed=neededBallSpeed,
+				direction=aimDirection,
 				throwVelocity=throwVelocity,
 				worldVelocity=worldVelocity,
 				velocity=worldVelocity,
 				speed=ballSpeed,
-				aimPoint=originPosition+throwDirection*AIM_SCALE,
+				aimPoint=pointA+aimDirection*AIM_SCALE,
 				angleDeg=angle,
-				totalErr=totalError,
+				totalErr=missDistance,
 				speedError=speedError,
-				ballAtCatch=catchPosition,
+				ballAtCatch=ballPointAtTime,
 				landing=landingPosition,
 				landingTime=landingTime,
-				flatDistNow=distance,
+				flatDistNow=pointADistance,
 				movementShape=shape,
 				verticalVelocityAtCatch=verticalVelocityAtCatch,
 				interceptResidual=interceptResidual,
@@ -1162,25 +1074,25 @@ function QBAim.new(ctx,parent)
 		end
 
 		local function considerRoot(time)
-			local candidate=candidateAt(time,"root")
-			if isAcceptable(candidate) and (not best or candidate.score<best.score) then
-				best=candidate
+			local candidate=planAt(time,"root")
+			if isAcceptable(candidate) and (not bestPlan or candidate.score<bestPlan.score) then
+				bestPlan=candidate
 			end
 		end
 
 		local function considerNear(time)
-			local candidate=candidateAt(time,"near")
-			if candidate and (not bestNear or candidate.missEstimate<bestNear.missEstimate) then
-				bestNear=candidate
+			local candidate=planAt(time,"near")
+			if candidate and (not bestNearPlan or candidate.missEstimate<bestNearPlan.missEstimate) then
+				bestNearPlan=candidate
 			end
 		end
 
 		local previousTime=MIN_T
-		local previousValue=interceptF(previousTime,offset,relativeVelocity,ballSpeed)
+		local previousValue=radarInterceptF(previousTime,pointAToPointB,pointBRelativeVelocity,ballSpeed)
 		considerNear(previousTime)
 
 		for time=MIN_T+DT,MAX_T,DT do
-			local value=interceptF(time,offset,relativeVelocity,ballSpeed)
+			local value=radarInterceptF(time,pointAToPointB,pointBRelativeVelocity,ballSpeed)
 			considerNear(time)
 
 			if previousValue==0 then
@@ -1188,18 +1100,18 @@ function QBAim.new(ctx,parent)
 			elseif value==0 then
 				considerRoot(time)
 			elseif (previousValue<0 and value>0) or (previousValue>0 and value<0) then
-				considerRoot(refineInterceptRoot(previousTime,time,offset,relativeVelocity,ballSpeed))
+				considerRoot(refineRadarRoot(previousTime,time,pointAToPointB,pointBRelativeVelocity,ballSpeed))
 			end
 
 			previousTime=time
 			previousValue=value
 		end
 
-		if not best and isAcceptable(bestNear) then
-			best=bestNear
+		if not bestPlan and isAcceptable(bestNearPlan) then
+			bestPlan=bestNearPlan
 		end
 
-		return best
+		return bestPlan
 	end
 
 
@@ -1506,9 +1418,9 @@ function QBAim.new(ctx,parent)
 			return nil
 		end
 
-		local originPosition=origin(qbRoot,ball)
-		local targetVelocity,shape=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
-		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower()),ball
+		local pointA=origin(qbRoot,ball)
+		local pointBVelocity,shape=routeVelocity(receiver,data,pointA,receiverRoot,selectedRouteLock)
+		return solve(qbRoot,ball,receiverRoot,pointBVelocity,shape,ballPower or currentBallPower()),ball
 	end
 
 	local function buildReleasePlan(receiver,ballPower)
@@ -1545,7 +1457,7 @@ function QBAim.new(ctx,parent)
 			return false,"Gameplay ReEvent missing"
 		end
 
-		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=REMOTE_DISPLAY_POWER}) -- must be 100, not plan.speed/95
+		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=REMOTE_DISPLAY_POWER})
 		pcall(function()
 			local variables=require(LP.PlayerScripts.ClientMain.Utilities.Variables)
 			if variables.Mechanics and variables.Mechanics.UnequipFootball then
@@ -1565,7 +1477,7 @@ function QBAim.new(ctx,parent)
 		reEvent:FireServer("Mechanics","ThrowBall",{
 			Target=plan.aimPoint,
 			AutoThrow=false,
-			Power=REMOTE_DISPLAY_POWER, -- must be 100, not plan.speed/95
+			Power=REMOTE_DISPLAY_POWER,
 		})
 
 		return true,nil
