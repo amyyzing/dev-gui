@@ -687,6 +687,13 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
+	local function c2Y()
+		local center=originalCenter()
+		local c2=center and center:FindFirstChild("C2",true)
+		local cf=c2 and attachmentCFrame(c2)
+		return cf and cf.Position.Y
+	end
+
 	local function arcRig()
 		local original,folder=originalCenter()
 		if not(original and folder) then return nil end
@@ -943,7 +950,7 @@ function QBAim.new(ctx,parent)
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
 		local horizontal=Vector3.new(rootVelocity.X,0,rootVelocity.Z)*QB_RELEASE_DELAY*QB_XZ_RELEASE_FACTOR
 		local basePosition=ball and ball.Position or qbRoot.Position
-		local y=basePosition.Y
+		local y=c2Y() or basePosition.Y
 
 		return Vector3.new(basePosition.X+horizontal.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+horizontal.Z)
 	end
