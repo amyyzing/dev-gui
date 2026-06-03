@@ -9,24 +9,6 @@ local PARAMS={
 	SprintStaminaDepleteRate="staminaDepleteValue",
 }
 
-local function safeDisconnect(conn)
-	if conn and typeof(conn)=="RBXScriptConnection" then
-		pcall(function()
-			conn:Disconnect()
-		end)
-	end
-end
-
-local function safeDisconnectAll(t)
-	if not t then return end
-
-	for _,conn in ipairs(t) do
-		safeDisconnect(conn)
-	end
-
-	table.clear(t)
-end
-
 local function clampStaminaDeplete(value)
 	local n=tonumber(value)
 	if not n then return 10 end
@@ -34,6 +16,7 @@ local function clampStaminaDeplete(value)
 end
 
 function GameParams.new(ctx,parent)
+	local safeDisconnect=ctx.safeDisconnect
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
 	local buildToggleRow=ctx.buildToggleRow
@@ -50,6 +33,16 @@ function GameParams.new(ctx,parent)
 	local folderConns=setmetatable({}, {__mode="k"})
 	local valueConns=setmetatable({}, {__mode="k"})
 	local applying=false
+
+	local function safeDisconnectAll(t)
+		if not t then return end
+
+		for _,conn in ipairs(t) do
+			safeDisconnect(conn)
+		end
+
+		table.clear(t)
+	end
 
 	local function changed()
 		if ctx.onChanged then pcall(ctx.onChanged,state) end

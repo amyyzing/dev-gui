@@ -1,13 +1,5 @@
 local MapCleaner={}
 
-local function safeDisconnect(conn)
-	if conn and typeof(conn)=="RBXScriptConnection" then
-		pcall(function()
-			conn:Disconnect()
-		end)
-	end
-end
-
 local function firstChild(parent)
 	if not parent then return nil end
 	return parent:GetChildren()[1]
@@ -48,6 +40,7 @@ end
 function MapCleaner.new(ctx,page)
 	local New=ctx.New
 	local THEME=ctx.THEME
+	local safeDisconnect=ctx.safeDisconnect
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
 	local getCurrentModeKey=ctx.getCurrentModeKey or function() return "mode1" end

@@ -1,13 +1,5 @@
 local AntiMaterial={}
 
-local function safeDisconnect(conn)
-	if conn and typeof(conn)=="RBXScriptConnection" then
-		pcall(function()
-			conn:Disconnect()
-		end)
-	end
-end
-
 local function ensureWorldSettings(ctx)
 	local ws=ctx.WORLD_SETTINGS or ctx.WorldSettings or {}
 
@@ -35,6 +27,7 @@ end
 
 function AntiMaterial.new(ctx,page)
 	local THEME=ctx.THEME
+	local safeDisconnect=ctx.safeDisconnect
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
 

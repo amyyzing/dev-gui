@@ -12,14 +12,6 @@ local VALID_TEAM_IDS={
 	AwayTeam=true,
 }
 
-local function safeDisconnect(conn)
-	if conn and typeof(conn)=="RBXScriptConnection" then
-		pcall(function()
-			conn:Disconnect()
-		end)
-	end
-end
-
 local function firstChild(parent)
 	if not parent then return nil end
 	return parent:GetChildren()[1]
@@ -81,6 +73,7 @@ local function makeNoop()
 end
 
 function ESP.new(ctx,parent)
+	local safeDisconnect=ctx.safeDisconnect
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
 	local inputToBinding=ctx.inputToBinding
@@ -103,7 +96,7 @@ function ESP.new(ctx,parent)
 
 	if DefenseModule and DefenseModule.new then
 		local ok,result=pcall(function()
-			return DefenseModule.new({THEME=THEME})
+			return DefenseModule.new({THEME=THEME,safeDisconnect=safeDisconnect})
 		end)
 		defenseApi=ok and result or makeNoop()
 	else

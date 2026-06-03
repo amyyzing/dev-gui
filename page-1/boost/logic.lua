@@ -13,30 +13,10 @@ local DEFAULT_RADIUS=10
 local TOGGLE_JB_KEY=Enum.KeyCode.Unknown
 local TOGGLE_AB_KEY=Enum.KeyCode.Unknown
 
-local function safeDisconnect(conn)
-	if conn and typeof(conn)=="RBXScriptConnection" then
-		pcall(function()
-			conn:Disconnect()
-		end)
-	end
-end
-
 local function clampNumber(value,min,max,fallback)
 	local n=tonumber(value)
 	if not n then return fallback end
 	return math.clamp(n,min,max)
-end
-
-local function inputToBinding(input)
-	local uiType=tostring(input.UserInputType)
-
-	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
-	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
-	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
-
-	local key=input.KeyCode
-	if key and key~=Enum.KeyCode.Unknown then return key end
-	return nil
 end
 
 local function isBound(binding,key)
@@ -104,6 +84,8 @@ local function getFootball()
 end
 
 function Boost.new(ctx,parent)
+	local safeDisconnect=ctx.safeDisconnect
+	local inputToBinding=ctx.inputToBinding
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
 	local buildToggleRow=ctx.buildToggleRow
@@ -372,7 +354,7 @@ function Boost.new(ctx,parent)
 			alwaysBoostKey=ctx.getAlwaysBoostToggleKey() or Enum.KeyCode.Unknown
 		end
 
-		local binding=(ctx.inputToBinding or inputToBinding)(input)
+		local binding=inputToBinding(input)
 		local handled=isBound(binding,jumpBoostKey) or isBound(binding,alwaysBoostKey)
 		if not handled then
 			return false

@@ -8,14 +8,6 @@ local me=Players.LocalPlayer
 local DEFAULT_SPEED=18
 local TOGGLE_SPEED_KEY=Enum.KeyCode.Unknown
 
-local function safeDisconnect(conn)
-	if conn and typeof(conn)=="RBXScriptConnection" then
-		pcall(function()
-			conn:Disconnect()
-		end)
-	end
-end
-
 local function getMyHumanoid()
 	local character=workspace:FindFirstChild(me.Name) or me.Character
 
@@ -30,19 +22,9 @@ local function clampSpeed(value)
 	return math.clamp(tonumber(value) or DEFAULT_SPEED,0,100)
 end
 
-local function inputToBinding(input)
-	local uiType=tostring(input.UserInputType)
-
-	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
-	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
-	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
-
-	local key=input.KeyCode
-	if key and key~=Enum.KeyCode.Unknown then return key end
-	return nil
-end
-
 function Speed.new(ctx,parent)
+	local safeDisconnect=ctx.safeDisconnect
+	local inputToBinding=ctx.inputToBinding
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
 	local buildToggleRow=ctx.buildToggleRow
@@ -185,7 +167,7 @@ function Speed.new(ctx,parent)
 
 		if speedKey==nil or speedKey==Enum.KeyCode.Unknown then return false end
 
-		local binding=(ctx.inputToBinding or inputToBinding)(input)
+		local binding=inputToBinding(input)
 		if binding==speedKey then
 			api.SetSpeedState(not state.speedEnabled,true,true)
 			return true

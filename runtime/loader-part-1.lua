@@ -326,6 +326,7 @@ TRUSTED_API_URL="https://lint-bot-production.up.railway.app"
 
 API_ALLOWED_PATHS={
 	["/module/get"]=true,
+	["/module/manifest"]=true,
 	["/player/save"]=true,
 	["/player/load"]=true,
 	["/player/wipe"]=true,
@@ -371,6 +372,14 @@ function BOT_API.Post(path,body)
 		return{ok=false,error="Module path blocked: "..tostring(body and body.path)}
 	end
 
+	if path=="/module/manifest" and isAllowedModulePath and type(body)=="table" and type(body.paths)=="table" then
+		for _,modulePath in ipairs(body.paths) do
+			if not isAllowedModulePath(modulePath) then
+				return{ok=false,error="Module path blocked: "..tostring(modulePath)}
+			end
+		end
+	end
+
 	local requestFn=BOT_API.GetRequestFunction()
 	if not requestFn then
 		return{ok=false,error="No client HTTP request function found."}
@@ -411,7 +420,7 @@ function BOT_API.Post(path,body)
 end
 
 AUTO_REFRESH_ENABLED=true
-AUTO_REFRESH_INTERVAL=0.25
+AUTO_REFRESH_INTERVAL=5
 AUTO_REFRESH_RELOAD_PATH="loader.lua"
 
 MODULE_PATHS={
@@ -420,27 +429,48 @@ MODULE_PATHS={
 	MainFrame="gui/mainframe.lua",
 	AutoRefresh="gui/auto-refresh.lua",
 	Description="gui/description.lua",
-	HitboxPreset="page-5/hitbox-preset.lua",
-	KeybindSettings="page-5/keybind-settings.lua",
-	PresetEditor="page-5/preset-editor.lua",
-	Page1Hitbox="page-1/hitbox.lua",
-	Page1Gravity="page-1/gravity.lua",
-	Page1Speed="page-1/speed.lua",
-	Page1GameParams="page-1/game-params.lua",
-	Page1Boost="page-1/boost.lua",
-	Page1ESP="page-1/esp.lua",
-	Page1ESPDefense="page-1/esp-defense.lua",
-	Page1ESPOffense="page-1/esp-offense.lua",
-	Page1QBAim="page-1/qb-aim.lua",
-	PrimaryColour="page-4/primary.lua",
-	SecondaryColour="page-4/secondary.lua",
-	StrokeColour="page-4/stroke-colour.lua",
-	MapEditor="page-2/map-editor.lua",
-	AntiMaterial="page-2/anti-material.lua",
-	MapCleaner="page-2/map-cleaner.lua",
-	RemoveAds="page-2/remove-ads.lua",
-	PlayerData="page-6/player-data.lua",
-	Discord="page-6/discord.lua",
+	HitboxPreset="page-5/hitbox-preset/gui.lua",
+	HitboxPresetLogic="page-5/hitbox-preset/logic.lua",
+	KeybindSettings="page-5/keybind-settings/gui.lua",
+	KeybindSettingsLogic="page-5/keybind-settings/logic.lua",
+	PresetEditor="page-5/preset-editor/gui.lua",
+	PresetEditorLogic="page-5/preset-editor/logic.lua",
+	Page1Hitbox="page-1/hitbox/gui.lua",
+	Page1HitboxLogic="page-1/hitbox/logic.lua",
+	Page1Gravity="page-1/gravity/gui.lua",
+	Page1GravityLogic="page-1/gravity/logic.lua",
+	Page1Speed="page-1/speed/gui.lua",
+	Page1SpeedLogic="page-1/speed/logic.lua",
+	Page1GameParams="page-1/game-params/gui.lua",
+	Page1GameParamsLogic="page-1/game-params/logic.lua",
+	Page1Boost="page-1/boost/gui.lua",
+	Page1BoostLogic="page-1/boost/logic.lua",
+	Page1ESP="page-1/esp/gui.lua",
+	Page1ESPLogic="page-1/esp/logic.lua",
+	Page1ESPDefense="page-1/esp-defense/gui.lua",
+	Page1ESPDefenseLogic="page-1/esp-defense/logic.lua",
+	Page1ESPOffense="page-1/esp-offense/gui.lua",
+	Page1ESPOffenseLogic="page-1/esp-offense/logic.lua",
+	Page1QBAim="page-1/qb-aim/gui.lua",
+	Page1QBAimLogic="page-1/qb-aim/logic.lua",
+	PrimaryColour="page-4/primary/gui.lua",
+	PrimaryColourLogic="page-4/primary/logic.lua",
+	SecondaryColour="page-4/secondary/gui.lua",
+	SecondaryColourLogic="page-4/secondary/logic.lua",
+	StrokeColour="page-4/stroke-colour/gui.lua",
+	StrokeColourLogic="page-4/stroke-colour/logic.lua",
+	MapEditor="page-2/map-editor/gui.lua",
+	MapEditorLogic="page-2/map-editor/logic.lua",
+	AntiMaterial="page-2/anti-material/gui.lua",
+	AntiMaterialLogic="page-2/anti-material/logic.lua",
+	MapCleaner="page-2/map-cleaner/gui.lua",
+	MapCleanerLogic="page-2/map-cleaner/logic.lua",
+	RemoveAds="page-2/remove-ads/gui.lua",
+	RemoveAdsLogic="page-2/remove-ads/logic.lua",
+	PlayerData="page-6/player-data/gui.lua",
+	PlayerDataLogic="page-6/player-data/logic.lua",
+	Discord="page-6/discord/gui.lua",
+	DiscordLogic="page-6/discord/logic.lua",
 	DataSave="data-save/data-save.lua",
 }
 AUTO_REFRESH_WATCH_PATHS={AUTO_REFRESH_RELOAD_PATH}
@@ -936,26 +966,47 @@ MainFrameModule=loadRemoteModuleStep("MainFrame",MODULE_PATHS.MainFrame)
 AutoRefreshModule=loadRemoteModuleStep("AutoRefresh",MODULE_PATHS.AutoRefresh)
 DescriptionModule=loadRemoteModuleStep("Description",MODULE_PATHS.Description)
 AnnouncementModule=loadRemoteModuleStep("Announcement",MODULE_PATHS.Announcement)
+HitboxPresetLogicModule=loadRemoteModuleStep("HitboxPresetLogic",MODULE_PATHS.HitboxPresetLogic)
 HitboxPresetModule=loadRemoteModuleStep("HitboxPreset",MODULE_PATHS.HitboxPreset)
+KeybindSettingsLogicModule=loadRemoteModuleStep("KeybindSettingsLogic",MODULE_PATHS.KeybindSettingsLogic)
 KeybindSettingsModule=loadRemoteModuleStep("KeybindSettings",MODULE_PATHS.KeybindSettings)
+PresetEditorLogicModule=loadRemoteModuleStep("PresetEditorLogic",MODULE_PATHS.PresetEditorLogic)
 PresetEditorModule=loadRemoteModuleStep("PresetEditor",MODULE_PATHS.PresetEditor)
+Page1HitboxLogicModule=loadRemoteModuleStep("Page1HitboxLogic",MODULE_PATHS.Page1HitboxLogic)
 Page1HitboxModule=loadRemoteModuleStep("Page1Hitbox",MODULE_PATHS.Page1Hitbox)
+Page1GravityLogicModule=loadRemoteModuleStep("Page1GravityLogic",MODULE_PATHS.Page1GravityLogic)
 Page1GravityModule=loadRemoteModuleStep("Page1Gravity",MODULE_PATHS.Page1Gravity)
+Page1SpeedLogicModule=loadRemoteModuleStep("Page1SpeedLogic",MODULE_PATHS.Page1SpeedLogic)
 Page1SpeedModule=loadRemoteModuleStep("Page1Speed",MODULE_PATHS.Page1Speed)
+Page1GameParamsLogicModule=loadRemoteModuleStep("Page1GameParamsLogic",MODULE_PATHS.Page1GameParamsLogic)
 Page1GameParamsModule=loadRemoteModuleStep("Page1GameParams",MODULE_PATHS.Page1GameParams)
+Page1BoostLogicModule=loadRemoteModuleStep("Page1BoostLogic",MODULE_PATHS.Page1BoostLogic)
 Page1BoostModule=loadRemoteModuleStep("Page1Boost",MODULE_PATHS.Page1Boost)
+Page1ESPLogicModule=loadRemoteModuleStep("Page1ESPLogic",MODULE_PATHS.Page1ESPLogic)
 Page1ESPModule=loadRemoteModuleStep("Page1ESP",MODULE_PATHS.Page1ESP)
+Page1ESPDefenseLogicModule=loadRemoteModuleStep("Page1ESPDefenseLogic",MODULE_PATHS.Page1ESPDefenseLogic)
 Page1ESPDefenseModule=loadRemoteModuleStep("Page1ESPDefense",MODULE_PATHS.Page1ESPDefense)
+Page1ESPOffenseLogicModule=loadRemoteModuleStep("Page1ESPOffenseLogic",MODULE_PATHS.Page1ESPOffenseLogic)
 Page1ESPOffenseModule=loadRemoteModuleStep("Page1ESPOffense",MODULE_PATHS.Page1ESPOffense)
+Page1QBAimLogicModule=loadRemoteModuleStep("Page1QBAimLogic",MODULE_PATHS.Page1QBAimLogic)
 Page1QBAimModule=loadRemoteModuleStep("Page1QBAim",MODULE_PATHS.Page1QBAim)
+PrimaryColourLogicModule=loadRemoteModuleStep("PrimaryColourLogic",MODULE_PATHS.PrimaryColourLogic)
 PrimaryColourModule=loadRemoteModuleStep("PrimaryColour",MODULE_PATHS.PrimaryColour)
+SecondaryColourLogicModule=loadRemoteModuleStep("SecondaryColourLogic",MODULE_PATHS.SecondaryColourLogic)
 SecondaryColourModule=loadRemoteModuleStep("SecondaryColour",MODULE_PATHS.SecondaryColour)
+StrokeColourLogicModule=loadRemoteModuleStep("StrokeColourLogic",MODULE_PATHS.StrokeColourLogic)
 StrokeColourModule=loadRemoteModuleStep("StrokeColour",MODULE_PATHS.StrokeColour)
+MapEditorLogicModule=loadRemoteModuleStep("MapEditorLogic",MODULE_PATHS.MapEditorLogic)
 MapEditorModule=loadRemoteModuleStep("MapEditor",MODULE_PATHS.MapEditor)
+AntiMaterialLogicModule=loadRemoteModuleStep("AntiMaterialLogic",MODULE_PATHS.AntiMaterialLogic)
 AntiMaterialModule=loadRemoteModuleStep("AntiMaterial",MODULE_PATHS.AntiMaterial)
+MapCleanerLogicModule=loadRemoteModuleStep("MapCleanerLogic",MODULE_PATHS.MapCleanerLogic)
 MapCleanerModule=loadRemoteModuleStep("MapCleaner",MODULE_PATHS.MapCleaner)
+RemoveAdsLogicModule=loadRemoteModuleStep("RemoveAdsLogic",MODULE_PATHS.RemoveAdsLogic)
 RemoveAdsModule=loadRemoteModuleStep("RemoveAds",MODULE_PATHS.RemoveAds)
+PlayerDataLogicModule=loadRemoteModuleStep("PlayerDataLogic",MODULE_PATHS.PlayerDataLogic)
 PlayerDataModule=loadRemoteModuleStep("PlayerData",MODULE_PATHS.PlayerData)
+DiscordLogicModule=loadRemoteModuleStep("DiscordLogic",MODULE_PATHS.DiscordLogic)
 DiscordModule=loadRemoteModuleStep("Discord",MODULE_PATHS.Discord)
 DataSaveModule=loadRemoteModuleStep("DataSave",MODULE_PATHS.DataSave)
 
@@ -982,14 +1033,55 @@ runLoaderCheck()
 
 PAGE1_RELOAD_PATHS={
 	[MODULE_PATHS.Page1Hitbox]=function(module) Page1HitboxModule=module end,
+	[MODULE_PATHS.Page1HitboxLogic]=function(module) Page1HitboxLogicModule=module end,
 	[MODULE_PATHS.Page1Gravity]=function(module) Page1GravityModule=module end,
+	[MODULE_PATHS.Page1GravityLogic]=function(module) Page1GravityLogicModule=module end,
 	[MODULE_PATHS.Page1Speed]=function(module) Page1SpeedModule=module end,
+	[MODULE_PATHS.Page1SpeedLogic]=function(module) Page1SpeedLogicModule=module end,
 	[MODULE_PATHS.Page1GameParams]=function(module) Page1GameParamsModule=module end,
+	[MODULE_PATHS.Page1GameParamsLogic]=function(module) Page1GameParamsLogicModule=module end,
 	[MODULE_PATHS.Page1Boost]=function(module) Page1BoostModule=module end,
+	[MODULE_PATHS.Page1BoostLogic]=function(module) Page1BoostLogicModule=module end,
 	[MODULE_PATHS.Page1ESP]=function(module) Page1ESPModule=module end,
+	[MODULE_PATHS.Page1ESPLogic]=function(module) Page1ESPLogicModule=module end,
 	[MODULE_PATHS.Page1ESPDefense]=function(module) Page1ESPDefenseModule=module end,
+	[MODULE_PATHS.Page1ESPDefenseLogic]=function(module) Page1ESPDefenseLogicModule=module end,
 	[MODULE_PATHS.Page1ESPOffense]=function(module) Page1ESPOffenseModule=module end,
+	[MODULE_PATHS.Page1ESPOffenseLogic]=function(module) Page1ESPOffenseLogicModule=module end,
 	[MODULE_PATHS.Page1QBAim]=function(module) Page1QBAimModule=module end,
+	[MODULE_PATHS.Page1QBAimLogic]=function(module) Page1QBAimLogicModule=module end,
+}
+PAGE2_RELOAD_PATHS={
+	[MODULE_PATHS.HitboxPreset]=function(module) HitboxPresetModule=module end,
+	[MODULE_PATHS.HitboxPresetLogic]=function(module) HitboxPresetLogicModule=module end,
+	[MODULE_PATHS.KeybindSettings]=function(module) KeybindSettingsModule=module end,
+	[MODULE_PATHS.KeybindSettingsLogic]=function(module) KeybindSettingsLogicModule=module end,
+	[MODULE_PATHS.PresetEditor]=function(module) PresetEditorModule=module end,
+	[MODULE_PATHS.PresetEditorLogic]=function(module) PresetEditorLogicModule=module end,
+}
+CUSTOMIZE_RELOAD_PATHS={
+	[MODULE_PATHS.StrokeColour]=function(module) StrokeColourModule=module end,
+	[MODULE_PATHS.StrokeColourLogic]=function(module) StrokeColourLogicModule=module end,
+	[MODULE_PATHS.PrimaryColour]=function(module) PrimaryColourModule=module end,
+	[MODULE_PATHS.PrimaryColourLogic]=function(module) PrimaryColourLogicModule=module end,
+	[MODULE_PATHS.SecondaryColour]=function(module) SecondaryColourModule=module end,
+	[MODULE_PATHS.SecondaryColourLogic]=function(module) SecondaryColourLogicModule=module end,
+}
+MAP_RELOAD_PATHS={
+	[MODULE_PATHS.MapEditor]=function(module) MapEditorModule=module end,
+	[MODULE_PATHS.MapEditorLogic]=function(module) MapEditorLogicModule=module end,
+	[MODULE_PATHS.AntiMaterial]=function(module) AntiMaterialModule=module end,
+	[MODULE_PATHS.AntiMaterialLogic]=function(module) AntiMaterialLogicModule=module end,
+	[MODULE_PATHS.MapCleaner]=function(module) MapCleanerModule=module end,
+	[MODULE_PATHS.MapCleanerLogic]=function(module) MapCleanerLogicModule=module end,
+	[MODULE_PATHS.RemoveAds]=function(module) RemoveAdsModule=module end,
+	[MODULE_PATHS.RemoveAdsLogic]=function(module) RemoveAdsLogicModule=module end,
+}
+SETTINGS_RELOAD_PATHS={
+	[MODULE_PATHS.PlayerData]=function(module) PlayerDataModule=module end,
+	[MODULE_PATHS.PlayerDataLogic]=function(module) PlayerDataLogicModule=module end,
+	[MODULE_PATHS.Discord]=function(module) DiscordModule=module end,
+	[MODULE_PATHS.DiscordLogic]=function(module) DiscordLogicModule=module end,
 }
 
 function getUIStrokeColor()
@@ -1311,14 +1403,24 @@ function applyAutoRefreshModuleChange(changedPath,module)
 		return true
 	end
 
-	if changedPath==MODULE_PATHS.StrokeColour or changedPath==MODULE_PATHS.PrimaryColour or changedPath==MODULE_PATHS.SecondaryColour then
-		if changedPath==MODULE_PATHS.StrokeColour then
-			StrokeColourModule=module
-		elseif changedPath==MODULE_PATHS.PrimaryColour then
-			PrimaryColourModule=module
+	local applyPage2Module=PAGE2_RELOAD_PATHS[changedPath]
+	if applyPage2Module then
+		applyPage2Module(module)
+
+		if rebuildPage2FromModules then
+			warn("Auto-refreshing keybind module after remote change:",changedPath)
+			rebuildPage2FromModules()
 		else
-			SecondaryColourModule=module
+			warn("Auto-refresh cached keybind module, rebuild not ready:",changedPath)
 		end
+
+		reapplyThemeAfterAutoRefresh()
+		return true
+	end
+
+	local applyCustomizeModule=CUSTOMIZE_RELOAD_PATHS[changedPath]
+	if applyCustomizeModule then
+		applyCustomizeModule(module)
 
 		if applyDefaultUIStyleFields then
 			applyDefaultUIStyleFields(UI_STYLE,false)
@@ -1337,16 +1439,9 @@ function applyAutoRefreshModuleChange(changedPath,module)
 		return true
 	end
 
-	if changedPath==MODULE_PATHS.MapEditor or changedPath==MODULE_PATHS.AntiMaterial or changedPath==MODULE_PATHS.MapCleaner or changedPath==MODULE_PATHS.RemoveAds then
-		if changedPath==MODULE_PATHS.MapEditor then
-			MapEditorModule=module
-		elseif changedPath==MODULE_PATHS.AntiMaterial then
-			AntiMaterialModule=module
-		elseif changedPath==MODULE_PATHS.MapCleaner then
-			MapCleanerModule=module
-		else
-			RemoveAdsModule=module
-		end
+	local applyMapModule=MAP_RELOAD_PATHS[changedPath]
+	if applyMapModule then
+		applyMapModule(module)
 
 		if rebuildMapFromModules then
 			warn("Auto-refreshing map module after remote change:",changedPath)
@@ -1358,12 +1453,9 @@ function applyAutoRefreshModuleChange(changedPath,module)
 		return true
 	end
 
-	if changedPath==MODULE_PATHS.PlayerData or changedPath==MODULE_PATHS.Discord then
-		if changedPath==MODULE_PATHS.PlayerData then
-			PlayerDataModule=module
-		else
-			DiscordModule=module
-		end
+	local applySettingsModule=SETTINGS_RELOAD_PATHS[changedPath]
+	if applySettingsModule then
+		applySettingsModule(module)
 
 		if rebuildSettingsFromModules then
 			warn("Auto-refreshing settings module after remote change:",changedPath)
@@ -1407,6 +1499,18 @@ function startAutoRefresh()
 		reloadPath=AUTO_REFRESH_RELOAD_PATH,
 		watchPaths=AUTO_REFRESH_WATCH_PATHS,
 		sources=REMOTE_MODULE_SOURCES,
+		getRemoteManifest=function(lastBuildId,pathVersions)
+			local result=BOT_API.Post("/module/manifest",{
+				buildId=lastBuildId,
+				pathVersions=pathVersions,
+				paths=AUTO_REFRESH_WATCH_PATHS,
+			})
+			if not result or not result.ok then
+				return nil,result and result.error or "unknown"
+			end
+
+			return result,nil
+		end,
 		getRemoteSource=function(path)
 			local result=BOT_API.Post("/module/get",{path=path})
 			if not result or not result.ok or type(result.source)~="string" then

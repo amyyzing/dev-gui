@@ -14,14 +14,7 @@ local ESP_HIGHLIGHT_NAME="MyESPHighlight"
 local RANGE_BASE_YARDS=7
 local YOUR_SPEED_YPS=7
 local ANTIMATTER_SPEED_YPS=25
-
-local function safeDisconnect(conn)
-	if conn and typeof(conn)=="RBXScriptConnection" then
-		pcall(function()
-			conn:Disconnect()
-		end)
-	end
-end
+local ESP_REFRESH_INTERVAL=0.12
 
 local function getLiveCharacter(player)
 	if not player then return nil end
@@ -257,8 +250,10 @@ end
 
 function ESPDefense.new(ctx)
 	local THEME=ctx.THEME
+	local safeDisconnect=ctx.safeDisconnect
 	local api={}
 	local heartbeatConn=nil
+	local heartbeatElapsed=0
 	local running=false
 
 	local function rebuild()
@@ -300,7 +295,13 @@ function ESPDefense.new(ctx)
 		if running then return end
 		running=true
 		safeDisconnect(heartbeatConn)
-		heartbeatConn=RunService.Heartbeat:Connect(rebuild)
+		heartbeatElapsed=0
+		heartbeatConn=RunService.Heartbeat:Connect(function(dt)
+			heartbeatElapsed+=(dt or 0)
+			if heartbeatElapsed<ESP_REFRESH_INTERVAL then return end
+			heartbeatElapsed=0
+			rebuild()
+		end)
 		rebuild()
 	end
 

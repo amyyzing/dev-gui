@@ -185,14 +185,27 @@ function GuiLogic.new(ctx)
 		-- Header/category switch. This version keeps every visual centered inside one
 		-- fixed wrapper so it does not drift vertically or horizontally when the
 		-- section header changes height.
-		local width=componentNumber("HeaderToggleWidth",88)
-		local height=componentNumber("HeaderToggleHeight",30)
-		local railHeight=componentNumber("HeaderToggleRailHeight",22)
-		local indicatorSize=componentNumber("HeaderToggleIndicatorSize",26)
-		local outerCoreSize=componentNumber("HeaderToggleOuterCoreSize",22)
-		local innerOffSize=componentNumber("HeaderToggleInnerOffSize",11)
-		local strokeThickness=componentNumber("HeaderToggleStrokeThickness",1.6)
+		local c=components()
+		local function headerNumber(key,fallback)
+			local value=tonumber(c[key])
+			return value~=nil and value or fallback
+		end
+
+		local width=headerNumber("HeaderToggleWidth",88)
+		local height=headerNumber("HeaderToggleHeight",30)
+		local railHeight=headerNumber("HeaderToggleRailHeight",22)
+		local indicatorSize=headerNumber("HeaderToggleIndicatorSize",26)
+		local outerCoreSize=headerNumber("HeaderToggleOuterCoreSize",22)
+		local innerOffSize=headerNumber("HeaderToggleInnerOffSize",11)
+		local strokeThickness=headerNumber("HeaderToggleStrokeThickness",1.6)
+		local expandedScale=headerNumber("HeaderToggleExpandedScale",1.05)
+		local collapsedScale=headerNumber("HeaderToggleCollapsedScale",0.94)
 		local z=zIndex or 6
+		local scaleInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		local expandInfo=TweenInfo.new(0.26,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+		local collapseInfo=TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut)
+		local softInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		local hoverInfo=TweenInfo.new(0.1,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 
 		local accent=themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(74,208,128))
 		local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
@@ -377,11 +390,18 @@ function GuiLogic.new(ctx)
 		local categoryExpanded=true
 		local activeTweens={}
 		local scaleTween=nil
+		local hoverTween=nil
 		local clickConn=nil
 		local hoverEnterConn=nil
 		local hoverLeaveConn=nil
 
-		local function cancelTweens()
+		local function applyProps(object,props)
+			for key,value in pairs(props) do
+				object[key]=value
+			end
+		end
+
+		local function cancelTrackedTweens()
 			for _,tw in ipairs(activeTweens) do
 				pcall(function()
 					tw:Cancel()
@@ -390,15 +410,37 @@ function GuiLogic.new(ctx)
 			table.clear(activeTweens)
 		end
 
-		local function playTween(object,info,goal)
+		local function playTrackedTween(object,info,goal)
 			local tw=TweenService:Create(object,info,goal)
 			table.insert(activeTweens,tw)
 			tw:Play()
 			return tw
 		end
 
+		local function visualState(expanded)
+			local innerSize=expanded and outerCoreSize or innerOffSize
+			local innerRotation=expanded and 45 or 0
+
+			return{
+				indicatorPosition=expanded and UDim2.new(1,-(indicatorSize/2+2),0.5,0) or UDim2.new(0,indicatorSize/2+2,0.5,0),
+				fillSize=expanded and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0),
+				fillTransparency=expanded and 0.08 or 1,
+				activeTransparency=expanded and 0.06 or 0.24,
+				innerSize=UDim2.fromOffset(innerSize,innerSize),
+				innerRotation=innerRotation,
+				innerFillTransparency=expanded and 1 or 0.12,
+				innerStrokeTransparency=expanded and 0.03 or 0.44,
+				innerStrokeThickness=expanded and strokeThickness or 1,
+				glowTransparency=expanded and 0.76 or 1,
+				targetAccent=expanded and accent or strokeColor,
+				innerColor=expanded and accent or muted,
+				tickTransparency=expanded and 0.24 or 0.72,
+				tickColor=expanded and accent or muted,
+			}
+		end
+
 		local function applyExpandedVisuals(animate)
-			local targetScale=categoryExpanded and componentNumber("HeaderToggleExpandedScale",1.05) or componentNumber("HeaderToggleCollapsedScale",0.94)
+			local targetScale=categoryExpanded and expandedScale or collapsedScale
 
 			if scaleTween then
 				scaleTween:Cancel()
@@ -410,75 +452,61 @@ function GuiLogic.new(ctx)
 				return
 			end
 
-			scaleTween=TweenService:Create(indicatorScale,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Scale=targetScale})
+			scaleTween=TweenService:Create(indicatorScale,scaleInfo,{Scale=targetScale})
 			scaleTween:Play()
 		end
 
 		local function applyVisuals(animate)
-			cancelTweens()
+			cancelTrackedTweens()
 
-			local expanded=state
-			local indicatorX=expanded and UDim2.new(1,-(indicatorSize/2+2),0.5,0) or UDim2.new(0,indicatorSize/2+2,0.5,0)
-			local fillSize=expanded and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
-			local fillTransparency=expanded and 0.08 or 1
-			local activeTransparency=expanded and 0.06 or 0.24
-			local innerSize=expanded and outerCoreSize or innerOffSize
-			local innerRotation=expanded and 45 or 0
-			local innerFillTransparency=expanded and 1 or 0.12
-			local innerStrokeTransparency=expanded and 0.03 or 0.44
-			local innerStrokeThickness=expanded and strokeThickness or 1
-			local glowTransparency=expanded and 0.76 or 1
-			local targetAccent=expanded and accent or strokeColor
-			local tickTransparency=expanded and 0.24 or 0.72
-			local tickColor=expanded and accent or muted
+			local visuals=visualState(state)
 
 			if not animate then
-				indicator.Position=indicatorX
-				railFillClip.Size=fillSize
-				railFill.BackgroundTransparency=fillTransparency
-				outerStroke.Color=targetAccent
-				outerStroke.Transparency=activeTransparency
-				inner.Size=UDim2.fromOffset(innerSize,innerSize)
-				inner.Rotation=innerRotation
-				inner.BackgroundColor3=expanded and accent or muted
-				inner.BackgroundTransparency=innerFillTransparency
-				innerStroke.Color=expanded and accent or muted
-				innerStroke.Thickness=innerStrokeThickness
-				innerStroke.Transparency=innerStrokeTransparency
-				glowOuter.Rotation=innerRotation
-				glowStroke.Transparency=glowTransparency
+				applyProps(indicator,{Position=visuals.indicatorPosition})
+				applyProps(railFillClip,{Size=visuals.fillSize})
+				applyProps(railFill,{BackgroundTransparency=visuals.fillTransparency})
+				applyProps(outerStroke,{Color=visuals.targetAccent,Transparency=visuals.activeTransparency})
+				applyProps(inner,{
+					Size=visuals.innerSize,
+					Rotation=visuals.innerRotation,
+					BackgroundColor3=visuals.innerColor,
+					BackgroundTransparency=visuals.innerFillTransparency,
+				})
+				applyProps(innerStroke,{
+					Color=visuals.innerColor,
+					Thickness=visuals.innerStrokeThickness,
+					Transparency=visuals.innerStrokeTransparency,
+				})
+				applyProps(glowOuter,{Rotation=visuals.innerRotation})
+				applyProps(glowStroke,{Transparency=visuals.glowTransparency})
 				for _,tick in ipairs(ticks) do
-					tick.BackgroundColor3=tickColor
-					tick.BackgroundTransparency=tickTransparency
+					applyProps(tick,{BackgroundColor3=visuals.tickColor,BackgroundTransparency=visuals.tickTransparency})
 				end
 				return
 			end
 
-			local shapeInfo=expanded
-				and TweenInfo.new(0.26,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
-				or TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut)
-			local softInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+			local shapeInfo=state and expandInfo or collapseInfo
 
-			playTween(indicator,shapeInfo,{Position=indicatorX})
-			playTween(railFillClip,shapeInfo,{Size=fillSize})
-			playTween(railFill,softInfo,{BackgroundTransparency=fillTransparency})
-			playTween(outerStroke,softInfo,{Color=targetAccent,Transparency=activeTransparency})
-			playTween(inner,shapeInfo,{
-				Size=UDim2.fromOffset(innerSize,innerSize),
-				Rotation=innerRotation,
-				BackgroundColor3=expanded and accent or muted,
-				BackgroundTransparency=innerFillTransparency,
+			playTrackedTween(indicator,shapeInfo,{Position=visuals.indicatorPosition})
+			playTrackedTween(railFillClip,shapeInfo,{Size=visuals.fillSize})
+			playTrackedTween(railFill,softInfo,{BackgroundTransparency=visuals.fillTransparency})
+			playTrackedTween(outerStroke,softInfo,{Color=visuals.targetAccent,Transparency=visuals.activeTransparency})
+			playTrackedTween(inner,shapeInfo,{
+				Size=visuals.innerSize,
+				Rotation=visuals.innerRotation,
+				BackgroundColor3=visuals.innerColor,
+				BackgroundTransparency=visuals.innerFillTransparency,
 			})
-			playTween(innerStroke,softInfo,{
-				Color=expanded and accent or muted,
-				Thickness=innerStrokeThickness,
-				Transparency=innerStrokeTransparency,
+			playTrackedTween(innerStroke,softInfo,{
+				Color=visuals.innerColor,
+				Thickness=visuals.innerStrokeThickness,
+				Transparency=visuals.innerStrokeTransparency,
 			})
-			playTween(glowOuter,shapeInfo,{Rotation=innerRotation})
-			playTween(glowStroke,softInfo,{Transparency=glowTransparency})
+			playTrackedTween(glowOuter,shapeInfo,{Rotation=visuals.innerRotation})
+			playTrackedTween(glowStroke,softInfo,{Transparency=visuals.glowTransparency})
 
 			for _,tick in ipairs(ticks) do
-				playTween(tick,softInfo,{BackgroundColor3=tickColor,BackgroundTransparency=tickTransparency})
+				playTrackedTween(tick,softInfo,{BackgroundColor3=visuals.tickColor,BackgroundTransparency=visuals.tickTransparency})
 			end
 		end
 
@@ -503,11 +531,19 @@ function GuiLogic.new(ctx)
 		end)
 
 		hoverEnterConn=hit.MouseEnter:Connect(function()
-			TweenService:Create(railStroke,TweenInfo.new(0.1,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Transparency=0.28}):Play()
+			if hoverTween then
+				hoverTween:Cancel()
+			end
+			hoverTween=TweenService:Create(railStroke,hoverInfo,{Transparency=0.28})
+			hoverTween:Play()
 		end)
 
 		hoverLeaveConn=hit.MouseLeave:Connect(function()
-			TweenService:Create(railStroke,TweenInfo.new(0.1,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Transparency=0.48}):Play()
+			if hoverTween then
+				hoverTween:Cancel()
+			end
+			hoverTween=TweenService:Create(railStroke,hoverInfo,{Transparency=0.48})
+			hoverTween:Play()
 		end)
 
 		applyVisuals(false)
@@ -525,10 +561,14 @@ function GuiLogic.new(ctx)
 				applyExpandedVisuals(animate~=false)
 			end,
 			destroy=function()
-				cancelTweens()
+				cancelTrackedTweens()
 				if scaleTween then
 					scaleTween:Cancel()
 					scaleTween=nil
+				end
+				if hoverTween then
+					hoverTween:Cancel()
+					hoverTween=nil
 				end
 				if clickConn then clickConn:Disconnect() clickConn=nil end
 				if hoverEnterConn then hoverEnterConn:Disconnect() hoverEnterConn=nil end

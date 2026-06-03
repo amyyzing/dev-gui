@@ -94,6 +94,7 @@ function buildActualSettingsPage()
 				BOT_API=BOT_API,
 				playerId=tostring(me.UserId),
 				me=me,
+				PlayerDataLogicModule=PlayerDataLogicModule,
 
 				makeSection=makeSection,
 				wrapTextButton=wrapTextButton,
@@ -131,7 +132,7 @@ function buildActualSettingsPage()
 		end
 	else
 		local section=makeSection(actualSettingsPage,1,"Player Data","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-6/player-data.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-6/player-data/gui.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 	end
 
 	if DiscordModule and DiscordModule.new then
@@ -140,6 +141,7 @@ function buildActualSettingsPage()
 				New=New,
 				THEME=THEME,
 				BOT_API=BOT_API,
+				DiscordLogicModule=DiscordLogicModule,
 				makeSection=makeSection,
 				wrapTextButton=wrapTextButton,
 			},actualSettingsPage)
@@ -153,7 +155,7 @@ function buildActualSettingsPage()
 		end
 	else
 		local section=makeSection(actualSettingsPage,3,"Discord","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-6/discord.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-6/discord/gui.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 	end
 
 	refreshSettingsPage()
@@ -221,6 +223,9 @@ function buildPage2()
 		placeWrappedButton=placeWrappedButton,
 		setWrappedButtonBg=setWrappedButtonBg,
 		makeBox=makeBox,
+		HitboxPresetLogicModule=HitboxPresetLogicModule,
+		KeybindSettingsLogicModule=KeybindSettingsLogicModule,
+		PresetEditorLogicModule=PresetEditorLogicModule,
 		BOT_API=BOT_API,
 		playerId=tostring(me.UserId),
 		requestPlayerAutosave=requestPlayerAutosave,
@@ -259,7 +264,7 @@ function buildPage2()
 			addPage2Error(ownedSection,"Hitbox Presets failed: "..tostring(result))
 		end
 	else
-		addPage2Error(ownedSection,"Missing remote module: page-5/hitbox-preset.lua")
+		addPage2Error(ownedSection,"Missing remote module: page-5/hitbox-preset/gui.lua")
 	end
 
 	if KeybindSettingsModule and type(KeybindSettingsModule.new)=="function" then
@@ -272,12 +277,12 @@ function buildPage2()
 			addPage2Error(bindSection,"Keybind Settings failed: "..tostring(result))
 		end
 	else
-		addPage2Error(bindSection,"Missing remote module: page-5/keybind-settings.lua")
+		addPage2Error(bindSection,"Missing remote module: page-5/keybind-settings/gui.lua")
 	end
 
 	if PresetEditorModule and type(PresetEditorModule.new)=="function" then
 		if not keybindSettings then
-			addPage2Error(editorSection,"Preset Editor needs keybind-settings.lua to load first.")
+			addPage2Error(editorSection,"Preset Editor needs keybind-settings/gui.lua to load first.")
 		else
 			local ok,result=pcall(function()
 				return PresetEditorModule.new(page2Ctx,editorSection,keybindSettings,hitboxPresets)
@@ -289,7 +294,7 @@ function buildPage2()
 			end
 		end
 	else
-		addPage2Error(editorSection,"Missing remote module: page-5/preset-editor.lua")
+		addPage2Error(editorSection,"Missing remote module: page-5/preset-editor/gui.lua")
 	end
 
 	refreshPage2UI=function()

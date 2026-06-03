@@ -48,8 +48,11 @@ function buildCustomizePage()
 				DEFAULT_UI_STYLE=getDefaultUIStyle and getDefaultUIStyle() or UI_STYLE,
 
 				SG=SG,
+				StrokeColourLogicModule=StrokeColourLogicModule,
 				PrimaryColourModule=PrimaryColourModule,
+				PrimaryColourLogicModule=PrimaryColourLogicModule,
 				SecondaryColourModule=SecondaryColourModule,
+				SecondaryColourLogicModule=SecondaryColourLogicModule,
 
 				makeSection=makeSection,
 				buildSlider=buildSlider,
@@ -85,7 +88,7 @@ function buildCustomizePage()
 			New("TextLabel",{
 				BackgroundTransparency=1,
 				Size=UDim2.new(1,0,0,22),
-				Text="page-4/stroke-colour.lua failed: "..tostring(result),
+				Text="page-4/stroke-colour/gui.lua failed: "..tostring(result),
 				Font=Enum.Font.Gotham,
 				TextSize=12,
 				TextColor3=THEME.RED,
@@ -94,13 +97,13 @@ function buildCustomizePage()
 			},fallbackSection)
 		end
 	else
-		warn("Missing remote module: page-4/stroke-colour.lua")
+		warn("Missing remote module: page-4/stroke-colour/gui.lua")
 
 		local fallbackSection=makeSection(uiSettingsPage,1,"Stroke Colour","Remote module failed to load.")
 		New("TextLabel",{
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,0,0,22),
-			Text="Missing page-4/stroke-colour.lua",
+			Text="Missing page-4/stroke-colour/gui.lua",
 			Font=Enum.Font.Gotham,
 			TextSize=12,
 			TextColor3=THEME.RED,
@@ -181,6 +184,7 @@ function buildMapPage()
 			return MapEditorModule.new({
 				New=New,
 				THEME=THEME,
+				MapEditorLogicModule=MapEditorLogicModule,
 				makeSection=makeSection,
 				buildSlider=buildSlider,
 				buildToggleRow=buildToggleRow,
@@ -201,6 +205,8 @@ function buildMapPage()
 				New=New,
 				THEME=THEME,
 				WORLD_SETTINGS=WORLD_SETTINGS,
+				safeDisconnect=safeDisconnect,
+				AntiMaterialLogicModule=AntiMaterialLogicModule,
 
 				makeSection=makeSection,
 				buildToggleRow=buildToggleRow,
@@ -219,7 +225,7 @@ function buildMapPage()
 		end
 	else
 		local section=makeSection(mapPage,1,"Anti Material","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-2/anti-material.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-2/anti-material/gui.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 	end
 
 	if MapCleanerModule and MapCleanerModule.new then
@@ -227,6 +233,8 @@ function buildMapPage()
 			return MapCleanerModule.new({
 				New=New,
 				THEME=THEME,
+				safeDisconnect=safeDisconnect,
+				MapCleanerLogicModule=MapCleanerLogicModule,
 				makeSection=makeSection,
 				buildToggleRow=buildToggleRow,
 				getCurrentModeKey=function()
@@ -246,7 +254,7 @@ function buildMapPage()
 		end
 	else
 		local section=makeSection(mapPage,2,"Map Cleaner","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-2/map-cleaner.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-2/map-cleaner/gui.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 	end
 
 	if RemoveAdsModule and RemoveAdsModule.new then
@@ -254,6 +262,8 @@ function buildMapPage()
 			return RemoveAdsModule.new({
 				New=New,
 				THEME=THEME,
+				safeDisconnect=safeDisconnect,
+				RemoveAdsLogicModule=RemoveAdsLogicModule,
 				makeSection=makeSection,
 				buildToggleRow=buildToggleRow,
 				getCurrentModeKey=function()
@@ -273,7 +283,7 @@ function buildMapPage()
 		end
 	else
 		local section=makeSection(mapPage,3,"Remove Ads","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-2/remove-ads.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-2/remove-ads/gui.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 	end
 
 	applyUIStrokeTheme()

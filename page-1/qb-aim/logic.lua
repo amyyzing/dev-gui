@@ -37,6 +37,7 @@ local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
 local ARC_PREVIEW_USE_C2_Y=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
+local RECEIVER_TRACK_INTERVAL=0.05
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
 local ARC_LANDING_Y=0.5
@@ -81,14 +82,6 @@ local VALID_TEAM_IDS={
 	AwayTeam=true,
 }
 
-local function safeDisconnect(conn)
-	if conn and typeof(conn)=="RBXScriptConnection" then
-		pcall(function()
-			conn:Disconnect()
-		end)
-	end
-end
-
 local function flat(v)
 	return Vector3.new(v.X,0,v.Z)
 end
@@ -118,23 +111,6 @@ local function routeSpeed(speed)
 	end
 
 	return clamped
-end
-
-local function inputToBinding(input)
-	local key=input.KeyCode
-	if key and key~=Enum.KeyCode.Unknown then
-		return key
-	end
-
-	local uiType=tostring(input.UserInputType)
-	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
-	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
-	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
-
-	local name=uiType:gsub("Enum.UserInputType%.","")
-	if name:match("^Gamepad") then return name end
-
-	return nil
 end
 
 local function getModeKey(ctx)
@@ -485,6 +461,8 @@ end
 function QBAim.new(ctx,parent)
 	local New=ctx.New
 	local THEME=ctx.THEME
+	local safeDisconnect=ctx.safeDisconnect
+	local inputToBinding=ctx.inputToBinding
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
 	local buildSlider=ctx.buildSlider
@@ -494,6 +472,7 @@ function QBAim.new(ctx,parent)
 	local trackedReceiver=nil
 	local selectedRouteLock=nil
 	local receiverData={}
+	local receiverTrackElapsed=0
 	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
@@ -671,8 +650,7 @@ function QBAim.new(ctx,parent)
 			return false
 		end
 
-		local convert=ctx.inputToBinding or inputToBinding
-		local incoming=convert(input)
+		local incoming=inputToBinding(input)
 		return incoming~=nil and incoming==binding
 	end
 
@@ -1737,14 +1715,18 @@ function QBAim.new(ctx,parent)
 
 	updateLeadDelayVisuals()
 
-	addConnection(RunService.Heartbeat:Connect(function()
+	addConnection(RunService.Heartbeat:Connect(function(dt)
 		if not isAlive() then return end
 
+		receiverTrackElapsed+=(dt or 0)
+		if receiverTrackElapsed<RECEIVER_TRACK_INTERVAL then return end
+		receiverTrackElapsed=0
+
+		local now=os.clock()
 		for _,player in ipairs(Players:GetPlayers()) do
 			if player~=LP and player.Character then
 				local receiverRoot=root(player.Character)
 				if receiverRoot then
-					local now=os.clock()
 					local data=receiverData[player]
 
 					if not data then

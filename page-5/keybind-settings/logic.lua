@@ -4,21 +4,6 @@ local UIS=game:GetService("UserInputService")
 local TweenService=game:GetService("TweenService")
 local TextService=game:GetService("TextService")
 
-local function inputToBinding(input)
-	local uiType=tostring(input.UserInputType)
-	local key=input.KeyCode
-	if key and key~=Enum.KeyCode.Unknown then return key end
-
-	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
-	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
-	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
-
-	local name=uiType:gsub("Enum.UserInputType%.","")
-	if name:match("^Gamepad") then return name end
-
-	return nil
-end
-
 local function defaultBindingRows(ctx)
 	local state=ctx.State or {}
 	ctx.State=state
@@ -59,6 +44,7 @@ function KeybindSettings.new(ctx,bindSection)
 	local New=ctx.New
 	local THEME=ctx.THEME
 	local bindingToLabel=ctx.bindingToLabel
+	local inputToBinding=ctx.inputToBinding
 	local wrapTextButton=ctx.wrapTextButton
 	local placeWrappedButton=ctx.placeWrappedButton
 	local setWrappedButtonBg=ctx.setWrappedButtonBg
@@ -105,7 +91,7 @@ function KeybindSettings.new(ctx,bindSection)
 	end
 
 	function api.CaptureInput(input)
-		local binding=(ctx.inputToBinding or inputToBinding)(input)
+		local binding=inputToBinding(input)
 		if binding==nil then return false end
 		return finishCapture(binding)
 	end

@@ -11,40 +11,10 @@ local DEFAULT_SIZE_Z=1.41
 local DEFAULT_TRANSPARENCY=0.7
 local TOGGLE_HB_KEY=Enum.KeyCode.Unknown
 
-local function safeDisconnect(conn)
-	if conn and typeof(conn)=="RBXScriptConnection" then
-		pcall(function()
-			conn:Disconnect()
-		end)
-	end
-end
-
-local function safeDisconnectAll(t)
-	if not t then return end
-
-	for _,conn in ipairs(t) do
-		safeDisconnect(conn)
-	end
-
-	table.clear(t)
-end
-
 local function clampNumber(value,min,max,fallback)
 	local n=tonumber(value)
 	if not n then return fallback end
 	return math.clamp(n,min,max)
-end
-
-local function inputToBinding(input)
-	local uiType=tostring(input.UserInputType)
-
-	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
-	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
-	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
-
-	local key=input.KeyCode
-	if key and key~=Enum.KeyCode.Unknown then return key end
-	return nil
 end
 
 local function getDirectChildCount(folder)
@@ -58,6 +28,8 @@ local function folderHasAnyDescendants(folder)
 end
 
 function Hitbox.new(ctx,parent)
+	local safeDisconnect=ctx.safeDisconnect
+	local inputToBinding=ctx.inputToBinding
 	local New=ctx.New
 	local THEME=ctx.THEME
 	local makeSection=ctx.makeSection
@@ -83,6 +55,16 @@ function Hitbox.new(ctx,parent)
 		Transparency=setmetatable({}, {__mode="k"}),
 		Size=setmetatable({}, {__mode="k"}),
 	}
+
+	local function safeDisconnectAll(t)
+		if not t then return end
+
+		for _,conn in ipairs(t) do
+			safeDisconnect(conn)
+		end
+
+		table.clear(t)
+	end
 
 	local function changed()
 		if ctx.onChanged then pcall(ctx.onChanged,state) end
@@ -621,7 +603,7 @@ function Hitbox.new(ctx,parent)
 
 		if hitboxKey==nil or hitboxKey==Enum.KeyCode.Unknown then return false end
 
-		local binding=(ctx.inputToBinding or inputToBinding)(input)
+		local binding=inputToBinding(input)
 		if binding==hitboxKey then
 			api.SetHitboxLock(not state.hitboxOn,true)
 			return true

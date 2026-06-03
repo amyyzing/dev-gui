@@ -322,7 +322,17 @@ function makePage1Ctx()
 		buildToggleRow=buildToggleRow,
 		HITBOX_ORIGINALS=HITBOX_ORIGINALS,
 		fmtNumber=fmtNumber,
+		safeDisconnect=safeDisconnect,
 		inputToBinding=inputToBinding,
+		Page1HitboxLogicModule=Page1HitboxLogicModule,
+		Page1GravityLogicModule=Page1GravityLogicModule,
+		Page1SpeedLogicModule=Page1SpeedLogicModule,
+		Page1GameParamsLogicModule=Page1GameParamsLogicModule,
+		Page1BoostLogicModule=Page1BoostLogicModule,
+		Page1ESPLogicModule=Page1ESPLogicModule,
+		Page1ESPDefenseLogicModule=Page1ESPDefenseLogicModule,
+		Page1ESPOffenseLogicModule=Page1ESPOffenseLogicModule,
+		Page1QBAimLogicModule=Page1QBAimLogicModule,
 		getCurrentModeKey=function() return CURRENT_MODE_KEY end,
 		getHitboxToggleKey=function() return TOGGLE_HB_KEY end,
 		getSpeedToggleKey=function() return TOGGLE_SPEED_KEY end,
@@ -333,8 +343,8 @@ function makePage1Ctx()
 		getQBAimThrowKey=function() return QB_AIM_THROW_KEY end,
 		getQBAimToggleKey=function() return QB_AIM_TOGGLE_KEY end,
 		Description=Description,
-		ESPDefenseModule=Page1ESPDefenseModule,
-		ESPOffenseModule=Page1ESPOffenseModule,
+		ESPDefenseModule=Page1ESPDefenseLogicModule,
+		ESPOffenseModule=Page1ESPOffenseLogicModule,
 		refreshESPStatus=function(state,available)
 			PAGE1_STATE.actionStatusOn=state and available~=false
 			actionStatusOn=PAGE1_STATE.actionStatusOn
@@ -379,7 +389,7 @@ function buildPage1()
 		end)
 		if ok then PAGE1_APIS.Hitbox=result else addPage1Error(leftCol,1,"Hitbox",tostring(result)) end
 	else
-		addPage1Error(leftCol,1,"Hitbox","page-1/hitbox.lua")
+		addPage1Error(leftCol,1,"Hitbox","page-1/hitbox/gui.lua")
 	end
 
 	if Page1GravityModule and Page1GravityModule.new then
@@ -388,7 +398,7 @@ function buildPage1()
 		end)
 		if ok then PAGE1_APIS.Gravity=result else addPage1Error(leftCol,2,"Gravity",tostring(result)) end
 	else
-		addPage1Error(leftCol,2,"Gravity","page-1/gravity.lua")
+		addPage1Error(leftCol,2,"Gravity","page-1/gravity/gui.lua")
 	end
 
 	if Page1SpeedModule and Page1SpeedModule.new then
@@ -397,7 +407,7 @@ function buildPage1()
 		end)
 		if ok then PAGE1_APIS.Speed=result else addPage1Error(leftCol,3,"Speed",tostring(result)) end
 	else
-		addPage1Error(leftCol,3,"Speed","page-1/speed.lua")
+		addPage1Error(leftCol,3,"Speed","page-1/speed/gui.lua")
 	end
 
 	if Page1GameParamsModule and Page1GameParamsModule.new then
@@ -406,7 +416,7 @@ function buildPage1()
 		end)
 		if ok then PAGE1_APIS.GameParams=result else addPage1Error(leftCol,4,"Game Params",tostring(result)) end
 	else
-		addPage1Error(leftCol,4,"Game Params","page-1/game-params.lua")
+		addPage1Error(leftCol,4,"Game Params","page-1/game-params/gui.lua")
 	end
 
 	if Page1BoostModule and Page1BoostModule.new then
@@ -415,7 +425,7 @@ function buildPage1()
 		end)
 		if ok then PAGE1_APIS.Boost=result else addPage1Error(rightCol,2,"Boost",tostring(result)) end
 	else
-		addPage1Error(rightCol,2,"Boost","page-1/boost.lua")
+		addPage1Error(rightCol,2,"Boost","page-1/boost/gui.lua")
 	end
 
 	if Page1ESPModule and Page1ESPModule.new then
@@ -424,7 +434,7 @@ function buildPage1()
 		end)
 		if ok then PAGE1_APIS.ESP=result else addPage1Error(rightCol,3,"ESP",tostring(result)) end
 	else
-		addPage1Error(rightCol,3,"ESP","page-1/esp.lua")
+		addPage1Error(rightCol,3,"ESP","page-1/esp/gui.lua")
 	end
 
 	if Page1QBAimModule and Page1QBAimModule.new then
@@ -433,7 +443,7 @@ function buildPage1()
 		end)
 		if ok then PAGE1_APIS.QBAim=result else addPage1Error(rightCol,4,"QB Aim",tostring(result)) end
 	else
-		addPage1Error(rightCol,4,"QB Aim","page-1/qb-aim.lua")
+		addPage1Error(rightCol,4,"QB Aim","page-1/qb-aim/gui.lua")
 	end
 
 	syncPage1State()

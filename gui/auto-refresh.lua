@@ -11,11 +11,15 @@ function AutoRefresh.new(ctx)
 	local loadModuleFromSource=ctx.loadModuleFromSource
 	local shouldReloadMain=ctx.shouldReloadMain or function() return false end
 	local applyModuleChange=ctx.applyModuleChange or function() return false end
+	local getRemoteManifest=ctx.getRemoteManifest
 	local getRemoteSource=ctx.getRemoteSource
 	local reloadFromSource=ctx.reloadFromSource
 	local optionalPaths=ctx.optionalPaths or {}
 	local reloading=false
 	local failed=false
+	local manifestFailed=false
+	local buildId=nil
+	local pathVersions={}
 	local fetchFailures={}
 	local optionalMissing={}
 
@@ -55,6 +59,67 @@ function AutoRefresh.new(ctx)
 		end
 
 		return result.source,nil
+	end
+
+	local function manifestValue(manifest,key)
+		return manifest and (manifest[key] or manifest[string.lower(key)] or manifest[string.upper(key)])
+	end
+
+	local function getManifestBuildId(manifest)
+		local value=manifestValue(manifest,"buildId") or manifestValue(manifest,"version") or manifestValue(manifest,"revision")
+		return value~=nil and tostring(value) or nil
+	end
+
+	local function getManifestChangedPaths(manifest,nextBuildId)
+		local changed=manifestValue(manifest,"changedPaths") or manifestValue(manifest,"pathsChanged")
+		if type(changed)=="table" and #changed>0 then
+			return changed
+		end
+
+		if buildId~=nil and nextBuildId~=nil and nextBuildId~=buildId then
+			return watchPaths
+		end
+
+		local versions=manifestValue(manifest,"versions") or manifestValue(manifest,"pathVersions")
+		if type(versions)=="table" then
+			local paths={}
+			for _,path in ipairs(watchPaths) do
+				local version=versions[path]
+				if version~=nil and pathVersions[path]~=nil and tostring(version)~=pathVersions[path] then
+					table.insert(paths,path)
+				end
+			end
+			return paths
+		end
+
+		return{}
+	end
+
+	local function rememberManifest(manifest,nextBuildId)
+		buildId=nextBuildId or buildId
+
+		local versions=manifestValue(manifest,"versions") or manifestValue(manifest,"pathVersions")
+		if type(versions)=="table" then
+			for path,version in pairs(versions) do
+				pathVersions[path]=tostring(version)
+			end
+		end
+	end
+
+	local function getManifestSource(manifest,path)
+		local sources=manifestValue(manifest,"sources") or manifestValue(manifest,"modules")
+		if type(sources)~="table" then
+			return nil
+		end
+
+		local entry=sources[path]
+		if type(entry)=="string" then
+			return entry
+		elseif type(entry)=="table" and type(entry.source)=="string" then
+			return entry.source
+		end
+
+		return nil
 	end
 
 	local function runReload(path,source,changedPath,changedSource)
@@ -141,6 +206,107 @@ function AutoRefresh.new(ctx)
 		return false
 	end
 
+	local function checkPathForSourceChange(path)
+		local source,sourceErr=fetchSource(path)
+		if source then
+			fetchFailures[path]=0
+			optionalMissing[path]=nil
+			local previous=sourceCache[path]
+			if previous~=nil and previous~=source then
+				if requestRefresh(path,source) then
+					return true
+				end
+				sourceCache[path]=source
+			end
+
+			if previous==nil then
+				sourceCache[path]=source
+			end
+		else
+			if optionalPaths[path] then
+				fetchFailures[path]=0
+				if not optionalMissing[path] then
+					optionalMissing[path]=true
+					warn("Auto-refresh skipping unavailable optional module:",path,sourceErr or "remote source fetch failed")
+				end
+			else
+				fetchFailures[path]=(fetchFailures[path] or 0)+1
+				if fetchFailures[path]>=3 then
+					return fail("Closing... encountered error",path,sourceErr or "remote source fetch failed")
+				end
+			end
+		end
+
+		return false
+	end
+
+	local function legacySourcePoll()
+		for _,path in ipairs(watchPaths) do
+			if not alive() then
+				return true
+			end
+
+			if checkPathForSourceChange(path) then
+				return true
+			end
+
+			task.wait(0.005)
+		end
+
+		return false
+	end
+
+	local function manifestPoll()
+		if not getRemoteManifest or manifestFailed then
+			return legacySourcePoll()
+		end
+
+		local manifest,manifestErr=getRemoteManifest(buildId,pathVersions)
+		if not manifest then
+			manifestFailed=true
+			warn("Auto-refresh manifest unavailable; falling back to source polling:",manifestErr or "unknown")
+			return legacySourcePoll()
+		end
+
+		local nextBuildId=getManifestBuildId(manifest)
+		local firstManifest=buildId==nil
+		local changedPaths=firstManifest and {} or getManifestChangedPaths(manifest,nextBuildId)
+		rememberManifest(manifest,nextBuildId)
+
+		for _,path in ipairs(changedPaths) do
+			if not alive() then
+				return true
+			end
+
+			local source=getManifestSource(manifest,path)
+			if not source then
+				local sourceErr=nil
+				source,sourceErr=fetchSource(path)
+				if not source then
+					if optionalPaths[path] then
+						warn("Auto-refresh skipping unavailable optional module:",path,sourceErr or "remote source fetch failed")
+					else
+						return fail("Closing... encountered error",path,sourceErr or "remote source fetch failed")
+					end
+				end
+			end
+
+			if source then
+				local previous=sourceCache[path]
+				if previous~=source then
+					if previous~=nil and requestRefresh(path,source) then
+						return true
+					end
+					sourceCache[path]=source
+				end
+			end
+
+			task.wait(0.005)
+		end
+
+		return false
+	end
+
 	function api.Start()
 		if not enabled then return end
 
@@ -148,43 +314,8 @@ function AutoRefresh.new(ctx)
 			task.wait(interval)
 
 			while alive() and not failed do
-				for _,path in ipairs(watchPaths) do
-					if not alive() then
-						return
-					end
-
-					local source,sourceErr=fetchSource(path)
-					if source then
-						fetchFailures[path]=0
-						optionalMissing[path]=nil
-						local previous=sourceCache[path]
-						if previous~=nil and previous~=source then
-							if requestRefresh(path,source) then
-								return
-							end
-							sourceCache[path]=source
-						end
-
-						if previous==nil then
-							sourceCache[path]=source
-						end
-					else
-						if optionalPaths[path] then
-							fetchFailures[path]=0
-							if not optionalMissing[path] then
-								optionalMissing[path]=true
-								warn("Auto-refresh skipping unavailable optional module:",path,sourceErr or "remote source fetch failed")
-							end
-						else
-							fetchFailures[path]=(fetchFailures[path] or 0)+1
-							if fetchFailures[path]>=3 then
-								fail("Closing... encountered error",path,sourceErr or "remote source fetch failed")
-								return
-							end
-						end
-					end
-
-					task.wait(0.005)
+				if manifestPoll() then
+					return
 				end
 
 				task.wait(interval)
