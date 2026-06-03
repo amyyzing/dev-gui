@@ -35,12 +35,10 @@ local QB_Y_MAX_CORRECTION=4.25
 local MIN_T,MAX_T,DT=0.35,6,0.01
 local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
-local ARC_PREVIEW_USE_C2_Y=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
 local RECEIVER_TRACK_INTERVAL=0.05
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
-local ARC_LANDING_Y=0.5
 local ARC_MAX_CURVE=400
 local PREVIEW_SMOOTH=0.28
 local C1_MARKER_ENABLED=true
@@ -689,13 +687,6 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
-	local function c2Y()
-		local center=originalCenter()
-		local c2=center and center:FindFirstChild("C2",true)
-		local cf=c2 and attachmentCFrame(c2)
-		return cf and cf.Position.Y
-	end
-
 	local function arcRig()
 		local original,folder=originalCenter()
 		if not(original and folder) then return nil end
@@ -953,9 +944,6 @@ function QBAim.new(ctx,parent)
 		local horizontal=Vector3.new(rootVelocity.X,0,rootVelocity.Z)*QB_RELEASE_DELAY*QB_XZ_RELEASE_FACTOR
 		local basePosition=ball and ball.Position or qbRoot.Position
 		local y=basePosition.Y
-		if ARC_PREVIEW_USE_C2_Y then
-			y=c2Y() or y
-		end
 
 		return Vector3.new(basePosition.X+horizontal.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+horizontal.Z)
 	end
@@ -1363,12 +1351,13 @@ function QBAim.new(ctx,parent)
 		if not(c2 and c1 and c3 and beam) then return end
 
 		local startPoint=plan.origin
-		local rawEnd=plan.landing or plan.target
-		local previewTime=plan.landingTime or plan.time
-		local endPoint=Vector3.new(rawEnd.X,ARC_LANDING_Y,rawEnd.Z)
+		local endPoint=plan.target or plan.c1Point
+		local previewTime=plan.time
+		if not(startPoint and endPoint and previewTime) then return end
+
 		local endVelocity=plan.velocity+G*previewTime
 		local p2=startPoint
-		local p1=plan.target
+		local p1=endPoint
 		local p3=endPoint
 
 		if preview.p2 then
