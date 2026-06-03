@@ -32,7 +32,6 @@ local QB_AIRBORNE_VY_EPSILON=2
 local QB_Y_RISE_FACTOR=0
 local QB_Y_FALL_FACTOR=0
 local QB_Y_MAX_CORRECTION=4.25
-local C2_GROUND_FALLBACK_MARGIN=2.5
 local MIN_T,MAX_T,DT=0.35,6,0.01
 local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
@@ -376,15 +375,20 @@ end
 local function prepPreviewObject(object)
 	if not object then return end
 
-	for _,descendant in ipairs(object:GetDescendants()) do
-		if descendant:IsA("BasePart") then
-			descendant.Anchored=true
-			descendant.CanCollide=false
-			descendant.CanTouch=false
-			descendant.CanQuery=false
-		elseif descendant:IsA("Beam") then
-			descendant.Enabled=true
+	local function prep(instance)
+		if instance:IsA("BasePart") then
+			instance.Anchored=true
+			instance.CanCollide=false
+			instance.CanTouch=false
+			instance.CanQuery=false
+		elseif instance:IsA("Beam") then
+			instance.Enabled=true
 		end
+	end
+
+	prep(object)
+	for _,descendant in ipairs(object:GetDescendants()) do
+		prep(descendant)
 	end
 end
 
@@ -689,32 +693,64 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function c2Y()
-		local center=originalCenter()
-		local c2=center and center:FindFirstChild("C2",true)
+		local c2=preview.c2
+		if not(c2 and c2.Parent) and preview.center and preview.center.Parent then
+			c2=preview.center:FindFirstChild("C2",true)
+		end
+
 		local cf=c2 and attachmentCFrame(c2)
+		if cf then
+			return cf.Position.Y
+		end
+
+		local center=originalCenter()
+		c2=center and center:FindFirstChild("C2",true)
+		cf=c2 and attachmentCFrame(c2)
 		return cf and cf.Position.Y
 	end
 
-	local function arcRig()
-		local original,folder=originalCenter()
-		if not(original and folder) then return nil end
+	local function setPreviewCenterVisible(visible)
+		local center=preview.center
+		if not(center and center.Parent) then return end
 
-		if not preview.center or preview.orig~=original or not preview.center.Parent then
-			if preview.center then
-				preview.center:Destroy()
+		local function apply(instance)
+			if instance:IsA("BasePart") then
+				if instance:GetAttribute("QBAimPreviewTransparency")==nil then
+					instance:SetAttribute("QBAimPreviewTransparency",instance.Transparency)
+				end
+				instance.Transparency=visible and (instance:GetAttribute("QBAimPreviewTransparency") or 0) or 1
+			elseif instance:IsA("Beam") then
+				instance.Enabled=visible
+			elseif instance:IsA("Attachment") then
+				pcall(function()
+					instance.Visible=visible
+				end)
 			end
-
-			preview.center=original:Clone()
-			preview.center.Name="ClonedCenter"
-			preview.center.Parent=folder
-			prepPreviewObject(preview.center)
-			preview.orig=original
 		end
 
-		local center=preview.center
+		apply(center)
+		for _,descendant in ipairs(center:GetDescendants()) do
+			apply(descendant)
+		end
+	end
+
+	local function destroyPreviewCenter()
+		if preview.center and preview.center.Parent then
+			preview.center:Destroy()
+		end
+
+		preview.center=nil
+		preview.c1=nil
+		preview.c2=nil
+		preview.c3=nil
+		preview.beam=nil
+		preview.orig=nil
+	end
+
+	local function bindArcRigParts(center)
 		preview.c2=center:FindFirstChild("C2",true)
 		preview.c3=center:FindFirstChild("C3",true)
-		if not(preview.c2 and preview.c3) then return nil end
+		if not(preview.c2 and preview.c3) then return false end
 
 		preview.c1=center:FindFirstChild("C1",true)
 		if not preview.c1 then
@@ -723,6 +759,7 @@ function QBAim.new(ctx,parent)
 			preview.c1.Parent=preview.c2.Parent
 		end
 
+		preview.beam=nil
 		for _,descendant in ipairs(center:GetDescendants()) do
 			if descendant:IsA("Beam") then
 				preview.beam=descendant
@@ -733,9 +770,27 @@ function QBAim.new(ctx,parent)
 		if preview.beam then
 			preview.beam.Attachment0=preview.c2
 			preview.beam.Attachment1=preview.c3
-			preview.beam.Enabled=true
+			preview.beam.Enabled=state.qbAimShowArc~=false
 		end
 
+		return preview.beam~=nil
+	end
+
+	local function arcRig()
+		local original,folder=originalCenter()
+		if original and folder and (not preview.center or preview.orig~=original or not preview.center.Parent) then
+			destroyPreviewCenter()
+			preview.center=original:Clone()
+			preview.center.Name="ClonedCenter"
+			preview.center.Parent=folder
+			prepPreviewObject(preview.center)
+			preview.orig=original
+		end
+
+		local center=preview.center
+		if not(center and center.Parent and bindArcRigParts(center)) then return nil end
+
+		setPreviewCenterVisible(state.qbAimShowArc~=false)
 		return preview.c2,preview.c1,preview.c3,preview.beam
 	end
 
@@ -951,9 +1006,7 @@ function QBAim.new(ctx,parent)
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
 		local horizontal=Vector3.new(rootVelocity.X,0,rootVelocity.Z)*QB_RELEASE_DELAY*QB_XZ_RELEASE_FACTOR
 		local basePosition=ball and ball.Position or qbRoot.Position
-		local baseY=basePosition.Y
-		local centerY=c2Y()
-		local y=centerY and centerY>=baseY-C2_GROUND_FALLBACK_MARGIN and centerY or baseY
+		local y=c2Y() or basePosition.Y
 
 		return Vector3.new(basePosition.X+horizontal.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+horizontal.Z)
 	end
@@ -1326,26 +1379,20 @@ function QBAim.new(ctx,parent)
 					descendant.Enabled=false
 				end
 			end
+			setPreviewCenterVisible(false)
 		end
 
 		hideC1AndC3Info()
 	end
 
-	local function clearPreviewVisuals()
+	local function clearPreviewVisuals(destroyCenter)
 		previewFrozen=false
 		preview.p1,preview.p2,preview.p3=nil,nil,nil
 		hideQBTrailPreview()
 
-		if preview.center and preview.center.Parent then
-			preview.center:Destroy()
+		if destroyCenter then
+			destroyPreviewCenter()
 		end
-
-		preview.center=nil
-		preview.c1=nil
-		preview.c2=nil
-		preview.c3=nil
-		preview.beam=nil
-		preview.orig=nil
 	end
 
 	local function previewPlan(plan)
@@ -1391,6 +1438,7 @@ function QBAim.new(ctx,parent)
 		beam.Attachment1=c3
 		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
 		beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
+		setPreviewCenterVisible(true)
 		beam.Enabled=true
 	end
 
@@ -1659,9 +1707,7 @@ function QBAim.new(ctx,parent)
 
 		table.clear(connections)
 
-		if preview.center and preview.center.Parent then
-			preview.center:Destroy()
-		end
+		destroyPreviewCenter()
 		if preview.c1Marker and preview.c1Marker.Parent then
 			preview.c1Marker:Destroy()
 		end
