@@ -27,16 +27,20 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		ZIndex=7,
 	},parent)
 
-	local outerGlow=New("Frame",{
+	local softHalo=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
 		Position=UDim2.new(0.5,0,0.5,0),
-		Size=UDim2.fromOffset(30,30),
-		BackgroundColor3=THEME.GREEN,
+		Size=UDim2.fromOffset(33,33),
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		ZIndex=6,
 	},switch)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},outerGlow)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},softHalo)
+	local softHaloStroke=New("UIStroke",{
+		Color=THEME.GREEN,
+		Thickness=2.2,
+		Transparency=1,
+	},softHalo)
 
 	local halo=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
@@ -52,17 +56,6 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		Thickness=1.4,
 		Transparency=1,
 	},halo)
-
-	local glow=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.new(0.5,0,0.5,0),
-		Size=UDim2.fromOffset(20,20),
-		BackgroundColor3=THEME.GREEN,
-		BackgroundTransparency=1,
-		BorderSizePixel=0,
-		ZIndex=7,
-	},switch)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},glow)
 
 	local ringClip=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
@@ -95,6 +88,7 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 			BackgroundColor3=THEME.MUTED,
 			BackgroundTransparency=0.48,
 			BorderSizePixel=0,
+			ClipsDescendants=true,
 			Rotation=degrees+90,
 			ZIndex=9,
 		},ringClip)
@@ -102,14 +96,13 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 
 		local fill=New("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=UDim2.new(0.5,x,0.5,y),
-			Size=UDim2.fromOffset(2,4),
+			Position=UDim2.fromScale(0.5,0.5),
+			Size=UDim2.new(1,0,1,0),
 			BackgroundColor3=THEME.GREEN,
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
-			Rotation=degrees+90,
 			ZIndex=10,
-		},ringClip)
+		},base)
 		New("UICorner",{CornerRadius=UDim.new(1,0)},fill)
 
 		segments[i]={base=base,fill=fill}
@@ -156,10 +149,8 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 			if not animate then
 				fillValue.Value=1
 			end
-			glow.BackgroundTransparency=animate and 1 or 0.84
-			glow.Size=UDim2.fromOffset(20,20)
-			outerGlow.BackgroundTransparency=animate and 1 or 0.93
-			outerGlow.Size=UDim2.fromOffset(30,30)
+			softHaloStroke.Transparency=animate and 1 or 0.76
+			softHaloStroke.Thickness=animate and 2.2 or 3.2
 			haloStroke.Transparency=animate and 1 or 0.48
 			haloStroke.Thickness=animate and 1.4 or 2
 
@@ -170,8 +161,7 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 
 			fillTween=TweenService:Create(fillValue,TweenInfo.new(0.44,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Value=1})
 			fillTween:Play()
-			tween(glow,0.24,{BackgroundTransparency=0.84,Size=UDim2.fromOffset(38,38)})
-			tween(outerGlow,0.28,{BackgroundTransparency=0.9,Size=UDim2.fromOffset(44,44)})
+			tween(softHaloStroke,0.28,{Transparency=0.68,Thickness=4.2})
 			tween(haloStroke,0.22,{Transparency=0.34,Thickness=2.4})
 		else
 			if not animate then
@@ -183,8 +173,7 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 
 			fillTween=TweenService:Create(fillValue,TweenInfo.new(0.34,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Value=0})
 			fillTween:Play()
-			tween(glow,0.18,{BackgroundTransparency=1,Size=UDim2.fromOffset(20,20)})
-			tween(outerGlow,0.2,{BackgroundTransparency=1,Size=UDim2.fromOffset(30,30)})
+			tween(softHaloStroke,0.18,{Transparency=1,Thickness=2.2})
 			tween(haloStroke,0.16,{Transparency=1,Thickness=1.4})
 		end
 
