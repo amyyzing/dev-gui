@@ -69,6 +69,10 @@ local CIRCLE_LOS_RATE_EPSILON=1.00
 local CIRCLE_EXTRA_LEAD_TIME_MAX=0.78
 local CIRCLE_BALANCE_LEAD_SCALE_MIN=0.72
 local CIRCLE_BALANCE_LEAD_SCALE_MAX=1.00
+local CIRCLE_TANGENT_REACTIVE_LEAD=0.58
+local CIRCLE_TANGENT_REACTIVE_LOS_GAIN=1.25
+local CIRCLE_TANGENT_ALIGNMENT_BOOST=0.30
+local CIRCLE_TANGENT_BALANCE_BOOST=0.35
 local DIAG_STREAK_SIDE_RATIO_MIN=0.30
 local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
@@ -104,11 +108,9 @@ local function routeSpeed(speed)
 	local clamped=math.clamp(speed,0,MAX_RUN_SPEED)
 	if clamped<ROUTE_LOCK_MIN_SPEED then
 		return 0
-	elseif clamped>=NORMAL_ROUTE_MIN_SPEED then
-		return MAX_RUN_SPEED
 	end
 
-	return clamped
+	return MAX_RUN_SPEED
 end
 
 local function getModeKey(ctx)
@@ -964,16 +966,7 @@ function QBAim.new(ctx,parent)
 		local adjustedSpeed=routeSpeed(measuredSpeed)
 		local stableDirection,stableSpeed=updateStable(data)
 
-		if routeLock and routeLock.player==receiver and routeLock.routeDir and os.clock()-routeLock.createdAt<=ROUTE_LOCK_MAX_AGE then
-			local speed=stableSpeed>0 and stableSpeed or adjustedSpeed
-			if speed<=0 then
-				speed=routeLock.routeSpeed or MAX_RUN_SPEED
-			end
-
-			local velocity=routeLock.routeDir*speed
-			return velocity,movementShape(origin,receiverRoot.Position,velocity)
-		end
-
+		-- H locks the receiver only. Route direction stays reactive and uses current tracked movement.
 		if stableDirection and stableSpeed>0 then
 			local velocity=stableDirection*stableSpeed
 			return velocity,movementShape(origin,receiverRoot.Position,velocity)
@@ -1055,6 +1048,7 @@ function QBAim.new(ctx,parent)
 		local result=components(originPosition,receiverRoot.Position,targetVelocity)
 		local radius=distXZ(originPosition,receiverRoot.Position)
 		local speed=math.max(result.speed,1e-6)
+		local velocityXZ=flat(targetVelocity or Vector3.zero)
 
 		local awayShare=math.clamp(result.away/speed,-1,1)
 		local positiveAwayShare=math.clamp(result.away/speed,0,1)
@@ -1079,11 +1073,36 @@ function QBAim.new(ctx,parent)
 
 		local losRate=result.sideAbs/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
 		local losDamping=1/(1+losRate*CIRCLE_LOS_RATE_GAIN)
+		local reactiveLosDamping=1/(1+losRate*CIRCLE_TANGENT_REACTIVE_LOS_GAIN)
 
-		local radialExtraTime=math.min(WR_LEAD_DELAY*distanceScale*radialGain*balanceLeadScale,CIRCLE_EXTRA_LEAD_TIME_MAX)
-		local tangentExtraTime=math.min(WR_LEAD_DELAY*distanceScale*tangentGain*losDamping*balanceLeadScale,CIRCLE_EXTRA_LEAD_TIME_MAX)
+		local tangentAlignment=0
+		if velocityXZ.Magnitude>1e-6 then
+			tangentAlignment=math.abs(velocityXZ.Unit:Dot(result.sideDir))
+		end
 
-		local flightLead=flat(targetVelocity)*flightTime
+		local tangentAlignmentBoost=1+CIRCLE_TANGENT_ALIGNMENT_BOOST*tangentAlignment
+		local tangentBalanceBoost=1+CIRCLE_TANGENT_BALANCE_BOOST*routeBalance
+
+		local radialExtraTime=math.min(
+			WR_LEAD_DELAY*distanceScale*radialGain*balanceLeadScale,
+			CIRCLE_EXTRA_LEAD_TIME_MAX
+		)
+
+		local tangentBaseTime=WR_LEAD_DELAY*distanceScale*tangentGain*losDamping*balanceLeadScale
+		local tangentReactiveTime=
+			CIRCLE_TANGENT_REACTIVE_LEAD
+			*distanceScale
+			*lateralShare
+			*reactiveLosDamping
+			*tangentAlignmentBoost
+			*tangentBalanceBoost
+
+		local tangentExtraTime=math.min(
+			math.max(tangentBaseTime,tangentReactiveTime),
+			CIRCLE_EXTRA_LEAD_TIME_MAX
+		)
+
+		local flightLead=velocityXZ*flightTime
 		local radialExtraLead=result.awayDir*result.away*radialExtraTime
 		local tangentExtraLead=result.sideDir*result.side*tangentExtraTime
 		local extraLead=radialExtraLead+tangentExtraLead
@@ -1098,6 +1117,8 @@ function QBAim.new(ctx,parent)
 			extraLeadTime=effectiveExtraTime,
 			radialExtraTime=radialExtraTime,
 			tangentExtraTime=tangentExtraTime,
+			tangentBaseTime=tangentBaseTime,
+			tangentReactiveTime=tangentReactiveTime,
 			distanceXZNow=radius,
 			distanceScale=distanceScale,
 			awayShare=awayShare,
@@ -1110,6 +1131,10 @@ function QBAim.new(ctx,parent)
 			tangentGain=tangentGain,
 			losRate=losRate,
 			losDamping=losDamping,
+			reactiveLosDamping=reactiveLosDamping,
+			tangentAlignment=tangentAlignment,
+			tangentAlignmentBoost=tangentAlignmentBoost,
+			tangentBalanceBoost=tangentBalanceBoost,
 			routeAway=result.away,
 			routeSide=result.side,
 			routeSpeed=result.speed,
