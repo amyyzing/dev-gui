@@ -181,6 +181,208 @@ function GuiLogic.new(ctx)
 		return{set=function(v) setState(v,false) end,get=function() return state end,wrap=wrap,knob=knob,hit=hit,width=width,height=height}
 	end
 
+	local function createHeaderSwitch(parent,startState,onChange,zIndex)
+		local width,height=34,34
+		local minimizedSize=16
+		local expandedSize=23
+		zIndex=zIndex or 6
+
+		local switch=New("Frame",{
+			AnchorPoint=Vector2.new(1,0.5),
+			Size=UDim2.fromOffset(width,height),
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			ZIndex=zIndex,
+		},parent)
+
+		local holder=New("Frame",{
+			AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.fromScale(0.5,0.5),
+			Size=UDim2.fromOffset(28,28),
+			BackgroundColor3=THEME.MUTED,
+			BackgroundTransparency=0.9,
+			BorderSizePixel=0,
+			ZIndex=zIndex+1,
+		},switch)
+		New("UICorner",{CornerRadius=UDim.new(0,5)},holder)
+
+		local holderStroke=New("UIStroke",{
+			Color=THEME.MUTED,
+			Thickness=1,
+			Transparency=0.62,
+		},holder)
+
+		local glow=New("Frame",{
+			AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.fromScale(0.5,0.5),
+			Size=UDim2.fromOffset(startState and 30 or 18,startState and 30 or 18),
+			BackgroundColor3=THEME.GREEN,
+			BackgroundTransparency=startState and 0.84 or 1,
+			BorderSizePixel=0,
+			Rotation=startState and 45 or 0,
+			ZIndex=zIndex+2,
+		},holder)
+		New("UICorner",{CornerRadius=UDim.new(0,4)},glow)
+
+		local square=New("Frame",{
+			AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.fromScale(0.5,0.5),
+			Size=UDim2.fromOffset(startState and expandedSize or minimizedSize,startState and expandedSize or minimizedSize),
+			BackgroundColor3=startState and THEME.GREEN or THEME.MUTED,
+			BackgroundTransparency=startState and 0 or 0.34,
+			BorderSizePixel=0,
+			Rotation=startState and 45 or 0,
+			ZIndex=zIndex+3,
+		},holder)
+		New("UICorner",{CornerRadius=UDim.new(0,3)},square)
+
+		local squareStroke=New("UIStroke",{
+			Color=startState and THEME.GREEN or THEME.MUTED,
+			Thickness=1,
+			Transparency=startState and 0.05 or 0.36,
+		},square)
+
+		local hit=New("TextButton",{
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			Text="",
+			AutoButtonColor=false,
+			Size=UDim2.new(1,0,1,0),
+			ZIndex=zIndex+4,
+		},switch)
+
+		local state=startState and true or false
+		local activeTweens={}
+		local clickConn=nil
+
+		local function cancelTweens()
+			for _,tw in ipairs(activeTweens) do
+				pcall(function()
+					tw:Cancel()
+				end)
+			end
+
+			table.clear(activeTweens)
+		end
+
+		local function playTween(object,info,goal)
+			local tw=TweenService:Create(object,info,goal)
+			table.insert(activeTweens,tw)
+			tw:Play()
+			return tw
+		end
+
+		local function applyVisuals(animate)
+			cancelTweens()
+
+			local expanded=state
+			local targetSize=expanded and expandedSize or minimizedSize
+			local targetRotation=expanded and 45 or 0
+			local targetColor=expanded and THEME.GREEN or THEME.MUTED
+			local targetSquareTransparency=expanded and 0 or 0.34
+			local targetGlowTransparency=expanded and 0.84 or 1
+			local targetGlowSize=expanded and 30 or 18
+			local targetHolderTransparency=expanded and 0.84 or 0.9
+			local targetStrokeTransparency=expanded and 0.26 or 0.62
+			local targetSquareStrokeTransparency=expanded and 0.05 or 0.36
+
+			if not animate then
+				square.Size=UDim2.fromOffset(targetSize,targetSize)
+				square.Rotation=targetRotation
+				square.BackgroundColor3=targetColor
+				square.BackgroundTransparency=targetSquareTransparency
+				squareStroke.Color=targetColor
+				squareStroke.Transparency=targetSquareStrokeTransparency
+				glow.Size=UDim2.fromOffset(targetGlowSize,targetGlowSize)
+				glow.Rotation=targetRotation
+				glow.BackgroundTransparency=targetGlowTransparency
+				holder.BackgroundColor3=targetColor
+				holder.BackgroundTransparency=targetHolderTransparency
+				holderStroke.Color=targetColor
+				holderStroke.Transparency=targetStrokeTransparency
+				return
+			end
+
+			local info=expanded
+				and TweenInfo.new(0.28,Enum.EasingStyle.Back,Enum.EasingDirection.Out)
+				or TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut)
+			local softInfo=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+
+			playTween(square,info,{
+				Size=UDim2.fromOffset(targetSize,targetSize),
+				Rotation=targetRotation,
+				BackgroundColor3=targetColor,
+				BackgroundTransparency=targetSquareTransparency,
+			})
+
+			playTween(squareStroke,softInfo,{
+				Color=targetColor,
+				Transparency=targetSquareStrokeTransparency,
+			})
+
+			playTween(glow,info,{
+				Size=UDim2.fromOffset(targetGlowSize,targetGlowSize),
+				Rotation=targetRotation,
+				BackgroundTransparency=targetGlowTransparency,
+			})
+
+			playTween(holder,softInfo,{
+				BackgroundColor3=targetColor,
+				BackgroundTransparency=targetHolderTransparency,
+			})
+
+			playTween(holderStroke,softInfo,{
+				Color=targetColor,
+				Transparency=targetStrokeTransparency,
+			})
+		end
+
+		local function setState(value,fire,animate,force)
+			local nextState=value and true or false
+			local changed=nextState~=state
+
+			if not changed and not force then
+				return
+			end
+
+			state=nextState
+			applyVisuals((animate~=false) and changed)
+
+			if fire and changed and onChange then
+				onChange(state)
+			end
+		end
+
+		clickConn=hit.MouseButton1Click:Connect(function()
+			setState(not state,true,true)
+		end)
+
+		applyVisuals(false)
+
+		return{
+			set=function(value)
+				setState(value,false,true)
+			end,
+			get=function()
+				return state
+			end,
+			destroy=function()
+				cancelTweens()
+				if clickConn then
+					clickConn:Disconnect()
+					clickConn=nil
+				end
+
+				if switch then
+					switch:Destroy()
+				end
+			end,
+			wrap=switch,
+			width=width,
+			height=height,
+		}
+	end
+
 	local function insetSize(size)
 		return UDim2.new(size.X.Scale,size.X.Offset-(WRAP_INSET*2),size.Y.Scale,size.Y.Offset-(WRAP_INSET*2))
 	end
@@ -316,11 +518,18 @@ function GuiLogic.new(ctx)
 		New("UIListLayout",{Padding=UDim.new(0,componentNumber("SectionGap",6)),SortOrder=Enum.SortOrder.LayoutOrder},sec)
 
 		local collapsed=false
-		local header=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,componentNumber("SectionHeaderHeight",22)),ZIndex=5,LayoutOrder=1},sec)
+		local headerToggleWidth=34
+		local headerToggleHeight=34
+		local headerHeight=componentNumber("SectionHeaderHeight",22)
+		if options.headerToggle then
+			headerHeight=math.max(headerHeight,headerToggleHeight)
+		end
+
+		local header=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,headerHeight),ZIndex=5,LayoutOrder=1},sec)
 		local controls={section=sec}
 		local headerButtonOptions=options.headerButton or options.headerAction
 		local headerButtonWidth=headerButtonOptions and (headerButtonOptions.width or headerButtonOptions.Width or 104) or 0
-		local toggleReserve=options.headerToggle and (componentNumber("ToggleWidth",48)+8) or 0
+		local toggleReserve=options.headerToggle and (headerToggleWidth+8) or 0
 		local titleReserve=toggleReserve+(headerButtonOptions and (headerButtonWidth+8) or 0)
 		local usesPrefix=componentValue("SectionPrefix",true)~=false
 		local titleButton=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-titleReserve,1,0),Text=(usesPrefix and "[-] " or "")..titleText,Font=componentFont("TitleFont",Enum.Font.GothamBold),TextSize=componentNumber("SectionTitleSize",14),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=5},header)
@@ -342,7 +551,7 @@ function GuiLogic.new(ctx)
 
 		if options.headerToggle then
 			local toggleOptions=options.headerToggle
-			controls.toggle=createSwitch(header,toggleOptions.startState,toggleOptions.onChange,nil,nil,nil,nil,6)
+			controls.toggle=createHeaderSwitch(header,toggleOptions.startState,toggleOptions.onChange,6)
 			controls.toggle.wrap.Position=UDim2.new(1,-controls.toggle.width,0.5,-controls.toggle.height/2)
 			headerRightOffset=controls.toggle.width+8
 		end
