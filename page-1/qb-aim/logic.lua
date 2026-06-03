@@ -1,5 +1,99 @@
 local QBAim={}
 
+--[[
+QB Aim module synopsis
+
+Goal
+----
+This module predicts where a locked receiver will be when the football arrives,
+then sends the game a far-away aim point in that direction. It also draws the
+preview beam so the user can see the calculated arc before throwing.
+
+The script does not try to simulate every server detail. Instead, it uses a
+small projectile model that matches the useful parts of the football behavior:
+a fixed launch speed, a fixed downward gravity value, and a receiver lead based
+on recent movement.
+
+Coordinate model
+----------------
+Roblox positions are Vector3 values:
+- X and Z are horizontal field movement.
+- Y is vertical height.
+
+Most route math uses only X/Z. The helper `flat(v)` removes Y so receiver speed
+and receiver direction are not polluted by jumping, falling, or animation bob.
+
+Projectile math
+---------------
+The ball is modeled with:
+
+	position(t) = origin + velocity * t + 0.5 * gravity * t^2
+
+Here `gravity` is `G = Vector3.new(0, -BALL_G, 0)`, so only Y curves downward.
+If the solver wants the ball to pass through a target at a chosen time, the
+formula is rearranged into:
+
+	velocityNeeded = (target - origin - 0.5 * G * t^2) / t
+
+That tells us the exact launch velocity that would hit that target at that time.
+The game throw has a fixed useful speed (`MODEL_BALL_SPEED`, currently 95), so
+the solver checks many possible times and prefers the one whose required speed
+and arc angle best match the game's throw.
+
+Why the solver loops through time
+---------------------------------
+There is no single perfect time because the receiver is moving, the throw speed
+is fixed, and different distances need different arc angles. The solver tests
+times from `MIN_T` to `MAX_T` in `DT` steps. For each time it:
+
+1. Predicts the catch point using the receiver's velocity and route shape.
+2. Computes the velocity needed to hit that point at that time.
+3. Converts that velocity into an angle and compares it to preferred limits.
+4. Scores the result using catch error, speed error, preferred angle, flight
+   time, and penalties for throws that are too low or still rising at catch.
+
+The lowest score becomes the selected throw plan.
+
+Receiver lead math
+------------------
+The target lead is split into two parts:
+- Flight lead: how far the receiver moves during the ball's flight time.
+- Extra lead: small radial/tangent adjustments for route behavior.
+
+Radial movement is movement toward or away from the QB. Tangent movement is
+sideways movement across the QB's line of sight. Splitting the route this way
+lets crossing, streaking, and running-away routes get different lead amounts
+without hardcoding every route by name.
+
+The C1/catch target uses `WR_MAX_Y`, which estimates a practical receiver catch
+height from jump power and player gravity:
+
+	max jump height ~= jumpPower^2 / (2 * gravity)
+
+Preview beam math
+-----------------
+The preview uses three attachment points:
+- C2: throw origin.
+- C1: predicted catch/target point.
+- C3: landing point after the catch-time arc continues downward.
+
+The beam attachments are pointed along the ball velocity so the Roblox Beam
+curves in the same direction as the predicted throw. `PREVIEW_BEAM_ROLL` rotates
+the beam ribbon 90 degrees for visual orientation only; it does not change the
+throw math. Preview point lerping is time-based so different frame rates do not
+make the arc feel more or less jumpy. A short missing-ball grace window prevents
+the preview from flickering when the held-ball detection misses for a frame.
+
+Important tuning knobs
+----------------------
+- `MODEL_BALL_SPEED`: speed used by the local prediction model.
+- `BALL_G`: downward acceleration used by the local ball model.
+- `WR_LEAD_DELAY`: extra receiver lead bias.
+- `MIN_T`, `MAX_T`, `DT`: search range and precision for flight time.
+- `preferredAngle`, `minimumAngle`, `maximumAngle`: distance-based arc limits.
+- `PREVIEW_SMOOTH` and `PREVIEW_MISSING_BALL_GRACE`: preview stability.
+]]
+
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
 local UIS=game:GetService("UserInputService")
