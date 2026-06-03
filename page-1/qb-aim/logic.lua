@@ -8,18 +8,15 @@ local ReplicatedStorage=game:GetService("ReplicatedStorage")
 
 local LP=Players.LocalPlayer
 
+local YARDS_TO_STUDS=3
 local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local MODEL_BALL_SPEED=95
-local REMOTE_DISPLAY_POWER=100
-local GAMEPLAY_BALL_POWER=MODEL_BALL_SPEED
-local SQUADS_BALL_POWER=MODEL_BALL_SPEED
-local POINT_A_VELOCITY_INHERITANCE=0
-local INTERCEPT_BISECTION_STEPS=12
-local SPEED_TOLERANCE=1.25
-local CATCH_TOLERANCE=2.0
+local REMOTE_DISPLAY_POWER=100 -- send to remote; server converts incoming UpdateFootball Power to 95
 local GLOBAL_MIN_ANGLE=-5
 local GLOBAL_MAX_ANGLE=55
+local GAMEPLAY_BALL_POWER=MODEL_BALL_SPEED
+local SQUADS_BALL_POWER=MODEL_BALL_SPEED
 local PLAYER_G=196.2
 local JUMP_POWER=53.5
 local WR_MAX_Y=6+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
@@ -27,7 +24,6 @@ local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
-local WR_LEAD_DELAY=0.75
 local QB_RELEASE_DELAY=0.25
 local QB_XZ_RELEASE_FACTOR=0
 local QB_LAUNCH_Y_BIAS=0
@@ -42,16 +38,11 @@ local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
 local ARC_PREVIEW_USE_C2_Y=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
-local RECEIVER_TRACK_INTERVAL=0.05
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
 local ARC_LANDING_Y=0.5
 local ARC_MAX_CURVE=400
-local PREVIEW_SMOOTH=0.18
-local PREVIEW_SNAP_C1=58
-local PREVIEW_SNAP_C3=82
-local PREVIEW_BEAM_ROLL=CFrame.Angles(math.rad(90),0,0)
-local PREVIEW_MISSING_BALL_GRACE=0.22
+local PREVIEW_SMOOTH=0.28
 local C1_MARKER_ENABLED=true
 local C1_MARKER_SIZE=1.65
 local C3_INFO_GUI_ENABLED=false
@@ -64,6 +55,22 @@ local STABLE_HOLD=0.55
 local STABLE_STOP_SPEED=1.75
 local STABLE_DOT_REPLACE=0.72
 local STABLE_BLEND=0.18
+local CIRCLE_RADIUS_FULL_LEAD=180
+local CIRCLE_DISTANCE_SCALE_MIN=0.35
+local CIRCLE_DISTANCE_SCALE_MAX=1.00
+local CIRCLE_RADIAL_EXTRA_BASE=0.55
+local CIRCLE_RADIAL_EXTRA_GAIN=0.45
+local CIRCLE_RADIAL_EXTRA_MIN=0.25
+local CIRCLE_RADIAL_EXTRA_MAX=1
+local CIRCLE_TANGENT_EXTRA_BASE=0.25
+local CIRCLE_TANGENT_EXTRA_GAIN=0.50
+local CIRCLE_TANGENT_EXTRA_MIN=0.15
+local CIRCLE_TANGENT_EXTRA_MAX=0.70
+local CIRCLE_LOS_RATE_GAIN=6
+local CIRCLE_LOS_RATE_EPSILON=1.00
+local CIRCLE_EXTRA_LEAD_TIME_MAX=0.78
+local CIRCLE_BALANCE_LEAD_SCALE_MIN=0.72
+local CIRCLE_BALANCE_LEAD_SCALE_MAX=1.00
 local DIAG_STREAK_SIDE_RATIO_MIN=0.30
 local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
@@ -74,6 +81,14 @@ local VALID_TEAM_IDS={
 	HomeTeam=true,
 	AwayTeam=true,
 }
+
+local function safeDisconnect(conn)
+	if conn and typeof(conn)=="RBXScriptConnection" then
+		pcall(function()
+			conn:Disconnect()
+		end)
+	end
+end
 
 local function flat(v)
 	return Vector3.new(v.X,0,v.Z)
@@ -104,6 +119,23 @@ local function routeSpeed(speed)
 	end
 
 	return clamped
+end
+
+local function inputToBinding(input)
+	local key=input.KeyCode
+	if key and key~=Enum.KeyCode.Unknown then
+		return key
+	end
+
+	local uiType=tostring(input.UserInputType)
+	if uiType=="Enum.UserInputType.MouseButton1" then return"MouseButton1" end
+	if uiType=="Enum.UserInputType.MouseButton2" then return"MouseButton2" end
+	if uiType=="Enum.UserInputType.MouseButton3" then return"MouseButton3" end
+
+	local name=uiType:gsub("Enum.UserInputType%.","")
+	if name:match("^Gamepad") then return name end
+
+	return nil
 end
 
 local function getModeKey(ctx)
@@ -367,10 +399,6 @@ local function xAxisCFrame(position,xVector)
 	return CFrame.fromMatrix(position,xVector,y,z)
 end
 
-local function beamCFrame(position,xVector)
-	return xAxisCFrame(position,xVector)*PREVIEW_BEAM_ROLL
-end
-
 local function prepPreviewObject(object)
 	if not object then return end
 
@@ -381,7 +409,6 @@ local function prepPreviewObject(object)
 			descendant.CanTouch=false
 			descendant.CanQuery=false
 		elseif descendant:IsA("Beam") then
-			descendant.Segments=math.max(descendant.Segments,24)
 			descendant.Enabled=true
 		end
 	end
@@ -459,22 +486,17 @@ end
 function QBAim.new(ctx,parent)
 	local New=ctx.New
 	local THEME=ctx.THEME
-	local safeDisconnect=ctx.safeDisconnect
-	local inputToBinding=ctx.inputToBinding
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
-	local buildSlider=ctx.buildSlider
 	local state=ctx.State or {}
 	local api={}
 	local enabled=false
 	local trackedReceiver=nil
 	local selectedRouteLock=nil
 	local receiverData={}
-	local receiverTrackElapsed=0
-	local preview={last=0,smoothLast=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil}
+	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
-	local previewMissingBallSince=0
 	local connections={}
 	local sectionBody=nil
 	local sectionFrame=nil
@@ -483,15 +505,6 @@ function QBAim.new(ctx,parent)
 	local arcToggle=nil
 	local statusLabel=nil
 	local targetLabel=nil
-	local leadDelayFrame=nil
-	local leadDelayBox=nil
-	local leadDelaySlider=nil
-	local leadDelaySliderFill=nil
-	local leadDelaySliderKnob=nil
-	local leadDelaySliderControl=nil
-	local leadDelayDragging=false
-	local LEAD_DELAY_MIN=0.00
-	local LEAD_DELAY_MAX=1.50
 
 	if state.qbAimTeamFilter==nil then
 		state.qbAimTeamFilter=true
@@ -501,11 +514,7 @@ function QBAim.new(ctx,parent)
 		state.qbAimShowArc=true
 	end
 
-	if state.qbAimLeadDelay==nil then
-		state.qbAimLeadDelay=WR_LEAD_DELAY
-	end
-
-	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
+	state.qbAimLeadDelay=nil
 
 	local function addConnection(conn)
 		table.insert(connections,conn)
@@ -554,48 +563,6 @@ function QBAim.new(ctx,parent)
 		else
 			targetLabel.Text="Target: none"
 		end
-	end
-
-	local function updateLeadDelayVisuals()
-		if leadDelaySliderControl then
-			leadDelaySliderControl.set(WR_LEAD_DELAY)
-		end
-
-		if leadDelayBox then
-			leadDelayBox.Text=string.format("%.2f",WR_LEAD_DELAY)
-		end
-
-		if leadDelaySliderFill and leadDelaySliderKnob and leadDelaySlider then
-			local alpha=(WR_LEAD_DELAY-LEAD_DELAY_MIN)/math.max(LEAD_DELAY_MAX-LEAD_DELAY_MIN,0.001)
-			alpha=math.clamp(alpha,0,1)
-			leadDelaySliderFill.Size=UDim2.new(alpha,0,1,0)
-			leadDelaySliderKnob.Position=UDim2.new(alpha,-5,0.5,-5)
-		end
-	end
-
-	local function setLeadDelay(value,showStatus)
-		local numberValue=tonumber(value)
-		if not numberValue then
-			updateLeadDelayVisuals()
-			return false
-		end
-
-		WR_LEAD_DELAY=math.clamp(numberValue,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
-		state.qbAimLeadDelay=WR_LEAD_DELAY
-		updateLeadDelayVisuals()
-		if showStatus then
-			setStatus(string.format("LD set to %.2fs",WR_LEAD_DELAY))
-			changed()
-		end
-		return true
-	end
-
-	local function setLeadDelayFromScreenX(screenX,showStatus)
-		if not leadDelaySlider then return false end
-		local pos=leadDelaySlider.AbsolutePosition.X
-		local size=math.max(leadDelaySlider.AbsoluteSize.X,1)
-		local alpha=math.clamp((screenX-pos)/size,0,1)
-		return setLeadDelay(LEAD_DELAY_MIN+(LEAD_DELAY_MAX-LEAD_DELAY_MIN)*alpha,showStatus)
 	end
 
 	local function canTargetReceiver(player)
@@ -649,7 +616,8 @@ function QBAim.new(ctx,parent)
 			return false
 		end
 
-		local incoming=inputToBinding(input)
+		local convert=ctx.inputToBinding or inputToBinding
+		local incoming=convert(input)
 		return incoming~=nil and incoming==binding
 	end
 
@@ -682,9 +650,9 @@ function QBAim.new(ctx,parent)
 		if not isAvailable() then
 			setStatus(currentModeText().." unsupported")
 		elseif enabled then
-			setStatus("")
+			setStatus(currentModeText().." ready")
 		else
-			setStatus("")
+			setStatus(currentModeText().." disabled")
 		end
 	end
 
@@ -959,37 +927,87 @@ function QBAim.new(ctx,parent)
 		return Vector3.new(basePosition.X+horizontal.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+horizontal.Z)
 	end
 
-	local function ballAt(pointA,velocity,time)
-		return pointA+velocity*time+0.5*G*time*time
+	local function velocityNeeded(originPosition,targetPosition,time)
+		return(targetPosition-originPosition-0.5*G*time*time)/time
 	end
 
-	local function landing(pointA,velocity)
-		local discriminant=velocity.Y*velocity.Y+2*BALL_G*pointA.Y
+	local function ballAt(originPosition,velocity,time)
+		return originPosition+velocity*time+0.5*G*time*time
+	end
+
+	local function landing(originPosition,velocity)
+		local discriminant=velocity.Y*velocity.Y+2*BALL_G*originPosition.Y
 		if discriminant<0 then return nil,nil end
 
 		local time=(velocity.Y+math.sqrt(discriminant))/BALL_G
 		if time<=0 then return nil,nil end
 
-		return ballAt(pointA,velocity,time),time
+		return ballAt(originPosition,velocity,time),time
 	end
 
-	local function radarVector(time,pointAToPointB,pointBRelativeVelocity)
-		return pointAToPointB+pointBRelativeVelocity*time-0.5*G*time*time
+	local function preferredAngle(distance)
+		local yards=distance/YARDS_TO_STUDS
+		if yards<15 then return 24 elseif yards<25 then return 22 elseif yards<40 then return 19 elseif yards<55 then return 16 elseif yards<70 then return 14 elseif yards<85 then return 17 end
+		return 22
 	end
 
-	local function radarInterceptF(time,pointAToPointB,pointBRelativeVelocity,ballSpeed)
-		local radarPath=radarVector(time,pointAToPointB,pointBRelativeVelocity)
-		return radarPath:Dot(radarPath)-ballSpeed*ballSpeed*time*time
+	local function minimumAngle(distance)
+		local yards=distance/YARDS_TO_STUDS
+		if yards<15 then return 14 elseif yards<25 then return 17 elseif yards<40 then return 16 elseif yards<55 then return 11 end
+		return 0
 	end
 
-	local function refineRadarRoot(lowTime,highTime,pointAToPointB,pointBRelativeVelocity,ballSpeed)
-		local lowValue=radarInterceptF(lowTime,pointAToPointB,pointBRelativeVelocity,ballSpeed)
+	local function maximumAngle(distance)
+		if distance<45 then return 42 elseif distance<75 then return 38 elseif distance<120 then return 34 elseif distance<170 then return 32 end
+		return 35
+	end
+
+	local function maximumTime(distance)
+		if distance<45 then return 1.35 elseif distance<75 then return 1.85 elseif distance<120 then return 2.45 elseif distance<170 then return 3.25 elseif distance<230 then return 4.25 end
+		return MAX_T
+	end
+
+	-- Universal ballistic moving-target intercept.
+	-- No route buckets and no radial/tangent lead are used here.
+	-- C1 is the WR max-reach point at the intercept time:
+	--   C1(t) = WRmaxNow + WRVelocityXZ * t
+	-- The throw time is the root of:
+	--   |C1(t) - A - 0.5*G*t^2|^2 = speed^2*t^2
+	local INTERCEPT_BISECTION_STEPS=18
+	local INTERCEPT_NEAR_SPEED_TOLERANCE=1.25
+	local INTERCEPT_NEAR_MISS_TOLERANCE=1.25
+	local INTERCEPT_SCAN_DT=0.01
+
+	local function targetAtTime(targetStart,targetVelocity,time)
+		local v=flat(targetVelocity or Vector3.zero)
+		return Vector3.new(
+			targetStart.X+v.X*time,
+			targetStart.Y,
+			targetStart.Z+v.Z*time
+		)
+	end
+
+	local function interceptVector(time,originPosition,targetStart,targetVelocity)
+		return targetAtTime(targetStart,targetVelocity,time)-originPosition-0.5*G*time*time
+	end
+
+	local function interceptFunction(time,originPosition,targetStart,targetVelocity,ballSpeed)
+		local r=interceptVector(time,originPosition,targetStart,targetVelocity)
+		return r:Dot(r)-ballSpeed*ballSpeed*time*time
+	end
+
+	local function refineInterceptRoot(lowTime,highTime,originPosition,targetStart,targetVelocity,ballSpeed)
+		local lowValue=interceptFunction(lowTime,originPosition,targetStart,targetVelocity,ballSpeed)
+
 		for _=1,INTERCEPT_BISECTION_STEPS do
 			local midTime=(lowTime+highTime)*0.5
-			local midValue=radarInterceptF(midTime,pointAToPointB,pointBRelativeVelocity,ballSpeed)
+			local midValue=interceptFunction(midTime,originPosition,targetStart,targetVelocity,ballSpeed)
+
 			if math.abs(midValue)<1e-6 then
 				return midTime
-			elseif (lowValue<=0 and midValue>=0) or (lowValue>=0 and midValue<=0) then
+			end
+
+			if (lowValue<=0 and midValue>=0) or (lowValue>=0 and midValue<=0) then
 				highTime=midTime
 			else
 				lowTime=midTime
@@ -1000,120 +1018,142 @@ function QBAim.new(ctx,parent)
 		return(lowTime+highTime)*0.5
 	end
 
-	local function solve(qbRoot,ball,receiverRoot,pointBVelocityInput,shape,ballPower)
-		local ballSpeed=MODEL_BALL_SPEED
-		local pointA=origin(qbRoot,ball)
-		local pointB=receiverMax(receiverRoot)
-		local pointBVelocity=flat(pointBVelocityInput or Vector3.zero)
-		local pointAVelocity=flat(qbRoot.AssemblyLinearVelocity or Vector3.zero)
-		local pointBRelativeVelocity=pointBVelocity-pointAVelocity*POINT_A_VELOCITY_INHERITANCE
-		local pointAToPointB=pointB-pointA
-		local pointADistance=distXZ(pointA,pointB)
-		local bestPlan=nil
-		local bestNearPlan=nil
+	local function makeUniversalLeadInfo(originPosition,receiverPosition,targetVelocity,time)
+		local route=components(originPosition,receiverPosition,targetVelocity)
+		local speed=math.max(route.speed,1e-6)
+		local flightLead=flat(targetVelocity)*time
 
-		local function planAt(time,source)
-			if time<MIN_T or time>MAX_T then return nil end
+		return{
+			flightLeadXZ=flightLead,
+			extraLeadXZ=Vector3.zero,
+			radialExtraLeadXZ=Vector3.zero,
+			tangentExtraLeadXZ=Vector3.zero,
+			extraLeadTime=0,
+			radialExtraTime=0,
+			tangentExtraTime=0,
+			distanceXZNow=distXZ(originPosition,receiverPosition),
+			distanceScale=0,
+			awayShare=math.clamp(route.away/speed,-1,1),
+			positiveAwayShare=math.clamp(route.away/speed,0,1),
+			radialShareAbs=math.clamp(route.awayAbs/speed,0,1),
+			lateralShare=math.clamp(route.sideAbs/speed,0,1),
+			routeBalance=1-math.abs(math.clamp(route.awayAbs/speed,0,1)-math.clamp(route.sideAbs/speed,0,1)),
+			balanceLeadScale=1,
+			radialGain=0,
+			tangentGain=0,
+			losRate=route.sideAbs/math.max(distXZ(originPosition,receiverPosition),1),
+			losDamping=1,
+			routeAway=route.away,
+			routeSide=route.side,
+			routeSpeed=route.speed,
+			universalIntercept=true,
+		}
+	end
 
-			local radarPath=radarVector(time,pointAToPointB,pointBRelativeVelocity)
-			local neededBallVelocity=radarPath/time
-			local neededBallSpeed=neededBallVelocity.Magnitude
-			if neededBallSpeed<1e-6 then return nil end
+	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower)
+		ballPower=ballPower or GAMEPLAY_BALL_POWER
+		local originPosition=origin(qbRoot,ball)
+		local targetStart=receiverMax(receiverRoot)
+		local distance=distXZ(originPosition,targetStart)
+		local preferred=preferredAngle(distance)
+		local minAngle=minimumAngle(distance)
+		local maxAngle=maximumAngle(distance)
+		local maxTime=math.min(MAX_T,math.max(maximumTime(distance),distance/math.max(ballPower*0.42,1)))
+		local best=nil
+		local bestNear=nil
 
-			local aimDirection=neededBallVelocity.Unit
-			local angle=math.deg(math.asin(math.clamp(aimDirection.Y,-1,1)))
-			if angle<GLOBAL_MIN_ANGLE or angle>GLOBAL_MAX_ANGLE then
+		local function candidateAt(time,source)
+			if time<MIN_T or time>maxTime then return nil end
+
+			local target=targetAtTime(targetStart,targetVelocity,time)
+			local needed=velocityNeeded(originPosition,target,time)
+			local requiredSpeed=needed.Magnitude
+			if requiredSpeed<1e-6 then return nil end
+
+			local direction=needed.Unit
+			local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
+			if angle<GLOBAL_MIN_ANGLE or angle>math.max(maxAngle,GLOBAL_MAX_ANGLE) then
 				return nil
 			end
 
-			local speedError=math.abs(neededBallSpeed-ballSpeed)
-			local missEstimate=speedError*time
-			local throwVelocity=aimDirection*ballSpeed
-			local worldVelocity=throwVelocity+pointAVelocity*POINT_A_VELOCITY_INHERITANCE
-			local futurePointB=pointB+pointBVelocity*time
-			local ballPointAtTime=ballAt(pointA,worldVelocity,time)
-			local missDistance=(ballPointAtTime-futurePointB).Magnitude
-			local verticalVelocityAtCatch=worldVelocity.Y+G.Y*time
-			local landingPosition,landingTime=landing(pointA,worldVelocity)
-			local interceptResidual=math.abs(radarInterceptF(time,pointAToPointB,pointBRelativeVelocity,ballSpeed))
-			local risingPenalty=verticalVelocityAtCatch>0 and verticalVelocityAtCatch*2 or 0
-			local anglePenalty=angle<0 and -angle*2 or math.max(angle-40,0)*0.25
-			local score=speedError*100+missEstimate*50+risingPenalty+anglePenalty+time*0.1
+			-- Use the model speed for the simulated ball, while the remote sends display power 100.
+			local finalVelocity=direction*ballPower
+			local catchPosition=ballAt(originPosition,finalVelocity,time)
+			local totalErr=(catchPosition-target).Magnitude
+			local xzErr=distXZ(catchPosition,target)
+			local yErr=catchPosition.Y-target.Y
+			local speedError=math.abs(ballPower-requiredSpeed)
+			local verticalVelocity=finalVelocity.Y+G.Y*time
+			local landingPosition,landingTime=landing(originPosition,finalVelocity)
+			local leadInfo=makeUniversalLeadInfo(originPosition,receiverRoot.Position,targetVelocity,time)
+
+			local upwardPenalty=verticalVelocity>3 and verticalVelocity*2.0 or 0
+			local lowPenalty=angle<minAngle and (minAngle-angle)*4.0 or 0
+			local highPenalty=angle>maxAngle and (angle-maxAngle)*6.0 or 0
+			local preferredPenalty=math.abs(angle-preferred)*0.35
+			local timePenalty=time*0.18
+			local score=totalErr*120+speedError*35+preferredPenalty+timePenalty+upwardPenalty+lowPenalty+highPenalty
 
 			return{
 				score=score,
 				time=time,
-				origin=pointA,
-				target=futurePointB,
-				c1Point=futurePointB,
-				requiredVelocity=neededBallVelocity,
-				requiredSpeed=neededBallSpeed,
-				direction=aimDirection,
-				throwVelocity=throwVelocity,
-				worldVelocity=worldVelocity,
-				velocity=worldVelocity,
-				speed=ballSpeed,
-				aimPoint=pointA+aimDirection*AIM_SCALE,
+				totalLeadTime=time,
+				origin=originPosition,
+				target=target,
+				c1Point=target,
+				requiredVelocity=needed,
+				requiredSpeed=requiredSpeed,
+				direction=direction,
+				velocity=finalVelocity,
+				speed=ballPower,
+				aimPoint=originPosition+direction*AIM_SCALE,
 				angleDeg=angle,
-				totalErr=missDistance,
+				preferredAngle=preferred,
+				minDesiredAngle=minAngle,
+				maxAngle=maxAngle,
+				totalErr=totalErr,
+				xzErr=xzErr,
+				yErr=yErr,
 				speedError=speedError,
-				ballAtCatch=ballPointAtTime,
+				ballAtCatch=catchPosition,
 				landing=landingPosition,
 				landingTime=landingTime,
-				flatDistNow=pointADistance,
+				flatDistNow=distance,
 				movementShape=shape,
-				verticalVelocityAtCatch=verticalVelocityAtCatch,
-				interceptResidual=interceptResidual,
-				missEstimate=missEstimate,
+				leadInfo=leadInfo,
+				verticalVelocityAtCatch=verticalVelocity,
 				interceptSource=source,
 			}
 		end
 
-		local function isAcceptable(candidate)
-			return candidate and (candidate.speedError<=SPEED_TOLERANCE or candidate.missEstimate<=CATCH_TOLERANCE)
-		end
+		local lastTime=MIN_T
+		local lastValue=interceptFunction(lastTime,originPosition,targetStart,targetVelocity,ballPower)
 
-		local function considerRoot(time)
-			local candidate=planAt(time,"root")
-			if isAcceptable(candidate) and (not bestPlan or candidate.score<bestPlan.score) then
-				bestPlan=candidate
-			end
-		end
+		for time=MIN_T+INTERCEPT_SCAN_DT,maxTime,INTERCEPT_SCAN_DT do
+			local value=interceptFunction(time,originPosition,targetStart,targetVelocity,ballPower)
 
-		local function considerNear(time)
-			local candidate=planAt(time,"near")
-			if candidate and (not bestNearPlan or candidate.missEstimate<bestNearPlan.missEstimate) then
-				bestNearPlan=candidate
-			end
-		end
-
-		local previousTime=MIN_T
-		local previousValue=radarInterceptF(previousTime,pointAToPointB,pointBRelativeVelocity,ballSpeed)
-		considerNear(previousTime)
-
-		for time=MIN_T+DT,MAX_T,DT do
-			local value=radarInterceptF(time,pointAToPointB,pointBRelativeVelocity,ballSpeed)
-			considerNear(time)
-
-			if previousValue==0 then
-				considerRoot(previousTime)
-			elseif value==0 then
-				considerRoot(time)
-			elseif (previousValue<0 and value>0) or (previousValue>0 and value<0) then
-				considerRoot(refineRadarRoot(previousTime,time,pointAToPointB,pointBRelativeVelocity,ballSpeed))
+			if (lastValue<=0 and value>=0) or (lastValue>=0 and value<=0) then
+				local rootTime=refineInterceptRoot(lastTime,time,originPosition,targetStart,targetVelocity,ballPower)
+				local candidate=candidateAt(rootTime,"root")
+				if candidate and (not best or candidate.score<best.score) then
+					best=candidate
+				end
 			end
 
-			previousTime=time
-			previousValue=value
+			local nearCandidate=candidateAt(time,"near")
+			if nearCandidate
+				and nearCandidate.speedError<=INTERCEPT_NEAR_SPEED_TOLERANCE
+				and nearCandidate.totalErr<=INTERCEPT_NEAR_MISS_TOLERANCE
+				and (not bestNear or nearCandidate.score<bestNear.score) then
+				bestNear=nearCandidate
+			end
+
+			lastTime=time
+			lastValue=value
 		end
 
-		if not bestPlan and isAcceptable(bestNearPlan) then
-			bestPlan=bestNearPlan
-		end
-
-		return bestPlan
+		return best or bestNear
 	end
-
 
 	local function ensureC1Marker()
 		if not C1_MARKER_ENABLED then return nil end
@@ -1231,7 +1271,7 @@ function QBAim.new(ctx,parent)
 			frame.Parent=billboard
 
 			local corner=Instance.new("UICorner")
-			corner.CornerRadius=UDim.new(0,0)
+			corner.CornerRadius=UDim.new(0,8)
 			corner.Parent=frame
 
 			local stroke=Instance.new("UIStroke")
@@ -1310,9 +1350,7 @@ function QBAim.new(ctx,parent)
 
 	local function clearPreviewVisuals()
 		previewFrozen=false
-		previewMissingBallSince=0
 		preview.p1,preview.p2,preview.p3=nil,nil,nil
-		preview.smoothLast=0
 		hideQBTrailPreview()
 
 		if preview.center and preview.center.Parent then
@@ -1336,7 +1374,6 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		previewMissingBallSince=0
 		local c2,c1,c3,beam=arcRig()
 		if not(c2 and c1 and c3 and beam) then return end
 
@@ -1348,27 +1385,23 @@ function QBAim.new(ctx,parent)
 		local p2=startPoint
 		local p1=plan.target
 		local p3=endPoint
-		local now=os.clock()
-		local smoothDt=preview.smoothLast>0 and math.clamp(now-preview.smoothLast,ARC_PREVIEW_UPDATE_INTERVAL,0.14) or ARC_PREVIEW_UPDATE_INTERVAL
-		local smoothAlpha=1-((1-PREVIEW_SMOOTH)^(smoothDt/ARC_PREVIEW_UPDATE_INTERVAL))
-		preview.smoothLast=now
 
 		if preview.p2 then
-			p2=preview.p2:Lerp(p2,smoothAlpha)
+			p2=preview.p2:Lerp(p2,PREVIEW_SMOOTH)
 		end
 
-		if preview.p1 and (p1-preview.p1).Magnitude<=PREVIEW_SNAP_C1 then
-			p1=preview.p1:Lerp(p1,smoothAlpha)
+		if preview.p1 and (p1-preview.p1).Magnitude<=28 then
+			p1=preview.p1:Lerp(p1,PREVIEW_SMOOTH)
 		end
 
-		if preview.p3 and (p3-preview.p3).Magnitude<=PREVIEW_SNAP_C3 then
-			p3=preview.p3:Lerp(p3,smoothAlpha)
+		if preview.p3 and (p3-preview.p3).Magnitude<=45 then
+			p3=preview.p3:Lerp(p3,PREVIEW_SMOOTH)
 		end
 
 		preview.p1,preview.p2,preview.p3=p1,p2,p3
-		setAttachmentCFrame(c2,beamCFrame(p2,plan.velocity))
-		setAttachmentCFrame(c1,beamCFrame(p1,plan.velocity+G*plan.time))
-		setAttachmentCFrame(c3,beamCFrame(p3,endVelocity))
+		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity))
+		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*plan.time))
+		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity))
 		updateC1AndC3Info(plan,p1,p3)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
@@ -1400,7 +1433,6 @@ function QBAim.new(ctx,parent)
 		end
 		previewFrozen=true
 		previewFreezeStarted=os.clock()
-		previewMissingBallSince=0
 	end
 
 	local function buildPlan(receiver,ballPower)
@@ -1418,9 +1450,9 @@ function QBAim.new(ctx,parent)
 			return nil
 		end
 
-		local pointA=origin(qbRoot,ball)
-		local pointBVelocity,shape=routeVelocity(receiver,data,pointA,receiverRoot,selectedRouteLock)
-		return solve(qbRoot,ball,receiverRoot,pointBVelocity,shape,ballPower or currentBallPower()),ball
+		local originPosition=origin(qbRoot,ball)
+		local targetVelocity,shape=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
+		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower()),ball
 	end
 
 	local function buildReleasePlan(receiver,ballPower)
@@ -1430,13 +1462,14 @@ function QBAim.new(ctx,parent)
 
 		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
 		local latestPlan=nil
+		local latestBall=nil
 
 		while os.clock()<endAt do
 			if not getHeldBall() then
 				return nil,nil
 			end
 
-			latestPlan=buildPlan(receiver,ballPower)
+			latestPlan,latestBall=buildPlan(receiver,ballPower)
 			if latestPlan then
 				previewPlan(latestPlan)
 			end
@@ -1448,7 +1481,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		local finalPlan,finalBall=buildPlan(receiver,ballPower)
-		return finalPlan,finalBall
+		return finalPlan or latestPlan,finalBall or latestBall
 	end
 
 	local function fireGameplayThrow(plan)
@@ -1457,7 +1490,7 @@ function QBAim.new(ctx,parent)
 			return false,"Gameplay ReEvent missing"
 		end
 
-		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=REMOTE_DISPLAY_POWER})
+		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=REMOTE_DISPLAY_POWER}) -- must be 100, not plan.speed/95
 		pcall(function()
 			local variables=require(LP.PlayerScripts.ClientMain.Utilities.Variables)
 			if variables.Mechanics and variables.Mechanics.UnequipFootball then
@@ -1477,7 +1510,7 @@ function QBAim.new(ctx,parent)
 		reEvent:FireServer("Mechanics","ThrowBall",{
 			Target=plan.aimPoint,
 			AutoThrow=false,
-			Power=REMOTE_DISPLAY_POWER,
+			Power=REMOTE_DISPLAY_POWER, -- must be 100, not plan.speed/95
 		})
 
 		return true,nil
@@ -1566,7 +1599,6 @@ function QBAim.new(ctx,parent)
 			trackedReceiver=best
 			selectedRouteLock=lockRoute(best)
 			previewFrozen=false
-			previewMissingBallSince=0
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			setTargetText()
 			setStatus("Locked "..best.Name)
@@ -1577,12 +1609,10 @@ function QBAim.new(ctx,parent)
 
 	local function setEnabled(value)
 		enabled=value and isAvailable() and true or false
-		state.qbAimEnabled=enabled
 		if not enabled then
 			trackedReceiver=nil
 			selectedRouteLock=nil
 			previewFrozen=false
-			previewMissingBallSince=0
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			hideQBTrailPreview()
 		end
@@ -1590,43 +1620,12 @@ function QBAim.new(ctx,parent)
 		syncControls()
 
 		if enabled and not getHeldBall() then
-			setStatus("Waiting for ball")
+			setStatus(currentModeText().." enabled, waiting for ball")
 		end
 	end
 
 	function api.SetQBAimState(value)
 		setEnabled(value)
-	end
-
-	function api.SetTeamFilterState(value,fire)
-		state.qbAimTeamFilter=value and true or false
-		if state.qbAimTeamFilter and trackedReceiver and not canTargetReceiver(trackedReceiver) then
-			trackedReceiver=nil
-			selectedRouteLock=nil
-			clearPreviewVisuals()
-			setTargetText()
-			setStatus("Target cleared")
-		end
-		syncControls()
-		if fire~=false then
-			changed()
-		end
-	end
-
-	function api.SetShowArcState(value,fire)
-		state.qbAimShowArc=value and true or false
-		if not state.qbAimShowArc then
-			clearPreviewVisuals()
-			setStatus("Arc hidden")
-		end
-		syncControls()
-		if fire~=false then
-			changed()
-		end
-	end
-
-	function api.SetLeadDelay(value,fire)
-		setLeadDelay(value,fire~=false)
 	end
 
 	function api.Refresh()
@@ -1655,62 +1654,47 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
-	local sectionControls=nil
-	sectionBody,sectionControls=makeSection(parent,4,"QB Aim","custom keys in Keybind Settings",{
-		headerToggle={
-			startState=enabled,
-			onChange=function(value)
-				setEnabled(value)
-			end,
-		},
-	})
+	sectionBody=makeSection(parent,4,"QB Aim","custom keys in Keybind Settings")
 	sectionFrame=sectionBody and sectionBody.Parent or nil
 
-	enabledToggle=sectionControls and sectionControls.toggle
-	if not enabledToggle then
-		enabledToggle=buildToggleRow(sectionBody,"Enabled",enabled,function(value)
-			setEnabled(value)
-		end)
-	end
+	enabledToggle=buildToggleRow(sectionBody,"Enabled",enabled,function(value)
+		setEnabled(value)
+	end)
 
 	teamFilterToggle=buildToggleRow(sectionBody,"Team Filter",state.qbAimTeamFilter~=false,function(value)
-		api.SetTeamFilterState(value,true)
+		state.qbAimTeamFilter=value and true or false
+		if state.qbAimTeamFilter and trackedReceiver and not canTargetReceiver(trackedReceiver) then
+			trackedReceiver=nil
+			selectedRouteLock=nil
+			clearPreviewVisuals()
+			setTargetText()
+			setStatus("Target cleared")
+		end
+		syncControls()
+		changed()
 	end)
 
 	arcToggle=buildToggleRow(sectionBody,"Show Arc",state.qbAimShowArc~=false,function(value)
-		api.SetShowArcState(value,true)
+		state.qbAimShowArc=value and true or false
+		if not state.qbAimShowArc then
+			clearPreviewVisuals()
+			setStatus("Arc hidden")
+		end
+		syncControls()
+		changed()
 	end)
 
-	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
+	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Disabled",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
 	targetLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Target: none",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
 
-	if buildSlider then
-		leadDelaySliderControl=buildSlider(sectionBody,"Lead Adjust",LEAD_DELAY_MIN,LEAD_DELAY_MAX,WR_LEAD_DELAY,2,function(value)
-			api.SetLeadDelay(value,true)
-		end)
-	else
-		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
-		leadDelayBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",WR_LEAD_DELAY),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},leadDelayFrame)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="Lead Adjust",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},leadDelayFrame)
-		addConnection(leadDelayBox.FocusLost:Connect(function()
-			setLeadDelay(leadDelayBox.Text,true)
-		end))
-	end
-
-	updateLeadDelayVisuals()
-
-	addConnection(RunService.Heartbeat:Connect(function(dt)
+	addConnection(RunService.Heartbeat:Connect(function()
 		if not isAlive() then return end
 
-		receiverTrackElapsed+=(dt or 0)
-		if receiverTrackElapsed<RECEIVER_TRACK_INTERVAL then return end
-		receiverTrackElapsed=0
-
-		local now=os.clock()
 		for _,player in ipairs(Players:GetPlayers()) do
 			if player~=LP and player.Character then
 				local receiverRoot=root(player.Character)
 				if receiverRoot then
+					local now=os.clock()
 					local data=receiverData[player]
 
 					if not data then
@@ -1751,23 +1735,17 @@ function QBAim.new(ctx,parent)
 		local now=os.clock()
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
 			local holdingBall=hasHeldBallForPreview()
+			if not holdingBall then
+				clearPreviewForMissingBall()
+				return
+			end
+
 			if previewFrozen then
 				if now-previewFreezeStarted<PREVIEW_POST_THROW_FREEZE_MIN then
 					return
 				end
 				previewFrozen=false
 			end
-
-			if not holdingBall then
-				if previewMissingBallSince==0 then
-					previewMissingBallSince=now
-				elseif now-previewMissingBallSince>=PREVIEW_MISSING_BALL_GRACE then
-					clearPreviewForMissingBall()
-				end
-				return
-			end
-
-			previewMissingBallSince=0
 		end
 
 		if not trackedReceiver then return end
@@ -1783,8 +1761,6 @@ function QBAim.new(ctx,parent)
 		local plan=buildPlan(trackedReceiver)
 		if plan then
 			previewPlan(plan)
-		else
-			hideQBTrailPreview()
 		end
 	end))
 

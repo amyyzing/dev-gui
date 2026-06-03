@@ -158,7 +158,6 @@ Description.Categories={
 			["Enabled"]="QB Aim",
 			["Team Filter"]="Filter Team",
 			["Show Arc"]="Aimbot Arc",
-			["LD"]="Lead Adjust",
 			["Target: none"]="Target: none",
 			["Target not teammate"]="Target not teammate",
 			["No receiver locked"]="No receiver locked",
