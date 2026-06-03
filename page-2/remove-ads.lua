@@ -17,7 +17,8 @@ end
 
 local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	local width,height=34,34
-	local segmentCount=32
+	local minimizedSize=16
+	local expandedSize=23
 	local switch=New("Frame",{
 		AnchorPoint=Vector2.new(1,0.5),
 		Position=UDim2.new(1,0,0.5,0),
@@ -27,62 +28,52 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		ZIndex=7,
 	},parent)
 
-	local ringClip=New("Frame",{
+	local holder=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.new(0.5,0,0.5,0),
+		Position=UDim2.fromScale(0.5,0.5),
 		Size=UDim2.fromOffset(28,28),
-		BackgroundTransparency=1,
+		BackgroundColor3=THEME.MUTED,
+		BackgroundTransparency=0.9,
 		BorderSizePixel=0,
-		ClipsDescendants=true,
-		ZIndex=9,
+		ZIndex=8,
 	},switch)
+	New("UICorner",{CornerRadius=UDim.new(0,5)},holder)
 
-	local fillValue=Instance.new("NumberValue")
-	fillValue.Name="FillProgress"
-	fillValue.Parent=switch
-	fillValue.Value=startState and 1 or 0
+	local holderStroke=New("UIStroke",{
+		Color=THEME.MUTED,
+		Thickness=1,
+		Transparency=0.62,
+	},holder)
 
-	local fillTween=nil
-	local segments={}
+	local glow=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.fromScale(0.5,0.5),
+		Size=UDim2.fromOffset(startState and 30 or 18,startState and 30 or 18),
+		BackgroundColor3=THEME.GREEN,
+		BackgroundTransparency=startState and 0.84 or 1,
+		BorderSizePixel=0,
+		Rotation=startState and 45 or 0,
+		ZIndex=9,
+	},holder)
+	New("UICorner",{CornerRadius=UDim.new(0,4)},glow)
 
-	for i=1,segmentCount do
-		local alpha=(i-1)/segmentCount
-		local degrees=-90+(alpha*360)
-		local radians=math.rad(degrees)
-		local radius=11.5
-		local x=math.cos(radians)*radius
-		local y=math.sin(radians)*radius
+	local square=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.fromScale(0.5,0.5),
+		Size=UDim2.fromOffset(startState and expandedSize or minimizedSize,startState and expandedSize or minimizedSize),
+		BackgroundColor3=startState and THEME.GREEN or THEME.MUTED,
+		BackgroundTransparency=startState and 0 or 0.34,
+		BorderSizePixel=0,
+		Rotation=startState and 45 or 0,
+		ZIndex=10,
+	},holder)
+	New("UICorner",{CornerRadius=UDim.new(0,3)},square)
 
-		-- The old version used the segment's Y position as revealStart.
-		-- That made left/right segments reveal together. This uses circular order instead.
-		local revealStart=alpha
-
-		local base=New("Frame",{
-			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=UDim2.new(0.5,x,0.5,y),
-			Size=UDim2.fromOffset(2,5),
-			BackgroundColor3=THEME.MUTED,
-			BackgroundTransparency=0.48,
-			BorderSizePixel=0,
-			ClipsDescendants=true,
-			Rotation=degrees+90,
-			ZIndex=9,
-		},ringClip)
-		New("UICorner",{CornerRadius=UDim.new(1,0)},base)
-
-		local fill=New("Frame",{
-			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=UDim2.fromScale(0.5,0.5),
-			Size=UDim2.new(1,0,1,0),
-			BackgroundColor3=THEME.GREEN,
-			BackgroundTransparency=1,
-			BorderSizePixel=0,
-			ZIndex=10,
-		},base)
-		New("UICorner",{CornerRadius=UDim.new(1,0)},fill)
-
-		segments[i]={base=base,fill=fill,revealStart=revealStart}
-	end
+	local squareStroke=New("UIStroke",{
+		Color=startState and THEME.GREEN or THEME.MUTED,
+		Thickness=1,
+		Transparency=startState and 0.05 or 0.36,
+	},square)
 
 	local hit=New("TextButton",{
 		BackgroundTransparency=1,
@@ -94,53 +85,89 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	},switch)
 
 	local state=startState and true or false
+	local activeTweens={}
+	local clickConn=nil
 
-	local function updateSegments(progress)
-		progress=math.clamp(tonumber(progress) or 0,0,1)
-
-		-- A small feather keeps each segment from popping in too harshly.
-		local revealBand=1/segmentCount
-
-		for _,segment in ipairs(segments) do
-			local visible=math.clamp((progress-segment.revealStart)/revealBand,0,1)
-			segment.fill.BackgroundTransparency=1-(visible*0.94)
-			segment.base.BackgroundTransparency=state and 0.62 or 0.48
+	local function cancelTweens()
+		for _,tw in ipairs(activeTweens) do
+			pcall(function()
+				tw:Cancel()
+			end)
 		end
+		table.clear(activeTweens)
 	end
 
-	local function paint(animate)
-		local accent=THEME.GREEN
-		local off=THEME.MUTED
-		local target=state and 1 or 0
+	local function playTween(object,info,goal)
+		local tw=TweenService:Create(object,info,goal)
+		table.insert(activeTweens,tw)
+		tw:Play()
+		return tw
+	end
 
-		if fillTween then
-			fillTween:Cancel()
-			fillTween=nil
-		end
+	local function applyVisuals(animate)
+		cancelTweens()
 
-		for _,segment in ipairs(segments) do
-			segment.base.BackgroundColor3=off
-			segment.fill.BackgroundColor3=accent
-		end
+		local expanded=state
+		local targetSize=expanded and expandedSize or minimizedSize
+		local targetRotation=expanded and 45 or 0
+		local targetColor=expanded and THEME.GREEN or THEME.MUTED
+		local targetSquareTransparency=expanded and 0 or 0.34
+		local targetGlowTransparency=expanded and 0.84 or 1
+		local targetGlowSize=expanded and 30 or 18
+		local targetHolderTransparency=expanded and 0.84 or 0.9
+		local targetStrokeTransparency=expanded and 0.26 or 0.62
+		local targetSquareStrokeTransparency=expanded and 0.05 or 0.36
 
 		if not animate then
-			fillValue.Value=target
-			updateSegments(target)
+			square.Size=UDim2.fromOffset(targetSize,targetSize)
+			square.Rotation=targetRotation
+			square.BackgroundColor3=targetColor
+			square.BackgroundTransparency=targetSquareTransparency
+			squareStroke.Color=targetColor
+			squareStroke.Transparency=targetSquareStrokeTransparency
+			glow.Size=UDim2.fromOffset(targetGlowSize,targetGlowSize)
+			glow.Rotation=targetRotation
+			glow.BackgroundTransparency=targetGlowTransparency
+			holder.BackgroundColor3=targetColor
+			holder.BackgroundTransparency=targetHolderTransparency
+			holderStroke.Color=targetColor
+			holderStroke.Transparency=targetStrokeTransparency
 			return
 		end
 
-		local duration=state and 0.44 or 0.34
-		local direction=state and Enum.EasingDirection.Out or Enum.EasingDirection.InOut
+		local info=expanded
+			and TweenInfo.new(0.28,Enum.EasingStyle.Back,Enum.EasingDirection.Out)
+			or TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut)
+		local softInfo=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 
-		fillTween=TweenService:Create(
-			fillValue,
-			TweenInfo.new(duration,Enum.EasingStyle.Quad,direction),
-			{Value=target}
-		)
-		fillTween:Play()
+		playTween(square,info,{
+			Size=UDim2.fromOffset(targetSize,targetSize),
+			Rotation=targetRotation,
+			BackgroundColor3=targetColor,
+			BackgroundTransparency=targetSquareTransparency,
+		})
+
+		playTween(squareStroke,softInfo,{
+			Color=targetColor,
+			Transparency=targetSquareStrokeTransparency,
+		})
+
+		playTween(glow,info,{
+			Size=UDim2.fromOffset(targetGlowSize,targetGlowSize),
+			Rotation=targetRotation,
+			BackgroundTransparency=targetGlowTransparency,
+		})
+
+		playTween(holder,softInfo,{
+			BackgroundColor3=targetColor,
+			BackgroundTransparency=targetHolderTransparency,
+		})
+
+		playTween(holderStroke,softInfo,{
+			Color=targetColor,
+			Transparency=targetStrokeTransparency,
+		})
 	end
-
-	local fillChangedConn=fillValue.Changed:Connect(updateSegments)
 
 	local function setState(value,fire,animate,force)
 		local nextState=value and true or false
@@ -153,18 +180,18 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		end
 
 		state=nextState
-		paint((animate~=false) and changed)
+		applyVisuals((animate~=false) and changed)
 
 		if fire and changed and onChange then
 			onChange(state)
 		end
 	end
 
-	hit.MouseButton1Click:Connect(function()
+	clickConn=hit.MouseButton1Click:Connect(function()
 		setState(not state,true,true)
 	end)
 
-	paint(false)
+	applyVisuals(false)
 
 	return{
 		set=function(value)
@@ -174,11 +201,8 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 			return state
 		end,
 		destroy=function()
-			if fillTween then
-				fillTween:Cancel()
-				fillTween=nil
-			end
-			safeDisconnect(fillChangedConn)
+			cancelTweens()
+			safeDisconnect(clickConn)
 			if switch then
 				switch:Destroy()
 			end
