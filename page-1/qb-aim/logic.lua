@@ -22,7 +22,7 @@ local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
-local WR_LEAD_DELAY=0.00
+local WR_LEAD_DELAY=0.75
 local QB_RELEASE_DELAY=0.25
 local QB_XZ_RELEASE_FACTOR=0
 local QB_LAUNCH_Y_BIAS=0
@@ -32,17 +32,21 @@ local QB_AIRBORNE_VY_EPSILON=2
 local QB_Y_RISE_FACTOR=0
 local QB_Y_FALL_FACTOR=0
 local QB_Y_MAX_CORRECTION=4.25
-local C2_GROUND_FALLBACK_MARGIN=2.50
-local C2_MAX_ABOVE_BALL=8.00
 local MIN_T,MAX_T,DT=0.35,6,0.01
 local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
+local ARC_PREVIEW_USE_C2_Y=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
 local RECEIVER_TRACK_INTERVAL=0.05
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
+local ARC_LANDING_Y=0.5
 local ARC_MAX_CURVE=400
-local PREVIEW_SMOOTH=0.28
+local PREVIEW_SMOOTH=0.18
+local PREVIEW_SNAP_C1=58
+local PREVIEW_SNAP_C3=82
+local PREVIEW_BEAM_ROLL=CFrame.Angles(math.rad(90),0,0)
+local PREVIEW_MISSING_BALL_GRACE=0.22
 local C1_MARKER_ENABLED=true
 local C1_MARKER_SIZE=1.65
 local C3_INFO_GUI_ENABLED=false
@@ -71,10 +75,6 @@ local CIRCLE_LOS_RATE_EPSILON=1.00
 local CIRCLE_EXTRA_LEAD_TIME_MAX=0.78
 local CIRCLE_BALANCE_LEAD_SCALE_MIN=0.72
 local CIRCLE_BALANCE_LEAD_SCALE_MAX=1.00
-local CIRCLE_TANGENT_REACTIVE_LEAD=0.58
-local CIRCLE_TANGENT_REACTIVE_LOS_GAIN=1.25
-local CIRCLE_TANGENT_ALIGNMENT_BOOST=0.30
-local CIRCLE_TANGENT_BALANCE_BOOST=0.35
 local DIAG_STREAK_SIDE_RATIO_MIN=0.30
 local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
@@ -110,9 +110,11 @@ local function routeSpeed(speed)
 	local clamped=math.clamp(speed,0,MAX_RUN_SPEED)
 	if clamped<ROUTE_LOCK_MIN_SPEED then
 		return 0
+	elseif clamped>=NORMAL_ROUTE_MIN_SPEED then
+		return MAX_RUN_SPEED
 	end
 
-	return MAX_RUN_SPEED
+	return clamped
 end
 
 local function getModeKey(ctx)
@@ -376,23 +378,23 @@ local function xAxisCFrame(position,xVector)
 	return CFrame.fromMatrix(position,xVector,y,z)
 end
 
+local function beamCFrame(position,xVector)
+	return xAxisCFrame(position,xVector)*PREVIEW_BEAM_ROLL
+end
+
 local function prepPreviewObject(object)
 	if not object then return end
 
-	local function prep(instance)
-		if instance:IsA("BasePart") then
-			instance.Anchored=true
-			instance.CanCollide=false
-			instance.CanTouch=false
-			instance.CanQuery=false
-		elseif instance:IsA("Beam") then
-			instance.Enabled=true
-		end
-	end
-
-	prep(object)
 	for _,descendant in ipairs(object:GetDescendants()) do
-		prep(descendant)
+		if descendant:IsA("BasePart") then
+			descendant.Anchored=true
+			descendant.CanCollide=false
+			descendant.CanTouch=false
+			descendant.CanQuery=false
+		elseif descendant:IsA("Beam") then
+			descendant.Segments=math.max(descendant.Segments,24)
+			descendant.Enabled=true
+		end
 	end
 end
 
@@ -480,9 +482,10 @@ function QBAim.new(ctx,parent)
 	local selectedRouteLock=nil
 	local receiverData={}
 	local receiverTrackElapsed=0
-	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil}
+	local preview={last=0,smoothLast=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
+	local previewMissingBallSince=0
 	local connections={}
 	local sectionBody=nil
 	local sectionFrame=nil
@@ -697,56 +700,32 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function c2Y()
-		-- Use the game's original Center.C2 only as a release-height reference.
-		-- Do not read from the cloned preview C2 here, because that creates stale/self-referential C2 values.
 		local center=originalCenter()
 		local c2=center and center:FindFirstChild("C2",true)
 		local cf=c2 and attachmentCFrame(c2)
 		return cf and cf.Position.Y
 	end
 
-	local function setPreviewCenterVisible(visible)
-		local center=preview.center
-		if not(center and center.Parent) then return end
+	local function arcRig()
+		local original,folder=originalCenter()
+		if not(original and folder) then return nil end
 
-		local function apply(instance)
-			if instance:IsA("BasePart") then
-				if instance:GetAttribute("QBAimPreviewTransparency")==nil then
-					instance:SetAttribute("QBAimPreviewTransparency",instance.Transparency)
-				end
-				instance.Transparency=visible and (instance:GetAttribute("QBAimPreviewTransparency") or 0) or 1
-			elseif instance:IsA("Beam") then
-				instance.Enabled=visible
-			elseif instance:IsA("Attachment") then
-				pcall(function()
-					instance.Visible=visible
-				end)
+		if not preview.center or preview.orig~=original or not preview.center.Parent then
+			if preview.center then
+				preview.center:Destroy()
 			end
+
+			preview.center=original:Clone()
+			preview.center.Name="ClonedCenter"
+			preview.center.Parent=folder
+			prepPreviewObject(preview.center)
+			preview.orig=original
 		end
 
-		apply(center)
-		for _,descendant in ipairs(center:GetDescendants()) do
-			apply(descendant)
-		end
-	end
-
-	local function destroyPreviewCenter()
-		if preview.center and preview.center.Parent then
-			preview.center:Destroy()
-		end
-
-		preview.center=nil
-		preview.c1=nil
-		preview.c2=nil
-		preview.c3=nil
-		preview.beam=nil
-		preview.orig=nil
-	end
-
-	local function bindArcRigParts(center)
+		local center=preview.center
 		preview.c2=center:FindFirstChild("C2",true)
 		preview.c3=center:FindFirstChild("C3",true)
-		if not(preview.c2 and preview.c3) then return false end
+		if not(preview.c2 and preview.c3) then return nil end
 
 		preview.c1=center:FindFirstChild("C1",true)
 		if not preview.c1 then
@@ -755,7 +734,6 @@ function QBAim.new(ctx,parent)
 			preview.c1.Parent=preview.c2.Parent
 		end
 
-		preview.beam=nil
 		for _,descendant in ipairs(center:GetDescendants()) do
 			if descendant:IsA("Beam") then
 				preview.beam=descendant
@@ -766,27 +744,9 @@ function QBAim.new(ctx,parent)
 		if preview.beam then
 			preview.beam.Attachment0=preview.c2
 			preview.beam.Attachment1=preview.c3
-			preview.beam.Enabled=state.qbAimShowArc~=false
+			preview.beam.Enabled=true
 		end
 
-		return preview.beam~=nil
-	end
-
-	local function arcRig()
-		local original,folder=originalCenter()
-		if original and folder and (not preview.center or preview.orig~=original or not preview.center.Parent) then
-			destroyPreviewCenter()
-			preview.center=original:Clone()
-			preview.center.Name="ClonedCenter"
-			preview.center.Parent=folder
-			prepPreviewObject(preview.center)
-			preview.orig=original
-		end
-
-		local center=preview.center
-		if not(center and center.Parent and bindArcRigParts(center)) then return nil end
-
-		setPreviewCenterVisible(state.qbAimShowArc~=false)
 		return preview.c2,preview.c1,preview.c3,preview.beam
 	end
 
@@ -960,7 +920,16 @@ function QBAim.new(ctx,parent)
 		local adjustedSpeed=routeSpeed(measuredSpeed)
 		local stableDirection,stableSpeed=updateStable(data)
 
-		-- H locks the receiver only. Route direction stays reactive and uses current tracked movement.
+		if routeLock and routeLock.player==receiver and routeLock.routeDir and os.clock()-routeLock.createdAt<=ROUTE_LOCK_MAX_AGE then
+			local speed=stableSpeed>0 and stableSpeed or adjustedSpeed
+			if speed<=0 then
+				speed=routeLock.routeSpeed or MAX_RUN_SPEED
+			end
+
+			local velocity=routeLock.routeDir*speed
+			return velocity,movementShape(origin,receiverRoot.Position,velocity)
+		end
+
 		if stableDirection and stableSpeed>0 then
 			local velocity=stableDirection*stableSpeed
 			return velocity,movementShape(origin,receiverRoot.Position,velocity)
@@ -993,15 +962,9 @@ function QBAim.new(ctx,parent)
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
 		local horizontal=Vector3.new(rootVelocity.X,0,rootVelocity.Z)*QB_RELEASE_DELAY*QB_XZ_RELEASE_FACTOR
 		local basePosition=ball and ball.Position or qbRoot.Position
-
-		-- Dynamic C2/release origin:
-		-- QB can jump, so C2 must follow the held football/QB release height instead of a stale/grounded preview attachment.
-		-- Original Center.C2 is only accepted if it is sane relative to the currently held ball.
-		local baseY=basePosition.Y
-		local centerY=c2Y()
-		local y=baseY
-		if centerY and centerY>=baseY-C2_GROUND_FALLBACK_MARGIN and centerY<=baseY+C2_MAX_ABOVE_BALL then
-			y=centerY
+		local y=basePosition.Y
+		if ARC_PREVIEW_USE_C2_Y then
+			y=c2Y() or y
 		end
 
 		return Vector3.new(basePosition.X+horizontal.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+horizontal.Z)
@@ -1051,7 +1014,6 @@ function QBAim.new(ctx,parent)
 		local result=components(originPosition,receiverRoot.Position,targetVelocity)
 		local radius=distXZ(originPosition,receiverRoot.Position)
 		local speed=math.max(result.speed,1e-6)
-		local velocityXZ=flat(targetVelocity or Vector3.zero)
 
 		local awayShare=math.clamp(result.away/speed,-1,1)
 		local positiveAwayShare=math.clamp(result.away/speed,0,1)
@@ -1076,36 +1038,11 @@ function QBAim.new(ctx,parent)
 
 		local losRate=result.sideAbs/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
 		local losDamping=1/(1+losRate*CIRCLE_LOS_RATE_GAIN)
-		local reactiveLosDamping=1/(1+losRate*CIRCLE_TANGENT_REACTIVE_LOS_GAIN)
 
-		local tangentAlignment=0
-		if velocityXZ.Magnitude>1e-6 then
-			tangentAlignment=math.abs(velocityXZ.Unit:Dot(result.sideDir))
-		end
+		local radialExtraTime=math.min(WR_LEAD_DELAY*distanceScale*radialGain*balanceLeadScale,CIRCLE_EXTRA_LEAD_TIME_MAX)
+		local tangentExtraTime=math.min(WR_LEAD_DELAY*distanceScale*tangentGain*losDamping*balanceLeadScale,CIRCLE_EXTRA_LEAD_TIME_MAX)
 
-		local tangentAlignmentBoost=1+CIRCLE_TANGENT_ALIGNMENT_BOOST*tangentAlignment
-		local tangentBalanceBoost=1+CIRCLE_TANGENT_BALANCE_BOOST*routeBalance
-
-		local radialExtraTime=math.min(
-			WR_LEAD_DELAY*distanceScale*radialGain*balanceLeadScale,
-			CIRCLE_EXTRA_LEAD_TIME_MAX
-		)
-
-		local tangentBaseTime=0
-		local tangentReactiveTime=
-			CIRCLE_TANGENT_REACTIVE_LEAD
-			*distanceScale
-			*lateralShare
-			*reactiveLosDamping
-			*tangentAlignmentBoost
-			*tangentBalanceBoost
-
-		local tangentExtraTime=math.min(
-			tangentReactiveTime,
-			CIRCLE_EXTRA_LEAD_TIME_MAX
-		)
-
-		local flightLead=velocityXZ*flightTime
+		local flightLead=flat(targetVelocity)*flightTime
 		local radialExtraLead=result.awayDir*result.away*radialExtraTime
 		local tangentExtraLead=result.sideDir*result.side*tangentExtraTime
 		local extraLead=radialExtraLead+tangentExtraLead
@@ -1120,8 +1057,6 @@ function QBAim.new(ctx,parent)
 			extraLeadTime=effectiveExtraTime,
 			radialExtraTime=radialExtraTime,
 			tangentExtraTime=tangentExtraTime,
-			tangentBaseTime=tangentBaseTime,
-			tangentReactiveTime=tangentReactiveTime,
 			distanceXZNow=radius,
 			distanceScale=distanceScale,
 			awayShare=awayShare,
@@ -1134,10 +1069,6 @@ function QBAim.new(ctx,parent)
 			tangentGain=tangentGain,
 			losRate=losRate,
 			losDamping=losDamping,
-			reactiveLosDamping=reactiveLosDamping,
-			tangentAlignment=tangentAlignment,
-			tangentAlignmentBoost=tangentAlignmentBoost,
-			tangentBalanceBoost=tangentBalanceBoost,
 			routeAway=result.away,
 			routeSide=result.side,
 			routeSpeed=result.speed,
@@ -1407,20 +1338,28 @@ function QBAim.new(ctx,parent)
 					descendant.Enabled=false
 				end
 			end
-			setPreviewCenterVisible(false)
 		end
 
 		hideC1AndC3Info()
 	end
 
-	local function clearPreviewVisuals(destroyCenter)
+	local function clearPreviewVisuals()
 		previewFrozen=false
+		previewMissingBallSince=0
 		preview.p1,preview.p2,preview.p3=nil,nil,nil
+		preview.smoothLast=0
 		hideQBTrailPreview()
 
-		if destroyCenter then
-			destroyPreviewCenter()
+		if preview.center and preview.center.Parent then
+			preview.center:Destroy()
 		end
+
+		preview.center=nil
+		preview.c1=nil
+		preview.c2=nil
+		preview.c3=nil
+		preview.beam=nil
+		preview.orig=nil
 	end
 
 	local function previewPlan(plan)
@@ -1432,41 +1371,44 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
+		previewMissingBallSince=0
 		local c2,c1,c3,beam=arcRig()
 		if not(c2 and c1 and c3 and beam) then return end
 
 		local startPoint=plan.origin
-		local endPoint=plan.target or plan.c1Point
-		local previewTime=plan.time
-		if not(startPoint and endPoint and previewTime) then return end
-
+		local rawEnd=plan.landing or plan.target
+		local previewTime=plan.landingTime or plan.time
+		local endPoint=Vector3.new(rawEnd.X,ARC_LANDING_Y,rawEnd.Z)
 		local endVelocity=plan.velocity+G*previewTime
 		local p2=startPoint
-		local p1=endPoint
+		local p1=plan.target
 		local p3=endPoint
+		local now=os.clock()
+		local smoothDt=preview.smoothLast>0 and math.clamp(now-preview.smoothLast,ARC_PREVIEW_UPDATE_INTERVAL,0.14) or ARC_PREVIEW_UPDATE_INTERVAL
+		local smoothAlpha=1-((1-PREVIEW_SMOOTH)^(smoothDt/ARC_PREVIEW_UPDATE_INTERVAL))
+		preview.smoothLast=now
 
 		if preview.p2 then
-			p2=preview.p2:Lerp(p2,PREVIEW_SMOOTH)
+			p2=preview.p2:Lerp(p2,smoothAlpha)
 		end
 
-		if preview.p1 and (p1-preview.p1).Magnitude<=28 then
-			p1=preview.p1:Lerp(p1,PREVIEW_SMOOTH)
+		if preview.p1 and (p1-preview.p1).Magnitude<=PREVIEW_SNAP_C1 then
+			p1=preview.p1:Lerp(p1,smoothAlpha)
 		end
 
-		if preview.p3 and (p3-preview.p3).Magnitude<=45 then
-			p3=preview.p3:Lerp(p3,PREVIEW_SMOOTH)
+		if preview.p3 and (p3-preview.p3).Magnitude<=PREVIEW_SNAP_C3 then
+			p3=preview.p3:Lerp(p3,smoothAlpha)
 		end
 
 		preview.p1,preview.p2,preview.p3=p1,p2,p3
-		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity))
-		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*plan.time))
-		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity))
+		setAttachmentCFrame(c2,beamCFrame(p2,plan.velocity))
+		setAttachmentCFrame(c1,beamCFrame(p1,plan.velocity+G*plan.time))
+		setAttachmentCFrame(c3,beamCFrame(p3,endVelocity))
 		updateC1AndC3Info(plan,p1,p3)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
 		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
 		beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
-		setPreviewCenterVisible(true)
 		beam.Enabled=true
 	end
 
@@ -1493,6 +1435,7 @@ function QBAim.new(ctx,parent)
 		end
 		previewFrozen=true
 		previewFreezeStarted=os.clock()
+		previewMissingBallSince=0
 	end
 
 	local function buildPlan(receiver,ballPower)
@@ -1659,6 +1602,7 @@ function QBAim.new(ctx,parent)
 			trackedReceiver=best
 			selectedRouteLock=lockRoute(best)
 			previewFrozen=false
+			previewMissingBallSince=0
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			setTargetText()
 			setStatus("Locked "..best.Name)
@@ -1674,6 +1618,7 @@ function QBAim.new(ctx,parent)
 			trackedReceiver=nil
 			selectedRouteLock=nil
 			previewFrozen=false
+			previewMissingBallSince=0
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			hideQBTrailPreview()
 		end
@@ -1735,7 +1680,9 @@ function QBAim.new(ctx,parent)
 
 		table.clear(connections)
 
-		destroyPreviewCenter()
+		if preview.center and preview.center.Parent then
+			preview.center:Destroy()
+		end
 		if preview.c1Marker and preview.c1Marker.Parent then
 			preview.c1Marker:Destroy()
 		end
@@ -1840,17 +1787,23 @@ function QBAim.new(ctx,parent)
 		local now=os.clock()
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
 			local holdingBall=hasHeldBallForPreview()
-			if not holdingBall then
-				clearPreviewForMissingBall()
-				return
-			end
-
 			if previewFrozen then
 				if now-previewFreezeStarted<PREVIEW_POST_THROW_FREEZE_MIN then
 					return
 				end
 				previewFrozen=false
 			end
+
+			if not holdingBall then
+				if previewMissingBallSince==0 then
+					previewMissingBallSince=now
+				elseif now-previewMissingBallSince>=PREVIEW_MISSING_BALL_GRACE then
+					clearPreviewForMissingBall()
+				end
+				return
+			end
+
+			previewMissingBallSince=0
 		end
 
 		if not trackedReceiver then return end
