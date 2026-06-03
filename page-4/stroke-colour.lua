@@ -750,26 +750,13 @@ function StrokeColour.new(ctx,page)
 
 		local titleButton=New("TextButton",{
 			BackgroundTransparency=1,
-			Size=UDim2.new(1,-54,1,0),
+			Size=UDim2.new(1,0,1,0),
 			Text="",
 			Font=Enum.Font.GothamBold,
 			TextSize=13,
 			TextColor3=THEME.TEXT,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			AutoButtonColor=false,
-			ZIndex=6,
-		},header)
-
-		local stateLabel=New("TextLabel",{
-			BackgroundTransparency=1,
-			AnchorPoint=Vector2.new(1,0.5),
-			Position=UDim2.new(1,0,0.5,0),
-			Size=UDim2.fromOffset(48,18),
-			Text="",
-			Font=Enum.Font.GothamMedium,
-			TextSize=11,
-			TextColor3=THEME.MUTED,
-			TextXAlignment=Enum.TextXAlignment.Right,
 			ZIndex=6,
 		},header)
 
@@ -800,7 +787,6 @@ function StrokeColour.new(ctx,page)
 
 		local function paint()
 			titleButton.Text=(expanded and "[-] " or "[+] ")..title
-			stateLabel.Text=expanded and "Hide" or "Show"
 			panel.BackgroundColor3=expanded and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
 		end
 

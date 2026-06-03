@@ -1,6 +1,7 @@
 local KeybindSettings={}
 
 local UIS=game:GetService("UserInputService")
+local TweenService=game:GetService("TweenService")
 
 local function inputToBinding(input)
 	local uiType=tostring(input.UserInputType)
@@ -154,7 +155,64 @@ function KeybindSettings.new(ctx,bindSection)
 	function api.AddBindRow(label,getter,setter)
 		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},bindSection)
 
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-138,1,0),Position=UDim2.fromOffset(0,0),Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
+		local labelButton=New("TextButton",{
+			BackgroundTransparency=1,
+			Size=UDim2.new(1,-138,1,0),
+			Position=UDim2.fromOffset(0,0),
+			Text=label,
+			Font=Enum.Font.GothamMedium,
+			TextSize=12,
+			TextColor3=THEME.TEXT,
+			TextXAlignment=Enum.TextXAlignment.Left,
+			AutoButtonColor=false,
+			ZIndex=6,
+			TextRole="TEXT",
+		},row)
+
+		local strike=New("Frame",{
+			AnchorPoint=Vector2.new(0,0.5),
+			BackgroundColor3=THEME.STROKE or THEME.GREEN,
+			BackgroundTransparency=0.18,
+			BorderSizePixel=0,
+			Position=UDim2.new(0,0,0.5,0),
+			Size=UDim2.new(0,0,0,1),
+			ZIndex=7,
+			ThemeRole="STROKE",
+		},labelButton)
+
+		local hoverTween=nil
+		local function tweenLabel(props)
+			if hoverTween then
+				hoverTween:Cancel()
+			end
+			hoverTween=TweenService:Create(labelButton,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),props)
+			hoverTween:Play()
+		end
+
+		labelButton.MouseEnter:Connect(function()
+			strike.BackgroundColor3=THEME.STROKE or THEME.GREEN
+			tweenLabel({TextColor3=THEME.STROKE or THEME.GREEN})
+			TweenService:Create(strike,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+				Size=UDim2.new(1,0,0,1),
+				BackgroundTransparency=0.08,
+			}):Play()
+		end)
+
+		labelButton.MouseLeave:Connect(function()
+			tweenLabel({TextColor3=THEME.TEXT})
+			TweenService:Create(strike,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+				Size=UDim2.new(0,0,0,1),
+				BackgroundTransparency=0.18,
+			}):Play()
+		end)
+
+		labelButton.MouseButton1Click:Connect(function()
+			if activeCapture then
+				activeCapture=nil
+			end
+			setter(Enum.KeyCode.Unknown)
+			requestRefresh()
+		end)
 
 		local btn=api.MakeBindButton(row,0,0,122)
 		placeWrappedButton(btn,UDim2.new(1,-122,0.5,-14))
@@ -178,7 +236,7 @@ function KeybindSettings.new(ctx,bindSection)
 			api.CaptureInput(input)
 		end)
 
-		table.insert(bindRows,{button=btn,getter=getter})
+		table.insert(bindRows,{button=btn,getter=getter,label=labelButton,strike=strike})
 		return btn
 	end
 
@@ -188,6 +246,14 @@ function KeybindSettings.new(ctx,bindSection)
 				item.button.Text=bindingToLabel(item.getter())
 				setWrappedButtonBg(item.button,THEME.BUTTON or THEME.BG)
 				item.button.TextColor3=THEME.TEXT
+			end
+
+			if item.label then
+				item.label.TextColor3=THEME.TEXT
+			end
+
+			if item.strike then
+				item.strike.BackgroundColor3=THEME.STROKE or THEME.GREEN
 			end
 		end
 	end

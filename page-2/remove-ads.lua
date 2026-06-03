@@ -16,7 +16,7 @@ local function firstChild(parent)
 end
 
 local function createPowerSwitch(New,THEME,parent,startState,onChange)
-	local width,height=52,28
+	local width,height=34,34
 	local switch=New("Frame",{
 		AnchorPoint=Vector2.new(1,0.5),
 		Position=UDim2.new(1,0,0.5,0),
@@ -29,7 +29,7 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	local glow=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
 		Position=UDim2.new(0.5,0,0.5,0),
-		Size=UDim2.fromOffset(24,24),
+		Size=UDim2.fromOffset(20,20),
 		BackgroundColor3=THEME.GREEN,
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
@@ -37,59 +37,60 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	},switch)
 	New("UICorner",{CornerRadius=UDim.new(1,0)},glow)
 
-	local circle=New("Frame",{
+	local baseRing=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.new(0.5,0,0.5,2),
-		Size=UDim2.fromOffset(24,24),
-		BackgroundTransparency=1,
+		Position=UDim2.new(0.5,0,0.5,0),
+		Size=UDim2.fromOffset(26,26),
+		BackgroundColor3=THEME.MUTED,
+		BackgroundTransparency=0.4,
 		BorderSizePixel=0,
 		ZIndex=9,
 	},switch)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},circle)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},baseRing)
 
-	local circleStroke=New("UIStroke",{
-		Color=THEME.MUTED,
-		Thickness=2,
-		Transparency=0.28,
-	},circle)
-
-	local progress=New("Frame",{
+	local baseCutout=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.new(0.5,0,0.5,2),
-		Size=UDim2.fromOffset(24,24),
+		Position=UDim2.new(0.5,0,0.5,0),
+		Size=UDim2.fromOffset(16,16),
+		BackgroundColor3=THEME.CARD or THEME.BG,
+		BorderSizePixel=0,
+		ZIndex=10,
+		ThemeRole="SECTION",
+	},baseRing)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},baseCutout)
+
+	local fillRing=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.new(0.5,0,0.5,0),
+		Size=UDim2.fromOffset(26,26),
+		BackgroundColor3=THEME.GREEN,
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
-		Rotation=-80,
-		ZIndex=10,
+		Rotation=-90,
+		ZIndex=11,
 	},switch)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},progress)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},fillRing)
 
-	local progressStroke=New("UIStroke",{
-		Color=THEME.GREEN,
-		Thickness=3,
-		Transparency=1,
-	},progress)
-
-	local progressGradient=New("UIGradient",{
+	local fillGradient=New("UIGradient",{
 		Rotation=0,
 		Transparency=NumberSequence.new({
 			NumberSequenceKeypoint.new(0,0),
-			NumberSequenceKeypoint.new(0.62,0),
-			NumberSequenceKeypoint.new(0.64,1),
+			NumberSequenceKeypoint.new(0.08,0),
+			NumberSequenceKeypoint.new(0.1,1),
 			NumberSequenceKeypoint.new(1,1),
 		}),
-	},progressStroke)
+	},fillRing)
 
-	local line=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0),
-		Position=UDim2.new(0.5,0,0,2),
-		Size=UDim2.fromOffset(4,13),
-		BackgroundColor3=THEME.MUTED,
-		BackgroundTransparency=0.2,
+	local fillCutout=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.new(0.5,0,0.5,0),
+		Size=UDim2.fromOffset(16,16),
+		BackgroundColor3=THEME.CARD or THEME.BG,
 		BorderSizePixel=0,
-		ZIndex=11,
-	},switch)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},line)
+		ZIndex=12,
+		ThemeRole="SECTION",
+	},fillRing)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},fillCutout)
 
 	local hit=New("TextButton",{
 		BackgroundTransparency=1,
@@ -116,45 +117,42 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		local off=THEME.MUTED
 
 		if state then
-			progress.Rotation=-80
-			progressGradient.Rotation=0
-			progressStroke.Transparency=animate and 1 or 0
-			glow.BackgroundTransparency=animate and 1 or 0.82
-			glow.Size=UDim2.fromOffset(24,24)
+			fillRing.Rotation=animate and -90 or 270
+			fillGradient.Rotation=animate and 0 or 360
+			fillGradient.Enabled=animate
+			fillRing.BackgroundTransparency=animate and 1 or 0
+			glow.BackgroundTransparency=animate and 1 or 0.84
+			glow.Size=UDim2.fromOffset(20,20)
 
-			tween(circleStroke,0.16,{Color=accent,Transparency=0.2})
-			tween(line,0.18,{BackgroundColor3=accent,BackgroundTransparency=0})
-			tween(progressStroke,0.16,{Transparency=0})
-			tween(progress,0.38,{Rotation=280},Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
-			tween(progressGradient,0.38,{Rotation=360},Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
-			tween(glow,0.24,{BackgroundTransparency=0.82,Size=UDim2.fromOffset(42,42)})
+			tween(baseRing,0.16,{BackgroundColor3=off,BackgroundTransparency=0.55})
+			tween(fillRing,0.16,{BackgroundTransparency=0})
+			tween(fillRing,0.42,{Rotation=270},Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+			tween(fillGradient,0.42,{Rotation=360},Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+			tween(glow,0.24,{BackgroundTransparency=0.84,Size=UDim2.fromOffset(38,38)})
+
+			task.delay(0.42,function()
+				if token==animToken and state and fillGradient then
+					fillGradient.Enabled=false
+				end
+			end)
 
 			if animate then
-				tween(switch,0.08,{Size=UDim2.fromOffset(width-4,height-2)})
+				tween(switch,0.08,{Size=UDim2.fromOffset(width-3,height-3)})
 				task.delay(0.08,function()
 					if token==animToken then
 						tween(switch,0.16,{Size=UDim2.fromOffset(width,height)},Enum.EasingStyle.Back,Enum.EasingDirection.Out)
 					end
 				end)
-				task.delay(0.18,function()
-					if token==animToken then
-						tween(line,0.12,{Position=UDim2.new(0.5,0,0,-1)})
-					end
-				end)
-				task.delay(0.3,function()
-					if token==animToken then
-						tween(line,0.14,{Position=UDim2.new(0.5,0,0,2)})
-					end
-				end)
 			end
 		else
-			tween(circleStroke,0.16,{Color=off,Transparency=0.28})
-			tween(line,0.16,{BackgroundColor3=off,BackgroundTransparency=0.2,Position=UDim2.new(0.5,0,0,2)})
-			tween(progressStroke,0.14,{Transparency=1})
-			tween(glow,0.18,{BackgroundTransparency=1,Size=UDim2.fromOffset(24,24)})
+			fillRing.Rotation=animate and 270 or -90
+			fillGradient.Rotation=animate and 360 or 0
+			fillGradient.Enabled=true
+			tween(baseRing,0.16,{BackgroundColor3=off,BackgroundTransparency=0.4})
+			tween(fillRing,0.28,{Rotation=-90,BackgroundTransparency=1},Enum.EasingStyle.Quart,Enum.EasingDirection.InOut)
+			tween(fillGradient,0.28,{Rotation=0},Enum.EasingStyle.Quart,Enum.EasingDirection.InOut)
+			tween(glow,0.18,{BackgroundTransparency=1,Size=UDim2.fromOffset(20,20)})
 			tween(switch,0.12,{Size=UDim2.fromOffset(width,height)})
-			progress.Rotation=-80
-			progressGradient.Rotation=0
 		end
 	end
 
