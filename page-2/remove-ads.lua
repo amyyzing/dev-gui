@@ -1,6 +1,5 @@
 local RemoveAds={}
 local TweenService=game:GetService("TweenService")
-local RunService=game:GetService("RunService")
 
 local function safeDisconnect(conn)
 	if conn and typeof(conn)=="RBXScriptConnection" then
@@ -16,314 +15,78 @@ local function firstChild(parent)
 	return children[1]
 end
 
-
 local function createPowerSwitch(New,THEME,parent,startState,onChange)
-	-- Category-wide visual toggle.
-	-- The full rail spans the header, while the clickable hitbox stays on the right side
-	-- so the left title/description area can still be used by the category expander.
-	local reservedWidth=142
-	local indicatorBoxSize=46
-	local outerCoreSize=28
-	local innerOffSize=12
-	local categoryExpandedScale=1.14
-	local categoryCollapsedScale=1
-	local strokeThickness=2
-	local glowNearThickness=4
-	local glowFarThickness=7
-
-	local accent=THEME.GREEN or Color3.fromRGB(74,208,128)
-	local muted=THEME.MUTED or Color3.fromRGB(150,150,160)
-	local white=THEME.WHITE or THEME.TEXT or Color3.fromRGB(245,245,245)
-	local dark=THEME.BACKGROUND or THEME.DARK or Color3.fromRGB(12,14,18)
-	local railOff=muted:Lerp(dark,0.42)
-	local inactiveFill=muted:Lerp(dark,0.18)
-	local outerInactive=muted:Lerp(white,0.30)
-	local shadowColor=accent:Lerp(dark,0.18)
-
+	local width,height=34,34
+	local minimizedSize=16
+	local expandedSize=23
 	local switch=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.fromScale(0.5,0.5),
-		Size=UDim2.new(1,-8,1,-2),
+		AnchorPoint=Vector2.new(1,0.5),
+		Position=UDim2.new(1,0,0.5,0),
+		Size=UDim2.fromOffset(width,height),
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
-		ClipsDescendants=false,
 		ZIndex=7,
 	},parent)
 
-	local wideScale=New("UIScale",{
-		Scale=1,
-	},switch)
-
-	local halo=New("Frame",{
+	local holder=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
 		Position=UDim2.fromScale(0.5,0.5),
-		Size=UDim2.new(1,-2,1,-4),
-		BackgroundTransparency=1,
+		Size=UDim2.fromOffset(28,28),
+		BackgroundColor3=THEME.MUTED,
+		BackgroundTransparency=0.9,
 		BorderSizePixel=0,
-		ZIndex=7,
+		ZIndex=8,
 	},switch)
+	New("UICorner",{CornerRadius=UDim.new(0,5)},holder)
 
-	local haloStroke=New("UIStroke",{
-		Color=accent,
+	local holderStroke=New("UIStroke",{
+		Color=THEME.MUTED,
 		Thickness=1,
-		Transparency=startState and 0.76 or 1,
-		LineJoinMode=Enum.LineJoinMode.Miter,
-	},halo)
+		Transparency=0.62,
+	},holder)
 
-	local haloGradient=New("UIGradient",{
-		Rotation=0,
-		Color=ColorSequence.new({
-			ColorSequenceKeypoint.new(0,accent),
-			ColorSequenceKeypoint.new(0.45,white),
-			ColorSequenceKeypoint.new(1,accent),
-		}),
-		Transparency=NumberSequence.new({
-			NumberSequenceKeypoint.new(0,0.95),
-			NumberSequenceKeypoint.new(0.55,0.28),
-			NumberSequenceKeypoint.new(1,0.95),
-		}),
-	},haloStroke)
-
-	local railRoot=New("Frame",{
-		AnchorPoint=Vector2.new(0,0.5),
-		Position=UDim2.new(0,12,0.5,0),
-		Size=UDim2.new(1,-reservedWidth,1,-12),
-		BackgroundTransparency=1,
+	local glow=New("Frame",{
+		AnchorPoint=Vector2.new(0.5,0.5),
+		Position=UDim2.fromScale(0.5,0.5),
+		Size=UDim2.fromOffset(startState and 30 or 18,startState and 30 or 18),
+		BackgroundColor3=THEME.GREEN,
+		BackgroundTransparency=startState and 0.84 or 1,
 		BorderSizePixel=0,
-		ClipsDescendants=false,
-		ZIndex=8,
-	},switch)
-
-	local railScale=New("UIScale",{
-		Scale=1,
-	},railRoot)
-
-	local railBase=New("Frame",{
-		AnchorPoint=Vector2.new(0,0.5),
-		Position=UDim2.fromScale(0,0.5),
-		Size=UDim2.new(1,0,0,2),
-		BackgroundColor3=railOff,
-		BackgroundTransparency=0.42,
-		BorderSizePixel=0,
-		ZIndex=8,
-	},railRoot)
-
-	local railActiveClip=New("Frame",{
-		AnchorPoint=Vector2.new(0,0.5),
-		Position=UDim2.fromScale(0,0.5),
-		Size=startState and UDim2.new(1,0,0,3) or UDim2.new(0,0,0,3),
-		BackgroundTransparency=1,
-		BorderSizePixel=0,
-		ClipsDescendants=true,
+		Rotation=startState and 45 or 0,
 		ZIndex=9,
-	},railRoot)
+	},holder)
+	New("UICorner",{CornerRadius=UDim.new(0,4)},glow)
 
-	local railActive=New("Frame",{
-		AnchorPoint=Vector2.new(0,0.5),
-		Position=UDim2.fromScale(0,0.5),
-		Size=UDim2.new(1,0,1,0),
-		BackgroundColor3=accent,
-		BackgroundTransparency=startState and 0.04 or 1,
-		BorderSizePixel=0,
-		ZIndex=9,
-	},railActiveClip)
-
-	local railGradient=New("UIGradient",{
-		Rotation=0,
-		Color=ColorSequence.new({
-			ColorSequenceKeypoint.new(0,accent),
-			ColorSequenceKeypoint.new(0.55,white),
-			ColorSequenceKeypoint.new(1,accent),
-		}),
-	},railActive)
-
-	local ticks={}
-	for i,alpha in ipairs({0.18,0.38,0.58,0.78}) do
-		local tick=New("Frame",{
-			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=UDim2.fromScale(alpha,0.5),
-			Size=UDim2.fromOffset(2,8),
-			BackgroundColor3=startState and accent or railOff,
-			BackgroundTransparency=startState and 0.18 or 0.72,
-			BorderSizePixel=0,
-			ZIndex=10,
-		},railRoot)
-		table.insert(ticks,tick)
-	end
-
-	local indicator=New("Frame",{
-		AnchorPoint=Vector2.new(1,0.5),
-		Position=UDim2.new(1,-8,0.5,0),
-		Size=UDim2.fromOffset(indicatorBoxSize,indicatorBoxSize),
-		BackgroundTransparency=1,
-		BorderSizePixel=0,
-		ClipsDescendants=false,
-		ZIndex=12,
-	},switch)
-
-	New("UIAspectRatioConstraint",{
-		AspectRatio=1,
-	},indicator)
-
-	New("UISizeConstraint",{
-		MinSize=Vector2.new(34,34),
-		MaxSize=Vector2.new(indicatorBoxSize,indicatorBoxSize),
-	},indicator)
-
-	local indicatorScale=New("UIScale",{
-		Scale=categoryExpandedScale,
-	},indicator)
-
-	local glowFar=New("Frame",{
+	local square=New("Frame",{
 		AnchorPoint=Vector2.new(0.5,0.5),
 		Position=UDim2.fromScale(0.5,0.5),
-		Size=UDim2.fromOffset(startState and outerCoreSize or innerOffSize,startState and outerCoreSize or innerOffSize),
-		BackgroundTransparency=1,
+		Size=UDim2.fromOffset(startState and expandedSize or minimizedSize,startState and expandedSize or minimizedSize),
+		BackgroundColor3=startState and THEME.GREEN or THEME.MUTED,
+		BackgroundTransparency=startState and 0 or 0.34,
 		BorderSizePixel=0,
 		Rotation=startState and 45 or 0,
-		ZIndex=12,
-	},indicator)
+		ZIndex=10,
+	},holder)
+	New("UICorner",{CornerRadius=UDim.new(0,3)},square)
 
-	New("UIAspectRatioConstraint",{AspectRatio=1},glowFar)
-	New("UISizeConstraint",{
-		MinSize=Vector2.new(innerOffSize,innerOffSize),
-		MaxSize=Vector2.new(outerCoreSize,outerCoreSize),
-	},glowFar)
-
-	local glowFarStroke=New("UIStroke",{
-		Color=shadowColor,
-		Thickness=glowFarThickness,
-		Transparency=startState and 0.78 or 1,
-		LineJoinMode=Enum.LineJoinMode.Miter,
-	},glowFar)
-
-	local glowFarGradient=New("UIGradient",{
-		Rotation=0,
-		Color=ColorSequence.new({
-			ColorSequenceKeypoint.new(0,accent),
-			ColorSequenceKeypoint.new(0.52,white),
-			ColorSequenceKeypoint.new(1,accent),
-		}),
-		Transparency=NumberSequence.new({
-			NumberSequenceKeypoint.new(0,0.88),
-			NumberSequenceKeypoint.new(0.5,0.12),
-			NumberSequenceKeypoint.new(1,0.88),
-		}),
-	},glowFarStroke)
-
-	local glowNear=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.fromScale(0.5,0.5),
-		Size=UDim2.fromOffset(startState and outerCoreSize or innerOffSize,startState and outerCoreSize or innerOffSize),
-		BackgroundTransparency=1,
-		BorderSizePixel=0,
-		Rotation=startState and 45 or 0,
-		ZIndex=13,
-	},indicator)
-
-	New("UIAspectRatioConstraint",{AspectRatio=1},glowNear)
-	New("UISizeConstraint",{
-		MinSize=Vector2.new(innerOffSize,innerOffSize),
-		MaxSize=Vector2.new(outerCoreSize,outerCoreSize),
-	},glowNear)
-
-	local glowNearStroke=New("UIStroke",{
-		Color=accent,
-		Thickness=glowNearThickness,
-		Transparency=startState and 0.55 or 1,
-		LineJoinMode=Enum.LineJoinMode.Miter,
-	},glowNear)
-
-	local glowNearGradient=New("UIGradient",{
-		Rotation=180,
-		Color=ColorSequence.new({
-			ColorSequenceKeypoint.new(0,accent),
-			ColorSequenceKeypoint.new(0.58,white),
-			ColorSequenceKeypoint.new(1,accent),
-		}),
-		Transparency=NumberSequence.new({
-			NumberSequenceKeypoint.new(0,0.72),
-			NumberSequenceKeypoint.new(0.52,0.05),
-			NumberSequenceKeypoint.new(1,0.72),
-		}),
-	},glowNearStroke)
-
-	local outerCore=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.fromScale(0.5,0.5),
-		Size=UDim2.fromOffset(outerCoreSize,outerCoreSize),
-		BackgroundTransparency=1,
-		BorderSizePixel=0,
-		Rotation=0,
-		ZIndex=14,
-	},indicator)
-
-	New("UIAspectRatioConstraint",{AspectRatio=1},outerCore)
-	New("UISizeConstraint",{
-		MinSize=Vector2.new(outerCoreSize,outerCoreSize),
-		MaxSize=Vector2.new(outerCoreSize,outerCoreSize),
-	},outerCore)
-
-	local outerStroke=New("UIStroke",{
-		Color=startState and white or outerInactive,
-		Thickness=strokeThickness,
-		Transparency=startState and 0.02 or 0.18,
-		LineJoinMode=Enum.LineJoinMode.Miter,
-	},outerCore)
-
-	local innerSquare=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.fromScale(0.5,0.5),
-		Size=UDim2.fromOffset(startState and outerCoreSize or innerOffSize,startState and outerCoreSize or innerOffSize),
-		BackgroundColor3=startState and accent or inactiveFill,
-		BackgroundTransparency=startState and 1 or 0.03,
-		BorderSizePixel=0,
-		Rotation=startState and 45 or 0,
-		ZIndex=15,
-	},indicator)
-
-	New("UIAspectRatioConstraint",{AspectRatio=1},innerSquare)
-	New("UISizeConstraint",{
-		MinSize=Vector2.new(innerOffSize,innerOffSize),
-		MaxSize=Vector2.new(outerCoreSize,outerCoreSize),
-	},innerSquare)
-
-	local innerStroke=New("UIStroke",{
-		Color=startState and accent or muted,
-		Thickness=strokeThickness,
-		Transparency=startState and 0.01 or 1,
-		LineJoinMode=Enum.LineJoinMode.Miter,
-	},innerSquare)
-
-	local innerStrokeGradient=New("UIGradient",{
-		Rotation=0,
-		Color=ColorSequence.new({
-			ColorSequenceKeypoint.new(0,accent),
-			ColorSequenceKeypoint.new(0.72,accent),
-			ColorSequenceKeypoint.new(1,white),
-		}),
-	},innerStroke)
+	local squareStroke=New("UIStroke",{
+		Color=startState and THEME.GREEN or THEME.MUTED,
+		Thickness=1,
+		Transparency=startState and 0.05 or 0.36,
+	},square)
 
 	local hit=New("TextButton",{
-		AnchorPoint=Vector2.new(1,0.5),
-		Position=UDim2.new(1,0,0.5,0),
-		Size=UDim2.new(0,reservedWidth,1,0),
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		Text="",
 		AutoButtonColor=false,
-		ZIndex=30,
+		Size=UDim2.new(1,0,1,0),
+		ZIndex=12,
 	},switch)
 
 	local state=startState and true or false
-	local categoryExpanded=true
 	local activeTweens={}
 	local clickConn=nil
-	local glowConn=nil
-	local hoverConnA=nil
-	local hoverConnB=nil
-	local hovering=false
-	local glowRotation=0
 
 	local function cancelTweens()
 		for _,tw in ipairs(activeTweens) do
@@ -344,110 +107,65 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 	local function applyVisuals(animate)
 		cancelTweens()
 
-		local expanded=categoryExpanded
-		local scale=expanded and categoryExpandedScale or categoryCollapsedScale
-		local railScaleTarget=expanded and 1.02 or 1
-		local targetInnerSize=state and outerCoreSize or innerOffSize
-		local targetInnerRotation=state and 45 or 0
-		local targetInnerColor=state and accent or inactiveFill
-		local targetOuterColor=state and white or outerInactive
-		local targetFillTransparency=state and 1 or 0.03
-		local targetInnerStrokeTransparency=state and 0.01 or 1
-		local targetOuterStrokeTransparency=state and 0.02 or 0.18
-		local targetGlowNearTransparency=state and 0.55 or 1
-		local targetGlowFarTransparency=state and 0.78 or 1
-		local targetHaloTransparency=state and (hovering and 0.64 or 0.76) or (hovering and 0.88 or 1)
-		local railActiveSize=state and UDim2.new(1,0,0,3) or UDim2.new(0,0,0,3)
-		local railActiveTransparency=state and 0.04 or 1
-		local railBaseTransparency=state and 0.22 or 0.42
-		local railBaseColor=state and accent:Lerp(dark,0.55) or railOff
-		local tickColor=state and accent or railOff
-		local tickTransparency=state and 0.18 or 0.72
-
-		glowFarGradient.Enabled=state
-		glowNearGradient.Enabled=state
-		innerStrokeGradient.Enabled=state
-		railGradient.Enabled=state
-		haloGradient.Enabled=state or hovering
+		local expanded=state
+		local targetSize=expanded and expandedSize or minimizedSize
+		local targetRotation=expanded and 45 or 0
+		local targetColor=expanded and THEME.GREEN or THEME.MUTED
+		local targetSquareTransparency=expanded and 0 or 0.34
+		local targetGlowTransparency=expanded and 0.84 or 1
+		local targetGlowSize=expanded and 30 or 18
+		local targetHolderTransparency=expanded and 0.84 or 0.9
+		local targetStrokeTransparency=expanded and 0.26 or 0.62
+		local targetSquareStrokeTransparency=expanded and 0.05 or 0.36
 
 		if not animate then
-			wideScale.Scale=1
-			railScale.Scale=railScaleTarget
-			indicatorScale.Scale=scale
-			haloStroke.Transparency=targetHaloTransparency
-			railBase.BackgroundColor3=railBaseColor
-			railBase.BackgroundTransparency=railBaseTransparency
-			railActiveClip.Size=railActiveSize
-			railActive.BackgroundTransparency=railActiveTransparency
-			for _,tick in ipairs(ticks) do
-				tick.BackgroundColor3=tickColor
-				tick.BackgroundTransparency=tickTransparency
-			end
-			outerStroke.Color=targetOuterColor
-			outerStroke.Transparency=targetOuterStrokeTransparency
-			glowFar.Size=UDim2.fromOffset(targetInnerSize,targetInnerSize)
-			glowFar.Rotation=targetInnerRotation
-			glowFarStroke.Transparency=targetGlowFarTransparency
-			glowNear.Size=UDim2.fromOffset(targetInnerSize,targetInnerSize)
-			glowNear.Rotation=targetInnerRotation
-			glowNearStroke.Transparency=targetGlowNearTransparency
-			innerSquare.Size=UDim2.fromOffset(targetInnerSize,targetInnerSize)
-			innerSquare.Rotation=targetInnerRotation
-			innerSquare.BackgroundColor3=targetInnerColor
-			innerSquare.BackgroundTransparency=targetFillTransparency
-			innerStroke.Color=accent
-			innerStroke.Transparency=targetInnerStrokeTransparency
+			square.Size=UDim2.fromOffset(targetSize,targetSize)
+			square.Rotation=targetRotation
+			square.BackgroundColor3=targetColor
+			square.BackgroundTransparency=targetSquareTransparency
+			squareStroke.Color=targetColor
+			squareStroke.Transparency=targetSquareStrokeTransparency
+			glow.Size=UDim2.fromOffset(targetGlowSize,targetGlowSize)
+			glow.Rotation=targetRotation
+			glow.BackgroundTransparency=targetGlowTransparency
+			holder.BackgroundColor3=targetColor
+			holder.BackgroundTransparency=targetHolderTransparency
+			holderStroke.Color=targetColor
+			holderStroke.Transparency=targetStrokeTransparency
 			return
 		end
 
-		local toggleInfo=state
-			and TweenInfo.new(0.34,Enum.EasingStyle.Back,Enum.EasingDirection.Out)
-			or TweenInfo.new(0.24,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut)
-		local scaleInfo=TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		local info=expanded
+			and TweenInfo.new(0.28,Enum.EasingStyle.Back,Enum.EasingDirection.Out)
+			or TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut)
 		local softInfo=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 
-		playTween(railScale,scaleInfo,{Scale=railScaleTarget})
-		playTween(indicatorScale,scaleInfo,{Scale=scale})
-		playTween(haloStroke,softInfo,{Transparency=targetHaloTransparency})
-		playTween(railBase,softInfo,{
-			BackgroundColor3=railBaseColor,
-			BackgroundTransparency=railBaseTransparency,
-		})
-		playTween(railActiveClip,toggleInfo,{Size=railActiveSize})
-		playTween(railActive,softInfo,{BackgroundTransparency=railActiveTransparency})
-
-		for _,tick in ipairs(ticks) do
-			playTween(tick,softInfo,{
-				BackgroundColor3=tickColor,
-				BackgroundTransparency=tickTransparency,
-			})
-		end
-
-		playTween(outerStroke,softInfo,{
-			Color=targetOuterColor,
-			Transparency=targetOuterStrokeTransparency,
+		playTween(square,info,{
+			Size=UDim2.fromOffset(targetSize,targetSize),
+			Rotation=targetRotation,
+			BackgroundColor3=targetColor,
+			BackgroundTransparency=targetSquareTransparency,
 		})
 
-		playTween(glowFar,toggleInfo,{
-			Size=UDim2.fromOffset(targetInnerSize,targetInnerSize),
-			Rotation=targetInnerRotation,
+		playTween(squareStroke,softInfo,{
+			Color=targetColor,
+			Transparency=targetSquareStrokeTransparency,
 		})
-		playTween(glowNear,toggleInfo,{
-			Size=UDim2.fromOffset(targetInnerSize,targetInnerSize),
-			Rotation=targetInnerRotation,
-		})
-		playTween(glowFarStroke,softInfo,{Transparency=targetGlowFarTransparency})
-		playTween(glowNearStroke,softInfo,{Transparency=targetGlowNearTransparency})
 
-		playTween(innerSquare,toggleInfo,{
-			Size=UDim2.fromOffset(targetInnerSize,targetInnerSize),
-			Rotation=targetInnerRotation,
-			BackgroundColor3=targetInnerColor,
-			BackgroundTransparency=targetFillTransparency,
+		playTween(glow,info,{
+			Size=UDim2.fromOffset(targetGlowSize,targetGlowSize),
+			Rotation=targetRotation,
+			BackgroundTransparency=targetGlowTransparency,
 		})
-		playTween(innerStroke,softInfo,{
-			Color=accent,
-			Transparency=targetInnerStrokeTransparency,
+
+		playTween(holder,softInfo,{
+			BackgroundColor3=targetColor,
+			BackgroundTransparency=targetHolderTransparency,
+		})
+
+		playTween(holderStroke,softInfo,{
+			Color=targetColor,
+			Transparency=targetStrokeTransparency,
 		})
 	end
 
@@ -455,6 +173,8 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		local nextState=value and true or false
 		local changed=nextState~=state
 
+		-- Avoid repainting when the value is already correct.
+		-- This prevents api.SetEnabled -> toggle.set from cancelling the click animation.
 		if not changed and not force then
 			return
 		end
@@ -467,44 +187,8 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		end
 	end
 
-	local function setCategoryExpanded(value,animate)
-		local nextExpanded=value and true or false
-		if nextExpanded==categoryExpanded then
-			return
-		end
-
-		categoryExpanded=nextExpanded
-		applyVisuals(animate~=false)
-	end
-
 	clickConn=hit.MouseButton1Click:Connect(function()
 		setState(not state,true,true)
-	end)
-
-	hoverConnA=hit.MouseEnter:Connect(function()
-		hovering=true
-		applyVisuals(true)
-	end)
-
-	hoverConnB=hit.MouseLeave:Connect(function()
-		hovering=false
-		applyVisuals(true)
-	end)
-
-	glowConn=RunService.RenderStepped:Connect(function(dt)
-		if not switch or not switch.Parent then return end
-
-		if state then
-			glowRotation=(glowRotation+(dt*92))%360
-			glowFarGradient.Rotation=glowRotation
-			glowNearGradient.Rotation=(360-glowRotation)%360
-			innerStrokeGradient.Rotation=(glowRotation*0.75)%360
-			railGradient.Offset=Vector2.new(math.sin(os.clock()*2.4)*0.18,0)
-			haloGradient.Rotation=(glowRotation*0.55)%360
-		elseif hovering then
-			glowRotation=(glowRotation+(dt*34))%360
-			haloGradient.Rotation=(glowRotation*0.45)%360
-		end
 	end)
 
 	applyVisuals(false)
@@ -516,25 +200,16 @@ local function createPowerSwitch(New,THEME,parent,startState,onChange)
 		get=function()
 			return state
 		end,
-		setExpanded=function(value,animate)
-			setCategoryExpanded(value,animate)
-		end,
-		getExpanded=function()
-			return categoryExpanded
-		end,
 		destroy=function()
 			cancelTweens()
 			safeDisconnect(clickConn)
-			safeDisconnect(hoverConnA)
-			safeDisconnect(hoverConnB)
-			safeDisconnect(glowConn)
 			if switch then
 				switch:Destroy()
 			end
 		end,
 		wrap=switch,
-		width=reservedWidth,
-		height=indicatorBoxSize,
+		width=width,
+		height=height,
 	}
 end
 
@@ -554,7 +229,6 @@ function RemoveAds.new(ctx,page)
 	local trackedAdsFolder=nil
 	local removed={}
 	local removedSet=setmetatable({}, {__mode="k"})
-	local categoryConns={}
 
 	local function isGameplay()
 		return tostring(getCurrentModeKey() or "mode1")=="mode1"
@@ -691,175 +365,6 @@ function RemoveAds.new(ctx,page)
 		end
 	end
 
-	local function disconnectCategoryWatchers()
-		for _,conn in ipairs(categoryConns) do
-			safeDisconnect(conn)
-		end
-		table.clear(categoryConns)
-	end
-
-	local function findHeader(section)
-		if not section then return nil end
-
-		for _,child in ipairs(section:GetChildren()) do
-			if child:IsA("Frame") and child.LayoutOrder==1 then
-				return child
-			end
-		end
-
-		return nil
-	end
-
-	local function findHeaderButton(header)
-		if not header then return nil end
-
-		for _,child in ipairs(header:GetChildren()) do
-			if child:IsA("TextButton") and tostring(child.Text or "")~="" then
-				return child
-			end
-		end
-
-		return nil
-	end
-
-	local function reserveHeaderSpace(header,width)
-		if not header then return end
-
-		for _,child in ipairs(header:GetChildren()) do
-			if child:IsA("TextButton") and tostring(child.Text or "")~="" then
-				child.Size=UDim2.new(1,-width,1,0)
-				return
-			end
-		end
-	end
-
-	local function readHeaderExpanded(headerButton)
-		if not headerButton then return nil end
-		local text=tostring(headerButton.Text or "")
-
-		if text:match("^%s*%[%-%]") then
-			return true
-		end
-
-		if text:match("^%s*%[%+%]") then
-			return false
-		end
-
-		return nil
-	end
-
-	local function readControlsExpanded(controls)
-		if type(controls)~="table" then
-			return nil
-		end
-
-		for _,key in ipairs({"expanded","Expanded","isExpanded","IsExpanded","open","Open"}) do
-			local value=controls[key]
-
-			if type(value)=="boolean" then
-				return value
-			end
-
-			if type(value)=="function" then
-				local ok,result=pcall(value)
-				if ok and type(result)=="boolean" then
-					return result
-				end
-			end
-
-			if typeof(value)=="Instance" and value:IsA("BoolValue") then
-				return value.Value
-			end
-		end
-
-		for _,key in ipairs({"content","Content","body","Body","container","Container","holder","Holder"}) do
-			local value=controls[key]
-			if typeof(value)=="Instance" and value:IsA("GuiObject") then
-				return value.Visible
-			end
-		end
-
-		return nil
-	end
-
-	local function readCategoryExpanded(headerButton,controls)
-		if ctx.getCategoryExpanded then
-			local ok,result=pcall(ctx.getCategoryExpanded)
-			if ok and type(result)=="boolean" then
-				return result
-			end
-		end
-
-		if ctx.isCategoryExpanded~=nil then
-			if type(ctx.isCategoryExpanded)=="function" then
-				local ok,result=pcall(ctx.isCategoryExpanded)
-				if ok and type(result)=="boolean" then
-					return result
-				end
-			elseif type(ctx.isCategoryExpanded)=="boolean" then
-				return ctx.isCategoryExpanded
-			end
-		end
-
-		local fromControls=readControlsExpanded(controls)
-		if fromControls~=nil then
-			return fromControls
-		end
-
-		local fromHeader=readHeaderExpanded(headerButton)
-		if fromHeader~=nil then
-			return fromHeader
-		end
-
-		return true
-	end
-
-	local function bindCategoryExpansion(headerButton,controls)
-		if not toggle or not toggle.setExpanded then
-			return
-		end
-
-		local function sync(animate)
-			if toggle and toggle.setExpanded then
-				toggle.setExpanded(readCategoryExpanded(headerButton,controls),animate~=false)
-			end
-		end
-
-		sync(false)
-
-		if headerButton then
-			table.insert(categoryConns,headerButton:GetPropertyChangedSignal("Text"):Connect(function()
-				sync(true)
-			end))
-
-			table.insert(categoryConns,headerButton.MouseButton1Click:Connect(function()
-				task.defer(function()
-					sync(true)
-				end)
-			end))
-		end
-
-		if type(controls)=="table" then
-			for _,key in ipairs({"expanded","Expanded","isExpanded","IsExpanded","open","Open"}) do
-				local value=controls[key]
-				if typeof(value)=="Instance" and value:IsA("BoolValue") then
-					table.insert(categoryConns,value.Changed:Connect(function()
-						sync(true)
-					end))
-				end
-			end
-
-			for _,key in ipairs({"content","Content","body","Body","container","Container","holder","Holder"}) do
-				local value=controls[key]
-				if typeof(value)=="Instance" and value:IsA("GuiObject") then
-					table.insert(categoryConns,value:GetPropertyChangedSignal("Visible"):Connect(function()
-						sync(true)
-					end))
-				end
-			end
-		end
-	end
-
 	function api.SetEnabled(state,fire)
 		enabled=state and isGameplay() or false
 		syncToggleVisual(enabled)
@@ -894,23 +399,37 @@ function RemoveAds.new(ctx,page)
 		end
 	end
 
-	function api.SetCategoryExpanded(expanded,animate)
-		if toggle and toggle.setExpanded then
-			toggle.setExpanded(expanded,animate~=false)
-		end
-	end
-
 	function api.Destroy()
 		enabled=false
-		disconnectCategoryWatchers()
 		disconnectWatchers()
 		restoreAds()
-
 		if toggle and toggle.destroy then
 			toggle.destroy()
 		end
-
 		toggle=nil
+	end
+
+	local function findHeader(section)
+		if not section then return nil end
+
+		for _,child in ipairs(section:GetChildren()) do
+			if child:IsA("Frame") and child.LayoutOrder==1 then
+				return child
+			end
+		end
+
+		return nil
+	end
+
+	local function reserveHeaderSpace(header,width)
+		if not header then return end
+
+		for _,child in ipairs(header:GetChildren()) do
+			if child:IsA("TextButton") and tostring(child.Text or "")~="" then
+				child.Size=UDim2.new(1,-width,1,0)
+				return
+			end
+		end
 	end
 
 	local section,sectionControls=makeSection(page,3,"Remove Ads","Gameplay only",{
@@ -923,9 +442,6 @@ function RemoveAds.new(ctx,page)
 			api.SetEnabled(state,true)
 		end)
 		reserveHeaderSpace(header,(toggle.width or 52)+10)
-
-		local headerButton=findHeaderButton(header)
-		bindCategoryExpansion(headerButton,sectionControls)
 	end
 
 	if not toggle then
