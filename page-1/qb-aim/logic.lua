@@ -18,6 +18,7 @@ local SQUADS_BALL_POWER=MODEL_BALL_SPEED
 local PLAYER_G=196.2
 local JUMP_POWER=53.5
 local WR_MAX_Y=6+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
+local C1_SOLVE_Y_BIAS=0.00
 local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
@@ -75,6 +76,7 @@ local CIRCLE_TANGENT_REACTIVE_LEAD=0.58
 local CIRCLE_TANGENT_REACTIVE_LOS_GAIN=1.25
 local CIRCLE_TANGENT_ALIGNMENT_BOOST=0.30
 local CIRCLE_TANGENT_BALANCE_BOOST=0.35
+local CIRCLE_RADIAL_BASE_LEAD_TIME=0.20
 local DIAG_STREAK_SIDE_RATIO_MIN=0.30
 local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
@@ -1086,8 +1088,21 @@ function QBAim.new(ctx,parent)
 		local tangentAlignmentBoost=1+CIRCLE_TANGENT_ALIGNMENT_BOOST*tangentAlignment
 		local tangentBalanceBoost=1+CIRCLE_TANGENT_BALANCE_BOOST*routeBalance
 
+		local radialBaseTime=
+			CIRCLE_RADIAL_BASE_LEAD_TIME
+			*distanceScale
+			*positiveAwayShare
+			*balanceLeadScale
+
+		local radialLDTime=
+			WR_LEAD_DELAY
+			*distanceScale
+			*radialGain
+			*balanceLeadScale
+			*positiveAwayShare
+
 		local radialExtraTime=math.min(
-			WR_LEAD_DELAY*distanceScale*radialGain*balanceLeadScale,
+			radialBaseTime+radialLDTime,
 			CIRCLE_EXTRA_LEAD_TIME_MAX
 		)
 
@@ -1112,7 +1127,7 @@ function QBAim.new(ctx,parent)
 		local effectiveExtraTime=result.speed>1e-6 and extraLead.Magnitude/result.speed or 0
 		local targetFlat=flat(receiverRoot.Position)+flightLead+extraLead
 
-		return Vector3.new(targetFlat.X,WR_MAX_Y,targetFlat.Z),{
+		return Vector3.new(targetFlat.X,WR_MAX_Y+C1_SOLVE_Y_BIAS,targetFlat.Z),{
 			flightLeadXZ=flightLead,
 			extraLeadXZ=extraLead,
 			radialExtraLeadXZ=radialExtraLead,
@@ -1122,6 +1137,9 @@ function QBAim.new(ctx,parent)
 			tangentExtraTime=tangentExtraTime,
 			tangentBaseTime=tangentBaseTime,
 			tangentReactiveTime=tangentReactiveTime,
+			radialBaseTime=radialBaseTime,
+			radialLDTime=radialLDTime,
+			c1SolveYBias=C1_SOLVE_Y_BIAS,
 			distanceXZNow=radius,
 			distanceScale=distanceScale,
 			awayShare=awayShare,
