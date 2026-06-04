@@ -19,6 +19,9 @@ local PLAYER_G=196.2
 local JUMP_POWER=55.5
 local WR_STANDING_TOP_Y=6.00
 local WR_MAX_Y=WR_STANDING_TOP_Y+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G) -- ~=13.85
+local C1_Y_MIN=13.00
+local C1_Y_MAX=WR_MAX_Y
+local C1_Y_POTENTIAL_EXPONENT=1.00
 local C1_SOLVE_Y_BIAS=0.00
 local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
@@ -44,7 +47,7 @@ local ARC_PREVIEW_ENABLED=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
 local RECEIVER_TRACK_INTERVAL=0.05
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
-local PREVIEW_POST_THROW_FREEZE_MIN=0.75
+local PREVIEW_POST_THROW_FREEZE_MIN=0.1
 local ARC_MAX_CURVE=400
 local PREVIEW_SMOOTH=0.28
 local C1_MARKER_ENABLED=true
@@ -1138,6 +1141,15 @@ function QBAim.new(ctx,parent)
 		}
 	end
 
+	local function c1HeightFromMagnitudePotential(potential,speed)
+		if speed<1e-6 then
+			return C1_Y_MAX
+		end
+
+		local alpha=math.clamp(potential,0,1)^C1_Y_POTENTIAL_EXPONENT
+		return C1_Y_MIN+(C1_Y_MAX-C1_Y_MIN)*alpha
+	end
+
 	local function c1Target(receiverPosition,originPosition,targetVelocity,flightTime)
 		local receiverMaxPoint=receiverMaxAt(receiverPosition)
 		local result=components3D(originPosition,receiverMaxPoint,targetVelocity)
@@ -1219,8 +1231,10 @@ function QBAim.new(ctx,parent)
 		local extraLeadXZ=flat(extraLead3)
 		local effectiveExtraTime=result.speed>1e-6 and extraLeadXZ.Magnitude/result.speed or 0
 		local targetFlat=flat(receiverMaxPoint)+flightLead+extraLeadXZ
+		local magnitudeChangePotential=radialShareAbs
+		local c1Height=c1HeightFromMagnitudePotential(magnitudeChangePotential,result.speed)
 
-		return Vector3.new(targetFlat.X,WR_MAX_Y+C1_SOLVE_Y_BIAS,targetFlat.Z),{
+		return Vector3.new(targetFlat.X,c1Height+C1_SOLVE_Y_BIAS,targetFlat.Z),{
 			flightLeadXZ=flightLead,
 			extraLeadXZ=extraLeadXZ,
 			radialExtraLeadXZ=flat(radialExtraLead3),
@@ -1232,6 +1246,10 @@ function QBAim.new(ctx,parent)
 			tangentReactiveTime=tangentReactiveTime,
 			radialBaseTime=radialBaseTime,
 			radialLDTime=radialLDTime,
+			magnitudeChangePotential=magnitudeChangePotential,
+			c1Height=c1Height,
+			c1HeightMin=C1_Y_MIN,
+			c1HeightMax=C1_Y_MAX,
 			c1SolveYBias=C1_SOLVE_Y_BIAS,
 			distance3DNow=radius,
 			distanceXZNow=distXZ(originPosition,receiverMaxPoint),
