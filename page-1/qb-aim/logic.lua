@@ -445,32 +445,79 @@ local function getSquadsReEvent()
 	return nil,nil
 end
 
+local function getGlobalMechanics()
+	local globals=(typeof(getgenv)=="function" and getgenv()) or _G or {}
+	local mechanics=type(globals)=="table" and rawget(globals,"Mechanics") or nil
+	if mechanics then
+		return mechanics
+	end
+
+	local variables=type(globals)=="table" and rawget(globals,"Variables") or nil
+	if type(variables)=="table" then
+		return variables.Mechanics
+	end
+
+	return nil
+end
+
+local function findThrowAnimation()
+	local containers={
+		ReplicatedStorage,
+		LP:FindFirstChild("PlayerScripts"),
+		LP.Character,
+	}
+
+	for _,container in ipairs(containers) do
+		local animation=container and container:FindFirstChild(THROW_ANIMATION_NAME,true)
+		if animation and animation:IsA("Animation") and animation.AnimationId~="" then
+			return animation
+		end
+	end
+
+	return nil
+end
+
+local function playLocalThrowAnimation()
+	local character=LP.Character or Workspace:FindFirstChild(LP.Name)
+	local humanoid=character and character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return false end
+
+	local animation=findThrowAnimation()
+	if not animation then return false end
+
+	local animator=humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		animator=Instance.new("Animator")
+		animator.Parent=humanoid
+	end
+
+	local ok,track=pcall(function()
+		return animator:LoadAnimation(animation)
+	end)
+
+	if not(ok and track) then return false end
+
+	pcall(function()
+		track.Priority=Enum.AnimationPriority.Action
+	end)
+	track:Play(0.05,1,THROW_ANIMATION_SPEED)
+	return true
+end
+
 local function playThrowAnimation()
 	if not PLAY_THROW_ANIMATION or not getHeldBall() then return end
 
-	local globals=(typeof(getgenv)=="function" and getgenv()) or _G or {}
-	local mechanics=rawget(globals,"Mechanics")
+	local mechanics=getGlobalMechanics()
 	if mechanics and type(mechanics.PlayAnimation)=="function" then
-		pcall(function()
+		local ok=pcall(function()
 			mechanics:PlayAnimation(THROW_ANIMATION_NAME,THROW_ANIMATION_SPEED)
 		end)
-		return
-	end
-
-	local playerScripts=LP:FindFirstChild("PlayerScripts")
-	local clientMain=playerScripts and playerScripts:FindFirstChild("ClientMain")
-	local utilities=clientMain and clientMain:FindFirstChild("Utilities")
-	local variablesModule=utilities and utilities:FindFirstChild("Variables")
-
-	if variablesModule then
-		local ok,variables=pcall(require,variablesModule)
-		local clientMechanics=ok and variables and variables.Mechanics
-		if clientMechanics and type(clientMechanics.PlayAnimation)=="function" then
-			pcall(function()
-				clientMechanics:PlayAnimation(THROW_ANIMATION_NAME,THROW_ANIMATION_SPEED)
-			end)
+		if ok then
+			return
 		end
 	end
+
+	playLocalThrowAnimation()
 end
 
 function QBAim.new(ctx,parent)
@@ -1680,9 +1727,9 @@ function QBAim.new(ctx,parent)
 
 		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=REMOTE_DISPLAY_POWER}) -- must be 100, not plan.speed/95
 		pcall(function()
-			local variables=require(LP.PlayerScripts.ClientMain.Utilities.Variables)
-			if variables.Mechanics and variables.Mechanics.UnequipFootball then
-				variables.Mechanics:UnequipFootball()
+			local mechanics=getGlobalMechanics()
+			if mechanics and type(mechanics.UnequipFootball)=="function" then
+				mechanics:UnequipFootball()
 			end
 		end)
 
