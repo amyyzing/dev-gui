@@ -295,6 +295,7 @@ PAGE1_STATE={
 	qbAimTeamFilter=qbAimTeamFilter,
 	qbAimShowArc=qbAimShowArc,
 	qbAimLeadDelay=qbAimLeadDelay,
+	testingEnabled=testingEnabled,
 }
 
 function syncPage1State()
@@ -323,6 +324,7 @@ function syncPage1State()
 	qbAimTeamFilter=PAGE1_STATE.qbAimTeamFilter
 	qbAimShowArc=PAGE1_STATE.qbAimShowArc
 	qbAimLeadDelay=PAGE1_STATE.qbAimLeadDelay
+	testingEnabled=PAGE1_STATE.testingEnabled
 end
 
 PAGE1_APIS={}
@@ -349,6 +351,7 @@ function makePage1Ctx()
 		Page1ESPDefenseLogicModule=Page1ESPDefenseLogicModule,
 		Page1ESPOffenseLogicModule=Page1ESPOffenseLogicModule,
 		Page1QBAimLogicModule=Page1QBAimLogicModule,
+		Page1TestingLogicModule=Page1TestingLogicModule,
 		getCurrentModeKey=function() return CURRENT_MODE_KEY end,
 		getHitboxToggleKey=function() return TOGGLE_HB_KEY end,
 		getSpeedToggleKey=function() return TOGGLE_SPEED_KEY end,
@@ -462,6 +465,15 @@ function buildPage1()
 		addPage1Error(rightCol,4,"QB Aim","page-1/qb-aim/gui.lua")
 	end
 
+	if Page1TestingModule and Page1TestingModule.new then
+		local ok,result=pcall(function()
+			return Page1TestingModule.new(ctx,rightCol)
+		end)
+		if ok then PAGE1_APIS.Testing=result else addPage1Error(rightCol,5,"Testing",tostring(result)) end
+	else
+		addPage1Error(rightCol,5,"Testing","page-1/testing/gui.lua")
+	end
+
 	syncPage1State()
 	refreshActionStatus()
 end
@@ -521,6 +533,7 @@ function resetMainPageDefaults()
 	PAGE1_STATE.qbAimTeamFilter=true
 	PAGE1_STATE.qbAimShowArc=true
 	PAGE1_STATE.qbAimLeadDelay=0.75
+	PAGE1_STATE.testingEnabled=false
 
 	for _,api in pairs(PAGE1_APIS) do
 		if api and api.Refresh then

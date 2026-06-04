@@ -194,6 +194,7 @@ function resetRuntimeEffectsBeforeAutoRefresh()
 	call("Boost","SetAlwaysBoostState",false,false)
 	call("ESP","SetESPState",false,false)
 	call("QBAim","SetQBAimState",false)
+	call("Testing","SetTestingState",false,false)
 
 	if AntiMaterialAPI and AntiMaterialAPI.SetEnabled then
 		pcall(AntiMaterialAPI.SetEnabled,false,false)
@@ -233,6 +234,7 @@ function resetRuntimeEffectsBeforeAutoRefresh()
 		PAGE1_STATE.jumpBoostTradeMode=false
 		PAGE1_STATE.actionStatusOn=false
 		PAGE1_STATE.qbAimEnabled=false
+		PAGE1_STATE.testingEnabled=false
 	end
 
 	pcall(function()
@@ -300,6 +302,7 @@ function buildDataSaveContext()
 		setJumpPowerValue=function(v) PAGE1_STATE.jumpPowerValue=v; syncPage1State() end,
 		setDivePowerValue=function(v) PAGE1_STATE.divePowerValue=v; syncPage1State() end,
 		setJumpBoostState=function(v) PAGE1_STATE.jumpBoostOn=v and true or false; syncPage1State() end,
+		setTestingState=function(v) PAGE1_STATE.testingEnabled=v and true or false; syncPage1State() end,
 	}
 end
 

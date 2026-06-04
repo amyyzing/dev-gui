@@ -43,6 +43,7 @@ ballDetectionRadius=10
 potatoMode=false
 actionStatusOn=false
 qbAimEnabled=false
+testingEnabled=false
 
 TOGGLE_UI_KEY=Enum.KeyCode.Unknown
 TOGGLE_HB_KEY=Enum.KeyCode.Unknown
@@ -454,6 +455,8 @@ MODULE_PATHS={
 	Page1ESPOffenseLogic="page-1/esp-offense/logic.lua",
 	Page1QBAim="page-1/qb-aim/gui.lua",
 	Page1QBAimLogic="page-1/qb-aim/logic.lua",
+	Page1Testing="page-1/testing/gui.lua",
+	Page1TestingLogic="page-1/testing/logic.lua",
 	PrimaryColour="page-4/primary/gui.lua",
 	PrimaryColourLogic="page-4/primary/logic.lua",
 	SecondaryColour="page-4/secondary/gui.lua",
@@ -1053,6 +1056,8 @@ Page1ESPOffenseLogicModule=loadRemoteModuleStep("Page1ESPOffenseLogic",MODULE_PA
 Page1ESPOffenseModule=loadRemoteModuleStep("Page1ESPOffense",MODULE_PATHS.Page1ESPOffense)
 Page1QBAimLogicModule=loadRemoteModuleStep("Page1QBAimLogic",MODULE_PATHS.Page1QBAimLogic)
 Page1QBAimModule=loadRemoteModuleStep("Page1QBAim",MODULE_PATHS.Page1QBAim)
+Page1TestingLogicModule=loadRemoteModuleStep("Page1TestingLogic",MODULE_PATHS.Page1TestingLogic)
+Page1TestingModule=loadRemoteModuleStep("Page1Testing",MODULE_PATHS.Page1Testing)
 PrimaryColourLogicModule=loadRemoteModuleStep("PrimaryColourLogic",MODULE_PATHS.PrimaryColourLogic)
 PrimaryColourModule=loadRemoteModuleStep("PrimaryColour",MODULE_PATHS.PrimaryColour)
 SecondaryColourLogicModule=loadRemoteModuleStep("SecondaryColourLogic",MODULE_PATHS.SecondaryColourLogic)
@@ -1113,6 +1118,8 @@ PAGE1_RELOAD_PATHS={
 	[MODULE_PATHS.Page1ESPOffenseLogic]=function(module) Page1ESPOffenseLogicModule=module end,
 	[MODULE_PATHS.Page1QBAim]=function(module) Page1QBAimModule=module end,
 	[MODULE_PATHS.Page1QBAimLogic]=function(module) Page1QBAimLogicModule=module end,
+	[MODULE_PATHS.Page1Testing]=function(module) Page1TestingModule=module end,
+	[MODULE_PATHS.Page1TestingLogic]=function(module) Page1TestingLogicModule=module end,
 }
 PAGE2_RELOAD_PATHS={
 	[MODULE_PATHS.HitboxPreset]=function(module) HitboxPresetModule=module end,

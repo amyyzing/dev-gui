@@ -36,6 +36,7 @@ Description.Categories={
 			["Boost"]={Title="AUTO BOOST",Description="Configure your boost"},
 			["ESP"]={Title="ESP",Description="WR/DB coverage esp, self-explanatory for league players"},
 			["QB Aim"]={Title="QB AIM",Description="Receiver lock, arc preview, and throw timing"},
+			["Testing"]={Title="TESTING",Description="Incoming throw C1 capture"},
 		},
 
 		Maps={
@@ -171,6 +172,12 @@ Description.Categories={
 			["QB Aim Lock Receiver"]="Select Receiver",
 			["QB Aim Throw"]="Throw Selected Receiver",
 			["QB Aim Toggle"]="Aimbot",
+		},
+
+		Testing={
+			["Testing"]="Testing",
+			["incoming C1 capture"]="incoming C1 capture",
+			["Off"]="Off",
 		},
 
 		Maps={
