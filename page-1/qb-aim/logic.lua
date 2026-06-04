@@ -35,6 +35,8 @@ local QB_Y_FALL_FACTOR=0
 local QB_Y_MAX_CORRECTION=4.25
 local C2_GROUND_FALLBACK_MARGIN=2.50
 local C2_MAX_ABOVE_BALL=8.00
+local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
+local QB_RELEASE_EXTRAPOLATE_VERTICAL=true
 local MIN_T,MAX_T,DT=0.35,6,0.01
 local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
@@ -976,8 +978,12 @@ function QBAim.new(ctx,parent)
 		return Vector3.zero,"standing"
 	end
 
+	local function receiverMaxAt(position)
+		return Vector3.new(position.X,WR_MAX_Y,position.Z)
+	end
+
 	local function receiverMax(receiverRoot)
-		return Vector3.new(receiverRoot.Position.X,WR_MAX_Y,receiverRoot.Position.Z)
+		return receiverMaxAt(receiverRoot.Position)
 	end
 
 	local function qbYCorrection(qbRoot)
@@ -991,14 +997,11 @@ function QBAim.new(ctx,parent)
 		return math.clamp(raw,0,QB_Y_MAX_CORRECTION)
 	end
 
-	local function origin(qbRoot,ball)
+	local function origin(qbRoot,ball,releaseOffset)
+		releaseOffset=releaseOffset or 0
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
-		local horizontal=Vector3.new(rootVelocity.X,0,rootVelocity.Z)*QB_RELEASE_DELAY*QB_XZ_RELEASE_FACTOR
 		local basePosition=ball and ball.Position or qbRoot.Position
 
-		-- Dynamic C2/release origin:
-		-- QB can jump, so C2 must follow the held football/QB release height instead of a stale/grounded preview attachment.
-		-- Original Center.C2 is only accepted if it is sane relative to the currently held ball.
 		local baseY=basePosition.Y
 		local centerY=c2Y()
 		local y=baseY
@@ -1006,7 +1009,20 @@ function QBAim.new(ctx,parent)
 			y=centerY
 		end
 
-		return Vector3.new(basePosition.X+horizontal.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+horizontal.Z)
+		local dx,dz=0,0
+		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and releaseOffset>0 then
+			dx=rootVelocity.X*releaseOffset
+			dz=rootVelocity.Z*releaseOffset
+		end
+
+		if QB_RELEASE_EXTRAPOLATE_VERTICAL and releaseOffset>0 then
+			local airborne=math.abs(rootVelocity.Y)>=QB_AIRBORNE_VY_EPSILON or qbRoot.Position.Y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON
+			if airborne then
+				y=y+rootVelocity.Y*releaseOffset-0.5*PLAYER_G*releaseOffset*releaseOffset
+			end
+		end
+
+		return Vector3.new(basePosition.X+dx,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+dz)
 	end
 
 	local function velocityNeeded(originPosition,targetPosition,time)
@@ -1049,16 +1065,90 @@ function QBAim.new(ctx,parent)
 		return MAX_T
 	end
 
-	local function c1Target(receiverRoot,originPosition,targetVelocity,flightTime)
-		local result=components(originPosition,receiverRoot.Position,targetVelocity)
-		local radius=distXZ(originPosition,receiverRoot.Position)
+	local function components3D(originPosition,receiverMaxPoint,velocity)
+		local radiusVec=receiverMaxPoint-originPosition
+		local radius=radiusVec.Magnitude
+		if radius<1e-6 then
+			local awayDir,sideDir=basis(originPosition,receiverMaxPoint)
+			local velocityXZ=flat(velocity or Vector3.zero)
+			return{
+				radius=0,
+				radialDir=awayDir,
+				tangentDir=sideDir,
+				elevationDir=Vector3.new(0,1,0),
+				lateralDir=sideDir,
+				awayDir=awayDir,
+				sideDir=sideDir,
+				radial=velocityXZ:Dot(awayDir),
+				tangent=velocityXZ:Dot(sideDir),
+				elevation=0,
+				away=velocityXZ:Dot(awayDir),
+				side=velocityXZ:Dot(sideDir),
+				awayAbs=math.abs(velocityXZ:Dot(awayDir)),
+				sideAbs=math.abs(velocityXZ:Dot(sideDir)),
+				lateralAbs=math.abs(velocityXZ:Dot(sideDir)),
+				speed=velocityXZ.Magnitude,
+			}
+		end
+
+		local radialDir=radiusVec.Unit
+		local up=Vector3.new(0,1,0)
+		local tangentDir=up:Cross(radialDir)
+		if tangentDir.Magnitude<1e-6 then
+			tangentDir=Vector3.new(1,0,0)
+		else
+			tangentDir=tangentDir.Unit
+		end
+		local elevationDir=radialDir:Cross(tangentDir)
+		if elevationDir.Magnitude<1e-6 then
+			elevationDir=up
+		else
+			elevationDir=elevationDir.Unit
+		end
+
+		local velocity3=Vector3.new((velocity or Vector3.zero).X,0,(velocity or Vector3.zero).Z)
+		local radial=velocity3:Dot(radialDir)
+		local tangent=velocity3:Dot(tangentDir)
+		local elevation=velocity3:Dot(elevationDir)
+		local lateralVec=tangentDir*tangent+elevationDir*elevation
+		local lateralAbs=lateralVec.Magnitude
+		local lateralDir=lateralAbs>1e-6 and lateralVec.Unit or tangentDir
+		local flatRadial=flat(radialDir)
+		local awayDir=flatRadial.Magnitude>1e-6 and flatRadial.Unit or Vector3.new(1,0,0)
+		local sideDir=Vector3.new(-awayDir.Z,0,awayDir.X)
+
+		return{
+			radius=radius,
+			radialDir=radialDir,
+			tangentDir=tangentDir,
+			elevationDir=elevationDir,
+			lateralDir=lateralDir,
+			awayDir=awayDir,
+			sideDir=sideDir,
+			radial=radial,
+			tangent=tangent,
+			elevation=elevation,
+			away=radial,
+			side=tangent,
+			awayAbs=math.abs(radial),
+			sideAbs=lateralAbs,
+			lateralAbs=lateralAbs,
+			speed=velocity3.Magnitude,
+		}
+	end
+
+	local function c1Target(receiverPosition,originPosition,targetVelocity,flightTime)
+		local receiverMaxPoint=receiverMaxAt(receiverPosition)
+		local result=components3D(originPosition,receiverMaxPoint,targetVelocity)
+		local radius=math.max(result.radius,1e-6)
 		local speed=math.max(result.speed,1e-6)
+		local velocity3=Vector3.new((targetVelocity or Vector3.zero).X,0,(targetVelocity or Vector3.zero).Z)
 		local velocityXZ=flat(targetVelocity or Vector3.zero)
 
-		local awayShare=math.clamp(result.away/speed,-1,1)
-		local positiveAwayShare=math.clamp(result.away/speed,0,1)
-		local radialShareAbs=math.clamp(result.awayAbs/speed,0,1)
-		local lateralShare=math.clamp(result.sideAbs/speed,0,1)
+		local awayShare=math.clamp(result.radial/speed,-1,1)
+		local positiveAwayShare=math.clamp(result.radial/speed,0,1)
+		local radialShareAbs=math.clamp(math.abs(result.radial)/speed,0,1)
+		local lateralShare=math.clamp(result.lateralAbs/speed,0,1)
 		local routeBalance=1-math.abs(radialShareAbs-lateralShare)
 		local balanceLeadScale=CIRCLE_BALANCE_LEAD_SCALE_MIN+(CIRCLE_BALANCE_LEAD_SCALE_MAX-CIRCLE_BALANCE_LEAD_SCALE_MIN)*routeBalance
 
@@ -1076,13 +1166,13 @@ function QBAim.new(ctx,parent)
 			CIRCLE_TANGENT_EXTRA_MAX
 		)
 
-		local losRate=result.sideAbs/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
+		local losRate=result.lateralAbs/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
 		local losDamping=1/(1+losRate*CIRCLE_LOS_RATE_GAIN)
 		local reactiveLosDamping=1/(1+losRate*CIRCLE_TANGENT_REACTIVE_LOS_GAIN)
 
 		local tangentAlignment=0
-		if velocityXZ.Magnitude>1e-6 then
-			tangentAlignment=math.abs(velocityXZ.Unit:Dot(result.sideDir))
+		if velocity3.Magnitude>1e-6 and result.lateralAbs>1e-6 then
+			tangentAlignment=math.abs(velocity3.Unit:Dot(result.lateralDir))
 		end
 
 		local tangentAlignmentBoost=1+CIRCLE_TANGENT_ALIGNMENT_BOOST*tangentAlignment
@@ -1121,17 +1211,19 @@ function QBAim.new(ctx,parent)
 		)
 
 		local flightLead=velocityXZ*flightTime
-		local radialExtraLead=result.awayDir*result.away*radialExtraTime
-		local tangentExtraLead=result.sideDir*result.side*tangentExtraTime
-		local extraLead=radialExtraLead+tangentExtraLead
-		local effectiveExtraTime=result.speed>1e-6 and extraLead.Magnitude/result.speed or 0
-		local targetFlat=flat(receiverRoot.Position)+flightLead+extraLead
+		local radialExtraLead3=result.radialDir*result.radial*radialExtraTime
+		local tangentVelocity3=result.tangentDir*result.tangent+result.elevationDir*result.elevation
+		local tangentExtraLead3=tangentVelocity3*tangentExtraTime
+		local extraLead3=radialExtraLead3+tangentExtraLead3
+		local extraLeadXZ=flat(extraLead3)
+		local effectiveExtraTime=result.speed>1e-6 and extraLeadXZ.Magnitude/result.speed or 0
+		local targetFlat=flat(receiverMaxPoint)+flightLead+extraLeadXZ
 
 		return Vector3.new(targetFlat.X,WR_MAX_Y+C1_SOLVE_Y_BIAS,targetFlat.Z),{
 			flightLeadXZ=flightLead,
-			extraLeadXZ=extraLead,
-			radialExtraLeadXZ=radialExtraLead,
-			tangentExtraLeadXZ=tangentExtraLead,
+			extraLeadXZ=extraLeadXZ,
+			radialExtraLeadXZ=flat(radialExtraLead3),
+			tangentExtraLeadXZ=flat(tangentExtraLead3),
 			extraLeadTime=effectiveExtraTime,
 			radialExtraTime=radialExtraTime,
 			tangentExtraTime=tangentExtraTime,
@@ -1140,7 +1232,8 @@ function QBAim.new(ctx,parent)
 			radialBaseTime=radialBaseTime,
 			radialLDTime=radialLDTime,
 			c1SolveYBias=C1_SOLVE_Y_BIAS,
-			distanceXZNow=radius,
+			distance3DNow=radius,
+			distanceXZNow=distXZ(originPosition,receiverMaxPoint),
 			distanceScale=distanceScale,
 			awayShare=awayShare,
 			positiveAwayShare=positiveAwayShare,
@@ -1156,16 +1249,20 @@ function QBAim.new(ctx,parent)
 			tangentAlignment=tangentAlignment,
 			tangentAlignmentBoost=tangentAlignmentBoost,
 			tangentBalanceBoost=tangentBalanceBoost,
-			routeAway=result.away,
-			routeSide=result.side,
+			routeAway=result.radial,
+			routeSide=result.tangent,
+			routeElevation=result.elevation,
 			routeSpeed=result.speed,
 		}
 	end
 
-	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower)
+	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower,releaseOffset)
 		ballPower=ballPower or GAMEPLAY_BALL_POWER
-		local originPosition=origin(qbRoot,ball)
-		local startTarget=receiverMax(receiverRoot)
+		releaseOffset=releaseOffset or 0
+		targetVelocity=targetVelocity or Vector3.zero
+		local originPosition=origin(qbRoot,ball,releaseOffset)
+		local receiverReleasePosition=receiverRoot.Position+flat(targetVelocity)*releaseOffset
+		local startTarget=receiverMaxAt(receiverReleasePosition)
 		local distance=distXZ(originPosition,startTarget)
 		local preferred=preferredAngle(distance)
 		local minAngle=minimumAngle(distance)
@@ -1175,7 +1272,7 @@ function QBAim.new(ctx,parent)
 
 		for time=MIN_T,MAX_T,DT do
 			if time<=maxTime then
-				local target,leadInfo=c1Target(receiverRoot,originPosition,targetVelocity,time)
+				local target,leadInfo=c1Target(receiverReleasePosition,originPosition,targetVelocity,time)
 				local needed=velocityNeeded(originPosition,target,time)
 				local requiredSpeed=needed.Magnitude
 
@@ -1513,7 +1610,7 @@ function QBAim.new(ctx,parent)
 		previewFreezeStarted=os.clock()
 	end
 
-	local function buildPlan(receiver,ballPower)
+	local function buildPlan(receiver,ballPower,releaseOffset)
 		if not canTargetReceiver(receiver) then
 			return nil,nil
 		end
@@ -1528,14 +1625,15 @@ function QBAim.new(ctx,parent)
 			return nil
 		end
 
-		local originPosition=origin(qbRoot,ball)
+		releaseOffset=releaseOffset or 0
+		local originPosition=origin(qbRoot,ball,releaseOffset)
 		local targetVelocity,shape=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
-		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower()),ball
+		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset),ball
 	end
 
 	local function buildReleasePlan(receiver,ballPower)
 		if THROW_ANIMATION_RELEASE_WAIT<=0 then
-			return buildPlan(receiver,ballPower)
+			return buildPlan(receiver,ballPower,0)
 		end
 
 		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
@@ -1547,7 +1645,8 @@ function QBAim.new(ctx,parent)
 				return nil,nil
 			end
 
-			latestPlan,latestBall=buildPlan(receiver,ballPower)
+			local remaining=math.max(endAt-os.clock(),0)
+			latestPlan,latestBall=buildPlan(receiver,ballPower,remaining)
 			if latestPlan then
 				previewPlan(latestPlan)
 			end
@@ -1558,7 +1657,7 @@ function QBAim.new(ctx,parent)
 			return nil,nil
 		end
 
-		local finalPlan,finalBall=buildPlan(receiver,ballPower)
+		local finalPlan,finalBall=buildPlan(receiver,ballPower,0)
 		return finalPlan or latestPlan,finalBall or latestBall
 	end
 
@@ -1881,7 +1980,7 @@ function QBAim.new(ctx,parent)
 		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
 		preview.last=now
 
-		local plan=buildPlan(trackedReceiver)
+		local plan=buildPlan(trackedReceiver,nil,THROW_ANIMATION_RELEASE_WAIT)
 		if plan then
 			previewPlan(plan)
 		end
