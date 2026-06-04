@@ -1629,14 +1629,14 @@ function QBAim.new(ctx,parent)
 		previewFreezeStarted=os.clock()
 	end
 
-	local function buildPlan(receiver,ballPower,releaseOffset)
+	local function buildPlan(receiver,ballPower,releaseOffset,releaseBall)
 		if not canTargetReceiver(receiver) then
 			return nil,nil
 		end
 
 		local character=LP.Character
 		local qbRoot=root(character)
-		local ball=getHeldBall()
+		local ball=releaseBall or getHeldBall()
 		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
 		local data=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
 
@@ -1650,9 +1650,9 @@ function QBAim.new(ctx,parent)
 		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset),ball
 	end
 
-	local function buildReleasePlan(receiver,ballPower)
+	local function buildReleasePlan(receiver,ballPower,releaseBall,fallbackPlan)
 		if THROW_ANIMATION_RELEASE_WAIT<=0 then
-			return buildPlan(receiver,ballPower,0)
+			return buildPlan(receiver,ballPower,0,releaseBall)
 		end
 
 		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
@@ -1660,24 +1660,16 @@ function QBAim.new(ctx,parent)
 		local latestBall=nil
 
 		while os.clock()<endAt do
-			if not getHeldBall() then
-				return nil,nil
-			end
-
 			local remaining=math.max(endAt-os.clock(),0)
-			latestPlan,latestBall=buildPlan(receiver,ballPower,remaining)
+			latestPlan,latestBall=buildPlan(receiver,ballPower,remaining,releaseBall)
 			if latestPlan then
 				previewPlan(latestPlan)
 			end
 			RunService.Heartbeat:Wait()
 		end
 
-		if not getHeldBall() then
-			return nil,nil
-		end
-
-		local finalPlan,finalBall=buildPlan(receiver,ballPower,0)
-		return finalPlan or latestPlan,finalBall or latestBall
+		local finalPlan,finalBall=buildPlan(receiver,ballPower,0,releaseBall)
+		return finalPlan or latestPlan or fallbackPlan,finalBall or latestBall or releaseBall
 	end
 
 	local function fireGameplayThrow(plan)
@@ -1738,16 +1730,17 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		playThrowAnimation()
-
-		local plan=buildReleasePlan(receiver,power)
-		if not plan then
+		local preAnimationPlan=buildPlan(receiver,power,THROW_ANIMATION_RELEASE_WAIT,heldBall)
+		if not preAnimationPlan then
 			setStatus("No release-time throw solution")
 			return
 		end
 
-		if not getHeldBall() then
-			clearPreviewForMissingBall("No ball held at release")
+		playThrowAnimation()
+
+		local plan=buildReleasePlan(receiver,power,heldBall,preAnimationPlan)
+		if not plan then
+			setStatus("No release-time throw solution")
 			return
 		end
 
