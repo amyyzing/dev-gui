@@ -89,9 +89,7 @@ local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
 local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
-local THROW_ANIMATION_MIN_PLAY_TIME=0.72
-local DEFER_UNEQUIP_UNTIL_THROW_ANIMATION_DONE=true
-local THROW_UNEQUIP_FALLBACK_DELAY=0.12
+local PLAY_THROW_LOCAL_FALLBACK=false
 local VALID_TEAM_IDS={
 	HomeTeam=true,
 	AwayTeam=true,
@@ -448,16 +446,42 @@ local function getSquadsReEvent()
 	return nil,nil
 end
 
+local cachedMechanics=nil
+
 local function getGlobalMechanics()
-	local globals=(typeof(getgenv)=="function" and getgenv()) or _G or {}
-	local mechanics=type(globals)=="table" and rawget(globals,"Mechanics") or nil
-	if mechanics then
-		return mechanics
+	local function valid(mechanics)
+		return mechanics and (type(mechanics.PlayAnimation)=="function" or type(mechanics.UnequipFootball)=="function")
 	end
 
-	local variables=type(globals)=="table" and rawget(globals,"Variables") or nil
-	if type(variables)=="table" then
-		return variables.Mechanics
+	if valid(cachedMechanics) then
+		return cachedMechanics
+	end
+
+	local globals=(typeof(getgenv)=="function" and getgenv()) or _G or {}
+	if type(globals)=="table" then
+		local mechanics=rawget(globals,"Mechanics")
+		if valid(mechanics) then
+			cachedMechanics=mechanics
+			return mechanics
+		end
+
+		local variables=rawget(globals,"Variables")
+		if type(variables)=="table" and valid(variables.Mechanics) then
+			cachedMechanics=variables.Mechanics
+			return variables.Mechanics
+		end
+	end
+
+	local playerScripts=LP:FindFirstChild("PlayerScripts")
+	local clientMain=playerScripts and playerScripts:FindFirstChild("ClientMain")
+	local utilities=clientMain and clientMain:FindFirstChild("Utilities")
+	local variablesModule=utilities and utilities:FindFirstChild("Variables")
+	if variablesModule then
+		local ok,variables=pcall(require,variablesModule)
+		if ok and type(variables)=="table" and valid(variables.Mechanics) then
+			cachedMechanics=variables.Mechanics
+			return variables.Mechanics
+		end
 	end
 
 	return nil
@@ -480,24 +504,13 @@ local function findThrowAnimation()
 	return nil
 end
 
-local activeThrowAnimationTrack=nil
-
-local function getThrowAnimationRemaining(animationState)
-	if not animationState or not animationState.startedAt then
-		return THROW_UNEQUIP_FALLBACK_DELAY
-	end
-
-	local minPlayTime=animationState.minPlayTime or THROW_ANIMATION_MIN_PLAY_TIME
-	return math.max(minPlayTime-(os.clock()-animationState.startedAt),0)
-end
-
 local function playLocalThrowAnimation()
 	local character=LP.Character or Workspace:FindFirstChild(LP.Name)
 	local humanoid=character and character:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return nil end
+	if not humanoid then return false end
 
 	local animation=findThrowAnimation()
-	if not animation then return nil end
+	if not animation then return false end
 
 	local animator=humanoid:FindFirstChildOfClass("Animator")
 	if not animator then
@@ -509,87 +522,34 @@ local function playLocalThrowAnimation()
 		return animator:LoadAnimation(animation)
 	end)
 
-	if not(ok and track) then return nil end
-
-	if activeThrowAnimationTrack and activeThrowAnimationTrack.IsPlaying then
-		pcall(function()
-			activeThrowAnimationTrack:Stop(0.03)
-		end)
-	end
-
-	activeThrowAnimationTrack=track
+	if not(ok and track) then return false end
 
 	pcall(function()
 		track.Priority=Enum.AnimationPriority.Action
 	end)
-
-	track.Looped=false
 	track:Play(0.05,1,THROW_ANIMATION_SPEED)
-
-	local length=0
-	pcall(function()
-		length=track.Length or 0
-	end)
-
-	local minPlayTime=THROW_ANIMATION_MIN_PLAY_TIME
-	if length>0 then
-		minPlayTime=math.max(minPlayTime,length/math.max(THROW_ANIMATION_SPEED,0.01))
-	end
-
-	task.delay(minPlayTime+0.15,function()
-		if activeThrowAnimationTrack==track then
-			activeThrowAnimationTrack=nil
-		end
-	end)
-
-	return{
-		source="local",
-		track=track,
-		startedAt=os.clock(),
-		minPlayTime=minPlayTime,
-	}
+	return true
 end
 
 local function playThrowAnimation()
-	if not PLAY_THROW_ANIMATION or not getHeldBall() then return nil end
+	if not PLAY_THROW_ANIMATION or not getHeldBall() then return false end
 
-	local startedAt=os.clock()
 	local mechanics=getGlobalMechanics()
 	if mechanics and type(mechanics.PlayAnimation)=="function" then
 		local ok=pcall(function()
 			mechanics:PlayAnimation(THROW_ANIMATION_NAME,THROW_ANIMATION_SPEED)
 		end)
 		if ok then
-			return{
-				source="mechanics",
-				startedAt=startedAt,
-				minPlayTime=THROW_ANIMATION_MIN_PLAY_TIME,
-			}
+			return true,"mechanics"
 		end
 	end
 
-	return playLocalThrowAnimation()
-end
-
-local function queueUnequipAfterThrowAnimation(animationState)
-	local mechanics=getGlobalMechanics()
-	if not(mechanics and type(mechanics.UnequipFootball)=="function") then
-		return
+	if PLAY_THROW_LOCAL_FALLBACK then
+		local ok=playLocalThrowAnimation()
+		return ok,"local"
 	end
 
-	local delayTime=THROW_UNEQUIP_FALLBACK_DELAY
-	if DEFER_UNEQUIP_UNTIL_THROW_ANIMATION_DONE then
-		delayTime=math.max(delayTime,getThrowAnimationRemaining(animationState))
-	end
-
-	task.delay(delayTime,function()
-		local currentMechanics=getGlobalMechanics()
-		if currentMechanics and type(currentMechanics.UnequipFootball)=="function" then
-			pcall(function()
-				currentMechanics:UnequipFootball()
-			end)
-		end
-	end)
+	return false,"none"
 end
 
 function QBAim.new(ctx,parent)
@@ -1791,14 +1751,19 @@ function QBAim.new(ctx,parent)
 		return finalPlan or latestPlan or fallbackPlan,finalBall or latestBall or releaseBall
 	end
 
-	local function fireGameplayThrow(plan,animationState)
+	local function fireGameplayThrow(plan)
 		local reEvent=getGameReEvent()
 		if not reEvent then
 			return false,"Gameplay ReEvent missing"
 		end
 
-		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=REMOTE_DISPLAY_POWER}) -- must be 100, not plan.speed/95
-		queueUnequipAfterThrowAnimation(animationState)
+		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=REMOTE_DISPLAY_POWER}) -- old behavior: fire after release frame
+		pcall(function()
+			local mechanics=getGlobalMechanics()
+			if mechanics and type(mechanics.UnequipFootball)=="function" then
+				mechanics:UnequipFootball() -- old behavior: unequip immediately after remote
+			end
+		end)
 
 		return true,nil
 	end
@@ -1850,7 +1815,7 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		local throwAnimationState=playThrowAnimation()
+		playThrowAnimation()
 
 		local plan=buildReleasePlan(receiver,power,heldBall,preAnimationPlan)
 		if not plan then
@@ -1860,7 +1825,7 @@ function QBAim.new(ctx,parent)
 
 		local ok,err
 		if modeKey=="mode1" then
-			ok,err=fireGameplayThrow(plan,throwAnimationState)
+			ok,err=fireGameplayThrow(plan)
 		elseif modeKey=="mode3" then
 			ok,err=fireSquadsThrow(plan)
 		else
