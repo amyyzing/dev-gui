@@ -28,6 +28,27 @@ local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
 local WR_LEAD_DELAY=0.4
+local LEAD_DELAY_BASELINE=0.40 -- slider is now a lead-strength scalar; 0.40 keeps old default feel
+local ADAPTIVE_LEAD_ENABLED=true
+local ROUTE_SPEED_PARTIAL_GAIN=1.08
+local PREDICTOR_HISTORY_MAX_AGE=1.25
+local PREDICTOR_MIN_SAMPLES=3
+local PREDICTOR_LS_BLEND=0.45
+local PREDICTOR_VELOCITY_BLEND=0.42
+local PREDICTOR_ACCEL_BLEND=0.28
+local PREDICTOR_ACCEL_MAX=48
+local PREDICTOR_ACCEL_TIME_MAX=1.05
+local PREDICTOR_ACCEL_LEAD_SCALE=0.22
+local PREDICTOR_ACCEL_LEAD_MAX=9.5
+local PREDICTOR_CONFIDENCE_MIN=0.30
+local PREDICTOR_CONFIDENCE_MAX=1.00
+local PREDICTOR_STALE_AFTER=0.35
+local ADAPTIVE_RADIAL_FLIGHT_SCALE_MIN=0.45
+local ADAPTIVE_RADIAL_FLIGHT_SCALE_MAX=1.12
+local ADAPTIVE_TANGENT_FLIGHT_SCALE_MIN=0.38
+local ADAPTIVE_TANGENT_FLIGHT_SCALE_MAX=0.95
+local ADAPTIVE_CLOSING_TANGENT_DAMPING=0.55
+local ADAPTIVE_UNCERTAINTY_DAMPING=0.45
 local QB_RELEASE_DELAY=0.25
 local QB_XZ_RELEASE_FACTOR=0
 local QB_LAUNCH_Y_BIAS=0
@@ -118,6 +139,24 @@ local function unit(v,fallback)
 	return v.Unit
 end
 
+local function clampMagnitude(v,maxMagnitude)
+	if not v then
+		return Vector3.zero
+	end
+
+	if v.Magnitude>maxMagnitude and maxMagnitude>0 then
+		return v.Unit*maxMagnitude
+	end
+
+	return v
+end
+
+local function safeVectorLerp(a,b,alpha)
+	if not a then return b or Vector3.zero end
+	if not b then return a or Vector3.zero end
+	return a:Lerp(b,math.clamp(alpha or 0,0,1))
+end
+
 local function root(character)
 	return character and (character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso"))
 end
@@ -128,7 +167,11 @@ local function routeSpeed(speed)
 		return 0
 	end
 
-	return MAX_RUN_SPEED
+	if clamped>=NORMAL_ROUTE_MIN_SPEED then
+		return MAX_RUN_SPEED
+	end
+
+	return math.clamp(clamped*ROUTE_SPEED_PARTIAL_GAIN,ROUTE_LOCK_MIN_SPEED,MAX_RUN_SPEED)
 end
 
 local function getModeKey(ctx)
@@ -721,6 +764,10 @@ function QBAim.new(ctx,parent)
 		receiverData[player]={
 			pos=receiverRoot.Position,
 			vel=receiverRoot.AssemblyLinearVelocity or Vector3.zero,
+			rawVel=receiverRoot.AssemblyLinearVelocity or Vector3.zero,
+			accel=Vector3.zero,
+			confidence=PREDICTOR_CONFIDENCE_MIN,
+			lastSeen=now,
 			t=now,
 			vh={},
 			ph={{t=now,pos=receiverRoot.Position}},
@@ -914,11 +961,89 @@ function QBAim.new(ctx,parent)
 		return movement,speed,distance
 	end
 
+	local function leastSquaresVelocity(data,now)
+		if not(data and data.ph and #data.ph>=PREDICTOR_MIN_SAMPLES) then
+			return nil,0,0
+		end
+
+		local count=0
+		local sumT,sumX,sumZ=0,0,0
+		local minT,maxT=nil,nil
+
+		for _,sample in ipairs(data.ph) do
+			if sample.t and sample.pos and now-sample.t<=PREDICTOR_HISTORY_MAX_AGE then
+				local t=sample.t-now
+				count+=1
+				sumT+=t
+				sumX+=sample.pos.X
+				sumZ+=sample.pos.Z
+				minT=minT and math.min(minT,t) or t
+				maxT=maxT and math.max(maxT,t) or t
+			end
+		end
+
+		if count<PREDICTOR_MIN_SAMPLES then
+			return nil,0,0
+		end
+
+		local meanT=sumT/count
+		local meanX=sumX/count
+		local meanZ=sumZ/count
+		local denom=0
+		local numX,numZ=0,0
+
+		for _,sample in ipairs(data.ph) do
+			if sample.t and sample.pos and now-sample.t<=PREDICTOR_HISTORY_MAX_AGE then
+				local centeredT=(sample.t-now)-meanT
+				denom+=centeredT*centeredT
+				numX+=centeredT*(sample.pos.X-meanX)
+				numZ+=centeredT*(sample.pos.Z-meanZ)
+			end
+		end
+
+		if denom<1e-6 then
+			return nil,0,0
+		end
+
+		local velocity=clampMagnitude(Vector3.new(numX/denom,0,numZ/denom),MAX_RUN_SPEED)
+		local span=(maxT or 0)-(minT or 0)
+		local quality=math.clamp((count-PREDICTOR_MIN_SAMPLES+1)/5,0,1)*math.clamp(span/STABLE_WINDOW,0,1)
+		return velocity,quality,span
+	end
+
+	local function predictionState(data,receiverPosition,fallbackVelocity)
+		local now=os.clock()
+		local measuredVelocity=clampMagnitude(flat((data and data.vel) or fallbackVelocity or Vector3.zero),MAX_RUN_SPEED)
+		local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
+		local blendedVelocity=measuredVelocity
+		if lsVelocity and lsVelocity.Magnitude>=ROUTE_LOCK_MIN_SPEED then
+			blendedVelocity=safeVectorLerp(measuredVelocity,lsVelocity,PREDICTOR_LS_BLEND*lsQuality)
+		end
+
+		blendedVelocity=clampMagnitude(blendedVelocity,MAX_RUN_SPEED)
+		local acceleration=clampMagnitude(flat(data and data.accel or Vector3.zero),PREDICTOR_ACCEL_MAX)
+		local sampleAge=data and data.lastSeen and math.max(now-data.lastSeen,0) or PREDICTOR_STALE_AFTER
+		local ageConfidence=1-math.clamp(sampleAge/PREDICTOR_STALE_AFTER,0,1)
+		local speedConfidence=math.clamp(blendedVelocity.Magnitude/NORMAL_ROUTE_MIN_SPEED,0,1)
+		local storedConfidence=math.clamp(data and data.confidence or PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
+		local confidence=math.clamp((0.35*storedConfidence+0.35*lsQuality+0.30*speedConfidence)*ageConfidence,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
+
+		return{
+			position=receiverPosition,
+			velocity=blendedVelocity,
+			acceleration=acceleration,
+			confidence=confidence,
+			lsQuality=lsQuality,
+			sampleAge=sampleAge,
+		}
+	end
+
 	local function updateStable(data)
 		if not data then return nil,0,"none" end
 
 		local now=os.clock()
 		local historyVelocity,historySpeed=historyVector(data,now)
+		local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
 		local measuredVelocity=flat(data.vel or Vector3.zero)
 		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
 			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
@@ -936,7 +1061,11 @@ function QBAim.new(ctx,parent)
 		local candidateDirection=nil
 		local candidateSpeed=0
 		local source="hold"
-		if historyVelocity and historyVelocity.Magnitude>0 then
+		if lsVelocity and lsQuality>=0.35 and lsVelocity.Magnitude>=STABLE_MIN_SPEED then
+			candidateDirection=lsVelocity.Unit
+			candidateSpeed=routeSpeed(lsVelocity.Magnitude)
+			source="least_squares"
+		elseif historyVelocity and historyVelocity.Magnitude>0 then
 			candidateDirection=historyVelocity.Unit
 			candidateSpeed=routeSpeed(historySpeed)
 			source="history"
@@ -1046,27 +1175,31 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function routeVelocity(receiver,data,origin,receiverRoot,routeLock)
-		local measuredVelocity=data and flat(data.vel) or Vector3.zero
-		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
-			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
-		end
-
+		local state=predictionState(data,receiverRoot.Position,data and data.vel or Vector3.zero)
+		local measuredVelocity=clampMagnitude(flat(state.velocity or Vector3.zero),MAX_RUN_SPEED)
 		local measuredSpeed=measuredVelocity.Magnitude
 		local adjustedSpeed=routeSpeed(measuredSpeed)
 		local stableDirection,stableSpeed=updateStable(data)
+		local velocity=Vector3.zero
 
-		-- H locks the receiver only. Route direction stays reactive and uses current tracked movement.
+		-- H locks the receiver identity only. Direction remains reactive, but the vector now blends
+		-- recent least-squares motion with the stable route direction instead of blindly max-leading.
 		if stableDirection and stableSpeed>0 then
-			local velocity=stableDirection*stableSpeed
-			return velocity,movementShape(origin,receiverRoot.Position,velocity)
+			velocity=stableDirection*stableSpeed
+			if measuredSpeed>=ROUTE_LOCK_MIN_SPEED and adjustedSpeed>0 then
+				local reactiveVelocity=measuredVelocity.Unit*adjustedSpeed
+				velocity=safeVectorLerp(velocity,reactiveVelocity,math.clamp((state.confidence or 0)*0.38,0,0.38))
+			end
+		elseif measuredSpeed>=ROUTE_LOCK_MIN_SPEED and adjustedSpeed>0 then
+			velocity=measuredVelocity.Unit*adjustedSpeed
+		else
+			state.routeVelocity=Vector3.zero
+			return Vector3.zero,"standing",state
 		end
 
-		if measuredSpeed>=ROUTE_LOCK_MIN_SPEED and adjustedSpeed>0 then
-			local velocity=measuredVelocity.Unit*adjustedSpeed
-			return velocity,movementShape(origin,receiverRoot.Position,velocity)
-		end
-
-		return Vector3.zero,"standing"
+		velocity=clampMagnitude(flat(velocity),MAX_RUN_SPEED)
+		state.routeVelocity=velocity
+		return velocity,movementShape(origin,receiverRoot.Position,velocity),state
 	end
 
 	local function receiverMaxAt(position)
@@ -1237,13 +1370,17 @@ function QBAim.new(ctx,parent)
 		return C1_Y_MIN+(C1_Y_MAX-C1_Y_MIN)*alpha
 	end
 
-	local function c1Target(receiverPosition,originPosition,targetVelocity,flightTime)
+	local function c1Target(receiverPosition,originPosition,targetVelocity,flightTime,predictorState)
 		local receiverMaxPoint=receiverMaxAt(receiverPosition)
 		local result=components3D(originPosition,receiverMaxPoint,targetVelocity)
 		local radius=math.max(result.radius,1e-6)
 		local speed=math.max(result.speed,1e-6)
 		local velocity3=Vector3.new((targetVelocity or Vector3.zero).X,0,(targetVelocity or Vector3.zero).Z)
 		local velocityXZ=flat(targetVelocity or Vector3.zero)
+		local predictorConfidence=math.clamp(predictorState and predictorState.confidence or 0.55,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
+		local leadUserScale=math.clamp(WR_LEAD_DELAY/math.max(LEAD_DELAY_BASELINE,0.01),0,2.25)
+		local speedScale=math.clamp(result.speed/MAX_RUN_SPEED,0,1)
+		local uncertaintyDamping=1-ADAPTIVE_UNCERTAINTY_DAMPING*(1-predictorConfidence)
 
 		local awayShare=math.clamp(result.radial/speed,-1,1)
 		local positiveAwayShare=math.clamp(result.radial/speed,0,1)
@@ -1309,8 +1446,14 @@ function QBAim.new(ctx,parent)
 			*positiveAwayShare
 			*balanceLeadScale
 
+		local radialFlightScale=math.clamp(flightTime/1.45,ADAPTIVE_RADIAL_FLIGHT_SCALE_MIN,ADAPTIVE_RADIAL_FLIGHT_SCALE_MAX)
+		local tangentFlightScale=math.clamp(flightTime/1.25,ADAPTIVE_TANGENT_FLIGHT_SCALE_MIN,ADAPTIVE_TANGENT_FLIGHT_SCALE_MAX)
+		local adaptiveLeadScale=ADAPTIVE_LEAD_ENABLED and (leadUserScale*speedScale*predictorConfidence*uncertaintyDamping) or 1
+
 		local radialLDTime=
-			WR_LEAD_DELAY
+			LEAD_DELAY_BASELINE
+			*adaptiveLeadScale
+			*radialFlightScale
 			*distanceScale
 			*radialGain
 			*balanceLeadScale
@@ -1322,14 +1465,18 @@ function QBAim.new(ctx,parent)
 		)
 
 		local tangentBaseTime=0
+		local tangentAdaptiveDamping=1-ADAPTIVE_CLOSING_TANGENT_DAMPING*closingShare
 		local tangentReactiveTime=
 			CIRCLE_TANGENT_REACTIVE_LEAD
+			*adaptiveLeadScale
+			*tangentFlightScale
 			*distanceScale
 			*lateralShare
 			*reactiveLosDamping
 			*tangentAlignmentBoost
 			*tangentBalanceBoost
 			*tangentSignedScale
+			*math.clamp(tangentAdaptiveDamping,0.35,1)
 
 		local tangentExtraTime=math.min(
 			tangentReactiveTime,
@@ -1337,18 +1484,23 @@ function QBAim.new(ctx,parent)
 		)
 
 		local flightLead=velocityXZ*flightTime
+		local accelerationXZ=clampMagnitude(flat(predictorState and predictorState.acceleration or Vector3.zero),PREDICTOR_ACCEL_MAX)
+		local accelTime=math.min(flightTime,PREDICTOR_ACCEL_TIME_MAX)
+		local accelerationLeadXZ=accelerationXZ*(0.5*accelTime*accelTime*PREDICTOR_ACCEL_LEAD_SCALE*predictorConfidence)
+		accelerationLeadXZ=clampMagnitude(accelerationLeadXZ,PREDICTOR_ACCEL_LEAD_MAX)
 		local radialExtraLead3=result.radialDir*result.radial*radialExtraTime
 		local tangentVelocity3=result.tangentDir*result.tangent+result.elevationDir*result.elevation
 		local tangentExtraLead3=tangentVelocity3*tangentExtraTime
 		local extraLead3=radialExtraLead3+tangentExtraLead3
 		local extraLeadXZ=flat(extraLead3)
-		local effectiveExtraTime=result.speed>1e-6 and extraLeadXZ.Magnitude/result.speed or 0
-		local targetFlat=flat(receiverMaxPoint)+flightLead+extraLeadXZ
+		local effectiveExtraTime=result.speed>1e-6 and (extraLeadXZ.Magnitude+accelerationLeadXZ.Magnitude)/result.speed or 0
+		local targetFlat=flat(receiverMaxPoint)+flightLead+accelerationLeadXZ+extraLeadXZ
 		local magnitudeChangePotential=radialShareAbs
 		local c1Height=c1HeightFromMagnitudePotential(magnitudeChangePotential,result.speed)
 
 		return Vector3.new(targetFlat.X,c1Height+C1_SOLVE_Y_BIAS,targetFlat.Z),{
 			flightLeadXZ=flightLead,
+			accelerationLeadXZ=accelerationLeadXZ,
 			extraLeadXZ=extraLeadXZ,
 			radialExtraLeadXZ=flat(radialExtraLead3),
 			tangentExtraLeadXZ=flat(tangentExtraLead3),
@@ -1359,6 +1511,12 @@ function QBAim.new(ctx,parent)
 			tangentReactiveTime=tangentReactiveTime,
 			radialBaseTime=radialBaseTime,
 			radialLDTime=radialLDTime,
+			adaptiveLeadScale=adaptiveLeadScale,
+			leadUserScale=leadUserScale,
+			predictorConfidence=predictorConfidence,
+			radialFlightScale=radialFlightScale,
+			tangentFlightScale=tangentFlightScale,
+			accelTime=accelTime,
 			magnitudeChangePotential=magnitudeChangePotential,
 			c1Height=c1Height,
 			c1HeightMin=C1_Y_MIN,
@@ -1394,7 +1552,7 @@ function QBAim.new(ctx,parent)
 		}
 	end
 
-	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower,releaseOffset)
+	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower,releaseOffset,predictorState)
 		ballPower=ballPower or GAMEPLAY_BALL_POWER
 		releaseOffset=releaseOffset or 0
 		targetVelocity=targetVelocity or Vector3.zero
@@ -1410,7 +1568,7 @@ function QBAim.new(ctx,parent)
 
 		for time=MIN_T,MAX_T,DT do
 			if time<=maxTime then
-				local target,leadInfo=c1Target(receiverReleasePosition,originPosition,targetVelocity,time)
+				local target,leadInfo=c1Target(receiverReleasePosition,originPosition,targetVelocity,time,predictorState)
 				local needed=velocityNeeded(originPosition,target,time)
 				local requiredSpeed=needed.Magnitude
 
@@ -1460,6 +1618,7 @@ function QBAim.new(ctx,parent)
 								landingTime=landingTime,
 								flatDistNow=distance,
 								movementShape=shape,
+								predictorState=predictorState,
 								leadInfo=leadInfo,
 							}
 						end
@@ -1767,8 +1926,8 @@ function QBAim.new(ctx,parent)
 
 		releaseOffset=releaseOffset or 0
 		local originPosition=origin(qbRoot,ball,releaseOffset)
-		local targetVelocity,shape=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
-		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset),ball
+		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
+		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,predictorState),ball
 	end
 
 	local function buildReleasePlan(receiver,ballPower,releaseBall,fallbackPlan)
@@ -2055,14 +2214,18 @@ function QBAim.new(ctx,parent)
 					local data=receiverData[player]
 
 					if not data then
-						data={pos=receiverRoot.Position,vel=Vector3.zero,t=now,vh={},ph={},sdir=nil,sspeed=0,stime=0,src="none"}
+						data={pos=receiverRoot.Position,vel=Vector3.zero,rawVel=Vector3.zero,accel=Vector3.zero,confidence=PREDICTOR_CONFIDENCE_MIN,lastSeen=now,t=now,vh={},ph={},sdir=nil,sspeed=0,stime=0,src="none"}
 						receiverData[player]=data
 					end
 
 					local dt=math.min(now-data.t,0.1)
 					if dt>0 then
-						local movement=(receiverRoot.Position-data.pos)/dt
-						table.insert(data.vh,movement)
+						local rawVelocity=(receiverRoot.Position-data.pos)/dt
+						local previousRawVelocity=data.rawVel or data.vel or Vector3.zero
+						local rawAcceleration=(rawVelocity-previousRawVelocity)/dt
+						rawAcceleration=clampMagnitude(rawAcceleration,PREDICTOR_ACCEL_MAX)
+						data.rawVel=rawVelocity
+						table.insert(data.vh,rawVelocity)
 						if #data.vh>5 then
 							table.remove(data.vh,1)
 						end
@@ -2072,14 +2235,27 @@ function QBAim.new(ctx,parent)
 							average=average+velocity
 						end
 
-						data.vel=average/#data.vh
+						average=average/#data.vh
 						data.pos=receiverRoot.Position
 						data.t=now
+						data.lastSeen=now
 						table.insert(data.ph,{t=now,pos=receiverRoot.Position})
 
-						while #data.ph>0 and now-data.ph[1].t>1.25 do
+						while #data.ph>0 and now-data.ph[1].t>PREDICTOR_HISTORY_MAX_AGE do
 							table.remove(data.ph,1)
 						end
+
+						local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
+						if lsVelocity and lsQuality>0 then
+							average=safeVectorLerp(average,lsVelocity,PREDICTOR_LS_BLEND*lsQuality)
+						end
+
+						data.vel=safeVectorLerp(data.vel,average,PREDICTOR_VELOCITY_BLEND)
+						data.vel=clampMagnitude(data.vel,MAX_RUN_SPEED)
+						data.accel=safeVectorLerp(data.accel,rawAcceleration,PREDICTOR_ACCEL_BLEND)
+						data.accel=clampMagnitude(data.accel,PREDICTOR_ACCEL_MAX)
+						local speedConfidence=math.clamp(data.vel.Magnitude/NORMAL_ROUTE_MIN_SPEED,0,1)
+						data.confidence=math.clamp(0.25+0.45*lsQuality+0.30*speedConfidence,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
 					end
 				end
 			end
