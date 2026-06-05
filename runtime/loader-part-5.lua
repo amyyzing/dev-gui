@@ -178,6 +178,15 @@ function resetRuntimeEffectsBeforeAutoRefresh()
 		end
 	end
 
+	local savedPage1State={}
+	if PAGE1_STATE then
+		for key,value in pairs(PAGE1_STATE) do
+			savedPage1State[key]=value
+		end
+	end
+
+	local savedSmoothPlastic=WORLD_SETTINGS and WORLD_SETTINGS.SmoothPlastic
+
 	call("Hitbox","SetHitboxLock",false,false)
 	call("Gravity","SetGravityState",false,false)
 	call("Speed","SetSpeedState",false,false,true)
@@ -235,6 +244,16 @@ function resetRuntimeEffectsBeforeAutoRefresh()
 		PAGE1_STATE.actionStatusOn=false
 		PAGE1_STATE.qbAimEnabled=false
 		PAGE1_STATE.testingEnabled=false
+	end
+
+	if PAGE1_STATE then
+		for key,value in pairs(savedPage1State) do
+			PAGE1_STATE[key]=value
+		end
+	end
+
+	if WORLD_SETTINGS and savedSmoothPlastic~=nil then
+		WORLD_SETTINGS.SmoothPlastic=savedSmoothPlastic and true or false
 	end
 
 	pcall(function()
@@ -302,7 +321,48 @@ function buildDataSaveContext()
 		setJumpPowerValue=function(v) PAGE1_STATE.jumpPowerValue=v; syncPage1State() end,
 		setDivePowerValue=function(v) PAGE1_STATE.divePowerValue=v; syncPage1State() end,
 		setJumpBoostState=function(v) PAGE1_STATE.jumpBoostOn=v and true or false; syncPage1State() end,
-		setTestingState=function(v) PAGE1_STATE.testingEnabled=v and true or false; syncPage1State() end,
+		setESPState=function(v)
+			PAGE1_STATE.actionStatusOn=v and true or false
+			syncPage1State()
+			if PAGE1_APIS.ESP and PAGE1_APIS.ESP.SetESPState then
+				pcall(PAGE1_APIS.ESP.SetESPState,PAGE1_STATE.actionStatusOn,false)
+			end
+		end,
+		setQBAimState=function(v)
+			PAGE1_STATE.qbAimEnabled=v and true or false
+			syncPage1State()
+			if PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.SetQBAimState then
+				pcall(PAGE1_APIS.QBAim.SetQBAimState,PAGE1_STATE.qbAimEnabled)
+			end
+		end,
+		setQBAimTeamFilter=function(v)
+			PAGE1_STATE.qbAimTeamFilter=v and true or false
+			syncPage1State()
+			if PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.SetTeamFilterState then
+				pcall(PAGE1_APIS.QBAim.SetTeamFilterState,PAGE1_STATE.qbAimTeamFilter,false)
+			end
+		end,
+		setQBAimShowArc=function(v)
+			PAGE1_STATE.qbAimShowArc=v and true or false
+			syncPage1State()
+			if PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.SetShowArcState then
+				pcall(PAGE1_APIS.QBAim.SetShowArcState,PAGE1_STATE.qbAimShowArc,false)
+			end
+		end,
+		setQBAimLeadDelay=function(v)
+			PAGE1_STATE.qbAimLeadDelay=v
+			syncPage1State()
+			if PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.SetLeadDelay then
+				pcall(PAGE1_APIS.QBAim.SetLeadDelay,PAGE1_STATE.qbAimLeadDelay,false)
+			end
+		end,
+		setTestingState=function(v)
+			PAGE1_STATE.testingEnabled=v and true or false
+			syncPage1State()
+			if PAGE1_APIS.Testing and PAGE1_APIS.Testing.SetTestingState then
+				pcall(PAGE1_APIS.Testing.SetTestingState,PAGE1_STATE.testingEnabled,false)
+			end
+		end,
 	}
 end
 

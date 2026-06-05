@@ -532,7 +532,7 @@ function resetMainPageDefaults()
 	PAGE1_STATE.qbAimEnabled=false
 	PAGE1_STATE.qbAimTeamFilter=true
 	PAGE1_STATE.qbAimShowArc=true
-	PAGE1_STATE.qbAimLeadDelay=0.75
+	PAGE1_STATE.qbAimLeadDelay=0.4
 	PAGE1_STATE.testingEnabled=false
 
 	for _,api in pairs(PAGE1_APIS) do

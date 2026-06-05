@@ -440,7 +440,7 @@ function DataSave.new(ctx)
 				y=getValue(ctx,"sizeY",5.4),
 				z=getValue(ctx,"sizeZ",1.41),
 				transparency=getValue(ctx,"targetTransparency",0.7),
-				enabled=false,
+				enabled=getValue(ctx,"hitboxOn",false),
 			},
 
 			gravity=getValue(ctx,"gravityValue",196.2),
@@ -468,10 +468,19 @@ function DataSave.new(ctx)
 				radius=getValue(ctx,"ballDetectionRadius",10),
 			},
 
+			esp={
+				enabled=getValue(ctx,"actionStatusOn",false),
+			},
+
 			qbAim={
+				enabled=getValue(ctx,"qbAimEnabled",false),
 				teamFilter=getValue(ctx,"qbAimTeamFilter",true),
 				showArc=getValue(ctx,"qbAimShowArc",true),
-				leadDelay=getValue(ctx,"qbAimLeadDelay",0.75),
+				leadDelay=getValue(ctx,"qbAimLeadDelay",0.4),
+			},
+
+			testing={
+				enabled=getValue(ctx,"testingEnabled",false),
 			},
 
 			keybinds={
@@ -560,10 +569,12 @@ function DataSave.new(ctx)
 			if ctx.setTransparency then pcall(ctx.setTransparency,tv) else setValue(ctx,"targetTransparency",tv) end
 		end
 
-		if ctx.setHitboxLock then
-			pcall(ctx.setHitboxLock,false)
-		else
-			setValue(ctx,"hitboxOn",false)
+		if hitbox.enabled~=nil then
+			if ctx.setHitboxLock then
+				pcall(ctx.setHitboxLock,hitbox.enabled)
+			else
+				setValue(ctx,"hitboxOn",hitbox.enabled and true or false)
+			end
 		end
 
 		if settings.gravity~=nil then
@@ -621,10 +632,30 @@ function DataSave.new(ctx)
 		if boost.chance~=nil then setValue(ctx,"boostChance",clampNumber(boost.chance,0,100,100)) end
 		if boost.radius~=nil then setValue(ctx,"ballDetectionRadius",clampNumber(boost.radius,1,50,10)) end
 
+		local esp=settings.esp or {}
+		if esp.enabled~=nil then
+			if ctx.setESPState then pcall(ctx.setESPState,esp.enabled) else setValue(ctx,"actionStatusOn",esp.enabled and true or false) end
+		end
+
 		local qbAim=settings.qbAim or {}
-		if qbAim.teamFilter~=nil then setValue(ctx,"qbAimTeamFilter",qbAim.teamFilter and true or false) end
-		if qbAim.showArc~=nil then setValue(ctx,"qbAimShowArc",qbAim.showArc and true or false) end
-		if qbAim.leadDelay~=nil then setValue(ctx,"qbAimLeadDelay",clampNumber(qbAim.leadDelay,0,1.5,0.75)) end
+		if qbAim.enabled~=nil then
+			if ctx.setQBAimState then pcall(ctx.setQBAimState,qbAim.enabled) else setValue(ctx,"qbAimEnabled",qbAim.enabled and true or false) end
+		end
+		if qbAim.teamFilter~=nil then
+			if ctx.setQBAimTeamFilter then pcall(ctx.setQBAimTeamFilter,qbAim.teamFilter) else setValue(ctx,"qbAimTeamFilter",qbAim.teamFilter and true or false) end
+		end
+		if qbAim.showArc~=nil then
+			if ctx.setQBAimShowArc then pcall(ctx.setQBAimShowArc,qbAim.showArc) else setValue(ctx,"qbAimShowArc",qbAim.showArc and true or false) end
+		end
+		if qbAim.leadDelay~=nil then
+			local leadDelay=clampNumber(qbAim.leadDelay,0,1.5,0.4)
+			if ctx.setQBAimLeadDelay then pcall(ctx.setQBAimLeadDelay,leadDelay) else setValue(ctx,"qbAimLeadDelay",leadDelay) end
+		end
+
+		local testing=settings.testing or {}
+		if testing.enabled~=nil then
+			if ctx.setTestingState then pcall(ctx.setTestingState,testing.enabled) else setValue(ctx,"testingEnabled",testing.enabled and true or false) end
+		end
 
 		local keybinds=settings.keybinds or {}
 		local keyMap={

@@ -8,7 +8,7 @@ local LP=Players.LocalPlayer
 
 local BALL_G=28
 local PLAYER_G=196.2
-local JUMP_POWER=53.5
+local JUMP_POWER=55.5
 local WR_MAX_Y=6+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
 
 local function firstFolder(container)

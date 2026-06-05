@@ -27,7 +27,7 @@ local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
-local WR_LEAD_DELAY=0.00
+local WR_LEAD_DELAY=0.4
 local QB_RELEASE_DELAY=0.25
 local QB_XZ_RELEASE_FACTOR=0
 local QB_LAUNCH_Y_BIAS=0
@@ -48,6 +48,7 @@ local ARC_PREVIEW_UPDATE_INTERVAL=0.035
 local RECEIVER_TRACK_INTERVAL=0.05
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
+local PREVIEW_MISSING_BALL_GRACE=0.2
 local ARC_MAX_CURVE=400
 local PREVIEW_SMOOTH=0.28
 local C1_MARKER_ENABLED=true
@@ -567,7 +568,7 @@ function QBAim.new(ctx,parent)
 	local selectedRouteLock=nil
 	local receiverData={}
 	local receiverTrackElapsed=0
-	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil}
+	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil,ballMissingSince=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
 	local connections={}
@@ -757,6 +758,7 @@ function QBAim.new(ctx,parent)
 			trackedReceiver=nil
 			selectedRouteLock=nil
 			previewFrozen=false
+			preview.ballMissingSince=nil
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 		end
 
@@ -1628,6 +1630,7 @@ function QBAim.new(ctx,parent)
 
 	local function clearPreviewVisuals(destroyCenter)
 		previewFrozen=false
+		preview.ballMissingSince=nil
 		preview.p1,preview.p2,preview.p3=nil,nil,nil
 		hideQBTrailPreview()
 
@@ -1645,6 +1648,7 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
+		preview.ballMissingSince=nil
 		local c2,c1,c3,beam=arcRig()
 		if not(c2 and c1 and c3 and beam) then return end
 
@@ -1867,6 +1871,7 @@ function QBAim.new(ctx,parent)
 			trackedReceiver=best
 			selectedRouteLock=lockRoute(best)
 			previewFrozen=false
+			preview.ballMissingSince=nil
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			setTargetText()
 			setStatus("Locked "..best.Name)
@@ -1882,6 +1887,7 @@ function QBAim.new(ctx,parent)
 			trackedReceiver=nil
 			selectedRouteLock=nil
 			previewFrozen=false
+			preview.ballMissingSince=nil
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			hideQBTrailPreview()
 		end
@@ -2047,18 +2053,25 @@ function QBAim.new(ctx,parent)
 
 		local now=os.clock()
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
-			local holdingBall=hasHeldBallForPreview()
-			if not holdingBall then
-				clearPreviewForMissingBall()
-				return
-			end
-
 			if previewFrozen then
 				if now-previewFreezeStarted<PREVIEW_POST_THROW_FREEZE_MIN then
 					return
 				end
 				previewFrozen=false
 			end
+
+			local holdingBall=hasHeldBallForPreview()
+			if not holdingBall then
+				preview.ballMissingSince=preview.ballMissingSince or now
+				if now-preview.ballMissingSince<PREVIEW_MISSING_BALL_GRACE then
+					return
+				end
+
+				clearPreviewForMissingBall()
+				return
+			end
+
+			preview.ballMissingSince=nil
 		end
 
 		if not trackedReceiver then return end
