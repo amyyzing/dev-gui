@@ -472,18 +472,6 @@ local function getGlobalMechanics()
 		end
 	end
 
-	local playerScripts=LP:FindFirstChild("PlayerScripts")
-	local clientMain=playerScripts and playerScripts:FindFirstChild("ClientMain")
-	local utilities=clientMain and clientMain:FindFirstChild("Utilities")
-	local variablesModule=utilities and utilities:FindFirstChild("Variables")
-	if variablesModule then
-		local ok,variables=pcall(require,variablesModule)
-		if ok and type(variables)=="table" and valid(variables.Mechanics) then
-			cachedMechanics=variables.Mechanics
-			return variables.Mechanics
-		end
-	end
-
 	return nil
 end
 
@@ -561,6 +549,20 @@ function QBAim.new(ctx,parent)
 	local buildToggleRow=ctx.buildToggleRow
 	local buildSlider=ctx.buildSlider
 	local state=ctx.State or {}
+
+	do
+		local function valid(mechanics)
+			return mechanics and (type(mechanics.PlayAnimation)=="function" or type(mechanics.UnequipFootball)=="function")
+		end
+
+		if valid(ctx.Mechanics) then
+			cachedMechanics=ctx.Mechanics
+		elseif type(ctx.Variables)=="table" and valid(ctx.Variables.Mechanics) then
+			cachedMechanics=ctx.Variables.Mechanics
+		elseif type(ctx.mechanics)=="table" and valid(ctx.mechanics) then
+			cachedMechanics=ctx.mechanics
+		end
+	end
 	local api={}
 	local enabled=false
 	local trackedReceiver=nil
