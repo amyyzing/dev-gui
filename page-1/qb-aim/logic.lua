@@ -83,8 +83,10 @@ local CIRCLE_TANGENT_REACTIVE_LEAD=0.58
 local CIRCLE_TANGENT_REACTIVE_LOS_GAIN=1.25
 local CIRCLE_TANGENT_ALIGNMENT_BOOST=0.30
 local CIRCLE_TANGENT_BALANCE_BOOST=0.35
-local CIRCLE_TANGENT_PURE_ROUTE_SCALE_MIN=0.15
-local CIRCLE_TANGENT_BALANCED_ROUTE_SCALE_MAX=1.00
+local CIRCLE_TANGENT_DOMINANCE_SCALE_MIN=0.35
+local CIRCLE_TANGENT_DOMINANCE_SCALE_MAX=1.00
+local CIRCLE_TANGENT_DOMINANCE_LIFT=0.30
+local CIRCLE_TANGENT_DOMINANCE_EPSILON=1e-6
 local CIRCLE_RADIAL_BASE_LEAD_TIME=0.20
 local DIAG_STREAK_SIDE_RATIO_MIN=0.30
 local DIAG_STREAK_SIDE_SPEED_MIN=4
@@ -1273,9 +1275,20 @@ function QBAim.new(ctx,parent)
 
 		local tangentAlignmentBoost=1+CIRCLE_TANGENT_ALIGNMENT_BOOST*tangentAlignment
 		local tangentBalanceBoost=1+CIRCLE_TANGENT_BALANCE_BOOST*routeBalance
-		local tangentRouteBlendScale=
-			CIRCLE_TANGENT_PURE_ROUTE_SCALE_MIN
-			+(CIRCLE_TANGENT_BALANCED_ROUTE_SCALE_MAX-CIRCLE_TANGENT_PURE_ROUTE_SCALE_MIN)*routeBalance
+
+		-- Continuous standardized radial/tangent dominance.
+		-- chi ~= 0   -> radial-dominant / streak-like
+		-- chi ~= 0.5 -> balanced post / diagonal
+		-- chi ~= 1   -> tangent-dominant / full slant
+		local tangentDominance=(lateralShare*lateralShare)/((radialShareAbs*radialShareAbs)+(lateralShare*lateralShare)+CIRCLE_TANGENT_DOMINANCE_EPSILON)
+		local balancePeak=1-math.abs(2*tangentDominance-1)
+		local tangentDominanceScale=math.clamp(
+			CIRCLE_TANGENT_DOMINANCE_SCALE_MIN
+			+(CIRCLE_TANGENT_DOMINANCE_SCALE_MAX-CIRCLE_TANGENT_DOMINANCE_SCALE_MIN)*balancePeak
+			+CIRCLE_TANGENT_DOMINANCE_LIFT*tangentDominance*(1-balancePeak),
+			CIRCLE_TANGENT_DOMINANCE_SCALE_MIN,
+			CIRCLE_TANGENT_DOMINANCE_SCALE_MAX
+		)
 
 		local radialBaseTime=
 			CIRCLE_RADIAL_BASE_LEAD_TIME
@@ -1303,7 +1316,7 @@ function QBAim.new(ctx,parent)
 			*reactiveLosDamping
 			*tangentAlignmentBoost
 			*tangentBalanceBoost
-			*tangentRouteBlendScale
+			*tangentDominanceScale
 
 		local tangentExtraTime=math.min(
 			tangentReactiveTime,
@@ -1355,7 +1368,9 @@ function QBAim.new(ctx,parent)
 			tangentAlignment=tangentAlignment,
 			tangentAlignmentBoost=tangentAlignmentBoost,
 			tangentBalanceBoost=tangentBalanceBoost,
-			tangentRouteBlendScale=tangentRouteBlendScale,
+			tangentDominance=tangentDominance,
+			tangentBalancePeak=balancePeak,
+			tangentDominanceScale=tangentDominanceScale,
 			routeAway=result.radial,
 			routeSide=result.tangent,
 			routeElevation=result.elevation,
