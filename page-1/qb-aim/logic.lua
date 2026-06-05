@@ -89,7 +89,8 @@ local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
 local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
-local PLAY_THROW_LOCAL_FALLBACK=false
+local PLAY_THROW_LOCAL_FALLBACK=true
+local LOCAL_FALLBACK_UNEQUIP_DELAY=0.72
 local VALID_TEAM_IDS={
 	HomeTeam=true,
 	AwayTeam=true,
@@ -447,10 +448,11 @@ local function getSquadsReEvent()
 end
 
 local cachedMechanics=nil
+local lastThrowAnimationMode=nil
 
 local function getGlobalMechanics()
 	local function valid(mechanics)
-		return mechanics and (type(mechanics.PlayAnimation)=="function" or type(mechanics.UnequipFootball)=="function")
+		return mechanics and (type(rawget(mechanics,"PlayAnimation"))=="function" or type(rawget(mechanics,"UnequipFootball"))=="function")
 	end
 
 	if valid(cachedMechanics) then
@@ -466,9 +468,29 @@ local function getGlobalMechanics()
 		end
 
 		local variables=rawget(globals,"Variables")
-		if type(variables)=="table" and valid(variables.Mechanics) then
-			cachedMechanics=variables.Mechanics
-			return variables.Mechanics
+		if type(variables)=="table" and valid(rawget(variables,"Mechanics")) then
+			cachedMechanics=rawget(variables,"Mechanics")
+			return cachedMechanics
+		end
+	end
+
+	-- Executor-only fallback: locate the already-initialized Mechanics table in memory.
+	-- This avoids requiring ClientMain.Utilities.Variables from CoreGui, which Roblox blocks.
+	if typeof(getgc)=="function" then
+		local ok,objects=pcall(getgc,true)
+		if ok and type(objects)=="table" then
+			for _,object in ipairs(objects) do
+				if type(object)=="table" and valid(object) then
+					local hasMechanicsShape = rawget(object,"DEF_QUARTERBACK")~=nil
+						or rawget(object,"BallPower")~=nil
+						or rawget(object,"BallEquipType")~=nil
+						or rawget(object,"Variables")~=nil
+					if hasMechanicsShape then
+						cachedMechanics=object
+						return object
+					end
+				end
+			end
 		end
 	end
 
@@ -1760,12 +1782,20 @@ function QBAim.new(ctx,parent)
 		end
 
 		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=REMOTE_DISPLAY_POWER}) -- old behavior: fire after release frame
-		pcall(function()
+		local function unequipThroughMechanics()
 			local mechanics=getGlobalMechanics()
-			if mechanics and type(mechanics.UnequipFootball)=="function" then
-				mechanics:UnequipFootball() -- old behavior: unequip immediately after remote
+			if mechanics and type(rawget(mechanics,"UnequipFootball"))=="function" then
+				mechanics:UnequipFootball()
 			end
-		end)
+		end
+
+		if lastThrowAnimationMode=="local" and LOCAL_FALLBACK_UNEQUIP_DELAY>0 then
+			task.delay(LOCAL_FALLBACK_UNEQUIP_DELAY, function()
+				pcall(unequipThroughMechanics)
+			end)
+		else
+			pcall(unequipThroughMechanics) -- old behavior when the real Mechanics animation path is available
+		end
 
 		return true,nil
 	end
@@ -1817,7 +1847,8 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		playThrowAnimation()
+		local _,animationMode=playThrowAnimation()
+		lastThrowAnimationMode=animationMode
 
 		local plan=buildReleasePlan(receiver,power,heldBall,preAnimationPlan)
 		if not plan then
