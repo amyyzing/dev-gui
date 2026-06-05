@@ -87,6 +87,8 @@ local CIRCLE_TANGENT_DOMINANCE_SCALE_MIN=0.35
 local CIRCLE_TANGENT_DOMINANCE_SCALE_MAX=1.00
 local CIRCLE_TANGENT_DOMINANCE_LIFT=0.30
 local CIRCLE_TANGENT_DOMINANCE_EPSILON=1e-6
+local CIRCLE_TANGENT_CLOSING_DAMPING=0.95
+local CIRCLE_TANGENT_CLOSING_SCALE_MIN=0.42
 local CIRCLE_RADIAL_BASE_LEAD_TIME=0.20
 local DIAG_STREAK_SIDE_RATIO_MIN=0.30
 local DIAG_STREAK_SIDE_SPEED_MIN=4
@@ -1290,6 +1292,17 @@ function QBAim.new(ctx,parent)
 			CIRCLE_TANGENT_DOMINANCE_SCALE_MAX
 		)
 
+		-- Signed radial range-rate correction.
+		-- awayShare < 0 means the WR is crossing while closing inward relative to the QB->WR radius.
+		-- That should reduce tangent extra lead without touching posts/diagonals that are opening or neutral.
+		local closingShare=math.clamp(-awayShare,0,1)
+		local tangentClosingScale=math.clamp(
+			1-CIRCLE_TANGENT_CLOSING_DAMPING*closingShare,
+			CIRCLE_TANGENT_CLOSING_SCALE_MIN,
+			1
+		)
+		local tangentSignedScale=tangentDominanceScale*tangentClosingScale
+
 		local radialBaseTime=
 			CIRCLE_RADIAL_BASE_LEAD_TIME
 			*distanceScale
@@ -1316,7 +1329,7 @@ function QBAim.new(ctx,parent)
 			*reactiveLosDamping
 			*tangentAlignmentBoost
 			*tangentBalanceBoost
-			*tangentDominanceScale
+			*tangentSignedScale
 
 		local tangentExtraTime=math.min(
 			tangentReactiveTime,
@@ -1371,6 +1384,9 @@ function QBAim.new(ctx,parent)
 			tangentDominance=tangentDominance,
 			tangentBalancePeak=balancePeak,
 			tangentDominanceScale=tangentDominanceScale,
+			closingShare=closingShare,
+			tangentClosingScale=tangentClosingScale,
+			tangentSignedScale=tangentSignedScale,
 			routeAway=result.radial,
 			routeSide=result.tangent,
 			routeElevation=result.elevation,
