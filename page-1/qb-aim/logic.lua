@@ -19,9 +19,9 @@ local PLAYER_G=196.2
 local JUMP_POWER=55.5
 local WR_STANDING_TOP_Y=6.00
 local WR_MAX_Y=WR_STANDING_TOP_Y+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G) -- ~=13.85
-local C1_Y_MIN=WR_MAX_Y -- fixed C1: solve at receiver jump peak, not a 13.00-13.85 dominance range
+local C1_Y_MIN=13.00
 local C1_Y_MAX=WR_MAX_Y
-local C1_Y_FIXED=WR_MAX_Y
+local C1_Y_POTENTIAL_EXPONENT=1.00
 local C1_SOLVE_Y_BIAS=0.00
 local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
@@ -1466,11 +1466,12 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function c1HeightFromMagnitudePotential(potential,speed)
-		-- Fixed C1 solve height.
-		-- Previous versions mapped radial/tangent dominance into a 13.00 -> 13.85 Y range.
-		-- That made the throw angle depend on route shape and could bias crossing/diagonal routes low.
-		-- The solver now always targets the receiver's maximum jump reach.
-		return C1_Y_FIXED
+		if speed<1e-6 then
+			return C1_Y_MAX
+		end
+
+		local alpha=math.clamp(potential,0,1)^C1_Y_POTENTIAL_EXPONENT
+		return C1_Y_MIN+(C1_Y_MAX-C1_Y_MIN)*alpha
 	end
 
 	local function c1Target(receiverPosition,originPosition,targetVelocity,flightTime,predictorState)
@@ -1618,7 +1619,7 @@ function QBAim.new(ctx,parent)
 		local extraLeadXZ=flat(extraLead3)
 		local effectiveExtraTime=result.speed>1e-6 and (extraLeadXZ.Magnitude+accelerationLeadXZ.Magnitude)/result.speed or 0
 		local targetFlat=flat(receiverMaxPoint)+flightLead+accelerationLeadXZ+extraLeadXZ
-		local magnitudeChangePotential=1 -- diagnostic only; C1 height is fixed at jump peak
+		local magnitudeChangePotential=radialShareAbs
 		local c1Height=c1HeightFromMagnitudePotential(magnitudeChangePotential,result.speed)
 
 		return Vector3.new(targetFlat.X,c1Height+C1_SOLVE_Y_BIAS,targetFlat.Z),{
