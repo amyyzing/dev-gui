@@ -19,9 +19,8 @@ local PLAYER_G=196.2
 local JUMP_POWER=55.5
 local WR_STANDING_TOP_Y=6.00
 local WR_MAX_Y=WR_STANDING_TOP_Y+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G) -- ~=13.85
-local C1_Y_MIN=WR_MAX_Y
+local C1_Y_MIN=13.00
 local C1_Y_MAX=WR_MAX_Y
-local C1_Y_FIXED=WR_MAX_Y
 local C1_Y_POTENTIAL_EXPONENT=1.00
 local C1_SOLVE_Y_BIAS=0.00
 local MAX_RUN_SPEED=21
@@ -50,12 +49,6 @@ local ADAPTIVE_TANGENT_FLIGHT_SCALE_MIN=0.38
 local ADAPTIVE_TANGENT_FLIGHT_SCALE_MAX=0.95
 local ADAPTIVE_CLOSING_TANGENT_DAMPING=0.55
 local ADAPTIVE_UNCERTAINTY_DAMPING=0.45
-local AXIS_INVARIANT_LEAD_ENABLED=true
-local AXIS_EXTRA_LEAD_FRACTION=0.08
-local AXIS_EXTRA_LEAD_TIME_MAX=0.16
-local AXIS_LOS_RATE_GAIN=3.00
-local AXIS_CLOSING_EXTRA_DAMPING=0.75
-local AXIS_BRAKE_FLIGHT_DAMPING=0.38
 local QB_RELEASE_DELAY=0.25
 local QB_XZ_RELEASE_FACTOR=0
 local QB_LAUNCH_Y_BIAS=0
@@ -1135,29 +1128,18 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function movementShape(origin,position,velocity)
-		-- Do not label routes as "slant" or "streak" from a QB-centered polar axis.
-		-- The same world-space route can look tangent, radial, or mixed depending only on
-		-- where the WR is on the QB-centered circle. Keep this as range relation only.
-		local velocityXZ=flat(velocity or Vector3.zero)
-		local speed=velocityXZ.Magnitude
-		if speed<0.1 then
+		local result=components(origin,position,velocity)
+		if result.speed<0.1 then
 			return"standing"
+		elseif result.sideAbs>result.awayAbs*1.35 then
+			return"slant"
+		elseif result.away>0 and result.sideAbs>=DIAG_STREAK_SIDE_SPEED_MIN and result.sideAbs>=result.awayAbs*DIAG_STREAK_SIDE_RATIO_MIN then
+			return"diagonal_streak"
+		elseif result.awayAbs>result.sideAbs*1.35 then
+			return"streak"
 		end
 
-		local losVector=flat(position-origin)
-		local losDir=unit(losVector,velocityXZ.Unit)
-		local signedShare=math.clamp(velocityXZ:Dot(losDir)/math.max(speed,1e-6),-1,1)
-		local crossShare=math.sqrt(math.max(1-signedShare*signedShare,0))
-
-		if signedShare>0.70 then
-			return"range_opening"
-		elseif signedShare<-0.70 then
-			return"range_closing"
-		elseif crossShare>0.70 then
-			return"range_crossing"
-		end
-
-		return"range_mixed"
+		return"diagonal"
 	end
 
 	local function lockRoute(receiver)
@@ -1380,113 +1362,162 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function c1HeightFromMagnitudePotential(potential,speed)
-		-- Fixed jump-peak target. Route dominance should not move C1 between 13.00 and WR_MAX_Y.
-		return C1_Y_FIXED
+		if speed<1e-6 then
+			return C1_Y_MAX
+		end
+
+		local alpha=math.clamp(potential,0,1)^C1_Y_POTENTIAL_EXPONENT
+		return C1_Y_MIN+(C1_Y_MAX-C1_Y_MIN)*alpha
 	end
 
 	local function c1Target(receiverPosition,originPosition,targetVelocity,flightTime,predictorState)
 		local receiverMaxPoint=receiverMaxAt(receiverPosition)
-
-		-- Axis-invariant predictor:
-		-- The catch target is moved along the receiver's actual velocity vector.
-		-- QB-centered radial/tangent projections are used only for damping/diagnostics, never
-		-- as the main lead basis. This prevents a north-running WR from being treated as
-		-- "full slant" on one side of the circle and "full streak" at the top of the circle.
-		local velocityXZ=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
-		local speed=velocityXZ.Magnitude
-		local routeDir=speed>1e-6 and velocityXZ.Unit or Vector3.new(1,0,0)
-
-		local losVector=flat(receiverMaxPoint-originPosition)
-		local radius=math.max(losVector.Magnitude,1e-6)
-		local losDir=unit(losVector,routeDir)
-
-		local signedRangeSpeed=speed>1e-6 and velocityXZ:Dot(losDir) or 0
-		local awayShare=speed>1e-6 and math.clamp(signedRangeSpeed/speed,-1,1) or 0
-		local positiveAwayShare=math.clamp(awayShare,0,1)
-		local closingShare=math.clamp(-awayShare,0,1)
-		local radialShareAbs=math.abs(awayShare)
-		local lateralVelocity=velocityXZ-losDir*signedRangeSpeed
-		local lateralSpeed=lateralVelocity.Magnitude
-		local lateralShare=speed>1e-6 and math.clamp(lateralSpeed/speed,0,1) or 0
-		local routeBalance=1-math.abs(radialShareAbs-lateralShare)
-
+		local result=components3D(originPosition,receiverMaxPoint,targetVelocity)
+		local radius=math.max(result.radius,1e-6)
+		local speed=math.max(result.speed,1e-6)
+		local velocity3=Vector3.new((targetVelocity or Vector3.zero).X,0,(targetVelocity or Vector3.zero).Z)
+		local velocityXZ=flat(targetVelocity or Vector3.zero)
 		local predictorConfidence=math.clamp(predictorState and predictorState.confidence or 0.55,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
 		local leadUserScale=math.clamp(WR_LEAD_DELAY/math.max(LEAD_DELAY_BASELINE,0.01),0,2.25)
-		local speedScale=math.clamp(speed/MAX_RUN_SPEED,0,1)
+		local speedScale=math.clamp(result.speed/MAX_RUN_SPEED,0,1)
 		local uncertaintyDamping=1-ADAPTIVE_UNCERTAINTY_DAMPING*(1-predictorConfidence)
 
-		local losRate=lateralSpeed/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
-		local losDamping=1/(1+losRate*CIRCLE_LOS_RATE_GAIN)
-		local reactiveLosDamping=1/(1+losRate*AXIS_LOS_RATE_GAIN)
+		local awayShare=math.clamp(result.radial/speed,-1,1)
+		local positiveAwayShare=math.clamp(result.radial/speed,0,1)
+		local radialShareAbs=math.clamp(math.abs(result.radial)/speed,0,1)
+		local lateralShare=math.clamp(result.lateralAbs/speed,0,1)
+		local routeBalance=1-math.abs(radialShareAbs-lateralShare)
+		local balanceLeadScale=CIRCLE_BALANCE_LEAD_SCALE_MIN+(CIRCLE_BALANCE_LEAD_SCALE_MAX-CIRCLE_BALANCE_LEAD_SCALE_MIN)*routeBalance
+
 		local distanceScale=math.clamp(radius/CIRCLE_RADIUS_FULL_LEAD,CIRCLE_DISTANCE_SCALE_MIN,CIRCLE_DISTANCE_SCALE_MAX)
 
-		local accelerationXZ=clampMagnitude(flat(predictorState and predictorState.acceleration or Vector3.zero),PREDICTOR_ACCEL_MAX)
-		local alongAcceleration=speed>1e-6 and accelerationXZ:Dot(routeDir) or 0
-		local brakingShare=math.clamp(-alongAcceleration/math.max(PREDICTOR_ACCEL_MAX,1),0,1)
-		local accelTime=math.min(flightTime,PREDICTOR_ACCEL_TIME_MAX)
+		local radialGain=math.clamp(
+			CIRCLE_RADIAL_EXTRA_BASE+CIRCLE_RADIAL_EXTRA_GAIN*positiveAwayShare,
+			CIRCLE_RADIAL_EXTRA_MIN,
+			CIRCLE_RADIAL_EXTRA_MAX
+		)
 
-		-- True intercept lead is v*t. Extra user lead is now a small along-route pad,
-		-- not a radial/tangent dominance term.
-		local brakeFlightScale=1-AXIS_BRAKE_FLIGHT_DAMPING*brakingShare*predictorConfidence
-		local flightLead=velocityXZ*flightTime*math.clamp(brakeFlightScale,0.45,1)
+		local tangentGain=math.clamp(
+			CIRCLE_TANGENT_EXTRA_BASE+CIRCLE_TANGENT_EXTRA_GAIN*positiveAwayShare,
+			CIRCLE_TANGENT_EXTRA_MIN,
+			CIRCLE_TANGENT_EXTRA_MAX
+		)
 
-		local accelerationLeadScale=PREDICTOR_ACCEL_LEAD_SCALE*predictorConfidence
-		local accelerationLeadXZ=accelerationXZ*(0.5*accelTime*accelTime*accelerationLeadScale)
-		accelerationLeadXZ=clampMagnitude(accelerationLeadXZ,PREDICTOR_ACCEL_LEAD_MAX)
+		local losRate=result.lateralAbs/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
+		local losDamping=1/(1+losRate*CIRCLE_LOS_RATE_GAIN)
+		local reactiveLosDamping=1/(1+losRate*CIRCLE_TANGENT_REACTIVE_LOS_GAIN)
 
-		local closingDamping=math.clamp(1-AXIS_CLOSING_EXTRA_DAMPING*closingShare,0.20,1)
-		local brakeExtraDamping=math.clamp(1-0.80*brakingShare,0.20,1)
-		local adaptiveLeadScale=ADAPTIVE_LEAD_ENABLED and (leadUserScale*speedScale*predictorConfidence*uncertaintyDamping) or 1
-		local axisExtraLeadTime=0
-
-		if AXIS_INVARIANT_LEAD_ENABLED then
-			axisExtraLeadTime=math.min(
-				LEAD_DELAY_BASELINE
-				*AXIS_EXTRA_LEAD_FRACTION
-				*adaptiveLeadScale
-				*distanceScale
-				*reactiveLosDamping
-				*closingDamping
-				*brakeExtraDamping,
-				AXIS_EXTRA_LEAD_TIME_MAX
-			)
+		local tangentAlignment=0
+		if velocity3.Magnitude>1e-6 and result.lateralAbs>1e-6 then
+			tangentAlignment=math.abs(velocity3.Unit:Dot(result.lateralDir))
 		end
 
-		local extraLeadXZ=velocityXZ*axisExtraLeadTime
-		local effectiveExtraTime=speed>1e-6 and (extraLeadXZ.Magnitude+accelerationLeadXZ.Magnitude)/speed or 0
-		local targetFlat=flat(receiverMaxPoint)+flightLead+accelerationLeadXZ+extraLeadXZ
-		local c1Height=c1HeightFromMagnitudePotential(0,speed)
+		local tangentAlignmentBoost=1+CIRCLE_TANGENT_ALIGNMENT_BOOST*tangentAlignment
+		local tangentBalanceBoost=1+CIRCLE_TANGENT_BALANCE_BOOST*routeBalance
 
-		-- Diagnostics keep the old field names so the rest of the module remains compatible.
+		-- Continuous standardized radial/tangent dominance.
+		-- chi ~= 0   -> radial-dominant / streak-like
+		-- chi ~= 0.5 -> balanced post / diagonal
+		-- chi ~= 1   -> tangent-dominant / full slant
 		local tangentDominance=(lateralShare*lateralShare)/((radialShareAbs*radialShareAbs)+(lateralShare*lateralShare)+CIRCLE_TANGENT_DOMINANCE_EPSILON)
 		local balancePeak=1-math.abs(2*tangentDominance-1)
-		local tangentClosingScale=closingDamping
-		local tangentSignedScale=closingDamping*brakeExtraDamping
+		local tangentDominanceScale=math.clamp(
+			CIRCLE_TANGENT_DOMINANCE_SCALE_MIN
+			+(CIRCLE_TANGENT_DOMINANCE_SCALE_MAX-CIRCLE_TANGENT_DOMINANCE_SCALE_MIN)*balancePeak
+			+CIRCLE_TANGENT_DOMINANCE_LIFT*tangentDominance*(1-balancePeak),
+			CIRCLE_TANGENT_DOMINANCE_SCALE_MIN,
+			CIRCLE_TANGENT_DOMINANCE_SCALE_MAX
+		)
+
+		-- Signed radial range-rate correction.
+		-- awayShare < 0 means the WR is crossing while closing inward relative to the QB->WR radius.
+		-- That should reduce tangent extra lead without touching posts/diagonals that are opening or neutral.
+		local closingShare=math.clamp(-awayShare,0,1)
+		local tangentClosingScale=math.clamp(
+			1-CIRCLE_TANGENT_CLOSING_DAMPING*closingShare,
+			CIRCLE_TANGENT_CLOSING_SCALE_MIN,
+			1
+		)
+		local tangentSignedScale=tangentDominanceScale*tangentClosingScale
+
+		local radialBaseTime=
+			CIRCLE_RADIAL_BASE_LEAD_TIME
+			*distanceScale
+			*positiveAwayShare
+			*balanceLeadScale
+
+		local radialFlightScale=math.clamp(flightTime/1.45,ADAPTIVE_RADIAL_FLIGHT_SCALE_MIN,ADAPTIVE_RADIAL_FLIGHT_SCALE_MAX)
+		local tangentFlightScale=math.clamp(flightTime/1.25,ADAPTIVE_TANGENT_FLIGHT_SCALE_MIN,ADAPTIVE_TANGENT_FLIGHT_SCALE_MAX)
+		local adaptiveLeadScale=ADAPTIVE_LEAD_ENABLED and (leadUserScale*speedScale*predictorConfidence*uncertaintyDamping) or 1
+
+		local radialLDTime=
+			LEAD_DELAY_BASELINE
+			*adaptiveLeadScale
+			*radialFlightScale
+			*distanceScale
+			*radialGain
+			*balanceLeadScale
+			*positiveAwayShare
+
+		local radialExtraTime=math.min(
+			radialBaseTime+radialLDTime,
+			CIRCLE_EXTRA_LEAD_TIME_MAX
+		)
+
+		local tangentBaseTime=0
+		local tangentAdaptiveDamping=1-ADAPTIVE_CLOSING_TANGENT_DAMPING*closingShare
+		local tangentReactiveTime=
+			CIRCLE_TANGENT_REACTIVE_LEAD
+			*adaptiveLeadScale
+			*tangentFlightScale
+			*distanceScale
+			*lateralShare
+			*reactiveLosDamping
+			*tangentAlignmentBoost
+			*tangentBalanceBoost
+			*tangentSignedScale
+			*math.clamp(tangentAdaptiveDamping,0.35,1)
+
+		local tangentExtraTime=math.min(
+			tangentReactiveTime,
+			CIRCLE_EXTRA_LEAD_TIME_MAX
+		)
+
+		local flightLead=velocityXZ*flightTime
+		local accelerationXZ=clampMagnitude(flat(predictorState and predictorState.acceleration or Vector3.zero),PREDICTOR_ACCEL_MAX)
+		local accelTime=math.min(flightTime,PREDICTOR_ACCEL_TIME_MAX)
+		local accelerationLeadXZ=accelerationXZ*(0.5*accelTime*accelTime*PREDICTOR_ACCEL_LEAD_SCALE*predictorConfidence)
+		accelerationLeadXZ=clampMagnitude(accelerationLeadXZ,PREDICTOR_ACCEL_LEAD_MAX)
+		local radialExtraLead3=result.radialDir*result.radial*radialExtraTime
+		local tangentVelocity3=result.tangentDir*result.tangent+result.elevationDir*result.elevation
+		local tangentExtraLead3=tangentVelocity3*tangentExtraTime
+		local extraLead3=radialExtraLead3+tangentExtraLead3
+		local extraLeadXZ=flat(extraLead3)
+		local effectiveExtraTime=result.speed>1e-6 and (extraLeadXZ.Magnitude+accelerationLeadXZ.Magnitude)/result.speed or 0
+		local targetFlat=flat(receiverMaxPoint)+flightLead+accelerationLeadXZ+extraLeadXZ
+		local magnitudeChangePotential=radialShareAbs
+		local c1Height=c1HeightFromMagnitudePotential(magnitudeChangePotential,result.speed)
 
 		return Vector3.new(targetFlat.X,c1Height+C1_SOLVE_Y_BIAS,targetFlat.Z),{
 			flightLeadXZ=flightLead,
 			accelerationLeadXZ=accelerationLeadXZ,
 			extraLeadXZ=extraLeadXZ,
-			radialExtraLeadXZ=Vector3.zero,
-			tangentExtraLeadXZ=extraLeadXZ,
+			radialExtraLeadXZ=flat(radialExtraLead3),
+			tangentExtraLeadXZ=flat(tangentExtraLead3),
 			extraLeadTime=effectiveExtraTime,
-			radialExtraTime=0,
-			tangentExtraTime=axisExtraLeadTime,
-			tangentBaseTime=0,
-			tangentReactiveTime=axisExtraLeadTime,
-			radialBaseTime=0,
-			radialLDTime=0,
+			radialExtraTime=radialExtraTime,
+			tangentExtraTime=tangentExtraTime,
+			tangentBaseTime=tangentBaseTime,
+			tangentReactiveTime=tangentReactiveTime,
+			radialBaseTime=radialBaseTime,
+			radialLDTime=radialLDTime,
 			adaptiveLeadScale=adaptiveLeadScale,
 			leadUserScale=leadUserScale,
 			predictorConfidence=predictorConfidence,
-			radialFlightScale=1,
-			tangentFlightScale=1,
+			radialFlightScale=radialFlightScale,
+			tangentFlightScale=tangentFlightScale,
 			accelTime=accelTime,
-			accelerationLeadScale=accelerationLeadScale,
-			brakingShare=brakingShare,
-			brakeFlightScale=brakeFlightScale,
-			axisExtraLeadTime=axisExtraLeadTime,
-			magnitudeChangePotential=0,
+			magnitudeChangePotential=magnitudeChangePotential,
 			c1Height=c1Height,
 			c1HeightMin=C1_Y_MIN,
 			c1HeightMax=C1_Y_MAX,
@@ -1499,26 +1530,25 @@ function QBAim.new(ctx,parent)
 			radialShareAbs=radialShareAbs,
 			lateralShare=lateralShare,
 			routeBalance=routeBalance,
-			balanceLeadScale=1,
-			radialGain=0,
-			tangentGain=0,
+			balanceLeadScale=balanceLeadScale,
+			radialGain=radialGain,
+			tangentGain=tangentGain,
 			losRate=losRate,
 			losDamping=losDamping,
 			reactiveLosDamping=reactiveLosDamping,
-			tangentAlignment=1,
-			tangentAlignmentBoost=1,
-			tangentBalanceBoost=1,
+			tangentAlignment=tangentAlignment,
+			tangentAlignmentBoost=tangentAlignmentBoost,
+			tangentBalanceBoost=tangentBalanceBoost,
 			tangentDominance=tangentDominance,
 			tangentBalancePeak=balancePeak,
-			tangentDominanceScale=1,
+			tangentDominanceScale=tangentDominanceScale,
 			closingShare=closingShare,
 			tangentClosingScale=tangentClosingScale,
 			tangentSignedScale=tangentSignedScale,
-			routeAway=signedRangeSpeed,
-			routeSide=lateralSpeed,
-			routeElevation=0,
-			routeSpeed=speed,
-			axisInvariant=true,
+			routeAway=result.radial,
+			routeSide=result.tangent,
+			routeElevation=result.elevation,
+			routeSpeed=result.speed,
 		}
 	end
 
