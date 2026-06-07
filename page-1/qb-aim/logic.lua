@@ -27,48 +27,28 @@ local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
-local WR_LEAD_DELAY=0.35
-local LEAD_DELAY_BASELINE=0.35 -- slider is now a lead-strength scalar, not a fixed WR time offset
+local WR_LEAD_DELAY=0.4
+local LEAD_DELAY_BASELINE=0.40 -- slider is now a lead-strength scalar; 0.40 keeps old default feel
 local ADAPTIVE_LEAD_ENABLED=true
-local ROUTE_SPEED_PARTIAL_GAIN=1.00
-local BINARY_ROUTE_SPEED=true -- receiver intent is treated as full-speed route or stop, not blended 8/13/17 speed
-local PREDICTOR_HISTORY_MAX_AGE=0.38 -- short window; long LS history made cuts react late
+local ROUTE_SPEED_PARTIAL_GAIN=1.08
+local PREDICTOR_HISTORY_MAX_AGE=1.25
 local PREDICTOR_MIN_SAMPLES=3
-local PREDICTOR_LS_BLEND=0.18 -- LS is only a steady-route stabilizer now
-local PREDICTOR_VELOCITY_BLEND=0.86 -- fast reaction; smoothing is gated by cut/decel state below
-local PREDICTOR_ACCEL_BLEND=0.72
-local PREDICTOR_ACCEL_MAX=60
-local PREDICTOR_ACCEL_TIME_MAX=0.65
-local PREDICTOR_ACCEL_LEAD_SCALE=0.08 -- acceleration is mostly a classifier/damper, not a blind extra lead
-local PREDICTOR_ACCEL_LEAD_MAX=4.0
-local PREDICTOR_CONFIDENCE_MIN=0.25
+local PREDICTOR_LS_BLEND=0.45
+local PREDICTOR_VELOCITY_BLEND=0.42
+local PREDICTOR_ACCEL_BLEND=0.28
+local PREDICTOR_ACCEL_MAX=48
+local PREDICTOR_ACCEL_TIME_MAX=1.05
+local PREDICTOR_ACCEL_LEAD_SCALE=0.22
+local PREDICTOR_ACCEL_LEAD_MAX=9.5
+local PREDICTOR_CONFIDENCE_MIN=0.30
 local PREDICTOR_CONFIDENCE_MAX=1.00
-local PREDICTOR_STALE_AFTER=0.25
-local ADAPTIVE_RADIAL_FLIGHT_SCALE_MIN=0.40
-local ADAPTIVE_RADIAL_FLIGHT_SCALE_MAX=1.05
-local ADAPTIVE_TANGENT_FLIGHT_SCALE_MIN=0.34
-local ADAPTIVE_TANGENT_FLIGHT_SCALE_MAX=0.88
-local ADAPTIVE_CLOSING_TANGENT_DAMPING=0.72
-local ADAPTIVE_UNCERTAINTY_DAMPING=0.55
-local CUT_DOT_SNAP=0.72
-local HARD_CUT_DOT=0.32
-local CUT_STRENGTH_GAIN=1.25
-local DECEL_SPEED_DROP_TRIGGER=4.75
-local DECEL_ACCEL_TRIGGER=18
-local DECEL_HARD_ACCEL=48
-local STOP_RAW_SPEED=3.25
-local STOP_RAW_SPEED_HARD=1.25
-local REACTIVE_STEADY_BLEND=0.40
-local REACTIVE_CUT_BLEND=0.96
-local CUT_CONFIDENCE_DAMPING=0.45
-local DECEL_CONFIDENCE_DAMPING=0.65
-local CUT_EXTRA_LEAD_DAMPING=0.78
-local DECEL_EXTRA_LEAD_DAMPING=0.92
-local CUT_FLIGHT_HORIZON_MIN=0.72
-local DECEL_FLIGHT_HORIZON_MIN=0.12
-local STOP_FLIGHT_HORIZON_MIN=0.00
-local ACCEL_FORWARD_ONLY=true
-local ACCEL_REJECT_WHEN_CUTTING=0.85
+local PREDICTOR_STALE_AFTER=0.35
+local ADAPTIVE_RADIAL_FLIGHT_SCALE_MIN=0.45
+local ADAPTIVE_RADIAL_FLIGHT_SCALE_MAX=1.12
+local ADAPTIVE_TANGENT_FLIGHT_SCALE_MIN=0.38
+local ADAPTIVE_TANGENT_FLIGHT_SCALE_MAX=0.95
+local ADAPTIVE_CLOSING_TANGENT_DAMPING=0.55
+local ADAPTIVE_UNCERTAINTY_DAMPING=0.45
 local QB_RELEASE_DELAY=0.25
 local QB_XZ_RELEASE_FACTOR=0
 local QB_LAUNCH_Y_BIAS=0
@@ -177,22 +157,14 @@ local function safeVectorLerp(a,b,alpha)
 	return a:Lerp(b,math.clamp(alpha or 0,0,1))
 end
 
-local function lerpNumber(a,b,alpha)
-	return (a or 0)+((b or 0)-(a or 0))*math.clamp(alpha or 0,0,1)
-end
-
 local function root(character)
 	return character and (character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso"))
 end
 
 local function routeSpeed(speed)
-	local clamped=math.clamp(speed or 0,0,MAX_RUN_SPEED)
+	local clamped=math.clamp(speed,0,MAX_RUN_SPEED)
 	if clamped<ROUTE_LOCK_MIN_SPEED then
 		return 0
-	end
-
-	if BINARY_ROUTE_SPEED then
-		return MAX_RUN_SPEED
 	end
 
 	if clamped>=NORMAL_ROUTE_MIN_SPEED then
@@ -757,7 +729,7 @@ function QBAim.new(ctx,parent)
 		state.qbAimLeadDelay=WR_LEAD_DELAY
 		updateLeadDelayVisuals()
 		if showStatus then
-			setStatus(string.format("Lead strength %.2f",WR_LEAD_DELAY))
+			setStatus(string.format("LD set to %.2fs",WR_LEAD_DELAY))
 			changed()
 		end
 		return true
@@ -791,17 +763,9 @@ function QBAim.new(ctx,parent)
 		local now=os.clock()
 		receiverData[player]={
 			pos=receiverRoot.Position,
-			vel=flat(receiverRoot.AssemblyLinearVelocity or Vector3.zero),
-			rawVel=flat(receiverRoot.AssemblyLinearVelocity or Vector3.zero),
-			prevRawVel=flat(receiverRoot.AssemblyLinearVelocity or Vector3.zero),
-			rawSpeed=flat(receiverRoot.AssemblyLinearVelocity or Vector3.zero).Magnitude,
-			prevRawSpeed=flat(receiverRoot.AssemblyLinearVelocity or Vector3.zero).Magnitude,
+			vel=receiverRoot.AssemblyLinearVelocity or Vector3.zero,
+			rawVel=receiverRoot.AssemblyLinearVelocity or Vector3.zero,
 			accel=Vector3.zero,
-			cutStrength=0,
-			decelStrength=0,
-			stopStrength=0,
-			turnDot=1,
-			brakingAccel=0,
 			confidence=PREDICTOR_CONFIDENCE_MIN,
 			lastSeen=now,
 			t=now,
@@ -1049,19 +1013,10 @@ function QBAim.new(ctx,parent)
 
 	local function predictionState(data,receiverPosition,fallbackVelocity)
 		local now=os.clock()
-		local rawVelocity=clampMagnitude(flat((data and data.rawVel) or fallbackVelocity or Vector3.zero),MAX_RUN_SPEED)
-		local measuredVelocity=clampMagnitude(flat((data and data.vel) or rawVelocity or Vector3.zero),MAX_RUN_SPEED)
+		local measuredVelocity=clampMagnitude(flat((data and data.vel) or fallbackVelocity or Vector3.zero),MAX_RUN_SPEED)
 		local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
-		local cutStrength=math.clamp(data and data.cutStrength or 0,0,1)
-		local decelStrength=math.clamp(data and data.decelStrength or 0,0,1)
-		local stopStrength=math.clamp(data and data.stopStrength or 0,0,1)
-		local reactiveStrength=math.max(cutStrength,decelStrength,stopStrength)
 		local blendedVelocity=measuredVelocity
-
-		-- Old LS blending was the main reason hard cuts felt late. Use LS only when the route is steady.
-		if reactiveStrength>=0.12 then
-			blendedVelocity=safeVectorLerp(blendedVelocity,rawVelocity,math.clamp(0.70+0.26*reactiveStrength,0,0.96))
-		elseif lsVelocity and lsVelocity.Magnitude>=ROUTE_LOCK_MIN_SPEED then
+		if lsVelocity and lsVelocity.Magnitude>=ROUTE_LOCK_MIN_SPEED then
 			blendedVelocity=safeVectorLerp(measuredVelocity,lsVelocity,PREDICTOR_LS_BLEND*lsQuality)
 		end
 
@@ -1069,27 +1024,17 @@ function QBAim.new(ctx,parent)
 		local acceleration=clampMagnitude(flat(data and data.accel or Vector3.zero),PREDICTOR_ACCEL_MAX)
 		local sampleAge=data and data.lastSeen and math.max(now-data.lastSeen,0) or PREDICTOR_STALE_AFTER
 		local ageConfidence=1-math.clamp(sampleAge/PREDICTOR_STALE_AFTER,0,1)
-		local speedConfidence=math.clamp(rawVelocity.Magnitude/NORMAL_ROUTE_MIN_SPEED,0,1)
+		local speedConfidence=math.clamp(blendedVelocity.Magnitude/NORMAL_ROUTE_MIN_SPEED,0,1)
 		local storedConfidence=math.clamp(data and data.confidence or PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
-		local reactiveDamping=(1-CUT_CONFIDENCE_DAMPING*cutStrength)*(1-DECEL_CONFIDENCE_DAMPING*decelStrength)*(1-0.85*stopStrength)
-		local confidence=math.clamp((0.42*storedConfidence+0.23*lsQuality+0.35*speedConfidence)*ageConfidence*math.clamp(reactiveDamping,0.05,1),PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
+		local confidence=math.clamp((0.35*storedConfidence+0.35*lsQuality+0.30*speedConfidence)*ageConfidence,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
 
 		return{
 			position=receiverPosition,
 			velocity=blendedVelocity,
-			rawVelocity=rawVelocity,
 			acceleration=acceleration,
 			confidence=confidence,
 			lsQuality=lsQuality,
 			sampleAge=sampleAge,
-			cutStrength=cutStrength,
-			decelStrength=decelStrength,
-			stopStrength=stopStrength,
-			reactiveStrength=reactiveStrength,
-			turnDot=data and data.turnDot or 1,
-			rawSpeed=data and data.rawSpeed or rawVelocity.Magnitude,
-			prevRawSpeed=data and data.prevRawSpeed or rawVelocity.Magnitude,
-			brakingAccel=data and data.brakingAccel or 0,
 		}
 	end
 
@@ -1099,15 +1044,13 @@ function QBAim.new(ctx,parent)
 		local now=os.clock()
 		local historyVelocity,historySpeed=historyVector(data,now)
 		local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
-		local rawVelocity=clampMagnitude(flat(data.rawVel or data.vel or Vector3.zero),MAX_RUN_SPEED)
-		local measuredVelocity=clampMagnitude(flat(data.vel or rawVelocity),MAX_RUN_SPEED)
-		local rawSpeed=rawVelocity.Magnitude
-		local measuredSpeed=measuredVelocity.Magnitude
-		local cutStrength=math.clamp(data.cutStrength or 0,0,1)
-		local decelStrength=math.clamp(data.decelStrength or 0,0,1)
-		local stopStrength=math.clamp(data.stopStrength or 0,0,1)
+		local measuredVelocity=flat(data.vel or Vector3.zero)
+		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
+			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
+		end
 
-		if rawSpeed<=STOP_RAW_SPEED_HARD or stopStrength>=0.70 or (decelStrength>=0.78 and rawSpeed<STABLE_MIN_SPEED) then
+		local measuredSpeed=measuredVelocity.Magnitude
+		if measuredSpeed<=STABLE_STOP_SPEED then
 			data.sdir=nil
 			data.sspeed=0
 			data.stime=now
@@ -1118,29 +1061,7 @@ function QBAim.new(ctx,parent)
 		local candidateDirection=nil
 		local candidateSpeed=0
 		local source="hold"
-
-		-- On a cut, the newest vector matters more than the stable vector.
-		if cutStrength>=0.18 and rawSpeed>=ROUTE_LOCK_MIN_SPEED then
-			candidateDirection=rawVelocity.Unit
-			candidateSpeed=routeSpeed(rawSpeed)
-			source="cut_raw"
-		elseif decelStrength>=0.55 then
-			if rawSpeed>=NORMAL_ROUTE_MIN_SPEED then
-				candidateDirection=rawVelocity.Unit
-				candidateSpeed=routeSpeed(rawSpeed)
-				source="braking_raw"
-			else
-				data.sdir=nil
-				data.sspeed=0
-				data.stime=now
-				data.src="decelerating_stop"
-				return nil,0,"decelerating_stop"
-			end
-		elseif rawSpeed>=STABLE_MIN_SPEED then
-			candidateDirection=rawVelocity.Unit
-			candidateSpeed=routeSpeed(rawSpeed)
-			source="raw"
-		elseif lsVelocity and lsQuality>=0.45 and lsVelocity.Magnitude>=STABLE_MIN_SPEED then
+		if lsVelocity and lsQuality>=0.35 and lsVelocity.Magnitude>=STABLE_MIN_SPEED then
 			candidateDirection=lsVelocity.Unit
 			candidateSpeed=routeSpeed(lsVelocity.Magnitude)
 			source="least_squares"
@@ -1157,10 +1078,10 @@ function QBAim.new(ctx,parent)
 		if candidateDirection and candidateSpeed>0 then
 			if data.sdir and data.sdir.Magnitude>0 then
 				local dot=math.clamp(data.sdir:Dot(candidateDirection),-1,1)
-				if cutStrength>=0.18 or dot<CUT_DOT_SNAP then
-					data.sdir=unit(data.sdir:Lerp(candidateDirection,REACTIVE_CUT_BLEND),candidateDirection)
+				if dot>=STABLE_DOT_REPLACE then
+					data.sdir=unit(data.sdir:Lerp(candidateDirection,STABLE_BLEND),candidateDirection)
 				else
-					data.sdir=unit(data.sdir:Lerp(candidateDirection,REACTIVE_STEADY_BLEND),candidateDirection)
+					data.sdir=candidateDirection
 				end
 			else
 				data.sdir=candidateDirection
@@ -1172,7 +1093,7 @@ function QBAim.new(ctx,parent)
 			return data.sdir,data.sspeed,source
 		end
 
-		if data.sdir and now-(data.stime or 0)<=STABLE_HOLD and stopStrength<0.45 and decelStrength<0.55 then
+		if data.sdir and now-(data.stime or 0)<=STABLE_HOLD then
 			return data.sdir,data.sspeed or 0,"held"
 		end
 
@@ -1255,47 +1176,22 @@ function QBAim.new(ctx,parent)
 
 	local function routeVelocity(receiver,data,origin,receiverRoot,routeLock)
 		local state=predictionState(data,receiverRoot.Position,data and data.vel or Vector3.zero)
-		local rawVelocity=clampMagnitude(flat(state.rawVelocity or Vector3.zero),MAX_RUN_SPEED)
 		local measuredVelocity=clampMagnitude(flat(state.velocity or Vector3.zero),MAX_RUN_SPEED)
-		local rawSpeed=rawVelocity.Magnitude
 		local measuredSpeed=measuredVelocity.Magnitude
+		local adjustedSpeed=routeSpeed(measuredSpeed)
 		local stableDirection,stableSpeed=updateStable(data)
 		local velocity=Vector3.zero
-		local cutStrength=math.clamp(state.cutStrength or 0,0,1)
-		local decelStrength=math.clamp(state.decelStrength or 0,0,1)
-		local stopStrength=math.clamp(state.stopStrength or 0,0,1)
 
-		-- Stops/curls must not inherit the old route vector. This was a major source of overlead.
-		if stopStrength>=0.65 or rawSpeed<=STOP_RAW_SPEED_HARD or (decelStrength>=0.72 and rawSpeed<NORMAL_ROUTE_MIN_SPEED) then
-			state.routeVelocity=Vector3.zero
-			return Vector3.zero,"standing",state
-		end
-
-		-- Cut handling: snap to the newest observed direction and keep binary route speed.
-		if cutStrength>=0.18 and rawSpeed>=ROUTE_LOCK_MIN_SPEED then
-			velocity=rawVelocity.Unit*routeSpeed(rawSpeed)
-		elseif decelStrength>=0.55 then
-			-- If the player is braking but still clearly moving fast, keep the current direction for one frame.
-			-- Otherwise classify it as a stop/curl instead of leading an imaginary partial-speed route.
-			if rawSpeed>=NORMAL_ROUTE_MIN_SPEED then
-				velocity=rawVelocity.Unit*routeSpeed(rawSpeed)
-			else
-				state.routeVelocity=Vector3.zero
-				return Vector3.zero,"standing",state
-			end
-		elseif stableDirection and stableSpeed>0 then
+		-- H locks the receiver identity only. Direction remains reactive, but the vector now blends
+		-- recent least-squares motion with the stable route direction instead of blindly max-leading.
+		if stableDirection and stableSpeed>0 then
 			velocity=stableDirection*stableSpeed
-			if rawSpeed>=ROUTE_LOCK_MIN_SPEED then
-				local reactiveVelocity=rawVelocity.Unit*routeSpeed(rawSpeed)
-				velocity=safeVectorLerp(velocity,reactiveVelocity,math.clamp(0.35+0.45*(state.confidence or 0.5),0.35,0.80))
-			elseif measuredSpeed>=ROUTE_LOCK_MIN_SPEED then
-				local reactiveVelocity=measuredVelocity.Unit*routeSpeed(measuredSpeed)
-				velocity=safeVectorLerp(velocity,reactiveVelocity,0.25)
+			if measuredSpeed>=ROUTE_LOCK_MIN_SPEED and adjustedSpeed>0 then
+				local reactiveVelocity=measuredVelocity.Unit*adjustedSpeed
+				velocity=safeVectorLerp(velocity,reactiveVelocity,math.clamp((state.confidence or 0)*0.38,0,0.38))
 			end
-		elseif rawSpeed>=ROUTE_LOCK_MIN_SPEED then
-			velocity=rawVelocity.Unit*routeSpeed(rawSpeed)
-		elseif measuredSpeed>=ROUTE_LOCK_MIN_SPEED then
-			velocity=measuredVelocity.Unit*routeSpeed(measuredSpeed)
+		elseif measuredSpeed>=ROUTE_LOCK_MIN_SPEED and adjustedSpeed>0 then
+			velocity=measuredVelocity.Unit*adjustedSpeed
 		else
 			state.routeVelocity=Vector3.zero
 			return Vector3.zero,"standing",state
@@ -1485,18 +1381,6 @@ function QBAim.new(ctx,parent)
 		local leadUserScale=math.clamp(WR_LEAD_DELAY/math.max(LEAD_DELAY_BASELINE,0.01),0,2.25)
 		local speedScale=math.clamp(result.speed/MAX_RUN_SPEED,0,1)
 		local uncertaintyDamping=1-ADAPTIVE_UNCERTAINTY_DAMPING*(1-predictorConfidence)
-		local cutStrength=math.clamp(predictorState and predictorState.cutStrength or 0,0,1)
-		local decelStrength=math.clamp(predictorState and predictorState.decelStrength or 0,0,1)
-		local stopStrength=math.clamp(predictorState and predictorState.stopStrength or 0,0,1)
-		local instability=math.max(cutStrength,decelStrength,stopStrength)
-		local extraLeadDamping=math.clamp((1-CUT_EXTRA_LEAD_DAMPING*cutStrength)*(1-DECEL_EXTRA_LEAD_DAMPING*decelStrength)*(1-0.95*stopStrength),0,1)
-		local flightHorizonScale=math.clamp(
-			(1-cutStrength*(1-CUT_FLIGHT_HORIZON_MIN))
-			*(1-decelStrength*(1-DECEL_FLIGHT_HORIZON_MIN))
-			*(1-stopStrength*(1-STOP_FLIGHT_HORIZON_MIN)),
-			0,
-			1
-		)
 
 		local awayShare=math.clamp(result.radial/speed,-1,1)
 		local positiveAwayShare=math.clamp(result.radial/speed,0,1)
@@ -1561,11 +1445,10 @@ function QBAim.new(ctx,parent)
 			*distanceScale
 			*positiveAwayShare
 			*balanceLeadScale
-			*extraLeadDamping
 
 		local radialFlightScale=math.clamp(flightTime/1.45,ADAPTIVE_RADIAL_FLIGHT_SCALE_MIN,ADAPTIVE_RADIAL_FLIGHT_SCALE_MAX)
 		local tangentFlightScale=math.clamp(flightTime/1.25,ADAPTIVE_TANGENT_FLIGHT_SCALE_MIN,ADAPTIVE_TANGENT_FLIGHT_SCALE_MAX)
-		local adaptiveLeadScale=ADAPTIVE_LEAD_ENABLED and (leadUserScale*speedScale*predictorConfidence*uncertaintyDamping*extraLeadDamping) or 1
+		local adaptiveLeadScale=ADAPTIVE_LEAD_ENABLED and (leadUserScale*speedScale*predictorConfidence*uncertaintyDamping) or 1
 
 		local radialLDTime=
 			LEAD_DELAY_BASELINE
@@ -1600,17 +1483,10 @@ function QBAim.new(ctx,parent)
 			CIRCLE_EXTRA_LEAD_TIME_MAX
 		)
 
-		local flightLead=velocityXZ*(flightTime*flightHorizonScale)
+		local flightLead=velocityXZ*flightTime
 		local accelerationXZ=clampMagnitude(flat(predictorState and predictorState.acceleration or Vector3.zero),PREDICTOR_ACCEL_MAX)
-		local accelTime=math.min(flightTime*flightHorizonScale,PREDICTOR_ACCEL_TIME_MAX)
-		local accelerationLeadXZ=Vector3.zero
-		if ACCEL_FORWARD_ONLY and velocityXZ.Magnitude>1e-6 then
-			local forwardAccel=math.max(accelerationXZ:Dot(velocityXZ.Unit),0)
-			accelerationLeadXZ=velocityXZ.Unit*(0.5*forwardAccel*accelTime*accelTime*PREDICTOR_ACCEL_LEAD_SCALE*predictorConfidence)
-		else
-			accelerationLeadXZ=accelerationXZ*(0.5*accelTime*accelTime*PREDICTOR_ACCEL_LEAD_SCALE*predictorConfidence)
-		end
-		accelerationLeadXZ=accelerationLeadXZ*math.clamp(1-ACCEL_REJECT_WHEN_CUTTING*instability,0,1)
+		local accelTime=math.min(flightTime,PREDICTOR_ACCEL_TIME_MAX)
+		local accelerationLeadXZ=accelerationXZ*(0.5*accelTime*accelTime*PREDICTOR_ACCEL_LEAD_SCALE*predictorConfidence)
 		accelerationLeadXZ=clampMagnitude(accelerationLeadXZ,PREDICTOR_ACCEL_LEAD_MAX)
 		local radialExtraLead3=result.radialDir*result.radial*radialExtraTime
 		local tangentVelocity3=result.tangentDir*result.tangent+result.elevationDir*result.elevation
@@ -1638,12 +1514,6 @@ function QBAim.new(ctx,parent)
 			adaptiveLeadScale=adaptiveLeadScale,
 			leadUserScale=leadUserScale,
 			predictorConfidence=predictorConfidence,
-			cutStrength=cutStrength,
-			decelStrength=decelStrength,
-			stopStrength=stopStrength,
-			instability=instability,
-			extraLeadDamping=extraLeadDamping,
-			flightHorizonScale=flightHorizonScale,
 			radialFlightScale=radialFlightScale,
 			tangentFlightScale=tangentFlightScale,
 			accelTime=accelTime,
@@ -2344,58 +2214,19 @@ function QBAim.new(ctx,parent)
 					local data=receiverData[player]
 
 					if not data then
-						data={pos=receiverRoot.Position,vel=Vector3.zero,rawVel=Vector3.zero,prevRawVel=Vector3.zero,rawSpeed=0,prevRawSpeed=0,accel=Vector3.zero,cutStrength=0,decelStrength=0,stopStrength=0,turnDot=1,brakingAccel=0,confidence=PREDICTOR_CONFIDENCE_MIN,lastSeen=now,t=now,vh={},ph={},sdir=nil,sspeed=0,stime=0,src="none"}
+						data={pos=receiverRoot.Position,vel=Vector3.zero,rawVel=Vector3.zero,accel=Vector3.zero,confidence=PREDICTOR_CONFIDENCE_MIN,lastSeen=now,t=now,vh={},ph={},sdir=nil,sspeed=0,stime=0,src="none"}
 						receiverData[player]=data
 					end
 
-					local sampleDt=math.min(now-data.t,0.1)
-					if sampleDt>0 then
-						local rawVelocity=flat((receiverRoot.Position-data.pos)/sampleDt)
-						local previousRawVelocity=flat(data.rawVel or data.vel or Vector3.zero)
-						local rawAcceleration=clampMagnitude((rawVelocity-previousRawVelocity)/sampleDt,PREDICTOR_ACCEL_MAX)
-						local rawSpeed=rawVelocity.Magnitude
-						local previousRawSpeed=previousRawVelocity.Magnitude
-						local turnDot=1
-						if rawSpeed>=ROUTE_LOCK_MIN_SPEED and previousRawSpeed>=ROUTE_LOCK_MIN_SPEED then
-							turnDot=math.clamp(rawVelocity.Unit:Dot(previousRawVelocity.Unit),-1,1)
-						end
-
-						local rawCutStrength=0
-						if rawSpeed>=ROUTE_LOCK_MIN_SPEED and previousRawSpeed>=ROUTE_LOCK_MIN_SPEED then
-							rawCutStrength=math.clamp(((CUT_DOT_SNAP-turnDot)/math.max(CUT_DOT_SNAP-HARD_CUT_DOT,0.01))*CUT_STRENGTH_GAIN,0,1)
-						end
-
-						local speedDrop=math.max(previousRawSpeed-rawSpeed,0)
-						local brakingAccel=0
-						if previousRawSpeed>=ROUTE_LOCK_MIN_SPEED then
-							brakingAccel=math.max(-rawAcceleration:Dot(previousRawVelocity.Unit),0)
-						end
-
-						local rawDecelStrength=math.clamp(math.max(speedDrop/DECEL_SPEED_DROP_TRIGGER,(brakingAccel-DECEL_ACCEL_TRIGGER)/math.max(DECEL_HARD_ACCEL-DECEL_ACCEL_TRIGGER,1)),0,1)
-						local rawStopStrength=0
-						if rawSpeed<=STOP_RAW_SPEED then
-							rawStopStrength=math.clamp((STOP_RAW_SPEED-rawSpeed)/math.max(STOP_RAW_SPEED-STOP_RAW_SPEED_HARD,0.01),0,1)
-						end
-
-						local cutBlend=rawCutStrength>(data.cutStrength or 0) and 0.92 or 0.45
-						local decelBlend=rawDecelStrength>(data.decelStrength or 0) and 0.90 or 0.38
-						local stopBlend=rawStopStrength>(data.stopStrength or 0) and 0.95 or 0.42
-						data.cutStrength=lerpNumber(data.cutStrength or 0,rawCutStrength,cutBlend)
-						data.decelStrength=lerpNumber(data.decelStrength or 0,rawDecelStrength,decelBlend)
-						data.stopStrength=lerpNumber(data.stopStrength or 0,rawStopStrength,stopBlend)
-						data.turnDot=turnDot
-						data.brakingAccel=brakingAccel
-						data.prevRawVel=previousRawVelocity
-						data.prevRawSpeed=previousRawSpeed
+					local dt=math.min(now-data.t,0.1)
+					if dt>0 then
+						local rawVelocity=(receiverRoot.Position-data.pos)/dt
+						local previousRawVelocity=data.rawVel or data.vel or Vector3.zero
+						local rawAcceleration=(rawVelocity-previousRawVelocity)/dt
+						rawAcceleration=clampMagnitude(rawAcceleration,PREDICTOR_ACCEL_MAX)
 						data.rawVel=rawVelocity
-						data.rawSpeed=rawSpeed
-
-						if rawCutStrength>=0.18 or rawDecelStrength>=0.35 or rawStopStrength>=0.35 then
-							table.clear(data.vh)
-						end
-
 						table.insert(data.vh,rawVelocity)
-						if #data.vh>3 then
+						if #data.vh>5 then
 							table.remove(data.vh,1)
 						end
 
@@ -2403,8 +2234,8 @@ function QBAim.new(ctx,parent)
 						for _,velocity in ipairs(data.vh) do
 							average=average+velocity
 						end
-						average=average/math.max(#data.vh,1)
 
+						average=average/#data.vh
 						data.pos=receiverRoot.Position
 						data.t=now
 						data.lastSeen=now
@@ -2415,25 +2246,16 @@ function QBAim.new(ctx,parent)
 						end
 
 						local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
-						local reactiveStrength=math.max(data.cutStrength or 0,data.decelStrength or 0,data.stopStrength or 0)
-						if lsVelocity and lsQuality>0 and reactiveStrength<0.12 then
+						if lsVelocity and lsQuality>0 then
 							average=safeVectorLerp(average,lsVelocity,PREDICTOR_LS_BLEND*lsQuality)
 						end
 
-						if data.stopStrength>=0.70 or rawSpeed<=STOP_RAW_SPEED_HARD then
-							average=Vector3.zero
-						elseif data.cutStrength>=0.18 or data.decelStrength>=0.35 then
-							average=safeVectorLerp(average,rawVelocity,0.92)
-						end
-
-						local velocityBlend=math.clamp(PREDICTOR_VELOCITY_BLEND+0.12*reactiveStrength,0,0.98)
-						data.vel=safeVectorLerp(data.vel,average,velocityBlend)
+						data.vel=safeVectorLerp(data.vel,average,PREDICTOR_VELOCITY_BLEND)
 						data.vel=clampMagnitude(data.vel,MAX_RUN_SPEED)
-						data.accel=safeVectorLerp(data.accel,rawAcceleration,math.clamp(PREDICTOR_ACCEL_BLEND+0.20*reactiveStrength,0,1))
+						data.accel=safeVectorLerp(data.accel,rawAcceleration,PREDICTOR_ACCEL_BLEND)
 						data.accel=clampMagnitude(data.accel,PREDICTOR_ACCEL_MAX)
-						local speedConfidence=math.clamp(rawSpeed/NORMAL_ROUTE_MIN_SPEED,0,1)
-						local stabilityConfidence=math.clamp(1-0.45*(data.cutStrength or 0)-0.60*(data.decelStrength or 0)-0.85*(data.stopStrength or 0),0,1)
-						data.confidence=math.clamp((0.30+0.30*lsQuality+0.40*speedConfidence)*stabilityConfidence,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
+						local speedConfidence=math.clamp(data.vel.Magnitude/NORMAL_ROUTE_MIN_SPEED,0,1)
+						data.confidence=math.clamp(0.25+0.45*lsQuality+0.30*speedConfidence,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
 					end
 				end
 			end
