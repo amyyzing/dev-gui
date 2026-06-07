@@ -28,8 +28,8 @@ local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
-local WR_LEAD_DELAY=0.4
-local LEAD_DELAY_BASELINE=0.40 -- slider is now a lead-strength scalar; 0.40 keeps old default feel
+local WR_LEAD_DELAY=0.2
+local LEAD_DELAY_BASELINE=0.20 -- lead adjust is direct receiver prediction time; 0.20 is the baseline calculator
 local ADAPTIVE_LEAD_ENABLED=true
 local ROUTE_SPEED_PARTIAL_GAIN=1.08
 local PREDICTOR_HISTORY_MAX_AGE=1.25
@@ -1705,7 +1705,8 @@ function QBAim.new(ctx,parent)
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
 		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
 		local originPosition=origin(qbRoot,ball,releaseOffset)
-		local receiverReleasePosition=receiverRoot.Position+wrVel*releaseOffset
+		local receiverPredictionDelay=math.max(WR_LEAD_DELAY,0)
+		local receiverReleasePosition=receiverRoot.Position+wrVel*(releaseOffset+receiverPredictionDelay)
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
 		local bestRoot=nil
 		local bestNear=nil
@@ -1747,6 +1748,14 @@ function QBAim.new(ctx,parent)
 		local best=bestRoot or bestNear
 		if best and not best.leadInfo then
 			best.leadInfo=interceptLeadInfo(originPosition,best.target,wrVel,best.time,predictorState)
+		end
+		if best then
+			best.receiverPredictionDelay=receiverPredictionDelay
+			best.totalLeadTime=best.time+receiverPredictionDelay
+			if best.leadInfo then
+				best.leadInfo.receiverPredictionDelay=receiverPredictionDelay
+				best.leadInfo.extraLeadTime=receiverPredictionDelay
+			end
 		end
 
 		return best
