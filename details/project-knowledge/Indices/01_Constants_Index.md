@@ -22,7 +22,8 @@ local SQUADS_BALL_POWER=MODEL_BALL_SPEED
 local PLAYER_G=196.2
 local JUMP_POWER=55.5
 local WR_STANDING_TOP_Y=6.00
-local WR_MAX_Y=WR_STANDING_TOP_Y+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
+local DEFAULT_WR_MAX_Y=WR_STANDING_TOP_Y+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
+local WR_MAX_Y=DEFAULT_WR_MAX_Y
 local C1_Y_MIN=WR_MAX_Y
 local C1_Y_MAX=WR_MAX_Y
 local C1_Y_FIXED=WR_MAX_Y
@@ -30,7 +31,9 @@ local C1_Y_POTENTIAL_EXPONENT=1.00
 local C1_SOLVE_Y_BIAS=0.00
 ```
 
-- Current C1 Y is fixed at `WR_MAX_Y`, about `13.85`.
+- Default C1 Y is `WR_MAX_Y`, about `13.85`.
+- `WR_MAX_Y`, `C1_Y_MIN`, `C1_Y_MAX`, and `C1_Y_FIXED` are updated by the `Peak Height` slider.
+- `state.qbAimPeakHeight` persists the custom value, clamped to `8.00 -> 20.00`.
 - The old `13.00 -> 13.85` route-dominance range is not active in the live solver.
 
 ## Receiver velocity and lead adjustment
@@ -117,7 +120,9 @@ local ARC_MAX_CURVE=400
 local PREVIEW_SMOOTH=0.28
 local C1_MARKER_ENABLED=true
 local C1_MARKER_SIZE=1.65
+local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 ```
 
 - `C2` is the start/release attachment.
 - `C1` and `C3` are both placed on the intercept catch point in the current preview path.
+- The locked receiver is shown through a QB Aim-owned highlight, separate from ESP highlights.

@@ -295,6 +295,7 @@ PAGE1_STATE={
 	qbAimTeamFilter=qbAimTeamFilter,
 	qbAimShowArc=qbAimShowArc,
 	qbAimLeadDelay=qbAimLeadDelay,
+	qbAimPeakHeight=qbAimPeakHeight,
 	testingEnabled=testingEnabled,
 }
 
@@ -324,6 +325,7 @@ function syncPage1State()
 	qbAimTeamFilter=PAGE1_STATE.qbAimTeamFilter
 	qbAimShowArc=PAGE1_STATE.qbAimShowArc
 	qbAimLeadDelay=PAGE1_STATE.qbAimLeadDelay
+	qbAimPeakHeight=PAGE1_STATE.qbAimPeakHeight
 	testingEnabled=PAGE1_STATE.testingEnabled
 end
 
@@ -533,6 +535,7 @@ function resetMainPageDefaults()
 	PAGE1_STATE.qbAimTeamFilter=true
 	PAGE1_STATE.qbAimShowArc=true
 	PAGE1_STATE.qbAimLeadDelay=0.4
+	PAGE1_STATE.qbAimPeakHeight=13.85
 	PAGE1_STATE.testingEnabled=false
 
 	for _,api in pairs(PAGE1_APIS) do

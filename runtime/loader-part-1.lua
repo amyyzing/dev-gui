@@ -57,6 +57,7 @@ QB_AIM_TOGGLE_KEY=Enum.KeyCode.P
 qbAimTeamFilter=true
 qbAimShowArc=true
 qbAimLeadDelay=0.4
+qbAimPeakHeight=13.85
 
 DEFAULT_PRESETS={{key=Enum.KeyCode.Unknown, size=Vector3.new(0.1, 0.1, 0.1)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.7, 5.8, 1.65)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(3.1, 5.8, 1.70)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.52, 5.4, 1.41)},}
 

@@ -47,9 +47,18 @@
 - `setStatus`
 - `setTargetText`
 - `updateLeadDelayVisuals`
+- `syncPeakHeightConstants`
+- `updatePeakHeightVisuals`
 - `setLeadDelay`
+- `setPeakHeight`
 - `setLeadDelayFromScreenX`
+- `setPeakHeightFromScreenX`
 - `canTargetReceiver`
+- `getQBAimHighlight`
+- `ensureQBAimHighlight`
+- `destroyQBAimHighlight`
+- `clearTargetHighlights`
+- `updateTargetHighlight`
 - `ensureReceiverData`
 - `configuredBinding`
 - `bindingMatches`
@@ -112,6 +121,7 @@
 - `api.SetTeamFilterState`
 - `api.SetShowArcState`
 - `api.SetLeadDelay`
+- `api.SetPeakHeight`
 - `api.Refresh`
 - `api.Reset`
 - `api.Destroy`

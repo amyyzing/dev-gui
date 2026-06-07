@@ -356,6 +356,13 @@ function buildDataSaveContext()
 				pcall(PAGE1_APIS.QBAim.SetLeadDelay,PAGE1_STATE.qbAimLeadDelay,false)
 			end
 		end,
+		setQBAimPeakHeight=function(v)
+			PAGE1_STATE.qbAimPeakHeight=v
+			syncPage1State()
+			if PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.SetPeakHeight then
+				pcall(PAGE1_APIS.QBAim.SetPeakHeight,PAGE1_STATE.qbAimPeakHeight,false)
+			end
+		end,
 		setTestingState=function(v)
 			PAGE1_STATE.testingEnabled=v and true or false
 			syncPage1State()

@@ -18,7 +18,7 @@ originalCenter()
 | Attachment | Role |
 |---|---|
 | `C2` | Start/release attachment. Also used as a release-height reference for ball origin if its Y value is near the ball. |
-| `C1` | Mid/catch solve/marker attachment. Created if missing. In latest script C1 height is fixed to `WR_MAX_Y`. |
+| `C1` | Mid/catch solve/marker attachment. Created if missing. In latest script C1 height defaults to `WR_MAX_Y` and can be adjusted by `Peak Height`. |
 | `C3` | End/catch attachment for beam endpoint. |
 | `Beam` | Arc visualization. Uses `C2` as `Attachment0` and `C3` as `Attachment1`. |
 
@@ -27,6 +27,7 @@ Current behavior notes:
 - `QB_RELEASE_EXTRAPOLATE_VERTICAL=false`, so preview C2 does not apply player-gravity vertical prediction during the throw animation wait.
 - C2 Y comes from the current ball/Center C2 reference when that value is near the ball.
 - C1 and C3 use the intercept catch point in the current preview path.
+- `Peak Height` updates the Y used by `receiverMaxAt`, `C1_Y_MIN`, `C1_Y_MAX`, and `C1_Y_FIXED`.
 
 ## C2 release-height reference
 

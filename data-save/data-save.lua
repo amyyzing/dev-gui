@@ -477,6 +477,7 @@ function DataSave.new(ctx)
 				teamFilter=getValue(ctx,"qbAimTeamFilter",true),
 				showArc=getValue(ctx,"qbAimShowArc",true),
 				leadDelay=getValue(ctx,"qbAimLeadDelay",0.4),
+				peakHeight=getValue(ctx,"qbAimPeakHeight",13.85),
 			},
 
 			testing={
@@ -650,6 +651,10 @@ function DataSave.new(ctx)
 		if qbAim.leadDelay~=nil then
 			local leadDelay=clampNumber(qbAim.leadDelay,0,1.5,0.4)
 			if ctx.setQBAimLeadDelay then pcall(ctx.setQBAimLeadDelay,leadDelay) else setValue(ctx,"qbAimLeadDelay",leadDelay) end
+		end
+		if qbAim.peakHeight~=nil then
+			local peakHeight=clampNumber(qbAim.peakHeight,8,20,13.85)
+			if ctx.setQBAimPeakHeight then pcall(ctx.setQBAimPeakHeight,peakHeight) else setValue(ctx,"qbAimPeakHeight",peakHeight) end
 		end
 
 		local testing=settings.testing or {}

@@ -18,7 +18,8 @@ local SQUADS_BALL_POWER=MODEL_BALL_SPEED
 local PLAYER_G=196.2
 local JUMP_POWER=55.5
 local WR_STANDING_TOP_Y=6.00
-local WR_MAX_Y=WR_STANDING_TOP_Y+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G) -- ~=13.85
+local DEFAULT_WR_MAX_Y=WR_STANDING_TOP_Y+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G) -- ~=13.85
+local WR_MAX_Y=DEFAULT_WR_MAX_Y
 local C1_Y_MIN=WR_MAX_Y
 local C1_Y_MAX=WR_MAX_Y
 local C1_Y_FIXED=WR_MAX_Y
@@ -133,6 +134,7 @@ local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
 local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
 local PLAY_THROW_LOCAL_FALLBACK=false
+local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local VALID_TEAM_IDS={
 	HomeTeam=true,
 	AwayTeam=true,
@@ -648,14 +650,13 @@ function QBAim.new(ctx,parent)
 	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil,ballMissingSince=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
+	local highlightedCharacter=nil
 	local connections={}
 	local sectionBody=nil
 	local sectionFrame=nil
 	local enabledToggle=nil
 	local teamFilterToggle=nil
 	local arcToggle=nil
-	local statusLabel=nil
-	local targetLabel=nil
 	local leadDelayFrame=nil
 	local leadDelayBox=nil
 	local leadDelaySlider=nil
@@ -663,8 +664,18 @@ function QBAim.new(ctx,parent)
 	local leadDelaySliderKnob=nil
 	local leadDelaySliderControl=nil
 	local leadDelayDragging=false
+	local peakHeightFrame=nil
+	local peakHeightBox=nil
+	local peakHeightSlider=nil
+	local peakHeightSliderFill=nil
+	local peakHeightSliderKnob=nil
+	local peakHeightSliderControl=nil
+	local peakHeightDragging=false
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
+	local PEAK_HEIGHT_MIN=8.00
+	local PEAK_HEIGHT_MAX=20.00
+	local updateTargetHighlight=function() end
 
 	if state.qbAimTeamFilter==nil then
 		state.qbAimTeamFilter=true
@@ -678,7 +689,16 @@ function QBAim.new(ctx,parent)
 		state.qbAimLeadDelay=WR_LEAD_DELAY
 	end
 
+	if state.qbAimPeakHeight==nil then
+		state.qbAimPeakHeight=WR_MAX_Y
+	end
+
 	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
+	WR_MAX_Y=math.clamp(tonumber(state.qbAimPeakHeight) or WR_MAX_Y,PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX)
+	state.qbAimPeakHeight=WR_MAX_Y
+	C1_Y_MIN=WR_MAX_Y
+	C1_Y_MAX=WR_MAX_Y
+	C1_Y_FIXED=WR_MAX_Y
 
 	local function addConnection(conn)
 		table.insert(connections,conn)
@@ -714,19 +734,11 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function setStatus(text)
-		if statusLabel then
-			statusLabel.Text=text
-		end
+		return text
 	end
 
 	local function setTargetText()
-		if not targetLabel then return end
-
-		if trackedReceiver then
-			targetLabel.Text="Target: "..trackedReceiver.Name
-		else
-			targetLabel.Text="Target: none"
-		end
+		updateTargetHighlight()
 	end
 
 	local function updateLeadDelayVisuals()
@@ -743,6 +755,29 @@ function QBAim.new(ctx,parent)
 			alpha=math.clamp(alpha,0,1)
 			leadDelaySliderFill.Size=UDim2.new(alpha,0,1,0)
 			leadDelaySliderKnob.Position=UDim2.new(alpha,-5,0.5,-5)
+		end
+	end
+
+	local function syncPeakHeightConstants()
+		C1_Y_MIN=WR_MAX_Y
+		C1_Y_MAX=WR_MAX_Y
+		C1_Y_FIXED=WR_MAX_Y
+	end
+
+	local function updatePeakHeightVisuals()
+		if peakHeightSliderControl then
+			peakHeightSliderControl.set(WR_MAX_Y)
+		end
+
+		if peakHeightBox then
+			peakHeightBox.Text=string.format("%.2f",WR_MAX_Y)
+		end
+
+		if peakHeightSliderFill and peakHeightSliderKnob and peakHeightSlider then
+			local alpha=(WR_MAX_Y-PEAK_HEIGHT_MIN)/math.max(PEAK_HEIGHT_MAX-PEAK_HEIGHT_MIN,0.001)
+			alpha=math.clamp(alpha,0,1)
+			peakHeightSliderFill.Size=UDim2.new(alpha,0,1,0)
+			peakHeightSliderKnob.Position=UDim2.new(alpha,-5,0.5,-5)
 		end
 	end
 
@@ -763,12 +798,37 @@ function QBAim.new(ctx,parent)
 		return true
 	end
 
+	local function setPeakHeight(value,showStatus)
+		local numberValue=tonumber(value)
+		if not numberValue then
+			updatePeakHeightVisuals()
+			return false
+		end
+
+		WR_MAX_Y=math.clamp(numberValue,PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX)
+		state.qbAimPeakHeight=WR_MAX_Y
+		syncPeakHeightConstants()
+		updatePeakHeightVisuals()
+		if showStatus then
+			changed()
+		end
+		return true
+	end
+
 	local function setLeadDelayFromScreenX(screenX,showStatus)
 		if not leadDelaySlider then return false end
 		local pos=leadDelaySlider.AbsolutePosition.X
 		local size=math.max(leadDelaySlider.AbsoluteSize.X,1)
 		local alpha=math.clamp((screenX-pos)/size,0,1)
 		return setLeadDelay(LEAD_DELAY_MIN+(LEAD_DELAY_MAX-LEAD_DELAY_MIN)*alpha,showStatus)
+	end
+
+	local function setPeakHeightFromScreenX(screenX,showStatus)
+		if not peakHeightSlider then return false end
+		local pos=peakHeightSlider.AbsolutePosition.X
+		local size=math.max(peakHeightSlider.AbsoluteSize.X,1)
+		local alpha=math.clamp((screenX-pos)/size,0,1)
+		return setPeakHeight(PEAK_HEIGHT_MIN+(PEAK_HEIGHT_MAX-PEAK_HEIGHT_MIN)*alpha,showStatus)
 	end
 
 	local function canTargetReceiver(player)
@@ -781,6 +841,68 @@ function QBAim.new(ctx,parent)
 		end
 
 		return isSameTeam(player,LP)
+	end
+
+	local function getQBAimHighlight(character)
+		local highlight=character and character:FindFirstChild(QB_AIM_HIGHLIGHT_NAME)
+		if highlight and highlight:IsA("Highlight") then
+			return highlight
+		end
+
+		return nil
+	end
+
+	local function ensureQBAimHighlight(character)
+		local highlight=getQBAimHighlight(character)
+		if highlight then return highlight end
+
+		highlight=Instance.new("Highlight")
+		highlight.Name=QB_AIM_HIGHLIGHT_NAME
+		highlight.Parent=character
+		return highlight
+	end
+
+	local function destroyQBAimHighlight(character)
+		local highlight=getQBAimHighlight(character)
+		if highlight then
+			highlight:Destroy()
+		end
+	end
+
+	local function clearTargetHighlights()
+		for _,player in ipairs(Players:GetPlayers()) do
+			local character=player.Character
+			if character then
+				destroyQBAimHighlight(character)
+			end
+		end
+
+		highlightedCharacter=nil
+	end
+
+	updateTargetHighlight=function()
+		local character=enabled and trackedReceiver and trackedReceiver.Character or nil
+		if not(character and canTargetReceiver(trackedReceiver)) then
+			if highlightedCharacter then
+				destroyQBAimHighlight(highlightedCharacter)
+				highlightedCharacter=nil
+			end
+			return
+		end
+
+		if highlightedCharacter and highlightedCharacter~=character then
+			destroyQBAimHighlight(highlightedCharacter)
+		end
+
+		highlightedCharacter=character
+		local highlight=ensureQBAimHighlight(character)
+		highlight.Adornee=character
+		highlight.Enabled=true
+		highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.FillTransparency=0.65
+		highlight.OutlineTransparency=0
+		highlight.FillColor=THEME.BLUE or THEME.ACC or Color3.fromRGB(21,103,251)
+		highlight.OutlineColor=THEME.ACC or THEME.BLUE or Color3.fromRGB(32,202,106)
 	end
 
 	local function ensureReceiverData(player,receiverRoot)
@@ -855,6 +977,8 @@ function QBAim.new(ctx,parent)
 			arcToggle.set(state.qbAimShowArc~=false)
 		end
 
+		updateLeadDelayVisuals()
+		updatePeakHeightVisuals()
 		setTargetText()
 
 		if not isAvailable() then
@@ -2283,6 +2407,10 @@ function QBAim.new(ctx,parent)
 		setLeadDelay(value,fire~=false)
 	end
 
+	function api.SetPeakHeight(value,fire)
+		setPeakHeight(value,fire~=false)
+	end
+
 	function api.Refresh()
 		syncControls()
 	end
@@ -2299,6 +2427,7 @@ function QBAim.new(ctx,parent)
 		table.clear(connections)
 
 		destroyPreviewCenter()
+		clearTargetHighlights()
 		if preview.c1Marker and preview.c1Marker.Parent then
 			preview.c1Marker:Destroy()
 		end
@@ -2333,12 +2462,12 @@ function QBAim.new(ctx,parent)
 		api.SetShowArcState(value,true)
 	end)
 
-	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
-	targetLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="Target: none",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},sectionBody)
-
 	if buildSlider then
 		leadDelaySliderControl=buildSlider(sectionBody,"Lead Adjust",LEAD_DELAY_MIN,LEAD_DELAY_MAX,WR_LEAD_DELAY,2,function(value)
 			api.SetLeadDelay(value,true)
+		end)
+		peakHeightSliderControl=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
+			api.SetPeakHeight(value,true)
 		end)
 	else
 		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
@@ -2347,9 +2476,16 @@ function QBAim.new(ctx,parent)
 		addConnection(leadDelayBox.FocusLost:Connect(function()
 			setLeadDelay(leadDelayBox.Text,true)
 		end))
+		peakHeightFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
+		peakHeightBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",WR_MAX_Y),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},peakHeightFrame)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="Peak Height",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},peakHeightFrame)
+		addConnection(peakHeightBox.FocusLost:Connect(function()
+			setPeakHeight(peakHeightBox.Text,true)
+		end))
 	end
 
 	updateLeadDelayVisuals()
+	updatePeakHeightVisuals()
 
 	addConnection(RunService.Heartbeat:Connect(function(dt)
 		if not isAlive() then return end
@@ -2416,6 +2552,8 @@ function QBAim.new(ctx,parent)
 
 	addConnection(RunService.RenderStepped:Connect(function()
 		if not(enabled and isAvailable()) then return end
+
+		updateTargetHighlight()
 
 		local now=os.clock()
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then

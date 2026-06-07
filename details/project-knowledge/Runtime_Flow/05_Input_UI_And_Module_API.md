@@ -18,8 +18,9 @@ The script creates a `QB Aim` section with:
 - `Team Filter`
 - `Show Arc`
 - `Lead Adjust` slider or fallback textbox
-- status label
-- target label
+- `Peak Height` slider or fallback textbox
+
+The older status and target text labels are removed. Target feedback is now visual: when QB Aim is enabled and a receiver is locked, the receiver character gets a QB Aim-owned `Highlight` named `QBAimTargetHighlight`.
 
 ## Public API returned by `QBAim.new`
 
@@ -28,6 +29,7 @@ api.SetQBAimState(value)
 api.SetTeamFilterState(value, fire)
 api.SetShowArcState(value, fire)
 api.SetLeadDelay(value, fire)
+api.SetPeakHeight(value, fire)
 api.Refresh()
 api.Reset()
 api.Destroy()
@@ -40,6 +42,7 @@ state.qbAimEnabled
 state.qbAimTeamFilter
 state.qbAimShowArc
 state.qbAimLeadDelay
+state.qbAimPeakHeight
 ```
 
 `ctx.onChanged(state)` is called when relevant user state changes.
