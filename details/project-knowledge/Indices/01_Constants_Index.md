@@ -42,11 +42,15 @@ local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
 local WR_LEAD_DELAY=0.2
 local LEAD_DELAY_BASELINE=0.20
+local LEAD_DELAY_ZERO_FLIGHT_TIME=0.70
+local LEAD_DELAY_FULL_FLIGHT_TIME=1.35
 local ROUTE_SPEED_PARTIAL_GAIN=1.08
 ```
 
-- `WR_LEAD_DELAY` is direct receiver prediction time.
-- The intercept target starts from `receiverRoot.Position + wrVel * (releaseOffset + WR_LEAD_DELAY)`.
+- `WR_LEAD_DELAY` is extra receiver prediction time.
+- The intercept target starts from `receiverRoot.Position + wrVel * releaseOffset`.
+- The extra lead delay is applied inside the intercept equation as `wrVel * leadDelayForFlightTime(t)`.
+- `leadDelayForFlightTime(t)` ramps from `0` at `0.70s` flight time to full `WR_LEAD_DELAY` at `1.35s`.
 - `0.20` is the baseline calculator value.
 
 ## Axis-invariant predictor support

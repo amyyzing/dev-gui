@@ -30,6 +30,8 @@ local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
 local WR_LEAD_DELAY=0.2
 local LEAD_DELAY_BASELINE=0.20 -- lead adjust is direct receiver prediction time; 0.20 is the baseline calculator
+local LEAD_DELAY_ZERO_FLIGHT_TIME=0.70
+local LEAD_DELAY_FULL_FLIGHT_TIME=1.35
 local ADAPTIVE_LEAD_ENABLED=true
 local ROUTE_SPEED_PARTIAL_GAIN=1.08
 local PREDICTOR_HISTORY_MAX_AGE=1.25
@@ -162,6 +164,19 @@ local function clampMagnitude(v,maxMagnitude)
 	end
 
 	return v
+end
+
+local function smoothstep(edge0,edge1,value)
+	if edge1<=edge0 then
+		return value>=edge1 and 1 or 0
+	end
+
+	local alpha=math.clamp((value-edge0)/(edge1-edge0),0,1)
+	return alpha*alpha*(3-2*alpha)
+end
+
+local function leadDelayForFlightTime(time)
+	return math.max(WR_LEAD_DELAY,0)*smoothstep(LEAD_DELAY_ZERO_FLIGHT_TIME,LEAD_DELAY_FULL_FLIGHT_TIME,time or 0)
 end
 
 local function safeVectorLerp(a,b,alpha)
@@ -1530,7 +1545,8 @@ function QBAim.new(ctx,parent)
 
 	local function interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
 		local inheritedVelocity=qbVel*QB_INHERITANCE
-		local neededDisplacement=receiverStart-originPosition+(wrVel-inheritedVelocity)*time-0.5*G*time*time
+		local receiverLeadDelay=leadDelayForFlightTime(time)
+		local neededDisplacement=receiverStart-originPosition+(wrVel-inheritedVelocity)*time+wrVel*receiverLeadDelay-0.5*G*time*time
 		return neededDisplacement:Dot(neededDisplacement)-ballSpeed*ballSpeed*time*time
 	end
 
@@ -1606,7 +1622,8 @@ function QBAim.new(ctx,parent)
 		if time<=0 then return nil end
 
 		local inheritedVelocity=qbVel*QB_INHERITANCE
-		local neededDisplacement=receiverStart-originPosition+(wrVel-inheritedVelocity)*time-0.5*G*time*time
+		local receiverLeadDelay=leadDelayForFlightTime(time)
+		local neededDisplacement=receiverStart-originPosition+(wrVel-inheritedVelocity)*time+wrVel*receiverLeadDelay-0.5*G*time*time
 		local requiredVelocity=neededDisplacement/time
 		local requiredSpeed=requiredVelocity.Magnitude
 		if requiredSpeed<=1e-6 then return nil end
@@ -1617,7 +1634,7 @@ function QBAim.new(ctx,parent)
 
 		local throwVelocity=direction*ballSpeed
 		local worldVelocity=throwVelocity+inheritedVelocity
-		local target=receiverStart+wrVel*time
+		local target=receiverStart+wrVel*(time+receiverLeadDelay)
 		local catchPosition=ballAt(originPosition,worldVelocity,time)
 		local speedError=math.abs(requiredSpeed-ballSpeed)
 		local missEstimate=speedError*time
@@ -1628,7 +1645,9 @@ function QBAim.new(ctx,parent)
 		return{
 			score=speedError*100+missEstimate*25+time*0.35+(verticalVelocityAtCatch>6 and verticalVelocityAtCatch*0.15 or 0),
 			time=time,
-			totalLeadTime=time,
+			totalLeadTime=time+receiverLeadDelay,
+			receiverPredictionDelay=receiverLeadDelay,
+			receiverPredictionDelayScale=WR_LEAD_DELAY>0 and receiverLeadDelay/WR_LEAD_DELAY or 0,
 			origin=originPosition,
 			target=target,
 			c1Point=target,
@@ -1705,8 +1724,7 @@ function QBAim.new(ctx,parent)
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
 		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
 		local originPosition=origin(qbRoot,ball,releaseOffset)
-		local receiverPredictionDelay=math.max(WR_LEAD_DELAY,0)
-		local receiverReleasePosition=receiverRoot.Position+wrVel*(releaseOffset+receiverPredictionDelay)
+		local receiverReleasePosition=receiverRoot.Position+wrVel*releaseOffset
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
 		local bestRoot=nil
 		local bestNear=nil
@@ -1750,11 +1768,14 @@ function QBAim.new(ctx,parent)
 			best.leadInfo=interceptLeadInfo(originPosition,best.target,wrVel,best.time,predictorState)
 		end
 		if best then
+			local receiverPredictionDelay=best.receiverPredictionDelay or leadDelayForFlightTime(best.time)
 			best.receiverPredictionDelay=receiverPredictionDelay
+			best.receiverPredictionDelayScale=WR_LEAD_DELAY>0 and receiverPredictionDelay/WR_LEAD_DELAY or 0
 			best.totalLeadTime=best.time+receiverPredictionDelay
 			if best.leadInfo then
 				best.leadInfo.receiverPredictionDelay=receiverPredictionDelay
 				best.leadInfo.extraLeadTime=receiverPredictionDelay
+				best.leadInfo.receiverPredictionDelayScale=best.receiverPredictionDelayScale
 			end
 		end
 

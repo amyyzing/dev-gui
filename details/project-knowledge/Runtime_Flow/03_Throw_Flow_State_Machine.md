@@ -17,7 +17,8 @@ Select power by mode:
   ↓
 Build pre-animation release-offset plan
   using fixed-speed intercept at 95 studs/s
-  receiver start = WR peak position + wrVel * (releaseOffset + lead adjust)
+  receiver start = WR peak position + wrVel * releaseOffset
+  extra lead adjust = wrVel * leadDelayForFlightTime(t)
   ↓
 Play throw animation
   ↓
@@ -26,7 +27,7 @@ During 0.2666667s release wait:
   update arc preview if plan exists
   ↓
 Build final plan at release
-  using releaseOffset = 0 but still applying lead adjust
+  using releaseOffset = 0 but still applying tapered lead adjust
   ↓
 Send remote:
   mode1 -> Gameplay ReEvent Mechanics/ThrowBall
@@ -101,8 +102,10 @@ Freeze preview briefly after throw
 The current `solve` path does not choose a throw by route/distance angle buckets. It scans time and solves the fixed-speed intercept condition:
 
 ```lua
-F(t) = |receiverStart - origin + (wrVel - qbVel * QB_INHERITANCE) * t - 0.5 * G * t * t|^2 - MODEL_BALL_SPEED^2 * t * t
+F(t) = |receiverStart - origin + (wrVel - qbVel * QB_INHERITANCE) * t + wrVel * leadDelayForFlightTime(t) - 0.5 * G * t * t|^2 - MODEL_BALL_SPEED^2 * t * t
 ```
+
+`leadDelayForFlightTime(t)` uses a smooth ramp from `0` at `0.70s` to full `WR_LEAD_DELAY` at `1.35s`. This keeps short throws from receiving the full extra lead while preserving the baseline compensation on longer throws.
 
 After a valid time is chosen:
 

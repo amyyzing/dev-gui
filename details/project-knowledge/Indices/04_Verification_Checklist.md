@@ -42,6 +42,7 @@ Use this when comparing the markdown map against actual in-game explorer output 
 - Confirm model ball speed is `95` for display power `100`.
 - Confirm player jump peak is still about `13.85` studs.
 - Confirm fixed C1 Y at `WR_MAX_Y` is correct in current gameplay.
-- Confirm `Lead Adjust = 0.20` behaves like the baseline calculator.
+- Confirm `Lead Adjust = 0.20` still behaves like the baseline calculator on medium/long throws.
+- Confirm short throws do not receive full extra lead delay and no longer overlead as hard.
 - Confirm larger lead adjust values advance C1 by receiver velocity before the intercept solve.
 - Confirm C2 follows ball/Center C2 while jumping and does not drop during preview.

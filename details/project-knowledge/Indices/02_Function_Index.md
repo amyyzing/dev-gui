@@ -4,6 +4,8 @@
 - `distXZ`
 - `unit`
 - `clampMagnitude`
+- `smoothstep`
+- `leadDelayForFlightTime`
 - `safeVectorLerp`
 - `lerpNumber`
 - `root`
