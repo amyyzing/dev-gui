@@ -46,3 +46,7 @@ state.qbAimPeakHeight
 ```
 
 `ctx.onChanged(state)` is called when relevant user state changes.
+
+## Toggle refresh behavior
+
+The runtime refreshes the active page controls when a page/tab is activated. Main-page modules repaint from `PAGE1_STATE` through their `api.Refresh()` methods, and shared header toggles force a visual repaint even when the boolean value did not change. This keeps saved toggle state consistent after rejoin, lazy page construction, and tab switches.

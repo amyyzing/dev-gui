@@ -551,7 +551,7 @@ function GuiLogic.new(ctx)
 
 		return{
 			set=function(value)
-				setState(value,false,true)
+				setState(value,false,false,true)
 			end,
 			get=function()
 				return state

@@ -146,11 +146,14 @@ function setPersistentValue(name,value)
 end
 
 function refreshAllUI()
-	for _,api in pairs(PAGE1_APIS) do
-		if api and api.Refresh then pcall(api.Refresh) end
+	if refreshRuntimePageControls then
+		pcall(refreshRuntimePageControls,"main")
+	else
+		for _,api in pairs(PAGE1_APIS) do
+			if api and api.Refresh then pcall(api.Refresh) end
+		end
+		syncPage1State()
 	end
-
-	syncPage1State()
 
 	if StrokeColourAPI and StrokeColourAPI.Refresh then pcall(StrokeColourAPI.Refresh) end
 	if MapEditorAPI and MapEditorAPI.Refresh then pcall(MapEditorAPI.Refresh) end

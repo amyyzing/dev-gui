@@ -476,8 +476,8 @@ function DataSave.new(ctx)
 				enabled=getValue(ctx,"qbAimEnabled",false),
 				teamFilter=getValue(ctx,"qbAimTeamFilter",true),
 				showArc=getValue(ctx,"qbAimShowArc",true),
-				leadDelay=getValue(ctx,"qbAimLeadDelay",0.4),
-				peakHeight=getValue(ctx,"qbAimPeakHeight",13.85),
+				leadDelay=getValue(ctx,"qbAimLeadDelay",0.38),
+				peakHeight=getValue(ctx,"qbAimPeakHeight",14.00),
 			},
 
 			testing={
@@ -649,11 +649,11 @@ function DataSave.new(ctx)
 			if ctx.setQBAimShowArc then pcall(ctx.setQBAimShowArc,qbAim.showArc) else setValue(ctx,"qbAimShowArc",qbAim.showArc and true or false) end
 		end
 		if qbAim.leadDelay~=nil then
-			local leadDelay=clampNumber(qbAim.leadDelay,0,1.5,0.4)
+			local leadDelay=clampNumber(qbAim.leadDelay,0,1.5,0.38)
 			if ctx.setQBAimLeadDelay then pcall(ctx.setQBAimLeadDelay,leadDelay) else setValue(ctx,"qbAimLeadDelay",leadDelay) end
 		end
 		if qbAim.peakHeight~=nil then
-			local peakHeight=clampNumber(qbAim.peakHeight,8,20,13.85)
+			local peakHeight=clampNumber(qbAim.peakHeight,8,20,14.00)
 			if ctx.setQBAimPeakHeight then pcall(ctx.setQBAimPeakHeight,peakHeight) else setValue(ctx,"qbAimPeakHeight",peakHeight) end
 		end
 

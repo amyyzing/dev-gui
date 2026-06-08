@@ -47,13 +47,22 @@ LAZY_PAGE_BUILT={}
 function ensureRuntimePageBuilt(name)
 	name=tostring(name or "main")
 	local builder=LAZY_PAGE_BUILDERS[name]
-	if not builder or LAZY_PAGE_BUILT[name] then return end
+	if not builder or LAZY_PAGE_BUILT[name] then
+		if refreshRuntimePageControls then
+			pcall(refreshRuntimePageControls,name)
+		end
+		return
+	end
 
 	LAZY_PAGE_BUILT[name]=true
 	local ok,err=pcall(builder)
 	if not ok then
 		LAZY_PAGE_BUILT[name]=false
 		warn("Lazy page build failed:",name,err)
+	end
+
+	if refreshRuntimePageControls then
+		pcall(refreshRuntimePageControls,name)
 	end
 end
 
@@ -327,6 +336,49 @@ function syncPage1State()
 	qbAimLeadDelay=PAGE1_STATE.qbAimLeadDelay
 	qbAimPeakHeight=PAGE1_STATE.qbAimPeakHeight
 	testingEnabled=PAGE1_STATE.testingEnabled
+end
+
+function refreshRuntimePageControls(name)
+	name=tostring(name or "main")
+
+	if name=="main" then
+		syncPage1State()
+		for _,api in pairs(PAGE1_APIS) do
+			if api and api.Refresh then
+				pcall(api.Refresh)
+			end
+		end
+		syncPage1State()
+		if refreshActionStatus then
+			pcall(refreshActionStatus)
+		end
+	elseif name=="maps" then
+		if refreshSettingsPage then
+			pcall(refreshSettingsPage)
+		end
+	elseif name=="customize" then
+		if StrokeColourAPI and StrokeColourAPI.Refresh then
+			pcall(StrokeColourAPI.Refresh)
+		end
+	elseif name=="page2" then
+		if refreshPage2UI then
+			pcall(refreshPage2UI)
+		end
+	elseif name=="settings" then
+		if PlayerDataAPI and PlayerDataAPI.Refresh then
+			pcall(PlayerDataAPI.Refresh)
+		end
+		if DiscordAPI and DiscordAPI.Refresh then
+			pcall(DiscordAPI.Refresh)
+		end
+	end
+
+	if applyUIStrokeTheme then
+		pcall(applyUIStrokeTheme)
+	end
+	if updateResponsiveLayout then
+		pcall(updateResponsiveLayout)
+	end
 end
 
 PAGE1_APIS={}
