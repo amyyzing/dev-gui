@@ -215,6 +215,53 @@ function GuiLogic.new(ctx)
 		local strokeColor=themeColor("STROKE",THEME.STROKE or muted)
 		local dark=input:Lerp(Color3.new(0,0,0),0.25)
 		local light=(THEME.TEXT or Color3.fromRGB(245,245,245))
+		local state=startState and true or false
+		local onPosition=UDim2.new(1,-(indicatorSize/2+indicatorInset),0.5,0)
+		local offPosition=UDim2.new(0,indicatorSize/2+indicatorInset,0.5,0)
+		local activeInnerSize=headerNumber("HeaderToggleActiveInnerSize",math.max(10,math.floor(outerCoreSize*0.54)))
+		local inactiveInnerSize=headerNumber("HeaderToggleInactiveInnerSize",math.min(innerOffSize,math.max(8,math.floor(inactiveOuterCoreSize*0.52))))
+		local stateVisuals={
+			[true]={
+				indicatorPosition=onPosition,
+				fillSize=UDim2.new(1,0,1,0),
+				fillTransparency=0.08,
+				outerCoreSize=UDim2.fromOffset(outerCoreSize,outerCoreSize),
+				outerStrokeColor=accent,
+				outerStrokeTransparency=0.08,
+				innerSize=UDim2.fromOffset(activeInnerSize,activeInnerSize),
+				innerRotation=45,
+				innerColor=light:Lerp(accent,0.2),
+				innerFillTransparency=0.05,
+				innerStrokeColor=accent,
+				innerStrokeTransparency=0.38,
+				glowTransparency=0.8,
+				tickColor=accent,
+				tickTransparency=0.34,
+			},
+			[false]={
+				indicatorPosition=offPosition,
+				fillSize=UDim2.new(0,0,1,0),
+				fillTransparency=1,
+				outerCoreSize=UDim2.fromOffset(inactiveOuterCoreSize,inactiveOuterCoreSize),
+				outerStrokeColor=strokeColor,
+				outerStrokeTransparency=0.28,
+				innerSize=UDim2.fromOffset(inactiveInnerSize,inactiveInnerSize),
+				innerRotation=0,
+				innerColor=muted,
+				innerFillTransparency=0.14,
+				innerStrokeColor=muted,
+				innerStrokeTransparency=0.58,
+				glowTransparency=1,
+				tickColor=muted,
+				tickTransparency=0.82,
+			},
+		}
+
+		local function visualState(enabled)
+			return stateVisuals[enabled and true or false]
+		end
+
+		local initialVisuals=visualState(state)
 
 		local switch=New("Frame",{
 			AnchorPoint=Vector2.new(1,0.5),
@@ -248,7 +295,7 @@ function GuiLogic.new(ctx)
 		local railFillClip=New("Frame",{
 			AnchorPoint=Vector2.new(0,0.5),
 			Position=UDim2.fromScale(0,0.5),
-			Size=startState and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0),
+			Size=initialVisuals.fillSize,
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
 			ClipsDescendants=true,
@@ -260,7 +307,7 @@ function GuiLogic.new(ctx)
 			Position=UDim2.fromScale(0,0.5),
 			Size=UDim2.new(1,0,1,0),
 			BackgroundColor3=accent,
-			BackgroundTransparency=startState and 0.08 or 1,
+			BackgroundTransparency=initialVisuals.fillTransparency,
 			BorderSizePixel=0,
 			ZIndex=z+2,
 		},railFillClip)
@@ -289,8 +336,8 @@ function GuiLogic.new(ctx)
 				AnchorPoint=Vector2.new(0.5,0.5),
 				Position=UDim2.fromScale(alpha,0.5),
 				Size=UDim2.fromOffset(1,railHeight-8),
-				BackgroundColor3=startState and accent or muted,
-				BackgroundTransparency=startState and 0.24 or 0.72,
+				BackgroundColor3=initialVisuals.tickColor,
+				BackgroundTransparency=initialVisuals.tickTransparency,
 				BorderSizePixel=0,
 				ZIndex=z+3,
 			},tickHolder)
@@ -299,7 +346,7 @@ function GuiLogic.new(ctx)
 
 		local indicator=New("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=startState and UDim2.new(1,-(indicatorSize/2+indicatorInset),0.5,0) or UDim2.new(0,indicatorSize/2+indicatorInset,0.5,0),
+			Position=initialVisuals.indicatorPosition,
 			Size=UDim2.fromOffset(indicatorSize,indicatorSize),
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
@@ -315,7 +362,7 @@ function GuiLogic.new(ctx)
 		local outerCore=New("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
 			Position=UDim2.fromScale(0.5,0.5),
-			Size=UDim2.fromOffset(startState and outerCoreSize or inactiveOuterCoreSize,startState and outerCoreSize or inactiveOuterCoreSize),
+			Size=initialVisuals.outerCoreSize,
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
 			Rotation=0,
@@ -324,9 +371,9 @@ function GuiLogic.new(ctx)
 		New("UIAspectRatioConstraint",{AspectRatio=1},outerCore)
 
 		local outerStroke=New("UIStroke",{
-			Color=startState and accent or strokeColor,
+			Color=initialVisuals.outerStrokeColor,
 			Thickness=strokeThickness,
-			Transparency=startState and 0.06 or 0.24,
+			Transparency=initialVisuals.outerStrokeTransparency,
 			LineJoinMode=Enum.LineJoinMode.Miter,
 		},outerCore)
 		outerStroke:SetAttribute("StrokeRole","Fixed")
@@ -337,7 +384,7 @@ function GuiLogic.new(ctx)
 			Size=UDim2.fromOffset(outerCoreSize+4,outerCoreSize+4),
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
-			Rotation=startState and 45 or 0,
+			Rotation=initialVisuals.innerRotation,
 			ZIndex=z+4,
 		},indicator)
 		New("UIAspectRatioConstraint",{AspectRatio=1},glowOuter)
@@ -345,7 +392,7 @@ function GuiLogic.new(ctx)
 		local glowStroke=New("UIStroke",{
 			Color=accent,
 			Thickness=4,
-			Transparency=startState and 0.76 or 1,
+			Transparency=initialVisuals.glowTransparency,
 			LineJoinMode=Enum.LineJoinMode.Miter,
 		},glowOuter)
 		glowStroke:SetAttribute("StrokeRole","Fixed")
@@ -366,19 +413,19 @@ function GuiLogic.new(ctx)
 		local inner=New("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
 			Position=UDim2.fromScale(0.5,0.5),
-			Size=UDim2.fromOffset(startState and outerCoreSize or innerOffSize,startState and outerCoreSize or innerOffSize),
-			BackgroundColor3=startState and accent or muted,
-			BackgroundTransparency=startState and 1 or 0.12,
+			Size=initialVisuals.innerSize,
+			BackgroundColor3=initialVisuals.innerColor,
+			BackgroundTransparency=initialVisuals.innerFillTransparency,
 			BorderSizePixel=0,
-			Rotation=startState and 45 or 0,
+			Rotation=initialVisuals.innerRotation,
 			ZIndex=z+7,
 		},indicator)
 		New("UIAspectRatioConstraint",{AspectRatio=1},inner)
 
 		local innerStroke=New("UIStroke",{
-			Color=startState and accent or muted,
+			Color=initialVisuals.innerStrokeColor,
 			Thickness=strokeThickness,
-			Transparency=startState and 0.03 or 0.44,
+			Transparency=initialVisuals.innerStrokeTransparency,
 			LineJoinMode=Enum.LineJoinMode.Miter,
 		},inner)
 		innerStroke:SetAttribute("StrokeRole","Fixed")
@@ -392,7 +439,6 @@ function GuiLogic.new(ctx)
 			ZIndex=z+10,
 		},switch)
 
-		local state=startState and true or false
 		local categoryExpanded=true
 		local activeTweens={}
 		local scaleTween=nil
@@ -429,30 +475,6 @@ function GuiLogic.new(ctx)
 			return tw
 		end
 
-		local function visualState(expanded)
-			local coreSize=expanded and outerCoreSize or inactiveOuterCoreSize
-			local innerSize=expanded and outerCoreSize or innerOffSize
-			local innerRotation=expanded and 45 or 0
-
-			return{
-				indicatorPosition=expanded and UDim2.new(1,-(indicatorSize/2+indicatorInset),0.5,0) or UDim2.new(0,indicatorSize/2+indicatorInset,0.5,0),
-				fillSize=expanded and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0),
-				fillTransparency=expanded and 0.08 or 1,
-				activeTransparency=expanded and 0.06 or 0.24,
-				outerCoreSize=UDim2.fromOffset(coreSize,coreSize),
-				innerSize=UDim2.fromOffset(innerSize,innerSize),
-				innerRotation=innerRotation,
-				innerFillTransparency=expanded and 1 or 0.12,
-				innerStrokeTransparency=expanded and 0.03 or 0.44,
-				innerStrokeThickness=strokeThickness,
-				glowTransparency=expanded and 0.76 or 1,
-				targetAccent=expanded and accent or strokeColor,
-				innerColor=expanded and accent or muted,
-				tickTransparency=expanded and 0.24 or 0.72,
-				tickColor=expanded and accent or muted,
-			}
-		end
-
 		local function applyExpandedVisuals(animate)
 			local targetScale=categoryExpanded and expandedScale or collapsedScale
 
@@ -480,7 +502,7 @@ function GuiLogic.new(ctx)
 				applyProps(outerCore,{Size=visuals.outerCoreSize})
 				applyProps(railFillClip,{Size=visuals.fillSize})
 				applyProps(railFill,{BackgroundTransparency=visuals.fillTransparency})
-				applyProps(outerStroke,{Color=visuals.targetAccent,Transparency=visuals.activeTransparency})
+				applyProps(outerStroke,{Color=visuals.outerStrokeColor,Transparency=visuals.outerStrokeTransparency})
 				applyProps(inner,{
 					Size=visuals.innerSize,
 					Rotation=visuals.innerRotation,
@@ -488,8 +510,8 @@ function GuiLogic.new(ctx)
 					BackgroundTransparency=visuals.innerFillTransparency,
 				})
 				applyProps(innerStroke,{
-					Color=visuals.innerColor,
-					Thickness=visuals.innerStrokeThickness,
+					Color=visuals.innerStrokeColor,
+					Thickness=strokeThickness,
 					Transparency=visuals.innerStrokeTransparency,
 				})
 				applyProps(glowOuter,{Rotation=visuals.innerRotation})
@@ -506,7 +528,7 @@ function GuiLogic.new(ctx)
 			playTrackedTween(outerCore,shapeInfo,{Size=visuals.outerCoreSize})
 			playTrackedTween(railFillClip,shapeInfo,{Size=visuals.fillSize})
 			playTrackedTween(railFill,softInfo,{BackgroundTransparency=visuals.fillTransparency})
-			playTrackedTween(outerStroke,softInfo,{Color=visuals.targetAccent,Transparency=visuals.activeTransparency})
+			playTrackedTween(outerStroke,softInfo,{Color=visuals.outerStrokeColor,Transparency=visuals.outerStrokeTransparency})
 			playTrackedTween(inner,shapeInfo,{
 				Size=visuals.innerSize,
 				Rotation=visuals.innerRotation,
@@ -514,8 +536,8 @@ function GuiLogic.new(ctx)
 				BackgroundTransparency=visuals.innerFillTransparency,
 			})
 			playTrackedTween(innerStroke,softInfo,{
-				Color=visuals.innerColor,
-				Thickness=visuals.innerStrokeThickness,
+				Color=visuals.innerStrokeColor,
+				Thickness=strokeThickness,
 				Transparency=visuals.innerStrokeTransparency,
 			})
 			playTrackedTween(glowOuter,shapeInfo,{Rotation=visuals.innerRotation})
