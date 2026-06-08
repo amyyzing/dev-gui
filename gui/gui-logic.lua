@@ -391,6 +391,7 @@ function GuiLogic.new(ctx)
 		local activeTweens={}
 		local scaleTween=nil
 		local hoverTween=nil
+		local visualTweenCount=0
 		local clickConn=nil
 		local hoverEnterConn=nil
 		local hoverLeaveConn=nil
@@ -408,11 +409,16 @@ function GuiLogic.new(ctx)
 				end)
 			end
 			table.clear(activeTweens)
+			visualTweenCount=0
 		end
 
 		local function playTrackedTween(object,info,goal)
 			local tw=TweenService:Create(object,info,goal)
 			table.insert(activeTweens,tw)
+			visualTweenCount+=1
+			tw.Completed:Connect(function()
+				visualTweenCount=math.max(visualTweenCount-1,0)
+			end)
 			tw:Play()
 			return tw
 		end
@@ -513,6 +519,10 @@ function GuiLogic.new(ctx)
 		local function setState(value,fire,animate,force)
 			local nextState=value and true or false
 			local changed=nextState~=state
+
+			if force and not changed and visualTweenCount>0 then
+				return
+			end
 
 			if not changed and not force then
 				return
