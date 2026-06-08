@@ -85,6 +85,11 @@ function refreshSettingsPage()
 end
 
 function buildActualSettingsPage()
+	PlayerDataLogicModule=loadDeferredModule("PlayerDataLogic",MODULE_PATHS.PlayerDataLogic,PlayerDataLogicModule)
+	PlayerDataModule=loadDeferredModule("PlayerData",MODULE_PATHS.PlayerData,PlayerDataModule)
+	DiscordLogicModule=loadDeferredModule("DiscordLogic",MODULE_PATHS.DiscordLogic,DiscordLogicModule)
+	DiscordModule=loadDeferredModule("Discord",MODULE_PATHS.Discord,DiscordModule)
+
 	if PlayerDataModule and PlayerDataModule.new then
 		local ok,result=pcall(function()
 			return PlayerDataModule.new({
@@ -201,6 +206,13 @@ function addPage2Error(parent,text)
 end
 
 function buildPage2()
+	HitboxPresetLogicModule=loadDeferredModule("HitboxPresetLogic",MODULE_PATHS.HitboxPresetLogic,HitboxPresetLogicModule)
+	HitboxPresetModule=loadDeferredModule("HitboxPreset",MODULE_PATHS.HitboxPreset,HitboxPresetModule)
+	KeybindSettingsLogicModule=loadDeferredModule("KeybindSettingsLogic",MODULE_PATHS.KeybindSettingsLogic,KeybindSettingsLogicModule)
+	KeybindSettingsModule=loadDeferredModule("KeybindSettings",MODULE_PATHS.KeybindSettings,KeybindSettingsModule)
+	PresetEditorLogicModule=loadDeferredModule("PresetEditorLogic",MODULE_PATHS.PresetEditorLogic,PresetEditorLogicModule)
+	PresetEditorModule=loadDeferredModule("PresetEditor",MODULE_PATHS.PresetEditor,PresetEditorModule)
+
 	local page2Wrap=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=4,LayoutOrder=1},futurePage)
 
 	New("UIListLayout",{FillDirection=Enum.FillDirection.Vertical,Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},page2Wrap)

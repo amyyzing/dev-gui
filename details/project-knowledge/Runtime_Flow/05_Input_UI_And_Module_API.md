@@ -50,3 +50,7 @@ state.qbAimPeakHeight
 ## Toggle refresh behavior
 
 The runtime refreshes the active page controls when a page/tab is activated. Main-page modules repaint from `PAGE1_STATE` through their `api.Refresh()` methods, and shared header toggles force a visual repaint even when the boolean value did not change. The forced repaint is skipped while a header-toggle state tween is running, so refresh sync does not cancel the click animation. This keeps saved toggle state consistent after rejoin, lazy page construction, and tab switches.
+
+Startup loading is intentionally split: core/main-page modules load through the loader, while Maps, Customize, Page2, and Settings modules are loaded on demand when their tabs are first built.
+
+Header toggle internal strokes are fixed-role strokes and use the same thickness in enabled and disabled states. State should read through fill/color/transparency, not outline-weight changes.

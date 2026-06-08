@@ -37,6 +37,13 @@ function buildCustomizePage()
 
 	clearCustomizePage()
 
+	StrokeColourLogicModule=loadDeferredModule("StrokeColourLogic",MODULE_PATHS.StrokeColourLogic,StrokeColourLogicModule)
+	StrokeColourModule=loadDeferredModule("StrokeColour",MODULE_PATHS.StrokeColour,StrokeColourModule)
+	PrimaryColourLogicModule=loadDeferredModule("PrimaryColourLogic",MODULE_PATHS.PrimaryColourLogic,PrimaryColourLogicModule)
+	PrimaryColourModule=loadDeferredModule("PrimaryColour",MODULE_PATHS.PrimaryColour,PrimaryColourModule)
+	SecondaryColourLogicModule=loadDeferredModule("SecondaryColourLogic",MODULE_PATHS.SecondaryColourLogic,SecondaryColourLogicModule)
+	SecondaryColourModule=loadDeferredModule("SecondaryColour",MODULE_PATHS.SecondaryColour,SecondaryColourModule)
+
 	if StrokeColourModule and StrokeColourModule.new then
 		local ok,result=pcall(function()
 			return StrokeColourModule.new({
@@ -193,6 +200,15 @@ function buildMapPage()
 	if type(WORLD_SETTINGS.OriginalMaterials)~="table" then
 		WORLD_SETTINGS.OriginalMaterials=setmetatable({}, {__mode="k"})
 	end
+
+	MapEditorLogicModule=loadDeferredModule("MapEditorLogic",MODULE_PATHS.MapEditorLogic,MapEditorLogicModule)
+	MapEditorModule=loadDeferredModule("MapEditor",MODULE_PATHS.MapEditor,MapEditorModule)
+	AntiMaterialLogicModule=loadDeferredModule("AntiMaterialLogic",MODULE_PATHS.AntiMaterialLogic,AntiMaterialLogicModule)
+	AntiMaterialModule=loadDeferredModule("AntiMaterial",MODULE_PATHS.AntiMaterial,AntiMaterialModule)
+	MapCleanerLogicModule=loadDeferredModule("MapCleanerLogic",MODULE_PATHS.MapCleanerLogic,MapCleanerLogicModule)
+	MapCleanerModule=loadDeferredModule("MapCleaner",MODULE_PATHS.MapCleaner,MapCleanerModule)
+	RemoveAdsLogicModule=loadDeferredModule("RemoveAdsLogic",MODULE_PATHS.RemoveAdsLogic,RemoveAdsLogicModule)
+	RemoveAdsModule=loadDeferredModule("RemoveAds",MODULE_PATHS.RemoveAds,RemoveAdsModule)
 
 	if MapEditorModule and MapEditorModule.new then
 		local ok,result=pcall(function()

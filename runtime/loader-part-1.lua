@@ -497,6 +497,44 @@ MODULE_PATH_SET[AUTO_REFRESH_RELOAD_PATH]=true
 for path in pairs(APP_RUNTIME_PATH_SET) do
 	MODULE_PATH_SET[path]=true
 end
+STARTUP_MODULE_PATHS={
+	MODULE_PATHS.GuiLogic,
+	MODULE_PATHS.MainFrame,
+	MODULE_PATHS.AutoRefresh,
+	MODULE_PATHS.Description,
+	MODULE_PATHS.Announcement,
+	MODULE_PATHS.Page1HitboxLogic,
+	MODULE_PATHS.Page1Hitbox,
+	MODULE_PATHS.Page1GravityLogic,
+	MODULE_PATHS.Page1Gravity,
+	MODULE_PATHS.Page1SpeedLogic,
+	MODULE_PATHS.Page1Speed,
+	MODULE_PATHS.Page1GameParamsLogic,
+	MODULE_PATHS.Page1GameParams,
+	MODULE_PATHS.Page1BoostLogic,
+	MODULE_PATHS.Page1Boost,
+	MODULE_PATHS.Page1ESPDefenseLogic,
+	MODULE_PATHS.Page1ESPDefense,
+	MODULE_PATHS.Page1ESPOffenseLogic,
+	MODULE_PATHS.Page1ESPOffense,
+	MODULE_PATHS.Page1ESPLogic,
+	MODULE_PATHS.Page1ESP,
+	MODULE_PATHS.Page1QBAimLogic,
+	MODULE_PATHS.Page1QBAim,
+	MODULE_PATHS.Page1TestingLogic,
+	MODULE_PATHS.Page1Testing,
+	MODULE_PATHS.DataSave,
+}
+STARTUP_MODULE_PATH_SET={}
+for _,path in ipairs(STARTUP_MODULE_PATHS) do
+	STARTUP_MODULE_PATH_SET[path]=true
+end
+DEFERRED_MODULE_PATH_SET={}
+for _,path in pairs(MODULE_PATHS) do
+	if not STARTUP_MODULE_PATH_SET[path] then
+		DEFERRED_MODULE_PATH_SET[path]=true
+	end
+end
 OPTIONAL_MODULE_PATH_SET={
 	[MODULE_PATHS.PrimaryColour]=true,
 	[MODULE_PATHS.SecondaryColour]=true,
@@ -597,10 +635,10 @@ function loadRemoteModule(modulePath)
 	return module
 end
 
-function modulePathList()
+function modulePathList(pathsSource)
 	local paths={}
 
-	for _,path in pairs(MODULE_PATHS) do
+	for _,path in pairs(pathsSource or MODULE_PATHS) do
 		table.insert(paths,path)
 	end
 
@@ -696,10 +734,7 @@ function playLoaderKeyframes(sequence,asynchronous)
 	end
 end
 
-LOADER_TOTAL=0
-for _ in pairs(MODULE_PATHS) do
-	LOADER_TOTAL+=1
-end
+LOADER_TOTAL=#STARTUP_MODULE_PATHS
 
 loaderCurrent=0
 loaderOverlay=New("Frame",{
@@ -1023,7 +1058,19 @@ function loadRemoteModuleStep(name,path)
 	return module
 end
 
-local batchLoaded,batchErr=loadRemoteModuleBatch(modulePathList())
+function loadDeferredModule(name,path,current)
+	if current~=nil then
+		return current
+	end
+
+	local module=loadRemoteModule(path)
+	if not module and not OPTIONAL_MODULE_PATH_SET[path] then
+		warn("Deferred module unavailable:",name,path)
+	end
+	return module
+end
+
+local batchLoaded,batchErr=loadRemoteModuleBatch(modulePathList(STARTUP_MODULE_PATHS))
 if not batchLoaded then
 	warn("Module batch unavailable; falling back to individual loads:",batchErr)
 end
@@ -1033,12 +1080,6 @@ MainFrameModule=loadRemoteModuleStep("MainFrame",MODULE_PATHS.MainFrame)
 AutoRefreshModule=loadRemoteModuleStep("AutoRefresh",MODULE_PATHS.AutoRefresh)
 DescriptionModule=loadRemoteModuleStep("Description",MODULE_PATHS.Description)
 AnnouncementModule=loadRemoteModuleStep("Announcement",MODULE_PATHS.Announcement)
-HitboxPresetLogicModule=loadRemoteModuleStep("HitboxPresetLogic",MODULE_PATHS.HitboxPresetLogic)
-HitboxPresetModule=loadRemoteModuleStep("HitboxPreset",MODULE_PATHS.HitboxPreset)
-KeybindSettingsLogicModule=loadRemoteModuleStep("KeybindSettingsLogic",MODULE_PATHS.KeybindSettingsLogic)
-KeybindSettingsModule=loadRemoteModuleStep("KeybindSettings",MODULE_PATHS.KeybindSettings)
-PresetEditorLogicModule=loadRemoteModuleStep("PresetEditorLogic",MODULE_PATHS.PresetEditorLogic)
-PresetEditorModule=loadRemoteModuleStep("PresetEditor",MODULE_PATHS.PresetEditor)
 Page1HitboxLogicModule=loadRemoteModuleStep("Page1HitboxLogic",MODULE_PATHS.Page1HitboxLogic)
 Page1HitboxModule=loadRemoteModuleStep("Page1Hitbox",MODULE_PATHS.Page1Hitbox)
 Page1GravityLogicModule=loadRemoteModuleStep("Page1GravityLogic",MODULE_PATHS.Page1GravityLogic)
@@ -1059,31 +1100,13 @@ Page1QBAimLogicModule=loadRemoteModuleStep("Page1QBAimLogic",MODULE_PATHS.Page1Q
 Page1QBAimModule=loadRemoteModuleStep("Page1QBAim",MODULE_PATHS.Page1QBAim)
 Page1TestingLogicModule=loadRemoteModuleStep("Page1TestingLogic",MODULE_PATHS.Page1TestingLogic)
 Page1TestingModule=loadRemoteModuleStep("Page1Testing",MODULE_PATHS.Page1Testing)
-PrimaryColourLogicModule=loadRemoteModuleStep("PrimaryColourLogic",MODULE_PATHS.PrimaryColourLogic)
-PrimaryColourModule=loadRemoteModuleStep("PrimaryColour",MODULE_PATHS.PrimaryColour)
-SecondaryColourLogicModule=loadRemoteModuleStep("SecondaryColourLogic",MODULE_PATHS.SecondaryColourLogic)
-SecondaryColourModule=loadRemoteModuleStep("SecondaryColour",MODULE_PATHS.SecondaryColour)
-StrokeColourLogicModule=loadRemoteModuleStep("StrokeColourLogic",MODULE_PATHS.StrokeColourLogic)
-StrokeColourModule=loadRemoteModuleStep("StrokeColour",MODULE_PATHS.StrokeColour)
-MapEditorLogicModule=loadRemoteModuleStep("MapEditorLogic",MODULE_PATHS.MapEditorLogic)
-MapEditorModule=loadRemoteModuleStep("MapEditor",MODULE_PATHS.MapEditor)
-AntiMaterialLogicModule=loadRemoteModuleStep("AntiMaterialLogic",MODULE_PATHS.AntiMaterialLogic)
-AntiMaterialModule=loadRemoteModuleStep("AntiMaterial",MODULE_PATHS.AntiMaterial)
-MapCleanerLogicModule=loadRemoteModuleStep("MapCleanerLogic",MODULE_PATHS.MapCleanerLogic)
-MapCleanerModule=loadRemoteModuleStep("MapCleaner",MODULE_PATHS.MapCleaner)
-RemoveAdsLogicModule=loadRemoteModuleStep("RemoveAdsLogic",MODULE_PATHS.RemoveAdsLogic)
-RemoveAdsModule=loadRemoteModuleStep("RemoveAds",MODULE_PATHS.RemoveAds)
-PlayerDataLogicModule=loadRemoteModuleStep("PlayerDataLogic",MODULE_PATHS.PlayerDataLogic)
-PlayerDataModule=loadRemoteModuleStep("PlayerData",MODULE_PATHS.PlayerData)
-DiscordLogicModule=loadRemoteModuleStep("DiscordLogic",MODULE_PATHS.DiscordLogic)
-DiscordModule=loadRemoteModuleStep("Discord",MODULE_PATHS.Discord)
 DataSaveModule=loadRemoteModuleStep("DataSave",MODULE_PATHS.DataSave)
 
 function runLoaderCheck()
 	local missing={}
 
 	for name,path in pairs(MODULE_PATHS) do
-		if not OPTIONAL_MODULE_PATH_SET[path] and not REMOTE_MODULE_CACHE[path] then
+		if STARTUP_MODULE_PATH_SET[path] and not OPTIONAL_MODULE_PATH_SET[path] and not REMOTE_MODULE_CACHE[path] then
 			table.insert(missing,name.." ("..path..")")
 		end
 	end
@@ -1093,8 +1116,8 @@ function runLoaderCheck()
 		warn("Loader check found missing modules:",table.concat(missing,", "))
 		setLoaderProgress("Missing modules: "..table.concat(missing,", "),LOADER_TOTAL,LOADER_TOTAL,true)
 	else
-		warn("Loader check complete: all remote modules loaded.")
-		setLoaderProgress("Verified remote modules.",LOADER_TOTAL,LOADER_TOTAL,false)
+		warn("Loader check complete: startup modules loaded. Deferred tabs load on demand.")
+		setLoaderProgress("Verified startup modules.",LOADER_TOTAL,LOADER_TOTAL,false)
 	end
 end
 

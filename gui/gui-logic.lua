@@ -240,6 +240,7 @@ function GuiLogic.new(ctx)
 			Transparency=0.48,
 			LineJoinMode=Enum.LineJoinMode.Miter,
 		},rail)
+		railStroke:SetAttribute("StrokeRole","Fixed")
 		railStroke:SetAttribute("BaseStrokeTransparency",0.48)
 
 		local railFillClip=New("Frame",{
@@ -326,6 +327,7 @@ function GuiLogic.new(ctx)
 			Transparency=startState and 0.06 or 0.24,
 			LineJoinMode=Enum.LineJoinMode.Miter,
 		},outerCore)
+		outerStroke:SetAttribute("StrokeRole","Fixed")
 
 		local glowOuter=New("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
@@ -344,6 +346,7 @@ function GuiLogic.new(ctx)
 			Transparency=startState and 0.76 or 1,
 			LineJoinMode=Enum.LineJoinMode.Miter,
 		},glowOuter)
+		glowStroke:SetAttribute("StrokeRole","Fixed")
 		New("UIGradient",{
 			Rotation=45,
 			Color=ColorSequence.new({
@@ -372,10 +375,11 @@ function GuiLogic.new(ctx)
 
 		local innerStroke=New("UIStroke",{
 			Color=startState and accent or muted,
-			Thickness=startState and strokeThickness or 1,
+			Thickness=strokeThickness,
 			Transparency=startState and 0.03 or 0.44,
 			LineJoinMode=Enum.LineJoinMode.Miter,
 		},inner)
+		innerStroke:SetAttribute("StrokeRole","Fixed")
 
 		local hit=New("TextButton",{
 			BackgroundTransparency=1,
@@ -436,7 +440,7 @@ function GuiLogic.new(ctx)
 				innerRotation=innerRotation,
 				innerFillTransparency=expanded and 1 or 0.12,
 				innerStrokeTransparency=expanded and 0.03 or 0.44,
-				innerStrokeThickness=expanded and strokeThickness or 1,
+				innerStrokeThickness=strokeThickness,
 				glowTransparency=expanded and 0.76 or 1,
 				targetAccent=expanded and accent or strokeColor,
 				innerColor=expanded and accent or muted,
