@@ -53,4 +53,4 @@ The runtime refreshes the active page controls when a page/tab is activated. Mai
 
 Startup loading is intentionally split: core/main-page modules load through the loader, while Maps, Customize, Page2, and Settings modules are loaded on demand when their tabs are first built.
 
-Header toggle internal strokes are fixed-role strokes and use the same thickness in enabled and disabled states. State should read through fill/color/transparency, not outline-weight changes.
+Header toggle internal strokes are fixed-role strokes and use the same thickness in enabled and disabled states. State should read through fill/color/transparency, not outline-weight changes. The disabled marker uses a smaller inactive core and extra inset so it stays inside the toggle rail/frame.

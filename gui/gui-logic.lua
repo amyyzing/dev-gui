@@ -197,6 +197,8 @@ function GuiLogic.new(ctx)
 		local indicatorSize=headerNumber("HeaderToggleIndicatorSize",26)
 		local outerCoreSize=headerNumber("HeaderToggleOuterCoreSize",22)
 		local innerOffSize=headerNumber("HeaderToggleInnerOffSize",11)
+		local inactiveOuterCoreSize=headerNumber("HeaderToggleInactiveOuterCoreSize",math.min(outerCoreSize,math.max(innerOffSize+6,railHeight-4)))
+		local indicatorInset=headerNumber("HeaderToggleIndicatorInset",4)
 		local strokeThickness=headerNumber("HeaderToggleStrokeThickness",1.6)
 		local expandedScale=headerNumber("HeaderToggleExpandedScale",1.05)
 		local collapsedScale=headerNumber("HeaderToggleCollapsedScale",0.94)
@@ -297,7 +299,7 @@ function GuiLogic.new(ctx)
 
 		local indicator=New("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=startState and UDim2.new(1,-(indicatorSize/2+2),0.5,0) or UDim2.new(0,indicatorSize/2+2,0.5,0),
+			Position=startState and UDim2.new(1,-(indicatorSize/2+indicatorInset),0.5,0) or UDim2.new(0,indicatorSize/2+indicatorInset,0.5,0),
 			Size=UDim2.fromOffset(indicatorSize,indicatorSize),
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
@@ -313,7 +315,7 @@ function GuiLogic.new(ctx)
 		local outerCore=New("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
 			Position=UDim2.fromScale(0.5,0.5),
-			Size=UDim2.fromOffset(outerCoreSize,outerCoreSize),
+			Size=UDim2.fromOffset(startState and outerCoreSize or inactiveOuterCoreSize,startState and outerCoreSize or inactiveOuterCoreSize),
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
 			Rotation=0,
@@ -428,14 +430,16 @@ function GuiLogic.new(ctx)
 		end
 
 		local function visualState(expanded)
+			local coreSize=expanded and outerCoreSize or inactiveOuterCoreSize
 			local innerSize=expanded and outerCoreSize or innerOffSize
 			local innerRotation=expanded and 45 or 0
 
 			return{
-				indicatorPosition=expanded and UDim2.new(1,-(indicatorSize/2+2),0.5,0) or UDim2.new(0,indicatorSize/2+2,0.5,0),
+				indicatorPosition=expanded and UDim2.new(1,-(indicatorSize/2+indicatorInset),0.5,0) or UDim2.new(0,indicatorSize/2+indicatorInset,0.5,0),
 				fillSize=expanded and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0),
 				fillTransparency=expanded and 0.08 or 1,
 				activeTransparency=expanded and 0.06 or 0.24,
+				outerCoreSize=UDim2.fromOffset(coreSize,coreSize),
 				innerSize=UDim2.fromOffset(innerSize,innerSize),
 				innerRotation=innerRotation,
 				innerFillTransparency=expanded and 1 or 0.12,
@@ -473,6 +477,7 @@ function GuiLogic.new(ctx)
 
 			if not animate then
 				applyProps(indicator,{Position=visuals.indicatorPosition})
+				applyProps(outerCore,{Size=visuals.outerCoreSize})
 				applyProps(railFillClip,{Size=visuals.fillSize})
 				applyProps(railFill,{BackgroundTransparency=visuals.fillTransparency})
 				applyProps(outerStroke,{Color=visuals.targetAccent,Transparency=visuals.activeTransparency})
@@ -498,6 +503,7 @@ function GuiLogic.new(ctx)
 			local shapeInfo=state and expandInfo or collapseInfo
 
 			playTrackedTween(indicator,shapeInfo,{Position=visuals.indicatorPosition})
+			playTrackedTween(outerCore,shapeInfo,{Size=visuals.outerCoreSize})
 			playTrackedTween(railFillClip,shapeInfo,{Size=visuals.fillSize})
 			playTrackedTween(railFill,softInfo,{BackgroundTransparency=visuals.fillTransparency})
 			playTrackedTween(outerStroke,softInfo,{Color=visuals.targetAccent,Transparency=visuals.activeTransparency})
