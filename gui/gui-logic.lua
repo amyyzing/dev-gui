@@ -116,69 +116,261 @@ function GuiLogic.new(ctx)
 		local c=components()
 		local toggleStyle=tostring(c.ToggleStyle or "switch"):lower()
 		local checkbox=toggleStyle=="checkbox"
-		local rounded=(tonumber(s.ControlRadius) or 0)>0 and not checkbox
-		width=width or componentNumber("ToggleWidth",48)
-		height=height or componentNumber("ToggleHeight",20)
-		knobSize=knobSize or componentNumber("ToggleKnobSize",16)
-		pad=pad or componentNumber("TogglePad",2)
+		local rounded=(tonumber(s.ControlRadius) or 0)>0
+		width=width or componentNumber("ToggleWidth",checkbox and 34 or 58)
+		height=height or componentNumber("ToggleHeight",checkbox and 22 or 22)
+		pad=pad or componentNumber("TogglePad",3)
 		zIndex=zIndex or 6
 
-		local wrap=New("Frame",{Size=UDim2.fromOffset(width,height),BackgroundColor3=themeColor("INPUT",Color3.fromRGB(0,0,0)),BorderSizePixel=0,ClipsDescendants=rounded or toggleStyle=="pill",ZIndex=zIndex,ThemeRole="INPUT",CornerRole="Control"},parent)
-		addCorner(wrap,"Control")
-		local wrapStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=componentNumber("ToggleStrokeTransparency",0.58)},wrap)
-		wrapStroke:SetAttribute("BaseStrokeTransparency",componentNumber("ToggleStrokeTransparency",0.58))
-
-		local knob=New("Frame",{Size=UDim2.fromOffset(knobSize,knobSize),Position=UDim2.fromOffset(pad,pad),BackgroundColor3=readableOn(themeColor("INPUT",Color3.fromRGB(0,0,0))),BorderSizePixel=0,ClipsDescendants=rounded or toggleStyle=="pill",ZIndex=zIndex+1,SkipThemeRole=true,CornerRole="Control"},wrap)
-		addCorner(knob,"Control")
-		local knobStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=componentNumber("ToggleStrokeTransparency",0.58)},knob)
-		knobStroke:SetAttribute("BaseStrokeTransparency",componentNumber("ToggleStrokeTransparency",0.58))
-		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),BorderSizePixel=0,AutoButtonColor=false,ZIndex=zIndex+2},wrap)
-
+		local onRole=tostring(c.ToggleOnRole or "SLIDER_FILL")
+		local offRole=tostring(c.ToggleOffRole or "INPUT")
+		local accent=themeRoleColor(onRole,themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(32,202,106)))
+		local danger=themeRoleColor("RED",THEME.RED or Color3.fromRGB(238,78,74))
+		local input=themeColor("INPUT",THEME.PANEL or Color3.fromRGB(18,18,24))
+		local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
+		local strokeColor=themeColor("STROKE",THEME.STROKE or muted)
+		local textColor=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(245,245,245))
+		local coreSize=knobSize or componentNumber("ToggleKnobSize",math.max(10,math.min(height-8,14)))
+		local tickHeight=math.max(6,height-10)
 		local state=startState and true or false
+		local hovering=false
+		local activeTweens={}
 
-		local function paint()
-			local ti=TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out)
-			local onRole=tostring(c.ToggleOnRole or "SLIDER_FILL")
-			local offRole=tostring(c.ToggleOffRole or "RED")
-			local bg=state and themeRoleColor(onRole,themeColor("SLIDER_FILL",THEME.GREEN)) or themeRoleColor(offRole,THEME.RED)
-			local pos=state and UDim2.fromOffset(width-knobSize-pad,pad) or UDim2.fromOffset(pad,pad)
-			local knobBg=readableOn(bg)
+		local wrap=New("Frame",{
+			Size=UDim2.fromOffset(width,height),
+			BackgroundColor3=input:Lerp(Color3.new(0,0,0),0.10),
+			BorderSizePixel=0,
+			ClipsDescendants=true,
+			ZIndex=zIndex,
+			ThemeRole="INPUT",
+			CornerRole="Control",
+		},parent)
+		addCorner(wrap,"Control")
 
-			if checkbox then
-				bg=themeColor("INPUT",Color3.fromRGB(0,0,0))
-				pos=UDim2.fromOffset(pad,pad)
-				knobBg=state and themeRoleColor(onRole,themeColor("SLIDER_FILL",THEME.GREEN)) or bg
-				knob.Visible=state
-			elseif toggleStyle=="block" then
-				bg=state and bg or themeColor("INPUT",Color3.fromRGB(0,0,0))
-				pos=state and UDim2.fromOffset(width-knobSize-pad,pad) or UDim2.fromOffset(pad,pad)
-				knobBg=state and readableOn(bg) or themeColor("MUTED",Color3.fromRGB(180,180,180))
-			end
+		local wrapStroke=New("UIStroke",{
+			Color=strokeColor,
+			Thickness=1,
+			Transparency=componentNumber("ToggleStrokeTransparency",0.50),
+		},wrap)
+		wrapStroke:SetAttribute("BaseStrokeTransparency",componentNumber("ToggleStrokeTransparency",0.50))
+		wrapStroke:SetAttribute("StrokeRole","Fixed")
 
-			wrap:SetAttribute("ThemeRole",state and (checkbox and "INPUT" or onRole) or ((toggleStyle=="block" or checkbox) and "INPUT" or offRole))
-			knob:SetAttribute("ThemeRole",nil)
+		local fillClip=New("Frame",{
+			AnchorPoint=Vector2.new(0,0.5),
+			Position=UDim2.fromScale(0,0.5),
+			Size=UDim2.new(0,0,1,0),
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			ClipsDescendants=true,
+			ZIndex=zIndex+1,
+		},wrap)
 
-			TweenService:Create(wrap,ti,{BackgroundColor3=bg}):Play()
-			TweenService:Create(knob,ti,{Position=pos,BackgroundColor3=knobBg}):Play()
+		local fill=New("Frame",{
+			AnchorPoint=Vector2.new(0,0.5),
+			Position=UDim2.fromScale(0,0.5),
+			Size=UDim2.new(1,0,1,0),
+			BackgroundColor3=accent,
+			BackgroundTransparency=0.18,
+			BorderSizePixel=0,
+			ZIndex=zIndex+1,
+			SkipThemeRole=true,
+		},fillClip)
+		addCorner(fill,"Control")
+		New("UIGradient",{
+			Rotation=0,
+			Color=ColorSequence.new({
+				ColorSequenceKeypoint.new(0,accent:Lerp(Color3.new(0,0,0),0.20)),
+				ColorSequenceKeypoint.new(0.55,accent),
+				ColorSequenceKeypoint.new(1,accent:Lerp(Color3.new(1,1,1),0.28)),
+			}),
+		},fill)
+
+		local tickHolder=New("Frame",{
+			AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.fromScale(0.5,0.5),
+			Size=UDim2.new(1,-10,1,0),
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			ZIndex=zIndex+2,
+		},wrap)
+
+		local ticks={}
+		for _,alpha in ipairs({0.25,0.50,0.75}) do
+			local tick=New("Frame",{
+				AnchorPoint=Vector2.new(0.5,0.5),
+				Position=UDim2.fromScale(alpha,0.5),
+				Size=UDim2.fromOffset(1,tickHeight),
+				BackgroundColor3=muted,
+				BackgroundTransparency=0.82,
+				BorderSizePixel=0,
+				ZIndex=zIndex+2,
+				SkipThemeRole=true,
+			},tickHolder)
+			table.insert(ticks,tick)
 		end
 
-		local function setState(v,fire)
-			state=v and true or false
-			paint()
+		local stateText=New("TextLabel",{
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			Position=UDim2.new(0,pad+coreSize+4,0,0),
+			Size=UDim2.new(1,-(pad*2+coreSize+6),1,0),
+			Text="OFF",
+			Font=componentFont("ControlFont",Enum.Font.GothamBold),
+			TextSize=componentNumber("ToggleTextSize",9),
+			TextColor3=muted,
+			TextTransparency=0.20,
+			TextXAlignment=Enum.TextXAlignment.Center,
+			ZIndex=zIndex+3,
+			SkipThemeRole=true,
+		},wrap)
 
-			if fire and onChange then
+		local core=New("Frame",{
+			AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.new(0,pad+(coreSize/2),0.5,0),
+			Size=UDim2.fromOffset(coreSize,coreSize),
+			BackgroundColor3=muted,
+			BackgroundTransparency=0.08,
+			BorderSizePixel=0,
+			Rotation=45,
+			ZIndex=zIndex+4,
+			SkipThemeRole=true,
+		},wrap)
+		New("UIAspectRatioConstraint",{AspectRatio=1},core)
+
+		local coreStroke=New("UIStroke",{
+			Color=strokeColor,
+			Thickness=1.2,
+			Transparency=0.34,
+		},core)
+		coreStroke:SetAttribute("StrokeRole","Fixed")
+
+		local coreDot=New("Frame",{
+			AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.fromScale(0.5,0.5),
+			Size=UDim2.fromOffset(math.max(4,coreSize-8),math.max(4,coreSize-8)),
+			BackgroundColor3=input,
+			BackgroundTransparency=0.16,
+			BorderSizePixel=0,
+			Rotation=0,
+			ZIndex=zIndex+5,
+			SkipThemeRole=true,
+		},core)
+		New("UIAspectRatioConstraint",{AspectRatio=1},coreDot)
+
+		local hit=New("TextButton",{
+			BackgroundTransparency=1,
+			Text="",
+			Size=UDim2.new(1,0,1,0),
+			BorderSizePixel=0,
+			AutoButtonColor=false,
+			ZIndex=zIndex+8,
+		},wrap)
+
+		local function cancelTweens()
+			for _,tw in ipairs(activeTweens) do
+				pcall(function()
+					tw:Cancel()
+				end)
+			end
+			table.clear(activeTweens)
+		end
+
+		local function tween(object,info,goal)
+			local tw=TweenService:Create(object,info,goal)
+			table.insert(activeTweens,tw)
+			tw:Play()
+			return tw
+		end
+
+		local function applyVisuals(animate)
+			cancelTweens()
+
+			local softInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+			local snapInfo=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+			local onX=width-pad-(coreSize/2)
+			local offX=pad+(coreSize/2)
+			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
+			local corePos=state and UDim2.new(0,onX,0.5,0) or UDim2.new(0,offX,0.5,0)
+			local coreColor=state and accent:Lerp(Color3.new(1,1,1),0.08) or muted
+			local bgColor=state and input:Lerp(accent,0.12) or input:Lerp(Color3.new(0,0,0),0.10)
+			local strokeTarget=state and accent or (hovering and muted or strokeColor)
+			local strokeTransparency=state and 0.22 or (hovering and 0.32 or componentNumber("ToggleStrokeTransparency",0.50))
+			local dotColor=state and readableOn(accent) or input
+			local dotTransparency=state and 0.02 or 0.18
+			local text=state and "ON" or "OFF"
+			local textPosition=state and UDim2.new(0,pad,0,0) or UDim2.new(0,pad+coreSize+4,0,0)
+			local textSize=state and UDim2.new(1,-(pad*2+coreSize+6),1,0) or UDim2.new(1,-(pad*2+coreSize+6),1,0)
+			local textColorTarget=state and readableOn(accent) or muted
+			local coreRotation=state and 135 or 45
+			local coreScale=state and math.min(coreSize+2,height-6) or coreSize
+
+			stateText.Text=text
+			wrap:SetAttribute("ThemeRole",state and onRole or offRole)
+
+			if not animate then
+				wrap.BackgroundColor3=bgColor
+				wrapStroke.Color=strokeTarget
+				wrapStroke.Transparency=strokeTransparency
+				fillClip.Size=fillSize
+				core.Position=corePos
+				core.Size=UDim2.fromOffset(coreScale,coreScale)
+				core.BackgroundColor3=coreColor
+				core.Rotation=coreRotation
+				coreStroke.Color=state and accent or strokeColor
+				coreStroke.Transparency=state and 0.12 or 0.34
+				coreDot.BackgroundColor3=dotColor
+				coreDot.BackgroundTransparency=dotTransparency
+				stateText.Position=textPosition
+				stateText.Size=textSize
+				stateText.TextColor3=textColorTarget
+				stateText.TextTransparency=state and 0.02 or 0.22
+				for _,tick in ipairs(ticks) do
+					tick.BackgroundColor3=state and readableOn(accent) or muted
+					tick.BackgroundTransparency=state and 0.74 or 0.86
+				end
+				return
+			end
+
+			tween(wrap,softInfo,{BackgroundColor3=bgColor})
+			tween(wrapStroke,softInfo,{Color=strokeTarget,Transparency=strokeTransparency})
+			tween(fillClip,snapInfo,{Size=fillSize})
+			tween(core,snapInfo,{Position=corePos,Size=UDim2.fromOffset(coreScale,coreScale),BackgroundColor3=coreColor,Rotation=coreRotation})
+			tween(coreStroke,softInfo,{Color=state and accent or strokeColor,Transparency=state and 0.12 or 0.34})
+			tween(coreDot,softInfo,{BackgroundColor3=dotColor,BackgroundTransparency=dotTransparency})
+			tween(stateText,softInfo,{Position=textPosition,Size=textSize,TextColor3=textColorTarget,TextTransparency=state and 0.02 or 0.22})
+
+			for _,tick in ipairs(ticks) do
+				tween(tick,softInfo,{BackgroundColor3=state and readableOn(accent) or muted,BackgroundTransparency=state and 0.74 or 0.86})
+			end
+		end
+
+		local function setState(v,fire,animate)
+			local nextState=v and true or false
+			local changed=nextState~=state
+			state=nextState
+			applyVisuals(animate~=false)
+
+			if fire and changed and onChange then
 				onChange(state)
 			end
 		end
 
-		hit.InputBegan:Connect(function(i)
-			if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-				setState(not state,true)
-			end
+		hit.MouseButton1Click:Connect(function()
+			setState(not state,true,true)
 		end)
 
-		setState(state,false)
-		return{set=function(v) setState(v,false) end,get=function() return state end,wrap=wrap,knob=knob,hit=hit,width=width,height=height}
+		hit.MouseEnter:Connect(function()
+			hovering=true
+			applyVisuals(true)
+		end)
+
+		hit.MouseLeave:Connect(function()
+			hovering=false
+			applyVisuals(true)
+		end)
+
+		setState(state,false,false)
+		return{set=function(v) setState(v,false,false) end,get=function() return state end,wrap=wrap,knob=core,hit=hit,width=width,height=height}
 	end
 
 	local function createHeaderSwitch(parent,startState,onChange,zIndex)
