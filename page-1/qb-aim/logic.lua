@@ -79,6 +79,7 @@ local C2_MAX_ABOVE_BALL=8.00
 local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
 local QB_RELEASE_EXTRAPOLATE_VERTICAL=false
 local MIN_T,MAX_T,DT=0.35,6,0.01
+local INTERCEPT_SCAN_DT=0.025
 local QB_INHERITANCE=0
 local INTERCEPT_BISECTION_STEPS=12
 local SPEED_TOLERANCE=1.25
@@ -88,6 +89,7 @@ local GLOBAL_MAX_ANGLE=55
 local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
+local HELD_BALL_CACHE_INTERVAL=0.12
 local RECEIVER_TRACK_INTERVAL=0.05
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
@@ -659,6 +661,8 @@ function QBAim.new(ctx,parent)
 	local previewFreezeStarted=0
 	local highlightedCharacter=nil
 	local connections={}
+	local heldBallCache=nil
+	local heldBallCacheExpires=0
 	local sectionBody=nil
 	local sectionFrame=nil
 	local enabledToggle=nil
@@ -710,6 +714,22 @@ function QBAim.new(ctx,parent)
 	local function addConnection(conn)
 		table.insert(connections,conn)
 		return conn
+	end
+
+	local function clearHeldBallCache()
+		heldBallCache=nil
+		heldBallCacheExpires=0
+	end
+
+	local function getCachedHeldBall(maxAge)
+		local now=os.clock()
+		if heldBallCache and heldBallCache.Parent and now<heldBallCacheExpires then
+			return heldBallCache
+		end
+
+		heldBallCache=getHeldBall()
+		heldBallCacheExpires=now+(maxAge or HELD_BALL_CACHE_INTERVAL)
+		return heldBallCache
 	end
 
 	local function changed()
@@ -1260,7 +1280,7 @@ function QBAim.new(ctx,parent)
 			return nil
 		end
 
-		local ball=getHeldBall()
+		local ball=getCachedHeldBall()
 		local characterRoot=LP.Character and root(LP.Character)
 		local qbPosition=(ball and ball.Position) or (characterRoot and characterRoot.Position) or receiverRoot.Position
 		local routeVelocity=velocity.Unit*MAX_RUN_SPEED
@@ -1636,7 +1656,7 @@ function QBAim.new(ctx,parent)
 
 		considerNear(previousTime)
 
-		for time=MIN_T+DT,MAX_T,DT do
+		for time=MIN_T+INTERCEPT_SCAN_DT,MAX_T,INTERCEPT_SCAN_DT do
 			local value=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
 			considerNear(time)
 
@@ -1918,7 +1938,7 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function hasHeldBallForPreview()
-		return getHeldBall()~=nil
+		return getCachedHeldBall()~=nil
 	end
 
 	local function clearPreviewForMissingBall(statusText)
@@ -1945,7 +1965,7 @@ function QBAim.new(ctx,parent)
 
 		local character=LP.Character
 		local qbRoot=root(character)
-		local ball=releaseBall or getHeldBall()
+		local ball=releaseBall or getCachedHeldBall()
 		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
 		local data=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
 
@@ -2025,7 +2045,8 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		local heldBall=getHeldBall()
+		clearHeldBallCache()
+		local heldBall=getCachedHeldBall(0)
 		if not heldBall then
 			clearPreviewForMissingBall("No ball held")
 			return
@@ -2112,6 +2133,7 @@ function QBAim.new(ctx,parent)
 		if not enabled then
 			trackedReceiver=nil
 			selectedRouteLock=nil
+			clearHeldBallCache()
 			previewFrozen=false
 			preview.ballMissingSince=nil
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
@@ -2120,7 +2142,7 @@ function QBAim.new(ctx,parent)
 
 		syncControls()
 
-		if enabled and not getHeldBall() then
+		if enabled and not getCachedHeldBall() then
 			setStatus("Waiting for ball")
 		end
 	end
@@ -2291,6 +2313,16 @@ function QBAim.new(ctx,parent)
 		updateTargetHighlight()
 
 		local now=os.clock()
+		if not trackedReceiver then return end
+
+		if state.qbAimShowArc==false then
+			hideQBTrailPreview()
+			return
+		end
+
+		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
+		preview.last=now
+
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
 			if previewFrozen then
 				if now-previewFreezeStarted<PREVIEW_POST_THROW_FREEZE_MIN then
@@ -2313,16 +2345,6 @@ function QBAim.new(ctx,parent)
 			preview.ballMissingSince=nil
 		end
 
-		if not trackedReceiver then return end
-
-		if state.qbAimShowArc==false then
-			hideQBTrailPreview()
-			return
-		end
-
-		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
-		preview.last=now
-
 		local plan=buildPlan(trackedReceiver,nil,THROW_ANIMATION_RELEASE_WAIT)
 		if plan then
 			previewPlan(plan)
@@ -2343,7 +2365,7 @@ function QBAim.new(ctx,parent)
 		local wantsThrow=bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T)
 		if not(wantsLock or wantsThrow) then return false end
 
-		if not getHeldBall() then
+		if not getCachedHeldBall() then
 			clearPreviewForMissingBall("No ball held")
 			return true
 		end

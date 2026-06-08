@@ -68,6 +68,27 @@ UI_MAIN={}
 
 BOX_WRAPPERS=setmetatable({}, {__mode="k"})
 BUTTON_WRAPPERS=setmetatable({}, {__mode="k"})
+THEMED_GUI_OBJECTS=setmetatable({}, {__mode="k"})
+THEMED_TEXT_OBJECTS=setmetatable({}, {__mode="k"})
+THEMED_STROKES=setmetatable({}, {__mode="k"})
+THEMED_CORNERS=setmetatable({}, {__mode="k"})
+LIQUID_STROKE_GRADIENTS=setmetatable({}, {__mode="k"})
+
+function registerThemeObject(obj)
+	if not obj then return end
+
+	if obj:IsA("GuiObject") then
+		THEMED_GUI_OBJECTS[obj]=true
+	end
+
+	if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+		THEMED_TEXT_OBJECTS[obj]=true
+	elseif obj:IsA("UIStroke") then
+		THEMED_STROKES[obj]=true
+	elseif obj:IsA("UICorner") then
+		THEMED_CORNERS[obj]=true
+	end
+end
 
 function colorClose(a,b)
 	if not(a and b) then return false end
@@ -76,6 +97,7 @@ end
 
 function markThemeRole(obj,color)
 	if not(obj and color) then return end
+	registerThemeObject(obj)
 	if obj:IsA("TextButton") and obj.Text=="" then return end
 
 	local role=nil
@@ -120,6 +142,7 @@ end
 
 function markThemeTextRole(obj,color)
 	if not(obj and color) then return end
+	registerThemeObject(obj)
 
 	local role=nil
 	if colorClose(color,THEME.TEXT) then
@@ -195,6 +218,7 @@ function New(class, props, parent)
 		obj[k]=v
 	end
 	obj.Parent=parent
+	registerThemeObject(obj)
 
 	if forcedThemeRole then
 		obj:SetAttribute("ThemeRole",forcedThemeRole)
@@ -422,7 +446,7 @@ function BOT_API.Post(path,body)
 	return decoded
 end
 
-AUTO_REFRESH_ENABLED=true
+AUTO_REFRESH_ENABLED=false
 AUTO_REFRESH_INTERVAL=5
 AUTO_REFRESH_RELOAD_PATH="loader.lua"
 
@@ -500,7 +524,6 @@ end
 STARTUP_MODULE_PATHS={
 	MODULE_PATHS.GuiLogic,
 	MODULE_PATHS.MainFrame,
-	MODULE_PATHS.AutoRefresh,
 	MODULE_PATHS.Description,
 	MODULE_PATHS.Announcement,
 	MODULE_PATHS.Page1HitboxLogic,
@@ -1052,6 +1075,12 @@ end
 
 function loadRemoteModuleStep(name,path)
 	loaderCurrent+=1
+	local cached=REMOTE_MODULE_CACHE[path]
+	if cached then
+		setLoaderProgress("Loaded cached "..path,loaderCurrent,LOADER_TOTAL,false)
+		return cached
+	end
+
 	setLoaderProgress("Fetching "..path,loaderCurrent-0.35,LOADER_TOTAL,false)
 	local module=loadRemoteModule(path)
 	setLoaderProgress((module and "Loaded " or "Missing ")..path,loaderCurrent,LOADER_TOTAL,not module)
@@ -1077,7 +1106,7 @@ end
 
 GuiLogicModule=loadRemoteModuleStep("GuiLogic",MODULE_PATHS.GuiLogic)
 MainFrameModule=loadRemoteModuleStep("MainFrame",MODULE_PATHS.MainFrame)
-AutoRefreshModule=loadRemoteModuleStep("AutoRefresh",MODULE_PATHS.AutoRefresh)
+AutoRefreshModule=AUTO_REFRESH_ENABLED and loadRemoteModuleStep("AutoRefresh",MODULE_PATHS.AutoRefresh) or nil
 DescriptionModule=loadRemoteModuleStep("Description",MODULE_PATHS.Description)
 AnnouncementModule=loadRemoteModuleStep("Announcement",MODULE_PATHS.Announcement)
 Page1HitboxLogicModule=loadRemoteModuleStep("Page1HitboxLogic",MODULE_PATHS.Page1HitboxLogic)
@@ -1422,15 +1451,25 @@ function applyUIPrimaryTheme()
 
 	if not SG then return end
 
-	for _,obj in ipairs(SG:GetDescendants()) do
-		local role=obj:GetAttribute("ThemeRole")
-		if role and THEME[role] and obj:IsA("GuiObject") then
-			obj.BackgroundColor3=THEME[role]
+	for obj in pairs(THEMED_GUI_OBJECTS) do
+		if not obj.Parent then
+			THEMED_GUI_OBJECTS[obj]=nil
+		elseif obj:IsDescendantOf(SG) then
+			local role=obj:GetAttribute("ThemeRole")
+			if role and THEME[role] then
+				obj.BackgroundColor3=THEME[role]
+			end
 		end
+	end
 
-		local textRole=obj:GetAttribute("ThemeTextRole")
-		if textRole and THEME[textRole] and (obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox")) then
-			obj.TextColor3=THEME[textRole]
+	for obj in pairs(THEMED_TEXT_OBJECTS) do
+		if not obj.Parent then
+			THEMED_TEXT_OBJECTS[obj]=nil
+		elseif obj:IsDescendantOf(SG) then
+			local textRole=obj:GetAttribute("ThemeTextRole")
+			if textRole and THEME[textRole] then
+				obj.TextColor3=THEME[textRole]
+			end
 		end
 	end
 end
@@ -1684,8 +1723,10 @@ function updateLiquidStrokeAnimation()
 		local direction=tostring(UI_STYLE.LiquidStrokeDirection or "Right")
 		local wave=math.sin(math.rad(t*2))*0.25
 
-		for _,obj in ipairs(SG:GetDescendants()) do
-			if obj:IsA("UIGradient") and obj.Name=="StrokeGradient" then
+		for obj in pairs(LIQUID_STROKE_GRADIENTS) do
+			if not obj.Parent then
+				LIQUID_STROKE_GRADIENTS[obj]=nil
+			elseif obj:IsDescendantOf(SG) and obj:IsA("UIGradient") and obj.Name=="StrokeGradient" then
 				if direction=="Right" then
 					obj.Rotation=0
 					obj.Offset=Vector2.new(wave,0)
@@ -1791,8 +1832,10 @@ applyUIStrokeTheme=function()
 		return math.clamp(math.max(baseTransparency,styleTransparency,roleTransparency),0,1)
 	end
 
-	for _,obj in ipairs(SG:GetDescendants()) do
-		if obj:IsA("UIStroke") then
+	for obj in pairs(THEMED_STROKES) do
+		if not obj.Parent then
+			THEMED_STROKES[obj]=nil
+		elseif obj:IsDescendantOf(SG) then
 			local role=getStrokeRole(obj)
 			if role~="Fixed" then
 				local accentRole=role=="Window" or role=="Accent"
@@ -1820,6 +1863,7 @@ applyUIStrokeTheme=function()
 						gradient.Name="StrokeGradient"
 						gradient.Parent=obj
 					end
+					LIQUID_STROKE_GRADIENTS[gradient]=true
 
 					if UI_STYLE.LiquidStroke then
 						gradient.Color=ColorSequence.new({
@@ -1838,12 +1882,18 @@ applyUIStrokeTheme=function()
 					end
 				else
 					if gradient then
+						LIQUID_STROKE_GRADIENTS[gradient]=nil
 						gradient:Destroy()
 					end
 				end
 			end
+		end
+	end
 
-		elseif obj:IsA("UICorner") then
+	for obj in pairs(THEMED_CORNERS) do
+		if not obj.Parent then
+			THEMED_CORNERS[obj]=nil
+		elseif obj:IsDescendantOf(SG) then
 			local shape=(getUILibRuntimeStyle(UI_STYLE.UILib) or {}).Shape or {}
 			local role=obj.Parent and obj.Parent:GetAttribute("CornerRole") or "Control"
 			local radius=shape.ControlRadius or 0

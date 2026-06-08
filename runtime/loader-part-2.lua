@@ -49,20 +49,23 @@ function ensureRuntimePageBuilt(name)
 	local builder=LAZY_PAGE_BUILDERS[name]
 	if not builder or LAZY_PAGE_BUILT[name] then
 		if refreshRuntimePageControls then
-			pcall(refreshRuntimePageControls,name)
+			pcall(refreshRuntimePageControls,name,false)
 		end
 		return
 	end
 
 	LAZY_PAGE_BUILT[name]=true
+	local built=false
 	local ok,err=pcall(builder)
 	if not ok then
 		LAZY_PAGE_BUILT[name]=false
 		warn("Lazy page build failed:",name,err)
+	else
+		built=true
 	end
 
 	if refreshRuntimePageControls then
-		pcall(refreshRuntimePageControls,name)
+		pcall(refreshRuntimePageControls,name,built)
 	end
 end
 
@@ -338,7 +341,7 @@ function syncPage1State()
 	testingEnabled=PAGE1_STATE.testingEnabled
 end
 
-function refreshRuntimePageControls(name)
+function refreshRuntimePageControls(name,forceTheme)
 	name=tostring(name or "main")
 
 	if name=="main" then
@@ -373,7 +376,7 @@ function refreshRuntimePageControls(name)
 		end
 	end
 
-	if applyUIStrokeTheme then
+	if forceTheme and applyUIStrokeTheme then
 		pcall(applyUIStrokeTheme)
 	end
 	if updateResponsiveLayout then

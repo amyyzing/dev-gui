@@ -112,11 +112,8 @@ function GuiLogic.new(ctx)
 	end
 
 	local function createSwitch(parent,startState,onChange,width,height,knobSize,pad,zIndex)
-		local s=shape()
 		local c=components()
-		local toggleStyle=tostring(c.ToggleStyle or "switch"):lower()
-		local checkbox=toggleStyle=="checkbox"
-		local rounded=(tonumber(s.ControlRadius) or 0)>0
+		local checkbox=tostring(c.ToggleStyle or "switch"):lower()=="checkbox"
 		width=width or componentNumber("ToggleWidth",checkbox and 34 or 58)
 		height=height or componentNumber("ToggleHeight",checkbox and 22 or 22)
 		pad=pad or componentNumber("TogglePad",3)
@@ -125,13 +122,15 @@ function GuiLogic.new(ctx)
 		local onRole=tostring(c.ToggleOnRole or "SLIDER_FILL")
 		local offRole=tostring(c.ToggleOffRole or "INPUT")
 		local accent=themeRoleColor(onRole,themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(32,202,106)))
-		local danger=themeRoleColor("RED",THEME.RED or Color3.fromRGB(238,78,74))
 		local input=themeColor("INPUT",THEME.PANEL or Color3.fromRGB(18,18,24))
 		local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 		local strokeColor=themeColor("STROKE",THEME.STROKE or muted)
-		local textColor=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(245,245,245))
 		local coreSize=knobSize or componentNumber("ToggleKnobSize",math.max(10,math.min(height-8,14)))
 		local tickHeight=math.max(6,height-10)
+		local onTextColor=readableOn(accent)
+		local offStrokeTransparency=componentNumber("ToggleStrokeTransparency",0.50)
+		local softInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		local snapInfo=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 		local state=startState and true or false
 		local hovering=false
 		local activeTweens={}
@@ -150,9 +149,9 @@ function GuiLogic.new(ctx)
 		local wrapStroke=New("UIStroke",{
 			Color=strokeColor,
 			Thickness=1,
-			Transparency=componentNumber("ToggleStrokeTransparency",0.50),
+			Transparency=offStrokeTransparency,
 		},wrap)
-		wrapStroke:SetAttribute("BaseStrokeTransparency",componentNumber("ToggleStrokeTransparency",0.50))
+		wrapStroke:SetAttribute("BaseStrokeTransparency",offStrokeTransparency)
 		wrapStroke:SetAttribute("StrokeRole","Fixed")
 
 		local fillClip=New("Frame",{
@@ -285,8 +284,6 @@ function GuiLogic.new(ctx)
 		local function applyVisuals(animate)
 			cancelTweens()
 
-			local softInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
-			local snapInfo=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 			local onX=width-pad-(coreSize/2)
 			local offX=pad+(coreSize/2)
 			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
@@ -294,13 +291,13 @@ function GuiLogic.new(ctx)
 			local coreColor=state and accent:Lerp(Color3.new(1,1,1),0.08) or muted
 			local bgColor=state and input:Lerp(accent,0.12) or input:Lerp(Color3.new(0,0,0),0.10)
 			local strokeTarget=state and accent or (hovering and muted or strokeColor)
-			local strokeTransparency=state and 0.22 or (hovering and 0.32 or componentNumber("ToggleStrokeTransparency",0.50))
-			local dotColor=state and readableOn(accent) or input
+			local strokeTransparency=state and 0.22 or (hovering and 0.32 or offStrokeTransparency)
+			local dotColor=state and onTextColor or input
 			local dotTransparency=state and 0.02 or 0.18
 			local text=state and "ON" or "OFF"
 			local textPosition=state and UDim2.new(0,pad,0,0) or UDim2.new(0,pad+coreSize+4,0,0)
 			local textSize=state and UDim2.new(1,-(pad*2+coreSize+6),1,0) or UDim2.new(1,-(pad*2+coreSize+6),1,0)
-			local textColorTarget=state and readableOn(accent) or muted
+			local textColorTarget=state and onTextColor or muted
 			local coreRotation=state and 135 or 45
 			local coreScale=state and math.min(coreSize+2,height-6) or coreSize
 
@@ -325,7 +322,7 @@ function GuiLogic.new(ctx)
 				stateText.TextColor3=textColorTarget
 				stateText.TextTransparency=state and 0.02 or 0.22
 				for _,tick in ipairs(ticks) do
-					tick.BackgroundColor3=state and readableOn(accent) or muted
+					tick.BackgroundColor3=state and onTextColor or muted
 					tick.BackgroundTransparency=state and 0.74 or 0.86
 				end
 				return
@@ -340,7 +337,7 @@ function GuiLogic.new(ctx)
 			tween(stateText,softInfo,{Position=textPosition,Size=textSize,TextColor3=textColorTarget,TextTransparency=state and 0.02 or 0.22})
 
 			for _,tick in ipairs(ticks) do
-				tween(tick,softInfo,{BackgroundColor3=state and readableOn(accent) or muted,BackgroundTransparency=state and 0.74 or 0.86})
+				tween(tick,softInfo,{BackgroundColor3=state and onTextColor or muted,BackgroundTransparency=state and 0.74 or 0.86})
 			end
 		end
 
