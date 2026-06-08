@@ -66,7 +66,7 @@ return FootballMath
 - Ball gravity used by model: `28`
 - Player gravity used for jump peak: `196.2`
 - Jump power used for peak: `55.5`
-- Receiver peak target Y: about `13.85`
-- Current live solver advances receiver start by `wrVel * (releaseOffset + WR_LEAD_DELAY)` before solving.
-- Current default `WR_LEAD_DELAY`: `0.20`
+- Receiver peak target Y: `14.00` by default, adjustable with the QB Aim `Peak Height` slider.
+- Current live solver starts from release-adjusted receiver position and applies `WR_LEAD_DELAY` through `targetAtTime`.
+- Current default `WR_LEAD_DELAY`: `0.38`
 - Current vertical release extrapolation: disabled

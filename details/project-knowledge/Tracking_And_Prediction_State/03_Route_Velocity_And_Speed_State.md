@@ -67,7 +67,8 @@ end
 The route velocity is no longer used to create route-bucket extra lead as the primary validity rule. It feeds `wrVel` into the fixed-speed intercept solve:
 
 ```lua
-receiverStart = receiverMaxAt(receiverRoot.Position + wrVel * (releaseOffset + WR_LEAD_DELAY))
+receiverStart = receiverMaxAt(receiverRoot.Position + wrVel * releaseOffset)
+target = targetAtTime(receiverStart, wrVel, flightTime, leadDelayForFlightTime(flightTime))
 ```
 
 Then the solver chooses a time where a `MODEL_BALL_SPEED = 95` projectile can hit that peak-height moving target.

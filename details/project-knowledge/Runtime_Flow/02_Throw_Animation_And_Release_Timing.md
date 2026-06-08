@@ -74,7 +74,7 @@ Current release-origin behavior:
 
 - Horizontal release extrapolation is enabled, so the origin X/Z follows QB movement during release wait.
 - Vertical release extrapolation is disabled, so C2/origin Y stays tied to the current ball/Center C2 reference instead of being projected downward by player gravity during jump preview.
-- Receiver release prediction uses `releaseOffset` directly. The `WR_LEAD_DELAY` slider remains default `0.20`, but its extra receiver prediction is now tapered by solved flight time, with near-zero effect on very short throws and full effect by about `1.35s`.
+- Receiver release prediction uses `releaseOffset` directly. The `WR_LEAD_DELAY` slider defaults to `0.38` and is applied as direct receiver ahead-time inside the intercept target.
 
 ```lua
 	local function buildReleasePlan(receiver,ballPower,releaseBall,fallbackPlan)

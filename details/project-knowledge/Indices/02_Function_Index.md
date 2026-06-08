@@ -7,7 +7,6 @@
 - `smoothstep`
 - `leadDelayForFlightTime`
 - `safeVectorLerp`
-- `lerpNumber`
 - `root`
 - `routeSpeed`
 - `getModeKey`
@@ -71,10 +70,9 @@
 - `arcRig`
 - `historyVector`
 - `leastSquaresVelocity`
+- `currentReceiverRawVelocity`
 - `predictionState`
 - `updateStable`
-- `basis`
-- `components`
 - `movementShape`
 - `lockRoute`
 - `routeVelocity`
@@ -85,11 +83,7 @@
 - `velocityNeeded`
 - `ballAt`
 - `landing`
-- `preferredAngle`
-- `minimumAngle`
-- `maximumAngle`
-- `maximumTime`
-- `components3D`
+- `targetAtTime`
 - `c1HeightFromMagnitudePotential`
 - `c1Target`
 - `interceptValue`

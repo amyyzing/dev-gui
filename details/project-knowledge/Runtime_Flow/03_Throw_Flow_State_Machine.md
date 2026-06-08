@@ -102,10 +102,10 @@ Freeze preview briefly after throw
 The current `solve` path does not choose a throw by route/distance angle buckets. It scans time and solves the fixed-speed intercept condition:
 
 ```lua
-F(t) = |receiverStart - origin + (wrVel - qbVel * QB_INHERITANCE) * t + wrVel * leadDelayForFlightTime(t) - 0.5 * G * t * t|^2 - MODEL_BALL_SPEED^2 * t * t
+F(t) = |targetAtTime(receiverStart, wrVel, t, leadDelayForFlightTime(t)) - origin - qbVel * QB_INHERITANCE * t - 0.5 * G * t * t|^2 - MODEL_BALL_SPEED^2 * t * t
 ```
 
-`leadDelayForFlightTime(t)` uses a smooth ramp from `0` at `0.70s` to full `WR_LEAD_DELAY` at `1.35s`. This keeps short throws from receiving the full extra lead while preserving the baseline compensation on longer throws.
+`leadDelayForFlightTime(t)` currently returns full `WR_LEAD_DELAY`. In this clean-math version, `Lead Adjust` is direct ahead-time on the receiver target; set it to `0` for a pure catch-time intercept.
 
 After a valid time is chosen:
 

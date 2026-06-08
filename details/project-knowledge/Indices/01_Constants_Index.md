@@ -22,7 +22,7 @@ local SQUADS_BALL_POWER=MODEL_BALL_SPEED
 local PLAYER_G=196.2
 local JUMP_POWER=55.5
 local WR_STANDING_TOP_Y=6.00
-local DEFAULT_WR_MAX_Y=WR_STANDING_TOP_Y+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
+local DEFAULT_WR_MAX_Y=14.00
 local WR_MAX_Y=DEFAULT_WR_MAX_Y
 local C1_Y_MIN=WR_MAX_Y
 local C1_Y_MAX=WR_MAX_Y
@@ -31,7 +31,7 @@ local C1_Y_POTENTIAL_EXPONENT=1.00
 local C1_SOLVE_Y_BIAS=0.00
 ```
 
-- Default C1 Y is `WR_MAX_Y`, about `13.85`.
+- Default C1 Y is `WR_MAX_Y = 14.00`.
 - `WR_MAX_Y`, `C1_Y_MIN`, `C1_Y_MAX`, and `C1_Y_FIXED` are updated by the `Peak Height` slider.
 - `state.qbAimPeakHeight` persists the custom value, clamped to `8.00 -> 20.00`.
 - The old `13.00 -> 13.85` route-dominance range is not active in the live solver.
@@ -43,8 +43,8 @@ local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
-local WR_LEAD_DELAY=0.2
-local LEAD_DELAY_BASELINE=0.20
+local WR_LEAD_DELAY=0.38
+local LEAD_DELAY_BASELINE=0.38
 local LEAD_DELAY_ZERO_FLIGHT_TIME=0.70
 local LEAD_DELAY_FULL_FLIGHT_TIME=1.35
 local ROUTE_SPEED_PARTIAL_GAIN=1.08
@@ -53,17 +53,17 @@ local ROUTE_SPEED_PARTIAL_GAIN=1.08
 - `WR_LEAD_DELAY` is extra receiver prediction time.
 - The intercept target starts from `receiverRoot.Position + wrVel * releaseOffset`.
 - The extra lead delay is applied inside the intercept equation as `wrVel * leadDelayForFlightTime(t)`.
-- `leadDelayForFlightTime(t)` ramps from `0` at `0.70s` flight time to full `WR_LEAD_DELAY` at `1.35s`.
-- `0.20` is the baseline calculator value.
+- `leadDelayForFlightTime(t)` currently returns full `WR_LEAD_DELAY`; the clean solver treats the slider as direct intentional ahead-time.
+- `0.38` is the current clean-math baseline.
 
 ## Axis-invariant predictor support
 
 ```lua
 local ADAPTIVE_LEAD_ENABLED=true
-local PREDICTOR_HISTORY_MAX_AGE=1.25
+local PREDICTOR_HISTORY_MAX_AGE=0.30
 local PREDICTOR_MIN_SAMPLES=3
-local PREDICTOR_LS_BLEND=0.45
-local PREDICTOR_VELOCITY_BLEND=0.42
+local PREDICTOR_LS_BLEND=0.00
+local PREDICTOR_VELOCITY_BLEND=1.00
 local PREDICTOR_ACCEL_BLEND=0.28
 local PREDICTOR_ACCEL_MAX=48
 local PREDICTOR_ACCEL_TIME_MAX=1.05

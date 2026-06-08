@@ -18,7 +18,7 @@ local SQUADS_BALL_POWER=MODEL_BALL_SPEED
 local PLAYER_G=196.2
 local JUMP_POWER=55.5
 local WR_STANDING_TOP_Y=6.00
-local DEFAULT_WR_MAX_Y=WR_STANDING_TOP_Y+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G) -- ~=13.85
+local DEFAULT_WR_MAX_Y=14.00 -- clean default catch peak; original jump formula is ~=13.85
 local WR_MAX_Y=DEFAULT_WR_MAX_Y
 local C1_Y_MIN=WR_MAX_Y
 local C1_Y_MAX=WR_MAX_Y
@@ -29,16 +29,22 @@ local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
-local WR_LEAD_DELAY=0.2
-local LEAD_DELAY_BASELINE=0.20 -- lead adjust is direct receiver prediction time; 0.20 is the baseline calculator
+local CLEAN_MATH_ENABLED=true
+local CLEAN_MOVING_SPEED_MIN=5.0
+local CLEAN_CATCH_Y_TOLERANCE=0.35
+local CLEAN_TARGET_MISS_TOLERANCE=0.35
+local CLEAN_NEAR_TARGET_MISS_TOLERANCE=0.05
+local CLEAN_USE_DIRECT_LEAD=true
+local WR_LEAD_DELAY=0.38
+local LEAD_DELAY_BASELINE=0.38 -- clean math: Lead Adjust is direct intentional ahead-time
 local LEAD_DELAY_ZERO_FLIGHT_TIME=0.70
 local LEAD_DELAY_FULL_FLIGHT_TIME=1.35
 local ADAPTIVE_LEAD_ENABLED=true
 local ROUTE_SPEED_PARTIAL_GAIN=1.08
-local PREDICTOR_HISTORY_MAX_AGE=1.25
+local PREDICTOR_HISTORY_MAX_AGE=0.30
 local PREDICTOR_MIN_SAMPLES=3
-local PREDICTOR_LS_BLEND=0.45
-local PREDICTOR_VELOCITY_BLEND=0.42
+local PREDICTOR_LS_BLEND=0.00
+local PREDICTOR_VELOCITY_BLEND=1.00
 local PREDICTOR_ACCEL_BLEND=0.28
 local PREDICTOR_ACCEL_MAX=48
 local PREDICTOR_ACCEL_TIME_MAX=1.05
@@ -87,7 +93,7 @@ local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
 local PREVIEW_MISSING_BALL_GRACE=0.2
 local ARC_MAX_CURVE=400
-local PREVIEW_SMOOTH=0.28
+local PREVIEW_SMOOTH=1.00
 local C1_MARKER_ENABLED=true
 local C1_MARKER_SIZE=1.65
 local C3_INFO_GUI_ENABLED=false
@@ -178,7 +184,10 @@ local function smoothstep(edge0,edge1,value)
 end
 
 local function leadDelayForFlightTime(time)
-	return math.max(WR_LEAD_DELAY,0)*smoothstep(LEAD_DELAY_ZERO_FLIGHT_TIME,LEAD_DELAY_FULL_FLIGHT_TIME,time or 0)
+	-- Clean math rebuild: Lead Adjust is not route classification and not radial/tangent damping.
+	-- It is only the intentional ahead-time along the receiver's current velocity vector.
+	-- Set Lead Adjust to 0 for pure catch-time intercept, or 0.35-0.40 for your ahead-of-WR catch window.
+	return math.max(WR_LEAD_DELAY,0)
 end
 
 local function safeVectorLerp(a,b,alpha)
@@ -192,16 +201,14 @@ local function root(character)
 end
 
 local function routeSpeed(speed)
-	local clamped=math.clamp(speed,0,MAX_RUN_SPEED)
-	if clamped<ROUTE_LOCK_MIN_SPEED then
+	-- Clean math rebuild: receivers are modeled as either stopped or moving at route speed.
+	-- This removes partial-speed formula drift and keeps the prediction equation simple.
+	local clamped=math.clamp(speed or 0,0,MAX_RUN_SPEED)
+	if clamped<CLEAN_MOVING_SPEED_MIN then
 		return 0
 	end
 
-	if clamped>=NORMAL_ROUTE_MIN_SPEED then
-		return MAX_RUN_SPEED
-	end
-
-	return math.clamp(clamped*ROUTE_SPEED_PARTIAL_GAIN,ROUTE_LOCK_MIN_SPEED,MAX_RUN_SPEED)
+	return MAX_RUN_SPEED
 end
 
 local function getModeKey(ctx)
@@ -1084,6 +1091,21 @@ function QBAim.new(ctx,parent)
 		return preview.c2,preview.c1,preview.c3,preview.beam
 	end
 
+	--[[
+		Clean math rebuild
+
+		Core equation:
+			ball(t) = origin + throwVelocity*t + 0.5*G*t^2
+			target(t) = receiverPeakAtRelease + wrVelocity*(t + leadDelay)
+
+		Only three football constants matter in the math core:
+			1. ball speed
+			2. receiver route speed
+			3. receiver catch height
+
+		No slant/streak/radial/tangent dominance is used for targeting. Route labels below are diagnostics only.
+	]]
+
 	local function historyVector(data,now)
 		if not(data and data.ph and #data.ph>=2) then
 			return nil,0,0
@@ -1091,8 +1113,28 @@ function QBAim.new(ctx,parent)
 
 		local latest=data.ph[#data.ph]
 		local earliest=data.ph[1]
+		local dt=latest.t-earliest.t
+		if dt<=0 then
+			return nil,0,0
+		end
+
+		local movement=flat(latest.pos-earliest.pos)
+		local distance=movement.Magnitude
+		local speed=distance/dt
+		return movement,speed,distance
+	end
+
+	local function leastSquaresVelocity(data,now)
+		-- Kept for compatibility with older diagnostics, but the clean predictor does not use
+		-- long-window least-squares because it lags hard cuts and slants.
+		if not(data and data.ph and #data.ph>=2) then
+			return nil,0,0
+		end
+
+		local latest=data.ph[#data.ph]
+		local earliest=data.ph[1]
 		for i=#data.ph,1,-1 do
-			if now-data.ph[i].t>=STABLE_WINDOW then
+			if now-data.ph[i].t>=PREDICTOR_HISTORY_MAX_AGE then
 				earliest=data.ph[i]
 				break
 			end
@@ -1103,186 +1145,89 @@ function QBAim.new(ctx,parent)
 			return nil,0,0
 		end
 
-		local movement=flat(latest.pos-earliest.pos)
-		local distance=movement.Magnitude
-		local speed=distance/dt
-		if distance<STABLE_MIN_DIST or speed<STABLE_MIN_SPEED then
-			return nil,speed,distance
-		end
-
-		return movement,speed,distance
+		local velocity=clampMagnitude(flat(latest.pos-earliest.pos)/dt,MAX_RUN_SPEED)
+		local quality=math.clamp(dt/math.max(PREDICTOR_HISTORY_MAX_AGE,0.05),0,1)
+		return velocity,quality,dt
 	end
 
-	local function leastSquaresVelocity(data,now)
-		if not(data and data.ph and #data.ph>=PREDICTOR_MIN_SAMPLES) then
-			return nil,0,0
+	local function currentReceiverRawVelocity(data,receiverRoot,fallbackVelocity)
+		local assembly=receiverRoot and receiverRoot.AssemblyLinearVelocity or nil
+		local assemblyXZ=assembly and flat(assembly) or Vector3.zero
+		local rawXZ=flat((data and data.rawVel) or fallbackVelocity or Vector3.zero)
+		local storedXZ=flat((data and data.vel) or Vector3.zero)
+
+		-- AssemblyLinearVelocity is preferred when it is clearly moving; otherwise use the
+		-- immediate position-delta velocity from the heartbeat tracker. No route-shape basis.
+		local velocity=Vector3.zero
+		local source="none"
+		if assemblyXZ.Magnitude>=CLEAN_MOVING_SPEED_MIN then
+			velocity=assemblyXZ
+			source="assembly"
+		elseif rawXZ.Magnitude>=CLEAN_MOVING_SPEED_MIN then
+			velocity=rawXZ
+			source="raw_delta"
+		elseif storedXZ.Magnitude>=CLEAN_MOVING_SPEED_MIN then
+			velocity=storedXZ
+			source="stored"
 		end
 
-		local count=0
-		local sumT,sumX,sumZ=0,0,0
-		local minT,maxT=nil,nil
-
-		for _,sample in ipairs(data.ph) do
-			if sample.t and sample.pos and now-sample.t<=PREDICTOR_HISTORY_MAX_AGE then
-				local t=sample.t-now
-				count+=1
-				sumT+=t
-				sumX+=sample.pos.X
-				sumZ+=sample.pos.Z
-				minT=minT and math.min(minT,t) or t
-				maxT=maxT and math.max(maxT,t) or t
-			end
+		if velocity.Magnitude<CLEAN_MOVING_SPEED_MIN then
+			return Vector3.zero,"stopped",0
 		end
 
-		if count<PREDICTOR_MIN_SAMPLES then
-			return nil,0,0
-		end
-
-		local meanT=sumT/count
-		local meanX=sumX/count
-		local meanZ=sumZ/count
-		local denom=0
-		local numX,numZ=0,0
-
-		for _,sample in ipairs(data.ph) do
-			if sample.t and sample.pos and now-sample.t<=PREDICTOR_HISTORY_MAX_AGE then
-				local centeredT=(sample.t-now)-meanT
-				denom+=centeredT*centeredT
-				numX+=centeredT*(sample.pos.X-meanX)
-				numZ+=centeredT*(sample.pos.Z-meanZ)
-			end
-		end
-
-		if denom<1e-6 then
-			return nil,0,0
-		end
-
-		local velocity=clampMagnitude(Vector3.new(numX/denom,0,numZ/denom),MAX_RUN_SPEED)
-		local span=(maxT or 0)-(minT or 0)
-		local quality=math.clamp((count-PREDICTOR_MIN_SAMPLES+1)/5,0,1)*math.clamp(span/STABLE_WINDOW,0,1)
-		return velocity,quality,span
+		return clampMagnitude(velocity,MAX_RUN_SPEED),source,velocity.Magnitude
 	end
 
-	local function predictionState(data,receiverPosition,fallbackVelocity)
+	local function predictionState(data,receiverPosition,fallbackVelocity,receiverRoot)
 		local now=os.clock()
-		local measuredVelocity=clampMagnitude(flat((data and data.vel) or fallbackVelocity or Vector3.zero),MAX_RUN_SPEED)
-		local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
-		local blendedVelocity=measuredVelocity
-		if lsVelocity and lsVelocity.Magnitude>=ROUTE_LOCK_MIN_SPEED then
-			blendedVelocity=safeVectorLerp(measuredVelocity,lsVelocity,PREDICTOR_LS_BLEND*lsQuality)
+		local rawVelocity,source,rawSpeed=currentReceiverRawVelocity(data,receiverRoot,fallbackVelocity)
+		local routeVelocity=Vector3.zero
+		if rawVelocity.Magnitude>=CLEAN_MOVING_SPEED_MIN then
+			routeVelocity=rawVelocity.Unit*MAX_RUN_SPEED
 		end
 
-		blendedVelocity=clampMagnitude(blendedVelocity,MAX_RUN_SPEED)
 		local acceleration=clampMagnitude(flat(data and data.accel or Vector3.zero),PREDICTOR_ACCEL_MAX)
 		local sampleAge=data and data.lastSeen and math.max(now-data.lastSeen,0) or PREDICTOR_STALE_AFTER
-		local ageConfidence=1-math.clamp(sampleAge/PREDICTOR_STALE_AFTER,0,1)
-		local speedConfidence=math.clamp(blendedVelocity.Magnitude/NORMAL_ROUTE_MIN_SPEED,0,1)
-		local storedConfidence=math.clamp(data and data.confidence or PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
-		local confidence=math.clamp((0.35*storedConfidence+0.35*lsQuality+0.30*speedConfidence)*ageConfidence,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
+		local moving=routeVelocity.Magnitude>0
+		local confidence=moving and 1 or PREDICTOR_CONFIDENCE_MIN
 
 		return{
 			position=receiverPosition,
-			velocity=blendedVelocity,
+			velocity=routeVelocity,
+			rawVelocity=rawVelocity,
+			rawSpeed=rawSpeed,
 			acceleration=acceleration,
 			confidence=confidence,
-			lsQuality=lsQuality,
+			lsQuality=0,
 			sampleAge=sampleAge,
+			source=source,
 		}
 	end
 
 	local function updateStable(data)
-		if not data then return nil,0,"none" end
-
-		local now=os.clock()
-		local historyVelocity,historySpeed=historyVector(data,now)
-		local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
-		local measuredVelocity=flat(data.vel or Vector3.zero)
-		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
-			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
-		end
-
-		local measuredSpeed=measuredVelocity.Magnitude
-		if measuredSpeed<=STABLE_STOP_SPEED then
-			data.sdir=nil
-			data.sspeed=0
-			data.stime=now
-			data.src="stopped"
+		-- Compatibility shim. Clean math does not hold old route direction.
+		local velocity,source,rawSpeed=currentReceiverRawVelocity(data,nil,data and data.rawVel or Vector3.zero)
+		if velocity.Magnitude<CLEAN_MOVING_SPEED_MIN then
+			if data then
+				data.sdir=nil
+				data.sspeed=0
+				data.src="stopped"
+			end
 			return nil,0,"stopped"
 		end
 
-		local candidateDirection=nil
-		local candidateSpeed=0
-		local source="hold"
-		if lsVelocity and lsQuality>=0.35 and lsVelocity.Magnitude>=STABLE_MIN_SPEED then
-			candidateDirection=lsVelocity.Unit
-			candidateSpeed=routeSpeed(lsVelocity.Magnitude)
-			source="least_squares"
-		elseif historyVelocity and historyVelocity.Magnitude>0 then
-			candidateDirection=historyVelocity.Unit
-			candidateSpeed=routeSpeed(historySpeed)
-			source="history"
-		elseif measuredSpeed>=STABLE_MIN_SPEED then
-			candidateDirection=measuredVelocity.Unit
-			candidateSpeed=routeSpeed(measuredSpeed)
-			source="measured"
-		end
-
-		if candidateDirection and candidateSpeed>0 then
-			if data.sdir and data.sdir.Magnitude>0 then
-				local dot=math.clamp(data.sdir:Dot(candidateDirection),-1,1)
-				if dot>=STABLE_DOT_REPLACE then
-					data.sdir=unit(data.sdir:Lerp(candidateDirection,STABLE_BLEND),candidateDirection)
-				else
-					data.sdir=candidateDirection
-				end
-			else
-				data.sdir=candidateDirection
-			end
-
-			data.sspeed=candidateSpeed
-			data.stime=now
+		local direction=velocity.Unit
+		if data then
+			data.sdir=direction
+			data.sspeed=MAX_RUN_SPEED
+			data.stime=os.clock()
 			data.src=source
-			return data.sdir,data.sspeed,source
 		end
-
-		if data.sdir and now-(data.stime or 0)<=STABLE_HOLD then
-			return data.sdir,data.sspeed or 0,"held"
-		end
-
-		return nil,0,"none"
-	end
-
-	local function basis(origin,position)
-		local toTarget=flat(position-origin)
-		if toTarget.Magnitude<0.1 then
-			return Vector3.new(1,0,0),Vector3.new(0,0,1)
-		end
-
-		local away=toTarget.Unit
-		return away,Vector3.new(-away.Z,0,away.X)
-	end
-
-	local function components(origin,position,velocity)
-		local awayDirection,sideDirection=basis(origin,position)
-		local flatVelocity=flat(velocity or Vector3.zero)
-		local away=flatVelocity:Dot(awayDirection)
-		local side=flatVelocity:Dot(sideDirection)
-
-		return{
-			awayDir=awayDirection,
-			sideDir=sideDirection,
-			away=away,
-			side=side,
-			awayAbs=math.abs(away),
-			sideAbs=math.abs(side),
-			speed=flatVelocity.Magnitude,
-		}
+		return direction,MAX_RUN_SPEED,source
 	end
 
 	local function movementShape(origin,position,velocity)
-		-- Do not label routes as "slant" or "streak" from a QB-centered polar axis.
-		-- The same world-space route can look tangent, radial, or mixed depending only on
-		-- where the WR is on the QB-centered circle. Keep this as range relation only.
+		-- Diagnostic only. The clean solver does not change the target formula based on this label.
 		local velocityXZ=flat(velocity or Vector3.zero)
 		local speed=velocityXZ.Magnitude
 		if speed<0.1 then
@@ -1310,59 +1255,40 @@ function QBAim.new(ctx,parent)
 		local data=receiverData[receiver]
 		if not(receiverRoot and data) then return nil end
 
-		local measuredVelocity=flat(data.vel)
-		if measuredVelocity.Magnitude>MAX_RUN_SPEED then
-			measuredVelocity=measuredVelocity.Unit*MAX_RUN_SPEED
-		end
-
-		local stableDirection,stableSpeed,stableSource=updateStable(data)
-		local speed=stableSpeed>0 and stableSpeed or routeSpeed(measuredVelocity.Magnitude)
-		if not stableDirection and (measuredVelocity.Magnitude<ROUTE_LOCK_MIN_SPEED or speed<=0) then
+		local velocity,source=currentReceiverRawVelocity(data,receiverRoot,receiverRoot.AssemblyLinearVelocity)
+		if velocity.Magnitude<CLEAN_MOVING_SPEED_MIN then
 			return nil
 		end
 
 		local ball=getHeldBall()
 		local characterRoot=LP.Character and root(LP.Character)
 		local qbPosition=(ball and ball.Position) or (characterRoot and characterRoot.Position) or receiverRoot.Position
-		local direction=stableDirection or measuredVelocity.Unit
+		local routeVelocity=velocity.Unit*MAX_RUN_SPEED
 
 		return{
 			player=receiver,
 			createdAt=os.clock(),
-			routeDir=direction,
-			routeSpeed=speed,
-			routeVelocity=direction*speed,
-			stableSource=stableSource,
-			shape=movementShape(qbPosition,receiverRoot.Position,direction*speed),
+			routeDir=routeVelocity.Unit,
+			routeSpeed=MAX_RUN_SPEED,
+			routeVelocity=routeVelocity,
+			stableSource=source,
+			shape=movementShape(qbPosition,receiverRoot.Position,routeVelocity),
 		}
 	end
 
-	local function routeVelocity(receiver,data,origin,receiverRoot,routeLock)
-		local state=predictionState(data,receiverRoot.Position,data and data.vel or Vector3.zero)
-		local measuredVelocity=clampMagnitude(flat(state.velocity or Vector3.zero),MAX_RUN_SPEED)
-		local measuredSpeed=measuredVelocity.Magnitude
-		local adjustedSpeed=routeSpeed(measuredSpeed)
-		local stableDirection,stableSpeed=updateStable(data)
-		local velocity=Vector3.zero
+	local function routeVelocity(receiver,data,originPosition,receiverRoot,routeLock)
+		local state=predictionState(data,receiverRoot.Position,data and data.rawVel or Vector3.zero,receiverRoot)
+		local velocity=state.velocity or Vector3.zero
 
-		-- H locks the receiver identity only. Direction remains reactive, but the vector now blends
-		-- recent least-squares motion with the stable route direction instead of blindly max-leading.
-		if stableDirection and stableSpeed>0 then
-			velocity=stableDirection*stableSpeed
-			if measuredSpeed>=ROUTE_LOCK_MIN_SPEED and adjustedSpeed>0 then
-				local reactiveVelocity=measuredVelocity.Unit*adjustedSpeed
-				velocity=safeVectorLerp(velocity,reactiveVelocity,math.clamp((state.confidence or 0)*0.38,0,0.38))
-			end
-		elseif measuredSpeed>=ROUTE_LOCK_MIN_SPEED and adjustedSpeed>0 then
-			velocity=measuredVelocity.Unit*adjustedSpeed
-		else
+		if velocity.Magnitude<CLEAN_MOVING_SPEED_MIN then
 			state.routeVelocity=Vector3.zero
 			return Vector3.zero,"standing",state
 		end
 
-		velocity=clampMagnitude(flat(velocity),MAX_RUN_SPEED)
+		-- H locks receiver identity only. Direction always uses the current raw vector.
+		velocity=velocity.Unit*MAX_RUN_SPEED
 		state.routeVelocity=velocity
-		return velocity,movementShape(origin,receiverRoot.Position,velocity),state
+		return velocity,movementShape(originPosition,receiverRoot.Position,velocity),state
 	end
 
 	local function receiverMaxAt(position)
@@ -1430,324 +1356,167 @@ function QBAim.new(ctx,parent)
 		return ballAt(originPosition,velocity,time),time
 	end
 
-	local function preferredAngle(distance)
-		local yards=distance/YARDS_TO_STUDS
-		if yards<15 then return 24 elseif yards<25 then return 22 elseif yards<40 then return 19 elseif yards<55 then return 16 elseif yards<70 then return 14 elseif yards<85 then return 17 end
-		return 22
-	end
-
-	local function minimumAngle(distance)
-		local yards=distance/YARDS_TO_STUDS
-		if yards<15 then return 14 elseif yards<25 then return 17 elseif yards<40 then return 16 elseif yards<55 then return 11 end
-		return 0
-	end
-
-	local function maximumAngle(distance)
-		if distance<45 then return 42 elseif distance<75 then return 38 elseif distance<120 then return 34 elseif distance<170 then return 32 end
-		return 35
-	end
-
-	local function maximumTime(distance)
-		if distance<45 then return 1.35 elseif distance<75 then return 1.85 elseif distance<120 then return 2.45 elseif distance<170 then return 3.25 elseif distance<230 then return 4.25 end
-		return MAX_T
-	end
-
-	local function components3D(originPosition,receiverMaxPoint,velocity)
-		local radiusVec=receiverMaxPoint-originPosition
-		local radius=radiusVec.Magnitude
-		if radius<1e-6 then
-			local awayDir,sideDir=basis(originPosition,receiverMaxPoint)
-			local velocityXZ=flat(velocity or Vector3.zero)
-			return{
-				radius=0,
-				radialDir=awayDir,
-				tangentDir=sideDir,
-				elevationDir=Vector3.new(0,1,0),
-				lateralDir=sideDir,
-				awayDir=awayDir,
-				sideDir=sideDir,
-				radial=velocityXZ:Dot(awayDir),
-				tangent=velocityXZ:Dot(sideDir),
-				elevation=0,
-				away=velocityXZ:Dot(awayDir),
-				side=velocityXZ:Dot(sideDir),
-				awayAbs=math.abs(velocityXZ:Dot(awayDir)),
-				sideAbs=math.abs(velocityXZ:Dot(sideDir)),
-				lateralAbs=math.abs(velocityXZ:Dot(sideDir)),
-				speed=velocityXZ.Magnitude,
-			}
-		end
-
-		local radialDir=radiusVec.Unit
-		local up=Vector3.new(0,1,0)
-		local tangentDir=up:Cross(radialDir)
-		if tangentDir.Magnitude<1e-6 then
-			tangentDir=Vector3.new(1,0,0)
-		else
-			tangentDir=tangentDir.Unit
-		end
-		local elevationDir=radialDir:Cross(tangentDir)
-		if elevationDir.Magnitude<1e-6 then
-			elevationDir=up
-		else
-			elevationDir=elevationDir.Unit
-		end
-
-		local velocity3=Vector3.new((velocity or Vector3.zero).X,0,(velocity or Vector3.zero).Z)
-		local radial=velocity3:Dot(radialDir)
-		local tangent=velocity3:Dot(tangentDir)
-		local elevation=velocity3:Dot(elevationDir)
-		local lateralVec=tangentDir*tangent+elevationDir*elevation
-		local lateralAbs=lateralVec.Magnitude
-		local lateralDir=lateralAbs>1e-6 and lateralVec.Unit or tangentDir
-		local flatRadial=flat(radialDir)
-		local awayDir=flatRadial.Magnitude>1e-6 and flatRadial.Unit or Vector3.new(1,0,0)
-		local sideDir=Vector3.new(-awayDir.Z,0,awayDir.X)
-
-		return{
-			radius=radius,
-			radialDir=radialDir,
-			tangentDir=tangentDir,
-			elevationDir=elevationDir,
-			lateralDir=lateralDir,
-			awayDir=awayDir,
-			sideDir=sideDir,
-			radial=radial,
-			tangent=tangent,
-			elevation=elevation,
-			away=radial,
-			side=tangent,
-			awayAbs=math.abs(radial),
-			sideAbs=lateralAbs,
-			lateralAbs=lateralAbs,
-			speed=velocity3.Magnitude,
-		}
+	local function targetAtTime(receiverStart,wrVel,time,leadDelay)
+		local target=receiverStart+flat(wrVel)*(time+(leadDelay or 0))
+		return Vector3.new(target.X,WR_MAX_Y+C1_SOLVE_Y_BIAS,target.Z)
 	end
 
 	local function c1HeightFromMagnitudePotential(potential,speed)
-		-- Fixed jump-peak target. Route dominance should not move C1 between 13.00 and WR_MAX_Y.
 		return C1_Y_FIXED
 	end
 
 	local function c1Target(receiverPosition,originPosition,targetVelocity,flightTime,predictorState)
-		local receiverMaxPoint=receiverMaxAt(receiverPosition)
-
-		-- Axis-invariant predictor:
-		-- The catch target is moved along the receiver's actual velocity vector.
-		-- QB-centered radial/tangent projections are used only for damping/diagnostics, never
-		-- as the main lead basis. This prevents a north-running WR from being treated as
-		-- "full slant" on one side of the circle and "full streak" at the top of the circle.
-		local velocityXZ=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
-		local speed=velocityXZ.Magnitude
-		local routeDir=speed>1e-6 and velocityXZ.Unit or Vector3.new(1,0,0)
-
-		local losVector=flat(receiverMaxPoint-originPosition)
-		local radius=math.max(losVector.Magnitude,1e-6)
-		local losDir=unit(losVector,routeDir)
-
-		local signedRangeSpeed=speed>1e-6 and velocityXZ:Dot(losDir) or 0
-		local awayShare=speed>1e-6 and math.clamp(signedRangeSpeed/speed,-1,1) or 0
-		local positiveAwayShare=math.clamp(awayShare,0,1)
-		local closingShare=math.clamp(-awayShare,0,1)
-		local radialShareAbs=math.abs(awayShare)
-		local lateralVelocity=velocityXZ-losDir*signedRangeSpeed
-		local lateralSpeed=lateralVelocity.Magnitude
+		local receiverStart=receiverMaxAt(receiverPosition)
+		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
+		local leadDelay=leadDelayForFlightTime(flightTime)
+		local target=targetAtTime(receiverStart,wrVel,flightTime,leadDelay)
+		local speed=wrVel.Magnitude
+		local losVector=flat(receiverStart-originPosition)
+		local losDir=unit(losVector,speed>0 and wrVel.Unit or Vector3.new(1,0,0))
+		local awayShare=speed>1e-6 and math.clamp(wrVel:Dot(losDir)/speed,-1,1) or 0
+		local lateralSpeed=(wrVel-losDir*wrVel:Dot(losDir)).Magnitude
 		local lateralShare=speed>1e-6 and math.clamp(lateralSpeed/speed,0,1) or 0
-		local routeBalance=1-math.abs(radialShareAbs-lateralShare)
 
-		local predictorConfidence=math.clamp(predictorState and predictorState.confidence or 0.55,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
-		local leadUserScale=math.clamp(WR_LEAD_DELAY/math.max(LEAD_DELAY_BASELINE,0.01),0,2.25)
-		local speedScale=math.clamp(speed/MAX_RUN_SPEED,0,1)
-		local uncertaintyDamping=1-ADAPTIVE_UNCERTAINTY_DAMPING*(1-predictorConfidence)
-
-		local losRate=lateralSpeed/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
-		local losDamping=1/(1+losRate*CIRCLE_LOS_RATE_GAIN)
-		local reactiveLosDamping=1/(1+losRate*AXIS_LOS_RATE_GAIN)
-		local distanceScale=math.clamp(radius/CIRCLE_RADIUS_FULL_LEAD,CIRCLE_DISTANCE_SCALE_MIN,CIRCLE_DISTANCE_SCALE_MAX)
-
-		local accelerationXZ=clampMagnitude(flat(predictorState and predictorState.acceleration or Vector3.zero),PREDICTOR_ACCEL_MAX)
-		local alongAcceleration=speed>1e-6 and accelerationXZ:Dot(routeDir) or 0
-		local brakingShare=math.clamp(-alongAcceleration/math.max(PREDICTOR_ACCEL_MAX,1),0,1)
-		local accelTime=math.min(flightTime,PREDICTOR_ACCEL_TIME_MAX)
-
-		-- True intercept lead is v*t. Extra user lead is now a small along-route pad,
-		-- not a radial/tangent dominance term.
-		local brakeFlightScale=1-AXIS_BRAKE_FLIGHT_DAMPING*brakingShare*predictorConfidence
-		local flightLead=velocityXZ*flightTime*math.clamp(brakeFlightScale,0.45,1)
-
-		local accelerationLeadScale=PREDICTOR_ACCEL_LEAD_SCALE*predictorConfidence
-		local accelerationLeadXZ=accelerationXZ*(0.5*accelTime*accelTime*accelerationLeadScale)
-		accelerationLeadXZ=clampMagnitude(accelerationLeadXZ,PREDICTOR_ACCEL_LEAD_MAX)
-
-		local closingDamping=math.clamp(1-AXIS_CLOSING_EXTRA_DAMPING*closingShare,0.20,1)
-		local brakeExtraDamping=math.clamp(1-0.80*brakingShare,0.20,1)
-		local adaptiveLeadScale=ADAPTIVE_LEAD_ENABLED and (leadUserScale*speedScale*predictorConfidence*uncertaintyDamping) or 1
-		local axisExtraLeadTime=0
-
-		if AXIS_INVARIANT_LEAD_ENABLED then
-			axisExtraLeadTime=math.min(
-				LEAD_DELAY_BASELINE
-				*AXIS_EXTRA_LEAD_FRACTION
-				*adaptiveLeadScale
-				*distanceScale
-				*reactiveLosDamping
-				*closingDamping
-				*brakeExtraDamping,
-				AXIS_EXTRA_LEAD_TIME_MAX
-			)
-		end
-
-		local extraLeadXZ=velocityXZ*axisExtraLeadTime
-		local effectiveExtraTime=speed>1e-6 and (extraLeadXZ.Magnitude+accelerationLeadXZ.Magnitude)/speed or 0
-		local targetFlat=flat(receiverMaxPoint)+flightLead+accelerationLeadXZ+extraLeadXZ
-		local c1Height=c1HeightFromMagnitudePotential(0,speed)
-
-		-- Diagnostics keep the old field names so the rest of the module remains compatible.
-		local tangentDominance=(lateralShare*lateralShare)/((radialShareAbs*radialShareAbs)+(lateralShare*lateralShare)+CIRCLE_TANGENT_DOMINANCE_EPSILON)
-		local balancePeak=1-math.abs(2*tangentDominance-1)
-		local tangentClosingScale=closingDamping
-		local tangentSignedScale=closingDamping*brakeExtraDamping
-
-		return Vector3.new(targetFlat.X,c1Height+C1_SOLVE_Y_BIAS,targetFlat.Z),{
-			flightLeadXZ=flightLead,
-			accelerationLeadXZ=accelerationLeadXZ,
-			extraLeadXZ=extraLeadXZ,
+		return target,{
+			flightLeadXZ=wrVel*flightTime,
+			accelerationLeadXZ=Vector3.zero,
+			extraLeadXZ=wrVel*leadDelay,
 			radialExtraLeadXZ=Vector3.zero,
-			tangentExtraLeadXZ=extraLeadXZ,
-			extraLeadTime=effectiveExtraTime,
+			tangentExtraLeadXZ=wrVel*leadDelay,
+			extraLeadTime=leadDelay,
 			radialExtraTime=0,
-			tangentExtraTime=axisExtraLeadTime,
+			tangentExtraTime=leadDelay,
 			tangentBaseTime=0,
-			tangentReactiveTime=axisExtraLeadTime,
+			tangentReactiveTime=leadDelay,
 			radialBaseTime=0,
 			radialLDTime=0,
-			adaptiveLeadScale=adaptiveLeadScale,
-			leadUserScale=leadUserScale,
-			predictorConfidence=predictorConfidence,
+			adaptiveLeadScale=1,
+			leadUserScale=math.clamp(WR_LEAD_DELAY/math.max(LEAD_DELAY_BASELINE,0.01),0,2.25),
+			predictorConfidence=predictorState and predictorState.confidence or 1,
 			radialFlightScale=1,
 			tangentFlightScale=1,
-			accelTime=accelTime,
-			accelerationLeadScale=accelerationLeadScale,
-			brakingShare=brakingShare,
-			brakeFlightScale=brakeFlightScale,
-			axisExtraLeadTime=axisExtraLeadTime,
+			accelTime=0,
 			magnitudeChangePotential=0,
-			c1Height=c1Height,
+			c1Height=C1_Y_FIXED,
 			c1HeightMin=C1_Y_MIN,
 			c1HeightMax=C1_Y_MAX,
 			c1SolveYBias=C1_SOLVE_Y_BIAS,
-			distance3DNow=radius,
-			distanceXZNow=distXZ(originPosition,receiverMaxPoint),
-			distanceScale=distanceScale,
+			distance3DNow=(receiverStart-originPosition).Magnitude,
+			distanceXZNow=distXZ(originPosition,receiverStart),
+			distanceScale=1,
 			awayShare=awayShare,
-			positiveAwayShare=positiveAwayShare,
-			radialShareAbs=radialShareAbs,
+			positiveAwayShare=math.clamp(awayShare,0,1),
+			radialShareAbs=math.abs(awayShare),
 			lateralShare=lateralShare,
-			routeBalance=routeBalance,
+			routeBalance=1-math.abs(math.abs(awayShare)-lateralShare),
 			balanceLeadScale=1,
 			radialGain=0,
 			tangentGain=0,
-			losRate=losRate,
-			losDamping=losDamping,
-			reactiveLosDamping=reactiveLosDamping,
+			losRate=0,
+			losDamping=1,
+			reactiveLosDamping=1,
 			tangentAlignment=1,
 			tangentAlignmentBoost=1,
 			tangentBalanceBoost=1,
-			tangentDominance=tangentDominance,
-			tangentBalancePeak=balancePeak,
+			tangentDominance=lateralShare*lateralShare/(awayShare*awayShare+lateralShare*lateralShare+CIRCLE_TANGENT_DOMINANCE_EPSILON),
+			tangentBalancePeak=1,
 			tangentDominanceScale=1,
-			closingShare=closingShare,
-			tangentClosingScale=tangentClosingScale,
-			tangentSignedScale=tangentSignedScale,
-			routeAway=signedRangeSpeed,
+			closingShare=math.clamp(-awayShare,0,1),
+			tangentClosingScale=1,
+			tangentSignedScale=1,
+			routeAway=wrVel:Dot(losDir),
 			routeSide=lateralSpeed,
 			routeElevation=0,
 			routeSpeed=speed,
 			axisInvariant=true,
+			cleanMath=true,
 		}
 	end
 
 	local function interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
-		local inheritedVelocity=qbVel*QB_INHERITANCE
+		local inheritedVelocity=flat(qbVel or Vector3.zero)*QB_INHERITANCE
 		local receiverLeadDelay=leadDelayForFlightTime(time)
-		local neededDisplacement=receiverStart-originPosition+(wrVel-inheritedVelocity)*time+wrVel*receiverLeadDelay-0.5*G*time*time
+		local target=targetAtTime(receiverStart,wrVel,time,receiverLeadDelay)
+		local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
 		return neededDisplacement:Dot(neededDisplacement)-ballSpeed*ballSpeed*time*time
 	end
 
 	local function interceptLeadInfo(originPosition,target,wrVel,time,predictorState)
-		local result=components3D(originPosition,target,wrVel)
-		local speed=math.max(result.speed,1e-6)
-		local radius=math.max(result.radius,1e-6)
-		local awayShare=math.clamp(result.radial/speed,-1,1)
-		local radialShareAbs=math.clamp(math.abs(result.radial)/speed,0,1)
-		local lateralShare=math.clamp(result.lateralAbs/speed,0,1)
-		local routeBalance=1-math.abs(radialShareAbs-lateralShare)
-		local losRate=result.lateralAbs/math.max(radius,CIRCLE_LOS_RATE_EPSILON)
-		local losDamping=1/(1+losRate*CIRCLE_LOS_RATE_GAIN)
-		local reactiveLosDamping=1/(1+losRate*CIRCLE_TANGENT_REACTIVE_LOS_GAIN)
-		local predictorConfidence=math.clamp(predictorState and predictorState.confidence or 0.55,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
+		local speed=math.max(flat(wrVel).Magnitude,1e-6)
+		local losVector=flat(target-originPosition)
+		local losDir=unit(losVector,flat(wrVel).Magnitude>0 and flat(wrVel).Unit or Vector3.new(1,0,0))
+		local away=flat(wrVel):Dot(losDir)
+		local awayShare=math.clamp(away/speed,-1,1)
+		local lateralSpeed=(flat(wrVel)-losDir*away).Magnitude
+		local lateralShare=math.clamp(lateralSpeed/speed,0,1)
+		local receiverPredictionDelay=leadDelayForFlightTime(time)
+		local predictorConfidence=math.clamp(predictorState and predictorState.confidence or 1,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
 
 		return{
-			flightLeadXZ=wrVel*time,
+			flightLeadXZ=flat(wrVel)*time,
 			accelerationLeadXZ=Vector3.zero,
-			extraLeadXZ=Vector3.zero,
+			extraLeadXZ=flat(wrVel)*receiverPredictionDelay,
 			radialExtraLeadXZ=Vector3.zero,
-			tangentExtraLeadXZ=Vector3.zero,
-			extraLeadTime=0,
+			tangentExtraLeadXZ=flat(wrVel)*receiverPredictionDelay,
+			extraLeadTime=receiverPredictionDelay,
 			radialExtraTime=0,
-			tangentExtraTime=0,
+			tangentExtraTime=receiverPredictionDelay,
 			tangentBaseTime=0,
-			tangentReactiveTime=0,
+			tangentReactiveTime=receiverPredictionDelay,
 			radialBaseTime=0,
 			radialLDTime=0,
-			adaptiveLeadScale=0,
+			adaptiveLeadScale=1,
 			leadUserScale=math.clamp(WR_LEAD_DELAY/math.max(LEAD_DELAY_BASELINE,0.01),0,2.25),
 			predictorConfidence=predictorConfidence,
 			radialFlightScale=1,
 			tangentFlightScale=1,
 			accelTime=0,
-			magnitudeChangePotential=1,
+			magnitudeChangePotential=0,
 			c1Height=C1_Y_FIXED,
 			c1HeightMin=C1_Y_MIN,
 			c1HeightMax=C1_Y_MAX,
 			c1SolveYBias=C1_SOLVE_Y_BIAS,
-			distance3DNow=radius,
+			distance3DNow=(target-originPosition).Magnitude,
 			distanceXZNow=distXZ(originPosition,target),
-			distanceScale=math.clamp(radius/CIRCLE_RADIUS_FULL_LEAD,CIRCLE_DISTANCE_SCALE_MIN,CIRCLE_DISTANCE_SCALE_MAX),
+			distanceScale=1,
 			awayShare=awayShare,
 			positiveAwayShare=math.clamp(awayShare,0,1),
-			radialShareAbs=radialShareAbs,
+			radialShareAbs=math.abs(awayShare),
 			lateralShare=lateralShare,
-			routeBalance=routeBalance,
+			routeBalance=1-math.abs(math.abs(awayShare)-lateralShare),
 			balanceLeadScale=1,
 			radialGain=0,
 			tangentGain=0,
-			losRate=losRate,
-			losDamping=losDamping,
-			reactiveLosDamping=reactiveLosDamping,
+			losRate=0,
+			losDamping=1,
+			reactiveLosDamping=1,
 			tangentAlignment=1,
 			tangentAlignmentBoost=1,
 			tangentBalanceBoost=1,
-			tangentDominance=(lateralShare*lateralShare)/((radialShareAbs*radialShareAbs)+(lateralShare*lateralShare)+CIRCLE_TANGENT_DOMINANCE_EPSILON),
-			tangentBalancePeak=routeBalance,
+			tangentDominance=(lateralShare*lateralShare)/((awayShare*awayShare)+(lateralShare*lateralShare)+CIRCLE_TANGENT_DOMINANCE_EPSILON),
+			tangentBalancePeak=1,
 			tangentDominanceScale=1,
 			closingShare=math.clamp(-awayShare,0,1),
 			tangentClosingScale=1,
 			tangentSignedScale=1,
-			routeAway=result.radial,
-			routeSide=result.tangent,
-			routeElevation=result.elevation,
-			routeSpeed=result.speed,
+			routeAway=away,
+			routeSide=lateralSpeed,
+			routeElevation=0,
+			routeSpeed=flat(wrVel).Magnitude,
 			fixedIntercept=true,
+			cleanMath=true,
+			receiverPredictionDelay=receiverPredictionDelay,
+			receiverPredictionDelayScale=WR_LEAD_DELAY>0 and receiverPredictionDelay/WR_LEAD_DELAY or 0,
 		}
 	end
 
 	local function interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,includeLeadInfo)
 		if time<=0 then return nil end
 
-		local inheritedVelocity=qbVel*QB_INHERITANCE
+		local inheritedVelocity=flat(qbVel or Vector3.zero)*QB_INHERITANCE
 		local receiverLeadDelay=leadDelayForFlightTime(time)
-		local neededDisplacement=receiverStart-originPosition+(wrVel-inheritedVelocity)*time+wrVel*receiverLeadDelay-0.5*G*time*time
+		local target=targetAtTime(receiverStart,wrVel,time,receiverLeadDelay)
+		local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
 		local requiredVelocity=neededDisplacement/time
 		local requiredSpeed=requiredVelocity.Magnitude
 		if requiredSpeed<=1e-6 then return nil end
@@ -1758,20 +1527,22 @@ function QBAim.new(ctx,parent)
 
 		local throwVelocity=direction*ballSpeed
 		local worldVelocity=throwVelocity+inheritedVelocity
-		local target=receiverStart+wrVel*(time+receiverLeadDelay)
 		local catchPosition=ballAt(originPosition,worldVelocity,time)
+		local targetMiss=(catchPosition-target).Magnitude
+		local yError=math.abs(catchPosition.Y-(WR_MAX_Y+C1_SOLVE_Y_BIAS))
 		local speedError=math.abs(requiredSpeed-ballSpeed)
-		local missEstimate=speedError*time
 		local residual=math.abs(interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time))
 		local verticalVelocityAtCatch=worldVelocity.Y+G.Y*time
 		local landingPosition,landingTime=landing(originPosition,worldVelocity)
+		local leadDistance=flat(wrVel).Magnitude*receiverLeadDelay
 
 		return{
-			score=speedError*100+missEstimate*25+time*0.35+(verticalVelocityAtCatch>6 and verticalVelocityAtCatch*0.15 or 0),
+			score=targetMiss*1000+speedError*100+time*0.5+math.max(verticalVelocityAtCatch-10,0)*0.25,
 			time=time,
 			totalLeadTime=time+receiverLeadDelay,
 			receiverPredictionDelay=receiverLeadDelay,
 			receiverPredictionDelayScale=WR_LEAD_DELAY>0 and receiverLeadDelay/WR_LEAD_DELAY or 0,
+			receiverLeadDistance=leadDistance,
 			origin=originPosition,
 			target=target,
 			c1Point=target,
@@ -1787,11 +1558,13 @@ function QBAim.new(ctx,parent)
 			preferredAngle=angle,
 			minDesiredAngle=GLOBAL_MIN_ANGLE,
 			maxAngle=GLOBAL_MAX_ANGLE,
-			totalErr=(catchPosition-target).Magnitude,
+			totalErr=targetMiss,
+			targetMiss=targetMiss,
+			yError=yError,
 			speedError=speedError,
 			verticalVelocityAtCatch=verticalVelocityAtCatch,
 			interceptResidual=residual,
-			missEstimate=missEstimate,
+			missEstimate=targetMiss,
 			ballAtCatch=catchPosition,
 			landing=landingPosition,
 			landingTime=landingTime,
@@ -1799,22 +1572,14 @@ function QBAim.new(ctx,parent)
 			movementShape=shape,
 			predictorState=predictorState,
 			leadInfo=includeLeadInfo and interceptLeadInfo(originPosition,target,wrVel,time,predictorState) or nil,
+			cleanMath=true,
 		}
 	end
 
 	local function betterIntercept(candidate,current)
 		if not current then return true end
-		if candidate.speedError+0.02<current.speedError then return true end
-		if current.speedError+0.02<candidate.speedError then return false end
-		if candidate.missEstimate+0.05<current.missEstimate then return true end
-		if current.missEstimate+0.05<candidate.missEstimate then return false end
-
-		local candidateRising=candidate.verticalVelocityAtCatch>6
-		local currentRising=current.verticalVelocityAtCatch>6
-		if candidateRising~=currentRising then
-			return not candidateRising
-		end
-
+		if candidate.score+1e-6<current.score then return true end
+		if current.score+1e-6<candidate.score then return false end
 		return candidate.time<current.time
 	end
 
@@ -1827,7 +1592,7 @@ function QBAim.new(ctx,parent)
 			local mid=(low+high)*0.5
 			local midValue=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,mid)
 
-			if midValue==0 then
+			if math.abs(midValue)<1e-5 then
 				return mid
 			end
 
@@ -1857,14 +1622,14 @@ function QBAim.new(ctx,parent)
 
 		local function considerNear(time)
 			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,false)
-			if candidate and (candidate.speedError<=SPEED_TOLERANCE or candidate.missEstimate<=CATCH_TOLERANCE) and betterIntercept(candidate,bestNear) then
+			if candidate and candidate.targetMiss<=CLEAN_NEAR_TARGET_MISS_TOLERANCE and candidate.yError<=CLEAN_CATCH_Y_TOLERANCE and betterIntercept(candidate,bestNear) then
 				bestNear=candidate
 			end
 		end
 
 		local function considerRoot(time)
 			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,false)
-			if candidate and betterIntercept(candidate,bestRoot) then
+			if candidate and candidate.targetMiss<=CLEAN_TARGET_MISS_TOLERANCE and candidate.yError<=CLEAN_CATCH_Y_TOLERANCE and betterIntercept(candidate,bestRoot) then
 				bestRoot=candidate
 			end
 		end
@@ -1875,9 +1640,9 @@ function QBAim.new(ctx,parent)
 			local value=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
 			considerNear(time)
 
-			if value==0 then
+			if math.abs(value)<1e-8 then
 				considerRoot(time)
-			elseif previousValue==0 then
+			elseif math.abs(previousValue)<1e-8 then
 				considerRoot(previousTime)
 			elseif (previousValue<0 and value>0) or (previousValue>0 and value<0) then
 				considerRoot(refineInterceptTime(originPosition,receiverStart,wrVel,qbVel,ballSpeed,previousTime,time,previousValue))
@@ -1891,21 +1656,9 @@ function QBAim.new(ctx,parent)
 		if best and not best.leadInfo then
 			best.leadInfo=interceptLeadInfo(originPosition,best.target,wrVel,best.time,predictorState)
 		end
-		if best then
-			local receiverPredictionDelay=best.receiverPredictionDelay or leadDelayForFlightTime(best.time)
-			best.receiverPredictionDelay=receiverPredictionDelay
-			best.receiverPredictionDelayScale=WR_LEAD_DELAY>0 and receiverPredictionDelay/WR_LEAD_DELAY or 0
-			best.totalLeadTime=best.time+receiverPredictionDelay
-			if best.leadInfo then
-				best.leadInfo.receiverPredictionDelay=receiverPredictionDelay
-				best.leadInfo.extraLeadTime=receiverPredictionDelay
-				best.leadInfo.receiverPredictionDelayScale=best.receiverPredictionDelayScale
-			end
-		end
 
 		return best
 	end
-
 
 	local function ensureC1Marker()
 		if not C1_MARKER_ENABLED then return nil end
@@ -2506,24 +2259,18 @@ function QBAim.new(ctx,parent)
 						receiverData[player]=data
 					end
 
-					local dt=math.min(now-data.t,0.1)
-					if dt>0 then
-						local rawVelocity=(receiverRoot.Position-data.pos)/dt
-						local previousRawVelocity=data.rawVel or data.vel or Vector3.zero
-						local rawAcceleration=(rawVelocity-previousRawVelocity)/dt
-						rawAcceleration=clampMagnitude(rawAcceleration,PREDICTOR_ACCEL_MAX)
-						data.rawVel=rawVelocity
-						table.insert(data.vh,rawVelocity)
-						if #data.vh>5 then
-							table.remove(data.vh,1)
-						end
+					local sampleDt=math.min(now-data.t,0.1)
+					if sampleDt>0 then
+						local positionVelocity=(receiverRoot.Position-data.pos)/sampleDt
+						local assemblyVelocity=receiverRoot.AssemblyLinearVelocity or Vector3.zero
+						local chosenVelocity=flat(assemblyVelocity).Magnitude>=CLEAN_MOVING_SPEED_MIN and assemblyVelocity or positionVelocity
+						local previousRawVelocity=data.rawVel or Vector3.zero
+						local rawAcceleration=(chosenVelocity-previousRawVelocity)/sampleDt
 
-						local average=Vector3.zero
-						for _,velocity in ipairs(data.vh) do
-							average=average+velocity
-						end
-
-						average=average/#data.vh
+						data.rawVel=clampMagnitude(chosenVelocity,MAX_RUN_SPEED)
+						data.vel=data.rawVel
+						data.accel=clampMagnitude(rawAcceleration,PREDICTOR_ACCEL_MAX)
+						data.confidence=flat(data.rawVel).Magnitude>=CLEAN_MOVING_SPEED_MIN and PREDICTOR_CONFIDENCE_MAX or PREDICTOR_CONFIDENCE_MIN
 						data.pos=receiverRoot.Position
 						data.t=now
 						data.lastSeen=now
@@ -2532,18 +2279,6 @@ function QBAim.new(ctx,parent)
 						while #data.ph>0 and now-data.ph[1].t>PREDICTOR_HISTORY_MAX_AGE do
 							table.remove(data.ph,1)
 						end
-
-						local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
-						if lsVelocity and lsQuality>0 then
-							average=safeVectorLerp(average,lsVelocity,PREDICTOR_LS_BLEND*lsQuality)
-						end
-
-						data.vel=safeVectorLerp(data.vel,average,PREDICTOR_VELOCITY_BLEND)
-						data.vel=clampMagnitude(data.vel,MAX_RUN_SPEED)
-						data.accel=safeVectorLerp(data.accel,rawAcceleration,PREDICTOR_ACCEL_BLEND)
-						data.accel=clampMagnitude(data.accel,PREDICTOR_ACCEL_MAX)
-						local speedConfidence=math.clamp(data.vel.Magnitude/NORMAL_ROUTE_MIN_SPEED,0,1)
-						data.confidence=math.clamp(0.25+0.45*lsQuality+0.30*speedConfidence,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
 					end
 				end
 			end

@@ -25,8 +25,8 @@ The local visual throw arc comes from `Local.Center`, with `C2` used as release-
 
 ## Current QBAim math notes
 
-- C1 height defaults to `WR_MAX_Y`, about `13.85`, and is user-adjustable through the `Peak Height` QB Aim slider.
+- C1 height defaults to `WR_MAX_Y = 14.00`, and is user-adjustable through the `Peak Height` QB Aim slider.
 - The live solver uses a fixed-speed projectile intercept condition with local ball speed `95` and remote display power `100`.
-- `Lead Adjust` is extra receiver prediction time. The current default is `0.20`, but the solver now tapers that extra delay by flight time so short throws do not receive the full compensation.
+- `Lead Adjust` is direct extra receiver prediction time. The current default is `0.38`; set it to `0` for pure catch-time intercept.
 - Vertical C2/release extrapolation is disabled. During jump preview, C2 should follow the current ball/Center C2 reference instead of being pulled downward by player-gravity prediction.
 - QB Aim no longer displays status/target text rows; the locked target is shown with a QB Aim-owned `Highlight`.
