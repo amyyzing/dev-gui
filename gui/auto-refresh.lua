@@ -323,18 +323,6 @@ function AutoRefresh.new(ctx)
 		end)
 	end
 
-	function api.RefreshOnce(forceSourcePoll)
-		if failed or reloading then
-			return false
-		end
-
-		if forceSourcePoll then
-			return legacySourcePoll()
-		end
-
-		return manifestPoll()
-	end
-
 	return api
 end
 
