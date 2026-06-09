@@ -15,6 +15,14 @@ local function clampStaminaDeplete(value)
 	return math.clamp(math.floor(math.abs(n)+0.5),0,50)
 end
 
+local function destroyControl(control)
+	if control and type(control.destroy)=="function" then
+		pcall(control.destroy)
+	elseif control and type(control.Destroy)=="function" then
+		pcall(control.Destroy)
+	end
+end
+
 function GameParams.new(ctx,parent)
 	local safeDisconnect=ctx.safeDisconnect
 	local makeSection=ctx.makeSection
@@ -391,6 +399,10 @@ function GameParams.new(ctx,parent)
 
 	function api.Destroy()
 		disconnectWatchers()
+		destroyControl(staminaRegenSlider)
+		destroyControl(staminaDepleteSlider)
+		destroyControl(jumpSlider)
+		destroyControl(diveSlider)
 	end
 	api.Refresh()
 

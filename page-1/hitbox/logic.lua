@@ -17,6 +17,14 @@ local function clampNumber(value,min,max,fallback)
 	return math.clamp(n,min,max)
 end
 
+local function destroyControl(control)
+	if control and type(control.destroy)=="function" then
+		pcall(control.destroy)
+	elseif control and type(control.Destroy)=="function" then
+		pcall(control.Destroy)
+	end
+end
+
 local function getDirectChildCount(folder)
 	if not folder then return 0 end
 	return #folder:GetChildren()
@@ -558,6 +566,7 @@ function Hitbox.new(ctx,parent)
 		workspaceConn=nil
 		safeDisconnect(destroyConn)
 		destroyConn=nil
+		destroyControl(transparencySlider)
 		clearAllWatchersAndRestore()
 	end
 

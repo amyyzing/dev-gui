@@ -688,6 +688,14 @@ function QBAim.new(ctx,parent)
 	local PEAK_HEIGHT_MAX=20.00
 	local updateTargetHighlight=function() end
 
+	local function destroyControl(control)
+		if control and type(control.destroy)=="function" then
+			pcall(control.destroy)
+		elseif control and type(control.Destroy)=="function" then
+			pcall(control.Destroy)
+		end
+	end
+
 	if state.qbAimTeamFilter==nil then
 		state.qbAimTeamFilter=true
 	end
@@ -2195,6 +2203,9 @@ function QBAim.new(ctx,parent)
 	end
 
 	function api.Destroy()
+		destroyControl(leadDelaySliderControl)
+		destroyControl(peakHeightSliderControl)
+
 		for _,conn in ipairs(connections) do
 			safeDisconnect(conn)
 		end

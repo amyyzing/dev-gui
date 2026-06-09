@@ -22,6 +22,14 @@ local function clampSpeed(value)
 	return math.clamp(tonumber(value) or DEFAULT_SPEED,0,100)
 end
 
+local function destroyControl(control)
+	if control and type(control.destroy)=="function" then
+		pcall(control.destroy)
+	elseif control and type(control.Destroy)=="function" then
+		pcall(control.Destroy)
+	end
+end
+
 function Speed.new(ctx,parent)
 	local safeDisconnect=ctx.safeDisconnect
 	local inputToBinding=ctx.inputToBinding
@@ -156,6 +164,7 @@ function Speed.new(ctx,parent)
 		inputConn=nil
 		safeDisconnect(destroyConn)
 		destroyConn=nil
+		destroyControl(slider)
 		stopForcing(state.speedEnabled)
 	end
 

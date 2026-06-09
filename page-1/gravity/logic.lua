@@ -1,5 +1,13 @@
 local Gravity={}
 
+local function destroyControl(control)
+	if control and type(control.destroy)=="function" then
+		pcall(control.destroy)
+	elseif control and type(control.Destroy)=="function" then
+		pcall(control.Destroy)
+	end
+end
+
 function Gravity.new(ctx,parent)
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
@@ -92,6 +100,10 @@ function Gravity.new(ctx,parent)
 		api.SetGravityState(false,false)
 		syncControls()
 		changed()
+	end
+
+	function api.Destroy()
+		destroyControl(slider)
 	end
 
 	return api

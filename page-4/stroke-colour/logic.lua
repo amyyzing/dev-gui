@@ -519,6 +519,8 @@ function StrokeColour.new(ctx,page)
 				conn:Disconnect()
 			end)
 		end
+
+		table.clear(connections)
 	end
 
 	function api.Reset()
@@ -1014,13 +1016,13 @@ function StrokeColour.new(ctx,page)
 			end
 		end
 
-		hit.InputBegan:Connect(function(input)
+		trackConnection(hit.InputBegan:Connect(function(input)
 			if input.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=true
 				valueBox:ReleaseFocus()
 				setValue(valueFromMouse(),true)
 			end
-		end)
+		end))
 
 		trackConnection(UIS.InputChanged:Connect(function(input)
 			if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then

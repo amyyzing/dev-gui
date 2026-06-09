@@ -23,6 +23,14 @@ local function isBound(binding,key)
 	return key~=nil and key~=Enum.KeyCode.Unknown and binding==key
 end
 
+local function destroyControl(control)
+	if control and type(control.destroy)=="function" then
+		pcall(control.destroy)
+	elseif control and type(control.Destroy)=="function" then
+		pcall(control.Destroy)
+	end
+end
+
 local function getFootball()
 	local parkMap=workspace:FindFirstChild("ParkMap")
 	if parkMap and parkMap:FindFirstChild("Replicated") then
@@ -329,6 +337,9 @@ function Boost.new(ctx,parent)
 		safeDisconnect(destroyConn)
 		destroyConn=nil
 		clearJumpBoostTouchConnection()
+		destroyControl(forceSlider)
+		destroyControl(chanceSlider)
+		destroyControl(radiusSlider)
 		boostReady=true
 	end
 
