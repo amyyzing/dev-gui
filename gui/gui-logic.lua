@@ -504,7 +504,7 @@ function GuiLogic.new(ctx)
 			Size=UDim2.fromOffset(width,height),
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
-			ClipsDescendants=false,
+			ClipsDescendants=true,
 			ZIndex=z,
 		},parent)
 
@@ -586,7 +586,7 @@ function GuiLogic.new(ctx)
 			Size=UDim2.fromOffset(indicatorSize,indicatorSize),
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
-			ClipsDescendants=false,
+			ClipsDescendants=true,
 			ZIndex=z+5,
 		},switch)
 		New("UIAspectRatioConstraint",{AspectRatio=1},indicator)
@@ -1353,10 +1353,11 @@ function GuiLogic.new(ctx)
 		local containerCorner=tostring(componentValue("SliderContainerCornerRole",containerRole=="BUTTON" and "Control" or "Section"))
 		local trackRole=tostring(componentValue("SliderTrackRole","SLIDER_BG"))
 		local valueRole=tostring(componentValue("SliderValueBoxRole","INPUT"))
-		local container=New("Frame",{BackgroundColor3=themeColor(containerRole,themeColor("SECTION",THEME.CARD)),BackgroundTransparency=componentNumber("SliderContainerTransparency",0.12),BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole=containerRole,CornerRole=containerCorner},parent)
+		local container=New("Frame",{BackgroundColor3=themeColor(containerRole,themeColor("SECTION",THEME.CARD)),BackgroundTransparency=componentNumber("SliderContainerTransparency",1),BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole=containerRole,CornerRole=containerCorner},parent)
 		addCorner(container,containerCorner)
-		local containerStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=componentNumber("SliderContainerStrokeTransparency",0.65)},container)
-		containerStroke:SetAttribute("BaseStrokeTransparency",componentNumber("SliderContainerStrokeTransparency",0.65))
+		local containerStrokeTransparency=componentNumber("SliderContainerStrokeTransparency",1)
+		local containerStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=containerStrokeTransparency},container)
+		containerStroke:SetAttribute("BaseStrokeTransparency",containerStrokeTransparency)
 		New("TextLabel",{BackgroundTransparency=1,Position=labelPosition,Size=labelSize,Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false},container)
 
 		local track=New("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor(trackRole,THEME.PANEL),BorderSizePixel=0,ClipsDescendants=rounded,ZIndex=6,ThemeRole=trackRole,CornerRole="Slider"},container)
