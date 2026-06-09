@@ -311,59 +311,16 @@ function GuiLogic.new(ctx)
 	end
 
 	local function createHeaderSwitch(parent,startState,onChange,zIndex)
-		-- Header/category switch. This version keeps every visual centered inside one
-		-- fixed wrapper so it does not drift vertically or horizontally when the
-		-- section header changes height.
 		local c=components()
-		local function headerNumber(key,fallback)
-			local value=tonumber(c[key])
-			return value~=nil and value or fallback
-		end
-
-		local width=headerNumber("HeaderToggleWidth",88)
-		local height=headerNumber("HeaderToggleHeight",30)
-		local railHeight=headerNumber("HeaderToggleRailHeight",22)
+		local width=tonumber(c.HeaderToggleWidth) or 88
+		local height=tonumber(c.HeaderToggleHeight) or 30
+		local railHeight=tonumber(c.HeaderToggleRailHeight) or 22
 		local z=zIndex or 6
-		local expandInfo=TweenInfo.new(0.26,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
-		local collapseInfo=TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut)
-		local softInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		local expanded=true
+		local expandedValue=makeFusionValue(expanded)
+		local destroyed=false
 
-		local state=startState and true or false
-		local stateValue=makeFusionValue(state)
-		local categoryExpanded=true
-		local function visualState(enabled)
-			local currentAccent=themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(74,208,128))
-			local currentMuted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
-			local currentBg=themeColor("SLIDER_BG",themeColor("INPUT",THEME.INPUT or THEME.PANEL or Color3.fromRGB(18,18,24)))
-			local bgColor=categoryExpanded and currentBg or currentBg:Lerp(THEME.TEXT or currentMuted,0.12)
-			local bgTransparency=categoryExpanded and 0.04 or 0
-
-			if enabled then
-				return{
-					fillSize=UDim2.new(1,0,1,0),
-					fillTransparency=0,
-					fillColor=currentAccent,
-					bgColor=bgColor,
-					bgTransparency=bgTransparency,
-					tickColor=currentAccent,
-					tickTransparency=0.34,
-				}
-			end
-
-			return{
-				fillSize=UDim2.new(0,0,1,0),
-				fillTransparency=1,
-				fillColor=currentAccent,
-				bgColor=bgColor,
-				bgTransparency=bgTransparency,
-				tickColor=currentMuted,
-				tickTransparency=0.86,
-			}
-		end
-
-		local initialVisuals=visualState(state)
-
-		local switch=New("Frame",{
+		local holder=New("Frame",{
 			AnchorPoint=Vector2.new(1,0.5),
 			Size=UDim2.fromOffset(width,height),
 			BackgroundTransparency=1,
@@ -372,197 +329,40 @@ function GuiLogic.new(ctx)
 			ZIndex=z,
 		},parent)
 
-		local rail=New("Frame",{
-			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=UDim2.fromScale(0.5,0.5),
-			Size=UDim2.new(1,0,0,railHeight),
-			BackgroundColor3=initialVisuals.bgColor,
-			BackgroundTransparency=initialVisuals.bgTransparency,
-			BorderSizePixel=0,
-			ClipsDescendants=true,
-			ZIndex=z+1,
-			ThemeRole="SLIDER_BG",
-		},switch)
+		local control=createSwitch(holder,startState,onChange,width,railHeight,nil,nil,z+1)
+		control.wrap.AnchorPoint=Vector2.new(0.5,0.5)
+		control.wrap.Position=UDim2.fromScale(0.5,0.5)
 
-		local railFillClip=New("Frame",{
-			AnchorPoint=Vector2.new(0,0.5),
-			Position=UDim2.fromScale(0,0.5),
-			Size=initialVisuals.fillSize,
-			BackgroundTransparency=1,
-			BorderSizePixel=0,
-			ClipsDescendants=true,
-			ZIndex=z+2,
-		},rail)
-
-		local railFill=New("Frame",{
-			AnchorPoint=Vector2.new(0,0.5),
-			Position=UDim2.fromScale(0,0.5),
-			Size=UDim2.new(1,0,1,0),
-			BackgroundColor3=initialVisuals.fillColor,
-			BackgroundTransparency=initialVisuals.fillTransparency,
-			BorderSizePixel=0,
-			ZIndex=z+2,
-			ThemeRole="SLIDER_FILL",
-		},railFillClip)
-
-		local tickHolder=New("Frame",{
-			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=UDim2.fromScale(0.5,0.5),
-			Size=UDim2.new(1,-12,1,0),
-			BackgroundTransparency=1,
-			BorderSizePixel=0,
-			ZIndex=z+3,
-		},rail)
-
-		local ticks={}
-		for _,alpha in ipairs({0.22,0.5,0.78}) do
-			local tick=New("Frame",{
-				AnchorPoint=Vector2.new(0.5,0.5),
-				Position=UDim2.fromScale(alpha,0.5),
-				Size=UDim2.fromOffset(1,railHeight-8),
-				BackgroundColor3=initialVisuals.tickColor,
-				BackgroundTransparency=initialVisuals.tickTransparency,
-				BorderSizePixel=0,
-				Visible=false,
-				ZIndex=z+3,
-			},tickHolder)
-			table.insert(ticks,tick)
-		end
-
-		local hit=New("TextButton",{
-			BackgroundTransparency=1,
-			BorderSizePixel=0,
-			Text="",
-			AutoButtonColor=false,
-			Selectable=true,
-			Size=UDim2.new(1,0,1,0),
-			ZIndex=z+10,
-		},switch)
-
-		local expandedValue=makeFusionValue(categoryExpanded)
-		local activeTweens={}
-		local visualTweenCount=0
-		local clickConn=nil
-		local destroyed=false
-
-		local function applyProps(object,props)
-			for key,value in pairs(props) do
-				object[key]=value
-			end
-		end
-
-		local function cancelTrackedTweens()
-			for _,tw in ipairs(activeTweens) do
-				pcall(function()
-					tw:Cancel()
-				end)
-			end
-			table.clear(activeTweens)
-			visualTweenCount=0
-		end
-
-		local function playTrackedTween(object,info,goal)
-			local tw=TweenService:Create(object,info,goal)
-			table.insert(activeTweens,tw)
-			visualTweenCount+=1
-			tw.Completed:Connect(function()
-				visualTweenCount=math.max(visualTweenCount-1,0)
-			end)
-			tw:Play()
-			return tw
-		end
-
-		local function applyExpandedVisuals(_animate)
+		local function setExpanded(value)
+			expanded=value and true or false
 			if expandedValue then
-				expandedValue:set(categoryExpanded)
+				expandedValue:set(expanded)
 			end
 		end
-
-		local function applyVisuals(animate)
-			cancelTrackedTweens()
-
-			local visuals=visualState(state)
-
-			if not animate then
-				applyProps(rail,{BackgroundColor3=visuals.bgColor,BackgroundTransparency=visuals.bgTransparency})
-				applyProps(railFillClip,{Size=visuals.fillSize})
-				applyProps(railFill,{BackgroundColor3=visuals.fillColor,BackgroundTransparency=visuals.fillTransparency})
-				for _,tick in ipairs(ticks) do
-					applyProps(tick,{BackgroundColor3=visuals.tickColor,BackgroundTransparency=visuals.tickTransparency})
-				end
-				return
-			end
-
-			local shapeInfo=state and expandInfo or collapseInfo
-
-			playTrackedTween(rail,softInfo,{BackgroundColor3=visuals.bgColor,BackgroundTransparency=visuals.bgTransparency})
-			playTrackedTween(railFillClip,shapeInfo,{Size=visuals.fillSize})
-			playTrackedTween(railFill,softInfo,{BackgroundColor3=visuals.fillColor,BackgroundTransparency=visuals.fillTransparency})
-
-			for _,tick in ipairs(ticks) do
-				playTrackedTween(tick,softInfo,{BackgroundColor3=visuals.tickColor,BackgroundTransparency=visuals.tickTransparency})
-			end
-		end
-
-		local function setState(value,fire,animate,force)
-			local nextState=value and true or false
-			local changed=nextState~=state
-
-			if force and not changed and visualTweenCount>0 then
-				return
-			end
-
-			if not changed and not force then
-				return
-			end
-
-			state=nextState
-			if stateValue then
-				stateValue:set(state)
-			end
-			applyVisuals((animate~=false) and changed)
-
-			if fire and changed and onChange then
-				onChange(state)
-			end
-		end
-
-		clickConn=hit.Activated:Connect(function()
-			setState(not state,true,true)
-		end)
-
-		applyVisuals(false)
-		applyExpandedVisuals(false)
 
 		local function destroyHeaderSwitch()
 			if destroyed then return end
 			destroyed=true
-			cancelTrackedTweens()
-			destroyFusionValue(stateValue)
+			if control and control.destroy then
+				control.destroy()
+			end
 			destroyFusionValue(expandedValue)
-			if clickConn then clickConn:Disconnect() clickConn=nil end
-			if switch then
-				switch:Destroy()
+			if holder then
+				holder:Destroy()
 			end
 		end
 
+		setExpanded(expanded)
+
 		return{
-			set=function(value)
-				setState(value,false,false,true)
-			end,
-			get=function()
-				return state
-			end,
-			stateValue=stateValue,
-			setExpanded=function(value,animate)
-				categoryExpanded=value and true or false
-				applyExpandedVisuals(animate~=false)
-				applyVisuals(animate~=false)
-			end,
+			set=control.set,
+			get=control.get,
+			stateValue=control.stateValue,
+			setExpanded=setExpanded,
 			expandedValue=expandedValue,
 			Destroy=destroyHeaderSwitch,
 			destroy=destroyHeaderSwitch,
-			wrap=switch,
+			wrap=holder,
 			width=width,
 			height=height,
 		}
