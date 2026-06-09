@@ -656,6 +656,7 @@ function GuiLogic.new(ctx)
 		local clickConn=nil
 		local hoverEnterConn=nil
 		local hoverLeaveConn=nil
+		local destroyed=false
 
 		local function applyProps(object,props)
 			for key,value in pairs(props) do
@@ -801,6 +802,8 @@ function GuiLogic.new(ctx)
 		applyExpandedVisuals(false)
 
 		local function destroyHeaderSwitch()
+			if destroyed then return end
+			destroyed=true
 			cancelTrackedTweens()
 			if scaleTween then
 				scaleTween:Cancel()
@@ -981,6 +984,21 @@ function GuiLogic.new(ctx)
 
 		local header=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,headerHeight),ClipsDescendants=true,ZIndex=5,LayoutOrder=1},sec)
 		local controls={section=sec}
+		local sectionConnections={}
+		local sectionDestroyed=false
+		local function connectSection(signal,fn)
+			local conn=signal:Connect(fn)
+			table.insert(sectionConnections,conn)
+			return conn
+		end
+		local function disconnectSectionConnections()
+			for _,conn in ipairs(sectionConnections) do
+				pcall(function()
+					conn:Disconnect()
+				end)
+			end
+			table.clear(sectionConnections)
+		end
 		local headerButtonOptions=options.headerButton or options.headerAction
 		local headerButtonWidth=headerButtonOptions and (headerButtonOptions.width or headerButtonOptions.Width or 104) or 0
 		local toggleReserve=options.headerToggle and (headerToggleWidth+8) or 0
@@ -1027,15 +1045,15 @@ function GuiLogic.new(ctx)
 				buttonWrap:SetAttribute("ThemeRole","BUTTON")
 			end
 
-			button.MouseEnter:Connect(function()
+			connectSection(button.MouseEnter,function()
 				buttonWrap.BackgroundColor3=hoverBg
 			end)
 
-			button.MouseLeave:Connect(function()
+			connectSection(button.MouseLeave,function()
 				buttonWrap.BackgroundColor3=customBg or (headerButtonOptions.danger and THEME.RED) or themeColor("BUTTON",THEME.BG)
 			end)
 
-			button.MouseButton1Click:Connect(function()
+			connectSection(button.MouseButton1Click,function()
 				local fn=headerButtonOptions.onClick or headerButtonOptions.OnClick
 				if fn then
 					fn()
@@ -1079,6 +1097,22 @@ function GuiLogic.new(ctx)
 				bodyTween=nil
 			end
 		end
+
+		local function destroySection()
+			if sectionDestroyed then return end
+			sectionDestroyed=true
+			cancelBodyTween()
+
+			if controls.toggle and controls.toggle.Destroy then
+				pcall(controls.toggle.Destroy)
+			end
+
+			disconnectSectionConnections()
+		end
+
+		controls.Destroy=destroySection
+		controls.destroy=destroySection
+		connectSection(sec.Destroying,destroySection)
 
 		local function setSubtitleVisible(visible,animate)
 			if not subtitleLabel then return end
@@ -1189,12 +1223,12 @@ function GuiLogic.new(ctx)
 			end
 		end
 
-		titleButton.MouseButton1Click:Connect(function()
+		connectSection(titleButton.MouseButton1Click,function()
 			collapsed=not collapsed
 			paint(true)
 		end)
 
-		sec:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		connectSection(sec:GetPropertyChangedSignal("AbsoluteSize"),function()
 			if body and not collapsed then
 				lastBodyHeight=getBodyHeight()
 			end
@@ -1208,16 +1242,32 @@ function GuiLogic.new(ctx)
 		local b=New("TextBox",{Size=UDim2.fromOffset(w,componentNumber("TextBoxHeight",28)),BackgroundColor3=themeColor("INPUT",THEME.PANEL),BorderSizePixel=0,ClearTextOnFocus=false,Text=txt,PlaceholderText=placeholder or "",Font=componentFont("TextFont",Enum.Font.Gotham),TextSize=componentNumber("InputTextSize",13),TextColor3=THEME.TEXT,PlaceholderColor3=THEME.MUTED,ZIndex=6,ThemeRole="INPUT"},parent)
 		local wrap,stroke=api.wrapTextBox(b,themeColor("INPUT",THEME.PANEL),2)
 		wrap:SetAttribute("ThemeRole","INPUT")
+		local boxConnections={}
+		local function connectBox(signal,fn)
+			local conn=signal:Connect(fn)
+			table.insert(boxConnections,conn)
+			return conn
+		end
+		local function cleanupBox()
+			for _,conn in ipairs(boxConnections) do
+				pcall(function()
+					conn:Disconnect()
+				end)
+			end
+			table.clear(boxConnections)
+		end
 
-		b.Focused:Connect(function()
+		connectBox(b.Focused,function()
 			wrap.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
 			stroke.Thickness=1
 		end)
 
-		b.FocusLost:Connect(function()
+		connectBox(b.FocusLost,function()
 			wrap.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
 			stroke.Thickness=1
 		end)
+
+		connectBox(b.Destroying,cleanupBox)
 
 		return b
 	end
