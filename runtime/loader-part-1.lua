@@ -495,16 +495,13 @@ function BOT_API.Post(path,body)
 	return decoded
 end
 
-AUTO_REFRESH_ENABLED=false
-AUTO_REFRESH_INTERVAL=5
-AUTO_REFRESH_RELOAD_PATH="loader.lua"
+MANUAL_REFRESH_RELOAD_PATH="loader.lua"
 
 MODULE_PATHS={
 	Announcement="announcement.lua",
 	GuiFusion="gui/fusion.lua",
 	GuiLogic="gui/gui-logic.lua",
 	MainFrame="gui/mainframe.lua",
-	AutoRefresh="gui/auto-refresh.lua",
 	Description="gui/description.lua",
 	HitboxPreset="page-5/hitbox-preset/gui.lua",
 	HitboxPresetLogic="page-5/hitbox-preset/logic.lua",
@@ -555,11 +552,6 @@ MODULE_PATHS={
 MODULE_GLOBAL_NAMES={GuiFusion="FusionModule"}
 STARTUP_MODULE_NAMES={"GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GravityLogic","Page1Gravity","Page1SpeedLogic","Page1Speed","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","DataSave"}
 OPTIONAL_MODULE_NAMES={"PrimaryColour","SecondaryColour"}
-PAGE1_RELOAD_NAMES={"Page1Hitbox","Page1HitboxLogic","Page1Gravity","Page1GravityLogic","Page1Speed","Page1SpeedLogic","Page1GameParams","Page1GameParamsLogic","Page1Boost","Page1BoostLogic","Page1ESP","Page1ESPLogic","Page1ESPDefense","Page1ESPDefenseLogic","Page1ESPOffense","Page1ESPOffenseLogic","Page1QBAim","Page1QBAimLogic","Page1Testing","Page1TestingLogic"}
-PAGE2_RELOAD_NAMES={"HitboxPreset","HitboxPresetLogic","KeybindSettings","KeybindSettingsLogic","PresetEditor","PresetEditorLogic"}
-CUSTOMIZE_RELOAD_NAMES={"StrokeColour","StrokeColourLogic","PrimaryColour","PrimaryColourLogic","SecondaryColour","SecondaryColourLogic"}
-MAP_RELOAD_NAMES={"MapEditor","MapEditorLogic","AntiMaterial","AntiMaterialLogic","MapCleaner","MapCleanerLogic","RemoveAds","RemoveAdsLogic"}
-SETTINGS_RELOAD_NAMES={"PlayerData","PlayerDataLogic","Discord","DiscordLogic"}
 
 function moduleGlobalName(name)
 	return MODULE_GLOBAL_NAMES[name] or (tostring(name).."Module")
@@ -583,22 +575,17 @@ function modulePathsFromNames(names)
 	return paths
 end
 
-AUTO_REFRESH_WATCH_PATHS={AUTO_REFRESH_RELOAD_PATH}
-for _,path in pairs(MODULE_PATHS) do
-	table.insert(AUTO_REFRESH_WATCH_PATHS,path)
-end
 APP_RUNTIME_PATH_SET={}
 if type(APP_RUNTIME_PATHS)=="table" then
 	for _,path in ipairs(APP_RUNTIME_PATHS) do
 		APP_RUNTIME_PATH_SET[path]=true
-		table.insert(AUTO_REFRESH_WATCH_PATHS,path)
 	end
 end
 MODULE_PATH_SET={}
 for _,path in pairs(MODULE_PATHS) do
 	MODULE_PATH_SET[path]=true
 end
-MODULE_PATH_SET[AUTO_REFRESH_RELOAD_PATH]=true
+MODULE_PATH_SET[MANUAL_REFRESH_RELOAD_PATH]=true
 for path in pairs(APP_RUNTIME_PATH_SET) do
 	MODULE_PATH_SET[path]=true
 end
@@ -618,7 +605,7 @@ for _,path in ipairs(modulePathsFromNames(OPTIONAL_MODULE_NAMES)) do
 	OPTIONAL_MODULE_PATH_SET[path]=true
 end
 MAX_REMOTE_MODULE_BYTES=300000
-REMOTE_MODULE_MARKERS={[AUTO_REFRESH_RELOAD_PATH]="HB_LOADER_V2"}
+REMOTE_MODULE_MARKERS={[MANUAL_REFRESH_RELOAD_PATH]="HB_LOADER_V2"}
 
 REMOTE_MODULE_CACHE={}
 REMOTE_MODULE_SOURCES={}
@@ -1068,66 +1055,6 @@ function finishLoader()
 	end)
 end
 
-function closeAfterAutoRefreshError(message,path)
-	if not(SG and SG.Parent) then return end
-
-	local overlay=New("Frame",{
-		Name="RefreshError",
-		BackgroundColor3=Color3.fromRGB(0,0,0),
-		BackgroundTransparency=0.08,
-		BorderSizePixel=0,
-		Size=UDim2.new(1,0,1,0),
-		ZIndex=LOADER_Z+20,
-	},SG)
-
-	local box=New("Frame",{
-		AnchorPoint=Vector2.new(0.5,0.5),
-		Position=UDim2.new(0.5,0,0.5,0),
-		Size=UDim2.fromOffset(410,128),
-		BackgroundColor3=THEME.BG,
-		BorderSizePixel=0,
-		ZIndex=LOADER_Z+21,
-	},overlay)
-	New("UIStroke",{Color=THEME.RED,Thickness=1,Transparency=0},box)
-	New("UIPadding",{PaddingTop=UDim.new(0,16),PaddingLeft=UDim.new(0,18),PaddingRight=UDim.new(0,18),PaddingBottom=UDim.new(0,16)},box)
-
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,24),
-		Text="Closing... encountered error",
-		Font=Enum.Font.GothamMedium,
-		TextSize=16,
-		TextColor3=THEME.RED,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=LOADER_Z+22,
-	},box)
-
-	New("TextLabel",{
-		BackgroundTransparency=1,
-		Position=UDim2.fromOffset(0,34),
-		Size=UDim2.new(1,0,0,48),
-		Text=tostring(path or message or "Auto-refresh failed."),
-		Font=Enum.Font.Gotham,
-		TextSize=12,
-		TextColor3=THEME.MUTED,
-		TextWrapped=true,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		TextYAlignment=Enum.TextYAlignment.Top,
-		ZIndex=LOADER_Z+22,
-	},box)
-
-	task.delay(1.35,function()
-		if shutdownTool then
-			pcall(shutdownTool)
-		else
-			toolAlive=false
-			if SG and SG.Parent then
-				SG:Destroy()
-			end
-		end
-	end)
-end
-
 function loadRemoteModuleStep(name,path)
 	loaderCurrent+=1
 	local cached=REMOTE_MODULE_CACHE[path]
@@ -1173,12 +1100,6 @@ for _,name in ipairs(STARTUP_MODULE_NAMES) do
 	loadRemoteModuleStepByName(name)
 end
 
-if AUTO_REFRESH_ENABLED then
-	loadRemoteModuleStepByName("AutoRefresh")
-else
-	AutoRefreshModule=nil
-end
-
 function runLoaderCheck()
 	local missing={}
 
@@ -1199,29 +1120,6 @@ function runLoaderCheck()
 end
 
 runLoaderCheck()
-
-function makeReloadPathMap(names)
-	local map={}
-
-	for _,name in ipairs(names or {}) do
-		local moduleName=name
-		local path=MODULE_PATHS[moduleName]
-
-		if path then
-			map[path]=function(module)
-				setLoadedModule(moduleName,module)
-			end
-		end
-	end
-
-	return map
-end
-
-PAGE1_RELOAD_PATHS=makeReloadPathMap(PAGE1_RELOAD_NAMES)
-PAGE2_RELOAD_PATHS=makeReloadPathMap(PAGE2_RELOAD_NAMES)
-CUSTOMIZE_RELOAD_PATHS=makeReloadPathMap(CUSTOMIZE_RELOAD_NAMES)
-MAP_RELOAD_PATHS=makeReloadPathMap(MAP_RELOAD_NAMES)
-SETTINGS_RELOAD_PATHS=makeReloadPathMap(SETTINGS_RELOAD_NAMES)
 
 function getUIStrokeColor()
 	return Color3.fromRGB(math.clamp(math.floor(UI_STYLE.StrokeR+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.StrokeG+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.StrokeB+0.5), 0, 255))
@@ -1494,156 +1392,16 @@ end
 
 liquidStrokeConn=nil
 MainFrame=nil
-AutoRefreshAPI=nil
 applyUIStrokeTheme=nil
 
-function reapplyThemeAfterAutoRefresh()
-	task.defer(function()
-		if applyUIStrokeTheme then pcall(applyUIStrokeTheme) end
-		if MainFrame and MainFrame.UpdateResponsiveLayout then pcall(MainFrame.UpdateResponsiveLayout) end
-	end)
-end
-
-function runAutoRefreshStep(label,fn,...)
-	if not fn then return end
-
-	local ok,err=pcall(fn,...)
-	if not ok then
-		error("Auto-refresh "..tostring(label).." failed: "..tostring(err))
-	end
-end
-
-function applyAutoRefreshModuleChange(changedPath,module)
-	if resetRuntimeEffectsBeforeAutoRefresh then
-		local ok,err=pcall(resetRuntimeEffectsBeforeAutoRefresh,changedPath)
-		if not ok then
-			warn("Auto-refresh effect reset failed:",err)
-		end
-	end
-
-	if changedPath==MODULE_PATHS.Description then
-		DescriptionModule=module
-		Description=module
-
-		if MainFrame and MainFrame.RefreshText then
-			runAutoRefreshStep("main text refresh",MainFrame.RefreshText,Description)
-		end
-
-		runAutoRefreshStep("page 1 rebuild",rebuildPage1FromModules)
-		runAutoRefreshStep("customize rebuild",rebuildCustomizeFromModules)
-		runAutoRefreshStep("map rebuild",rebuildMapFromModules)
-		runAutoRefreshStep("settings rebuild",rebuildSettingsFromModules)
-		runAutoRefreshStep("keybind rebuild",rebuildPage2FromModules)
-		runAutoRefreshStep("ui refresh",refreshAllUI)
-		reapplyThemeAfterAutoRefresh()
-		return true
-	end
-
-	local applyPage1Module=PAGE1_RELOAD_PATHS[changedPath]
-	if applyPage1Module then
-		applyPage1Module(module)
-
-		if rebuildPage1FromModules then
-			warn("Auto-refreshing page module after remote change:",changedPath)
-			rebuildPage1FromModules()
-		else
-			warn("Auto-refresh cached page module, rebuild not ready:",changedPath)
-		end
-
-		reapplyThemeAfterAutoRefresh()
-		return true
-	end
-
-	local applyPage2Module=PAGE2_RELOAD_PATHS[changedPath]
-	if applyPage2Module then
-		applyPage2Module(module)
-
-		if rebuildPage2FromModules then
-			warn("Auto-refreshing keybind module after remote change:",changedPath)
-			rebuildPage2FromModules()
-		else
-			warn("Auto-refresh cached keybind module, rebuild not ready:",changedPath)
-		end
-
-		reapplyThemeAfterAutoRefresh()
-		return true
-	end
-
-	local applyCustomizeModule=CUSTOMIZE_RELOAD_PATHS[changedPath]
-	if applyCustomizeModule then
-		applyCustomizeModule(module)
-
-		if applyDefaultUIStyleFields then
-			applyDefaultUIStyleFields(UI_STYLE,false)
-		end
-		if applyDefaultUIWindowFields then
-			applyDefaultUIWindowFields(UI_WINDOW,false)
-		end
-
-		if rebuildCustomizeFromModules then
-			warn("Auto-refreshing customize module after remote change:",changedPath)
-			rebuildCustomizeFromModules()
-		else
-			warn("Auto-refresh cached customize module, rebuild not ready:",changedPath)
-		end
-		reapplyThemeAfterAutoRefresh()
-		return true
-	end
-
-	local applyMapModule=MAP_RELOAD_PATHS[changedPath]
-	if applyMapModule then
-		applyMapModule(module)
-
-		if rebuildMapFromModules then
-			warn("Auto-refreshing map module after remote change:",changedPath)
-			rebuildMapFromModules()
-		else
-			warn("Auto-refresh cached map module, rebuild not ready:",changedPath)
-		end
-		reapplyThemeAfterAutoRefresh()
-		return true
-	end
-
-	local applySettingsModule=SETTINGS_RELOAD_PATHS[changedPath]
-	if applySettingsModule then
-		applySettingsModule(module)
-
-		if rebuildSettingsFromModules then
-			warn("Auto-refreshing settings module after remote change:",changedPath)
-			rebuildSettingsFromModules()
-		else
-			warn("Auto-refresh cached settings module, rebuild not ready:",changedPath)
-		end
-
-		reapplyThemeAfterAutoRefresh()
-		return true
-	end
-
-	if changedPath==MODULE_PATHS.DataSave then
-		DataSaveModule=module
-
-		if rebuildDataSaveFromModule then
-			warn("Auto-refreshing data-save module after remote change:",changedPath)
-			rebuildDataSaveFromModule(false)
-		else
-			warn("Auto-refresh cached data-save module, rebuild not ready:",changedPath)
-		end
-
-		reapplyThemeAfterAutoRefresh()
-		return true
-	end
-
-	return false
-end
-
 function refreshRemoteModulesNow()
-	local result=BOT_API.Post("/module/get",{path=AUTO_REFRESH_RELOAD_PATH})
+	local result=BOT_API.Post("/module/get",{path=MANUAL_REFRESH_RELOAD_PATH})
 	if not result or not result.ok or type(result.source)~="string" then
 		warn("Manual update failed:",result and result.error or "unknown")
 		return false
 	end
 
-	local verified,verifyErr=verifyRemoteModuleSource(AUTO_REFRESH_RELOAD_PATH,result.source)
+	local verified,verifyErr=verifyRemoteModuleSource(MANUAL_REFRESH_RELOAD_PATH,result.source)
 	if not verified then
 		warn("Manual update rejected:",verifyErr)
 		return false
@@ -1657,12 +1415,6 @@ function refreshRemoteModulesNow()
 
 	warn("Reloading GUI from fresh loader source.")
 	toolAlive=false
-	if AutoRefreshAPI and AutoRefreshAPI.Destroy then
-		pcall(function()
-			AutoRefreshAPI.Destroy()
-		end)
-		AutoRefreshAPI=nil
-	end
 	if stopLiquidStrokeAnimation then
 		pcall(stopLiquidStrokeAnimation)
 	end
@@ -1693,63 +1445,8 @@ function exposeManualModuleRefresh()
 	end
 end
 
-function startAutoRefresh()
+function initManualRefresh()
 	exposeManualModuleRefresh()
-
-	if not AUTO_REFRESH_ENABLED then return end
-	if not(AutoRefreshModule and AutoRefreshModule.new) then
-		warn("Missing remote module: gui/auto-refresh.lua")
-		return
-	end
-
-	AutoRefreshAPI=AutoRefreshModule.new({
-		BOT_API=BOT_API,
-		enabled=AUTO_REFRESH_ENABLED,
-		interval=AUTO_REFRESH_INTERVAL,
-		reloadPath=AUTO_REFRESH_RELOAD_PATH,
-		watchPaths=AUTO_REFRESH_WATCH_PATHS,
-		sources=REMOTE_MODULE_SOURCES,
-		getRemoteManifest=function(lastBuildId,pathVersions)
-			local result=BOT_API.Post("/module/manifest",{
-				buildId=lastBuildId,
-				pathVersions=pathVersions,
-				paths=AUTO_REFRESH_WATCH_PATHS,
-			})
-			if not result or not result.ok then
-				return nil,result and result.error or "unknown"
-			end
-
-			return result,nil
-		end,
-		getRemoteSource=function(path)
-			local result=BOT_API.Post("/module/get",{path=path})
-			if not result or not result.ok or type(result.source)~="string" then
-				return nil,result and result.error or "unknown"
-			end
-
-			local verified,verifyErr=verifyRemoteModuleSource(path,result.source)
-			if not verified then
-				return nil,verifyErr
-			end
-
-			return result.source,nil
-		end,
-		loadModuleFromSource=loadModuleFromSource,
-		setToolAlive=function(value)
-			toolAlive=value and true or false
-		end,
-		alive=function()
-			return toolAlive and SG and SG.Parent and guiParent:FindFirstChild(SG_NAME)==SG
-		end,
-		shouldReloadMain=function(changedPath)
-			return APP_RUNTIME_PATH_SET[changedPath] or changedPath==MODULE_PATHS.GuiLogic or changedPath==MODULE_PATHS.MainFrame or changedPath==MODULE_PATHS.Announcement or changedPath==MODULE_PATHS.AutoRefresh
-		end,
-		applyModuleChange=applyAutoRefreshModuleChange,
-		optionalPaths=OPTIONAL_MODULE_PATH_SET,
-		onError=closeAfterAutoRefreshError,
-	})
-
-	AutoRefreshAPI.Start()
 end
 
 function stopLiquidStrokeAnimation()

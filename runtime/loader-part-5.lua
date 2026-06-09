@@ -6,13 +6,6 @@ function shutdownTool()
 	sendPlayerSessionUpdate(true)
 	toolAlive=false
 
-	if AutoRefreshAPI and AutoRefreshAPI.Destroy then
-		pcall(function()
-			AutoRefreshAPI.Destroy()
-		end)
-		AutoRefreshAPI=nil
-	end
-
 	if AnnouncementAPI and AnnouncementAPI.Destroy then
 		pcall(function()
 			AnnouncementAPI.Destroy()
@@ -161,24 +154,6 @@ local RUNTIME_REFRESH_FNS={
 	"updateResponsiveLayout",
 	"refreshActionStatus",
 }
-local AUTO_REFRESH_RESET_VALUES={
-	hitboxOn=false,
-	gravityEnabled=false,
-	gravityValue=196.2,
-	speedEnabled=false,
-	speedValue=18,
-	gameParamsEnabled=false,
-	staminaRegenValue=10,
-	staminaDepleteValue=10,
-	jumpPowerValue=53.5,
-	divePowerValue=1.9,
-	jumpBoostOn=false,
-	jumpBoostTradeMode=false,
-	actionStatusOn=false,
-	qbAimEnabled=false,
-	testingEnabled=false,
-}
-
 function getPersistentValue(name,default)
 	if PAGE1_STATE and PAGE1_STATE[name]~=nil then return PAGE1_STATE[name] end
 	if PERSISTENT_GLOBAL_KEYS[name] and RUNTIME_ENV[name]~=nil then return RUNTIME_ENV[name] end
@@ -220,96 +195,6 @@ function refreshAllUI()
 		local fn=RUNTIME_ENV[fnName]
 		if type(fn)=="function" then pcall(fn) end
 	end
-end
-
-AUTO_REFRESH_EFFECT_RESETTING=false
-
-function resetRuntimeEffectsBeforeAutoRefresh()
-	if AUTO_REFRESH_EFFECT_RESETTING then return end
-	AUTO_REFRESH_EFFECT_RESETTING=true
-
-	local function call(apiName,method,...)
-		local api=PAGE1_APIS and PAGE1_APIS[apiName]
-		local fn=api and api[method]
-		if type(fn)=="function" then
-			pcall(fn,...)
-		end
-	end
-
-	local savedPage1State={}
-	if PAGE1_STATE then
-		for key,value in pairs(PAGE1_STATE) do
-			savedPage1State[key]=value
-		end
-	end
-
-	local savedSmoothPlastic=WORLD_SETTINGS and WORLD_SETTINGS.SmoothPlastic
-
-	call("Hitbox","SetHitboxLock",false,false)
-	call("Gravity","SetGravityState",false,false)
-	call("Speed","SetSpeedState",false,false,true)
-
-	if PAGE1_APIS and PAGE1_APIS.GameParams then
-		call("GameParams","SetStaminaRegenValue",10,false)
-		call("GameParams","SetStaminaDepleteValue",10,false)
-		call("GameParams","SetJumpPowerValue",53.5,false)
-		call("GameParams","SetDivePowerValue",1.9,false)
-		call("GameParams","SetGameParamsState",false,false)
-	end
-
-	call("Boost","SetJumpBoostState",false,false)
-	call("Boost","SetAlwaysBoostState",false,false)
-	call("ESP","SetESPState",false,false)
-	call("QBAim","SetQBAimState",false)
-	call("Testing","SetTestingState",false,false)
-
-	if AntiMaterialAPI and AntiMaterialAPI.SetEnabled then
-		pcall(AntiMaterialAPI.SetEnabled,false,false)
-	elseif WORLD_SETTINGS then
-		if typeof and typeof(WORLD_SETTINGS.Conn)=="RBXScriptConnection" then
-			pcall(function()
-				WORLD_SETTINGS.Conn:Disconnect()
-			end)
-		end
-
-		WORLD_SETTINGS.Conn=nil
-		if type(WORLD_SETTINGS.OriginalMaterials)=="table" then
-			for part,material in pairs(WORLD_SETTINGS.OriginalMaterials) do
-				if part and part.Parent and part:IsA("BasePart") then
-					pcall(function()
-						part.Material=material
-					end)
-				end
-			end
-			WORLD_SETTINGS.OriginalMaterials={}
-		end
-		WORLD_SETTINGS.SmoothPlastic=false
-	end
-
-	if PAGE1_STATE then
-		for key,value in pairs(AUTO_REFRESH_RESET_VALUES) do
-			PAGE1_STATE[key]=value
-		end
-	end
-
-	if PAGE1_STATE then
-		for key,value in pairs(savedPage1State) do
-			PAGE1_STATE[key]=value
-		end
-	end
-
-	if WORLD_SETTINGS and savedSmoothPlastic~=nil then
-		WORLD_SETTINGS.SmoothPlastic=savedSmoothPlastic and true or false
-	end
-
-	pcall(function()
-		workspace.Gravity=196.2
-	end)
-
-	if syncPage1State then pcall(syncPage1State) end
-	if refreshActionStatus then pcall(refreshActionStatus) end
-
-	AUTO_REFRESH_EFFECT_RESETTING=false
 end
 
 local DATA_SAVE_STATE_SETTERS={
@@ -539,5 +424,5 @@ elseif modeSubtitle then
 	modeSubtitle.Text=getMainDescriptionText()
 end
 sendPlayerLog()
-startAutoRefresh()
+initManualRefresh()
 finishLoader()
