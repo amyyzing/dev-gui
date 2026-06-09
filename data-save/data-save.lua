@@ -44,6 +44,17 @@ local UI_STYLE_BOOL_FIELDS={
 	{"liquidStroke","LiquidStroke"},
 }
 
+local APPLY_REFRESH_HOOKS={
+	"RefreshAll",
+	"applyUIStrokeTheme",
+	"refreshSettingsUI",
+	"refreshActualSettingsUI",
+	"refreshSpeedUI",
+	"refreshHitboxReadout",
+	"refreshPage2UI",
+	"updateResponsiveLayout",
+}
+
 local function cloneRoot()
 	return{
 		version=2,
@@ -245,6 +256,14 @@ local function getValue(ctx,name,default)
 	return default
 end
 
+local function hasAnyKey(t)
+	if type(t)~="table" then return false end
+	for _ in pairs(t) do
+		return true
+	end
+	return false
+end
+
 local function setValue(ctx,name,value)
 	local state=ctx.State or ctx.state
 
@@ -273,6 +292,30 @@ local function applyValue(ctx,setterName,stateName,value)
 	end
 
 	setValue(ctx,stateName,value)
+end
+
+local function applyBoolean(ctx,setterName,stateName,value)
+	if value~=nil then
+		applyValue(ctx,setterName,stateName,value and true or false)
+	end
+end
+
+local function applyClamped(ctx,setterName,stateName,value,min,max,fallback,clampFn)
+	if value~=nil then
+		applyValue(ctx,setterName,stateName,(clampFn or clampNumber)(value,min,max,fallback))
+	end
+end
+
+local function setBoolean(ctx,stateName,value)
+	if value~=nil then
+		setValue(ctx,stateName,value and true or false)
+	end
+end
+
+local function setClamped(ctx,stateName,value,min,max,fallback)
+	if value~=nil then
+		setValue(ctx,stateName,clampNumber(value,min,max,fallback))
+	end
 end
 
 local function getModeKey(ctx)
@@ -304,6 +347,26 @@ local function collectPresetEditor(ctx)
 	end
 
 	return output
+end
+
+local function collectUIStylePayload(uiStyle,defaultUIStyle)
+	local payload={}
+
+	for _,field in ipairs(UI_STYLE_NUMBER_FIELDS) do
+		payload[field[1]]=uiStyle[field[2]]
+	end
+
+	for _,field in ipairs(UI_STYLE_BOOL_FIELDS) do
+		payload[field[1]]=uiStyle[field[2]] and true or false
+	end
+
+	payload.liquidStrokeDirection=uiStyle.LiquidStrokeDirection
+	payload.cornerRadius=0
+	payload.uiLib=tostring(uiStyle.UILib or "")~="" and uiStyle.UILib or defaultUIStyle.UILib or "original"
+	payload.themePanelExpanded=uiStyle.ThemePanelExpanded and true or false
+	payload.coloursPanelExpanded=uiStyle.ColoursPanelExpanded and true or false
+
+	return payload
 end
 
 local function applyPresetEditor(ctx,presetEditor)
@@ -511,28 +574,7 @@ function DataSave.new(ctx)
 			},
 
 			presetEditor=collectPresetEditor(ctx),
-
-			uiStyle={
-				primaryR=uiStyle.PrimaryR,
-				primaryG=uiStyle.PrimaryG,
-				primaryB=uiStyle.PrimaryB,
-				strokeR=uiStyle.StrokeR,
-				strokeG=uiStyle.StrokeG,
-				strokeB=uiStyle.StrokeB,
-				gradientR=uiStyle.GradientR,
-				gradientG=uiStyle.GradientG,
-				gradientB=uiStyle.GradientB,
-				strokeGradient=uiStyle.StrokeGradient and true or false,
-				liquidStroke=uiStyle.LiquidStroke and true or false,
-				liquidStrokeSpeed=uiStyle.LiquidStrokeSpeed,
-				liquidStrokeDirection=uiStyle.LiquidStrokeDirection,
-				strokeThickness=uiStyle.StrokeThickness,
-				strokeTransparency=uiStyle.StrokeTransparency,
-				cornerRadius=0,
-				uiLib=tostring(uiStyle.UILib or "")~="" and uiStyle.UILib or defaultUIStyle.UILib or "original",
-				themePanelExpanded=uiStyle.ThemePanelExpanded and true or false,
-				coloursPanelExpanded=uiStyle.ColoursPanelExpanded and true or false,
-			},
+			uiStyle=collectUIStylePayload(uiStyle,defaultUIStyle),
 
 			workspace={
 				smoothPlastic=worldSettings.SmoothPlastic and true or false,
@@ -578,98 +620,42 @@ function DataSave.new(ctx)
 			setValue(ctx,"sizeZ",hz)
 		end
 
-		if hitbox.transparency~=nil then
-			local tv=clampNumber(hitbox.transparency,0,1,getValue(ctx,"targetTransparency",0.7))
-			applyValue(ctx,"setTransparency","targetTransparency",tv)
-		end
-
-		if hitbox.enabled~=nil then
-			applyValue(ctx,"setHitboxLock","hitboxOn",hitbox.enabled and true or false)
-		end
-
-		if settings.gravity~=nil then
-			local gv=clampNumber(settings.gravity,0,1000,196.2)
-			applyValue(ctx,"setGravity","gravityValue",gv)
-		end
-
-		if settings.gravityEnabled~=nil then
-			applyValue(ctx,"setGravityState","gravityEnabled",settings.gravityEnabled and true or false)
-		end
+		applyClamped(ctx,"setTransparency","targetTransparency",hitbox.transparency,0,1,getValue(ctx,"targetTransparency",0.7))
+		applyBoolean(ctx,"setHitboxLock","hitboxOn",hitbox.enabled)
+		applyClamped(ctx,"setGravity","gravityValue",settings.gravity,0,1000,196.2)
+		applyBoolean(ctx,"setGravityState","gravityEnabled",settings.gravityEnabled)
 
 		local speed=settings.speed or {}
-		if speed.value~=nil then
-			local sv=clampNumber(speed.value,0,100,18)
-			applyValue(ctx,"setSpeedValue","speedValue",sv)
-		end
-
-		if speed.enabled~=nil then
-			applyValue(ctx,"setSpeedState","speedEnabled",speed.enabled and true or false)
-		end
+		applyClamped(ctx,"setSpeedValue","speedValue",speed.value,0,100,18)
+		applyBoolean(ctx,"setSpeedState","speedEnabled",speed.enabled)
 
 		local gameParams=settings.gameParams or {}
-		if gameParams.enabled~=nil then
-			applyValue(ctx,"setGameParamsState","gameParamsEnabled",gameParams.enabled and true or false)
-		end
-
-		if gameParams.staminaRegen~=nil then
-			local sr=clampNumber(gameParams.staminaRegen,0,50,10)
-			applyValue(ctx,"setStaminaRegenValue","staminaRegenValue",sr)
-		end
-
-		if gameParams.staminaDeplete~=nil then
-			local sd=clampStaminaDeplete(gameParams.staminaDeplete)
-			applyValue(ctx,"setStaminaDepleteValue","staminaDepleteValue",sd)
-		end
-
-		if gameParams.jumpPower~=nil then
-			local jp=clampNumber(gameParams.jumpPower,0,300,53.5)
-			applyValue(ctx,"setJumpPowerValue","jumpPowerValue",jp)
-		end
-
-		if gameParams.divePower~=nil then
-			local dp=clampNumber(gameParams.divePower,0,15,1.9)
-			applyValue(ctx,"setDivePowerValue","divePowerValue",dp)
-		end
+		applyBoolean(ctx,"setGameParamsState","gameParamsEnabled",gameParams.enabled)
+		applyClamped(ctx,"setStaminaRegenValue","staminaRegenValue",gameParams.staminaRegen,0,50,10)
+		applyClamped(ctx,"setStaminaDepleteValue","staminaDepleteValue",gameParams.staminaDeplete,0,50,10,clampStaminaDeplete)
+		applyClamped(ctx,"setJumpPowerValue","jumpPowerValue",gameParams.jumpPower,0,300,53.5)
+		applyClamped(ctx,"setDivePowerValue","divePowerValue",gameParams.divePower,0,15,1.9)
 
 		local boost=settings.boost or {}
-		if boost.enabled~=nil then
-			applyValue(ctx,"setJumpBoostState","jumpBoostOn",boost.enabled and true or false)
-		end
-
-		if boost.always~=nil then setValue(ctx,"jumpBoostTradeMode",boost.always and true or false) end
-		if boost.forceY~=nil then setValue(ctx,"boostForceY",clampNumber(boost.forceY,10,100,32)) end
-		if boost.cooldown~=nil then setValue(ctx,"boostCooldown",clampNumber(boost.cooldown,0,60,5)) end
-		if boost.chance~=nil then setValue(ctx,"boostChance",clampNumber(boost.chance,0,100,100)) end
-		if boost.radius~=nil then setValue(ctx,"ballDetectionRadius",clampNumber(boost.radius,1,50,10)) end
+		applyBoolean(ctx,"setJumpBoostState","jumpBoostOn",boost.enabled)
+		setBoolean(ctx,"jumpBoostTradeMode",boost.always)
+		setClamped(ctx,"boostForceY",boost.forceY,10,100,32)
+		setClamped(ctx,"boostCooldown",boost.cooldown,0,60,5)
+		setClamped(ctx,"boostChance",boost.chance,0,100,100)
+		setClamped(ctx,"ballDetectionRadius",boost.radius,1,50,10)
 
 		local esp=settings.esp or {}
-		if esp.enabled~=nil then
-			applyValue(ctx,"setESPState","actionStatusOn",esp.enabled and true or false)
-		end
+		applyBoolean(ctx,"setESPState","actionStatusOn",esp.enabled)
 
 		local qbAim=settings.qbAim or {}
-		if qbAim.enabled~=nil then
-			applyValue(ctx,"setQBAimState","qbAimEnabled",qbAim.enabled and true or false)
-		end
-		if qbAim.teamFilter~=nil then
-			applyValue(ctx,"setQBAimTeamFilter","qbAimTeamFilter",qbAim.teamFilter and true or false)
-		end
-		if qbAim.showArc~=nil then
-			applyValue(ctx,"setQBAimShowArc","qbAimShowArc",qbAim.showArc and true or false)
-		end
-		if qbAim.leadDelay~=nil then
-			local leadDelay=clampNumber(qbAim.leadDelay,0,1.5,0.38)
-			applyValue(ctx,"setQBAimLeadDelay","qbAimLeadDelay",leadDelay)
-		end
-		if qbAim.peakHeight~=nil then
-			local peakHeight=clampNumber(qbAim.peakHeight,8,20,14.00)
-			applyValue(ctx,"setQBAimPeakHeight","qbAimPeakHeight",peakHeight)
-		end
+		applyBoolean(ctx,"setQBAimState","qbAimEnabled",qbAim.enabled)
+		applyBoolean(ctx,"setQBAimTeamFilter","qbAimTeamFilter",qbAim.teamFilter)
+		applyBoolean(ctx,"setQBAimShowArc","qbAimShowArc",qbAim.showArc)
+		applyClamped(ctx,"setQBAimLeadDelay","qbAimLeadDelay",qbAim.leadDelay,0,1.5,0.38)
+		applyClamped(ctx,"setQBAimPeakHeight","qbAimPeakHeight",qbAim.peakHeight,8,20,14.00)
 
 		local testing=settings.testing or {}
-		if testing.enabled~=nil then
-			applyValue(ctx,"setTestingState","testingEnabled",testing.enabled and true or false)
-		end
+		applyBoolean(ctx,"setTestingState","testingEnabled",testing.enabled)
 
 		local keybinds=settings.keybinds or {}
 		local keyMap={
@@ -697,15 +683,8 @@ function DataSave.new(ctx)
 
 		applyPresetEditor(ctx,settings.presetEditor or settings.PresetEditor)
 
-		local hasSavedUIStyle=type(settings.uiStyle)=="table"
-		local uiStyle=hasSavedUIStyle and settings.uiStyle or {}
-		if hasSavedUIStyle then
-			hasSavedUIStyle=false
-			for _ in pairs(uiStyle) do
-				hasSavedUIStyle=true
-				break
-			end
-		end
+		local uiStyle=type(settings.uiStyle)=="table" and settings.uiStyle or {}
+		local hasSavedUIStyle=hasAnyKey(uiStyle)
 
 		local defaultUIStyle=getDefaultUIStyle(ctx)
 		if ctx.UI_STYLE then
@@ -768,14 +747,11 @@ function DataSave.new(ctx)
 
 		api.SetLoading(false)
 
-		if ctx.RefreshAll then pcall(ctx.RefreshAll) end
-		if ctx.applyUIStrokeTheme then pcall(ctx.applyUIStrokeTheme) end
-		if ctx.refreshSettingsUI then pcall(ctx.refreshSettingsUI) end
-		if ctx.refreshActualSettingsUI then pcall(ctx.refreshActualSettingsUI) end
-		if ctx.refreshSpeedUI then pcall(ctx.refreshSpeedUI) end
-		if ctx.refreshHitboxReadout then pcall(ctx.refreshHitboxReadout) end
-		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
-		if ctx.updateResponsiveLayout then pcall(ctx.updateResponsiveLayout) end
+		for _,hookName in ipairs(APPLY_REFRESH_HOOKS) do
+			if ctx[hookName] then
+				pcall(ctx[hookName])
+			end
+		end
 	end
 
 	function api.SaveNow()

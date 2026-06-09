@@ -49,6 +49,33 @@ local function boolOrDefault(v,default)
 	return v and true or false
 end
 
+local COLOR_FIELDS={
+	Primary={"PrimaryR","PrimaryG","PrimaryB"},
+	Stroke={"StrokeR","StrokeG","StrokeB"},
+	Gradient={"GradientR","GradientG","GradientB"},
+}
+
+local BOOL_FIELDS={StrokeGradient=true,LiquidStroke=true,ThemePanelExpanded=true,ColoursPanelExpanded=true}
+local NUMBER_LIMITS={LiquidStrokeSpeed={0,2},StrokeThickness={0,8},StrokeTransparency={0,1}}
+
+local function normalizedStyleValue(key,value,default)
+	if BOOL_FIELDS[key] then
+		return boolOrDefault(value,default)
+	elseif key=="LiquidStrokeDirection" then
+		return tostring(value or default)
+	elseif key=="CornerRadius" then
+		return 0
+	elseif key=="UILib" then
+		return DEFAULTS.UILib
+	elseif type(default)=="number" then
+		local n=numberOrDefault(value,default)
+		local limits=NUMBER_LIMITS[key]
+		return limits and math.clamp(n,limits[1],limits[2]) or n
+	end
+
+	return value or default
+end
+
 local function applyDefaultOverrides(style)
 	if type(style)~="table" then
 		return
@@ -62,89 +89,31 @@ local function applyDefaultOverrides(style)
 end
 
 local function ensureStyleDefaults(style)
-	style.PrimaryR=numberOrDefault(style.PrimaryR,DEFAULTS.PrimaryR)
-	style.PrimaryG=numberOrDefault(style.PrimaryG,DEFAULTS.PrimaryG)
-	style.PrimaryB=numberOrDefault(style.PrimaryB,DEFAULTS.PrimaryB)
-
-	style.StrokeR=numberOrDefault(style.StrokeR,DEFAULTS.StrokeR)
-	style.StrokeG=numberOrDefault(style.StrokeG,DEFAULTS.StrokeG)
-	style.StrokeB=numberOrDefault(style.StrokeB,DEFAULTS.StrokeB)
-
-	style.GradientR=numberOrDefault(style.GradientR,DEFAULTS.GradientR)
-	style.GradientG=numberOrDefault(style.GradientG,DEFAULTS.GradientG)
-	style.GradientB=numberOrDefault(style.GradientB,DEFAULTS.GradientB)
-
-	style.StrokeGradient=boolOrDefault(style.StrokeGradient,DEFAULTS.StrokeGradient)
-	style.LiquidStroke=boolOrDefault(style.LiquidStroke,DEFAULTS.LiquidStroke)
-
-	style.LiquidStrokeSpeed=math.clamp(numberOrDefault(style.LiquidStrokeSpeed,DEFAULTS.LiquidStrokeSpeed),0,2)
-	style.LiquidStrokeDirection=tostring(style.LiquidStrokeDirection or DEFAULTS.LiquidStrokeDirection)
-
-	style.StrokeThickness=math.clamp(numberOrDefault(style.StrokeThickness,DEFAULTS.StrokeThickness),0,8)
-	style.StrokeTransparency=math.clamp(numberOrDefault(style.StrokeTransparency,DEFAULTS.StrokeTransparency),0,1)
-	style.CornerRadius=0
-	style.UILib=DEFAULTS.UILib
-	style.ThemePanelExpanded=boolOrDefault(style.ThemePanelExpanded,DEFAULTS.ThemePanelExpanded)
-	style.ColoursPanelExpanded=boolOrDefault(style.ColoursPanelExpanded,DEFAULTS.ColoursPanelExpanded)
+	for key,default in pairs(DEFAULTS) do
+		style[key]=normalizedStyleValue(key,style[key],default)
+	end
 end
 
 local function copyDefaultStyle(style)
 	style=style or DEFAULTS
 
-	return{
-		PrimaryR=numberOrDefault(style.PrimaryR,DEFAULTS.PrimaryR),
-		PrimaryG=numberOrDefault(style.PrimaryG,DEFAULTS.PrimaryG),
-		PrimaryB=numberOrDefault(style.PrimaryB,DEFAULTS.PrimaryB),
-
-		StrokeR=numberOrDefault(style.StrokeR,DEFAULTS.StrokeR),
-		StrokeG=numberOrDefault(style.StrokeG,DEFAULTS.StrokeG),
-		StrokeB=numberOrDefault(style.StrokeB,DEFAULTS.StrokeB),
-
-		GradientR=numberOrDefault(style.GradientR,DEFAULTS.GradientR),
-		GradientG=numberOrDefault(style.GradientG,DEFAULTS.GradientG),
-		GradientB=numberOrDefault(style.GradientB,DEFAULTS.GradientB),
-
-		StrokeGradient=boolOrDefault(style.StrokeGradient,DEFAULTS.StrokeGradient),
-		LiquidStroke=boolOrDefault(style.LiquidStroke,DEFAULTS.LiquidStroke),
-
-		LiquidStrokeSpeed=math.clamp(numberOrDefault(style.LiquidStrokeSpeed,DEFAULTS.LiquidStrokeSpeed),0,2),
-		LiquidStrokeDirection=tostring(style.LiquidStrokeDirection or DEFAULTS.LiquidStrokeDirection),
-
-		StrokeThickness=math.clamp(numberOrDefault(style.StrokeThickness,DEFAULTS.StrokeThickness),0,8),
-		StrokeTransparency=math.clamp(numberOrDefault(style.StrokeTransparency,DEFAULTS.StrokeTransparency),0,1),
-		CornerRadius=0,
-		UILib=DEFAULTS.UILib,
-		ThemePanelExpanded=boolOrDefault(style.ThemePanelExpanded,DEFAULTS.ThemePanelExpanded),
-		ColoursPanelExpanded=boolOrDefault(style.ColoursPanelExpanded,DEFAULTS.ColoursPanelExpanded),
-	}
+	local copy={}
+	for key,default in pairs(DEFAULTS) do
+		copy[key]=normalizedStyleValue(key,style[key],default)
+	end
+	return copy
 end
 
 local function colorFromStyle(style,prefix)
-	if prefix=="Primary" then
-		return Color3.fromRGB(clampByte(style.PrimaryR),clampByte(style.PrimaryG),clampByte(style.PrimaryB))
-	end
-
-	if prefix=="Gradient" then
-		return Color3.fromRGB(clampByte(style.GradientR),clampByte(style.GradientG),clampByte(style.GradientB))
-	end
-
-	return Color3.fromRGB(clampByte(style.StrokeR),clampByte(style.StrokeG),clampByte(style.StrokeB))
+	local fields=COLOR_FIELDS[prefix] or COLOR_FIELDS.Stroke
+	return Color3.fromRGB(clampByte(style[fields[1]]),clampByte(style[fields[2]]),clampByte(style[fields[3]]))
 end
 
 local function writeColorToStyle(style,prefix,c)
-	if prefix=="Primary" then
-		style.PrimaryR=math.floor(c.R*255+0.5)
-		style.PrimaryG=math.floor(c.G*255+0.5)
-		style.PrimaryB=math.floor(c.B*255+0.5)
-	elseif prefix=="Gradient" then
-		style.GradientR=math.floor(c.R*255+0.5)
-		style.GradientG=math.floor(c.G*255+0.5)
-		style.GradientB=math.floor(c.B*255+0.5)
-	else
-		style.StrokeR=math.floor(c.R*255+0.5)
-		style.StrokeG=math.floor(c.G*255+0.5)
-		style.StrokeB=math.floor(c.B*255+0.5)
-	end
+	local fields=COLOR_FIELDS[prefix] or COLOR_FIELDS.Stroke
+	style[fields[1]]=math.floor(c.R*255+0.5)
+	style[fields[2]]=math.floor(c.G*255+0.5)
+	style[fields[3]]=math.floor(c.B*255+0.5)
 end
 
 local function colorsMatch(a,b)
@@ -421,30 +390,9 @@ function StrokeColour.new(ctx,page)
 	end
 
 	function api.Reset()
-		UI_STYLE.PrimaryR=defaultStyle.PrimaryR
-		UI_STYLE.PrimaryG=defaultStyle.PrimaryG
-		UI_STYLE.PrimaryB=defaultStyle.PrimaryB
-
-		UI_STYLE.StrokeR=defaultStyle.StrokeR
-		UI_STYLE.StrokeG=defaultStyle.StrokeG
-		UI_STYLE.StrokeB=defaultStyle.StrokeB
-
-		UI_STYLE.GradientR=defaultStyle.GradientR
-		UI_STYLE.GradientG=defaultStyle.GradientG
-		UI_STYLE.GradientB=defaultStyle.GradientB
-
-		UI_STYLE.StrokeGradient=defaultStyle.StrokeGradient
-		UI_STYLE.LiquidStroke=defaultStyle.LiquidStroke
-
-		UI_STYLE.LiquidStrokeSpeed=defaultStyle.LiquidStrokeSpeed
-		UI_STYLE.LiquidStrokeDirection=defaultStyle.LiquidStrokeDirection
-
-		UI_STYLE.StrokeThickness=defaultStyle.StrokeThickness
-		UI_STYLE.StrokeTransparency=defaultStyle.StrokeTransparency
-		UI_STYLE.CornerRadius=defaultStyle.CornerRadius
-		UI_STYLE.UILib=defaultStyle.UILib
-		UI_STYLE.ThemePanelExpanded=defaultStyle.ThemePanelExpanded
-		UI_STYLE.ColoursPanelExpanded=defaultStyle.ColoursPanelExpanded
+		for key,value in pairs(defaultStyle) do
+			UI_STYLE[key]=value
+		end
 
 		api.Refresh()
 	end

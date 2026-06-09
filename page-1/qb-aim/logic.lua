@@ -97,25 +97,11 @@ local function clampMagnitude(v,maxMagnitude)
 end
 
 local function leadDelayForFlightTime(time)
-	-- Clean math rebuild: Lead Adjust is not route classification and not radial/tangent damping.
-	-- It is only the intentional ahead-time along the receiver's current velocity vector.
-	-- Set Lead Adjust to 0 for pure catch-time intercept, or 0.35-0.40 for your ahead-of-WR catch window.
 	return math.max(WR_LEAD_DELAY,0)
 end
 
 local function root(character)
 	return character and (character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso"))
-end
-
-local function routeSpeed(speed)
-	-- Clean math rebuild: receivers are modeled as either stopped or moving at route speed.
-	-- This removes partial-speed formula drift and keeps the prediction equation simple.
-	local clamped=math.clamp(speed or 0,0,MAX_RUN_SPEED)
-	if clamped<CLEAN_MOVING_SPEED_MIN then
-		return 0
-	end
-
-	return MAX_RUN_SPEED
 end
 
 local function getModeKey(ctx)
@@ -980,10 +966,6 @@ function QBAim.new(ctx,parent)
 
 	local function receiverMaxAt(position)
 		return Vector3.new(position.X,WR_MAX_Y,position.Z)
-	end
-
-	local function receiverMax(receiverRoot)
-		return receiverMaxAt(receiverRoot.Position)
 	end
 
 	local function qbYCorrection(qbRoot)

@@ -127,46 +127,23 @@ function colorClose(a,b)
 	return math.abs(a.R-b.R)<0.002 and math.abs(a.G-b.G)<0.002 and math.abs(a.B-b.B)<0.002
 end
 
+local THEME_ROLE_NAMES={"BG","PANEL","CARD","TEXT","MUTED","STROKE","GREEN","RED","BLUE","STROKE_SOFT","TOPBAR","SECTION","BUTTON","INPUT","SLIDER_BG","SLIDER_FILL"}
+local THEME_TEXT_ROLE_NAMES={"TEXT","MUTED","RED","GREEN","BLUE"}
+
+local function findThemeRole(color,roles)
+	for _,role in ipairs(roles) do
+		if THEME[role] and colorClose(color,THEME[role]) then
+			return role
+		end
+	end
+end
+
 function markThemeRole(obj,color)
 	if not(obj and color) then return end
 	registerThemeObject(obj)
 	if obj:IsA("TextButton") and obj.Text=="" then return end
 
-	local role=nil
-	if colorClose(color,THEME.BG) then
-		role="BG"
-	elseif colorClose(color,THEME.PANEL) then
-		role="PANEL"
-	elseif colorClose(color,THEME.CARD) then
-		role="CARD"
-	elseif colorClose(color,THEME.TEXT) then
-		role="TEXT"
-	elseif colorClose(color,THEME.MUTED) then
-		role="MUTED"
-	elseif colorClose(color,THEME.STROKE) then
-		role="STROKE"
-	elseif colorClose(color,THEME.GREEN) then
-		role="GREEN"
-	elseif colorClose(color,THEME.RED) then
-		role="RED"
-	elseif colorClose(color,THEME.BLUE) then
-		role="BLUE"
-	elseif THEME.STROKE_SOFT and colorClose(color,THEME.STROKE_SOFT) then
-		role="STROKE_SOFT"
-	elseif THEME.TOPBAR and colorClose(color,THEME.TOPBAR) then
-		role="TOPBAR"
-	elseif THEME.SECTION and colorClose(color,THEME.SECTION) then
-		role="SECTION"
-	elseif THEME.BUTTON and colorClose(color,THEME.BUTTON) then
-		role="BUTTON"
-	elseif THEME.INPUT and colorClose(color,THEME.INPUT) then
-		role="INPUT"
-	elseif THEME.SLIDER_BG and colorClose(color,THEME.SLIDER_BG) then
-		role="SLIDER_BG"
-	elseif THEME.SLIDER_FILL and colorClose(color,THEME.SLIDER_FILL) then
-		role="SLIDER_FILL"
-	end
-
+	local role=findThemeRole(color,THEME_ROLE_NAMES)
 	if role then
 		obj:SetAttribute("ThemeRole",role)
 	end
@@ -176,19 +153,7 @@ function markThemeTextRole(obj,color)
 	if not(obj and color) then return end
 	registerThemeObject(obj)
 
-	local role=nil
-	if colorClose(color,THEME.TEXT) then
-		role="TEXT"
-	elseif colorClose(color,THEME.MUTED) then
-		role="MUTED"
-	elseif colorClose(color,THEME.RED) then
-		role="RED"
-	elseif colorClose(color,THEME.GREEN) then
-		role="GREEN"
-	elseif colorClose(color,THEME.BLUE) then
-		role="BLUE"
-	end
-
+	local role=findThemeRole(color,THEME_TEXT_ROLE_NAMES)
 	if role then
 		obj:SetAttribute("ThemeTextRole",role)
 	end
@@ -1110,16 +1075,30 @@ end
 
 runLoaderCheck()
 
+local function styleByte(name,fallback)
+	return math.clamp(math.floor((tonumber(UI_STYLE[name]) or fallback)+0.5),0,255)
+end
+
+local STYLE_COLOR_DEFAULTS={Stroke={76,76,76},Gradient={45,45,45},Primary={28,28,28}}
+
+local function styleColor(prefix,defaults)
+	return Color3.fromRGB(
+		styleByte(prefix.."R",defaults[1]),
+		styleByte(prefix.."G",defaults[2]),
+		styleByte(prefix.."B",defaults[3])
+	)
+end
+
 function getUIStrokeColor()
-	return Color3.fromRGB(math.clamp(math.floor(UI_STYLE.StrokeR+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.StrokeG+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.StrokeB+0.5), 0, 255))
+	return styleColor("Stroke",STYLE_COLOR_DEFAULTS.Stroke)
 end
 
 function getUIStrokeGradientColor()
-	return Color3.fromRGB(math.clamp(math.floor(UI_STYLE.GradientR+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.GradientG+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.GradientB+0.5), 0, 255))
+	return styleColor("Gradient",STYLE_COLOR_DEFAULTS.Gradient)
 end
 
 function getUIPrimaryColor()
-	return Color3.fromRGB(math.clamp(math.floor((UI_STYLE.PrimaryR or 28)+0.5),0,255),math.clamp(math.floor((UI_STYLE.PrimaryG or 28)+0.5),0,255),math.clamp(math.floor((UI_STYLE.PrimaryB or 28)+0.5),0,255))
+	return styleColor("Primary",STYLE_COLOR_DEFAULTS.Primary)
 end
 
 UILibOriginalModule={
@@ -1481,6 +1460,71 @@ function updateLiquidStrokeAnimation()
 	end))
 end
 
+local function resolveStrokeRole(stroke)
+	local explicit=stroke:GetAttribute("StrokeRole")
+	if explicit then
+		return explicit
+	end
+
+	local parent=stroke.Parent
+	local themeRole=parent and parent:GetAttribute("ThemeRole") or nil
+	local cornerRole=parent and parent:GetAttribute("CornerRole") or nil
+
+	if cornerRole=="Window" then
+		return "Window"
+	elseif themeRole=="SLIDER_FILL" or themeRole=="RED" or themeRole=="GREEN" or themeRole=="BLUE" then
+		return "Accent"
+	elseif themeRole=="SLIDER_BG" or cornerRole=="Slider" then
+		return "Slider"
+	elseif themeRole=="SECTION" or themeRole=="TOPBAR" or cornerRole=="Section" then
+		return "Section"
+	elseif themeRole=="BUTTON" or themeRole=="INPUT" or cornerRole=="Control" then
+		return "Control"
+	end
+
+	return "Control"
+end
+
+local function strokeRoleRadius(role,shape)
+	if role=="Window" then
+		return tonumber(shape.WindowRadius) or 0
+	elseif role=="Section" then
+		return tonumber(shape.SectionRadius) or 0
+	elseif role=="Slider" then
+		return tonumber(shape.SliderRadius) or 0
+	elseif role=="Control" or role=="Accent" then
+		return tonumber(shape.ControlRadius) or 0
+	end
+
+	return 0
+end
+
+local function strokeTransparencyForRole(role,shape,baseTransparency,styleTransparency)
+	local roleTransparency=0.82
+
+	if role=="Window" then
+		roleTransparency=shape.WindowStrokeTransparency or 0.62
+	elseif role=="Section" then
+		roleTransparency=shape.SectionStrokeTransparency or 0.92
+	elseif role=="Control" then
+		roleTransparency=shape.ControlStrokeTransparency or 0.9
+	elseif role=="Slider" then
+		roleTransparency=shape.SliderStrokeTransparency or 0.9
+	elseif role=="Accent" then
+		roleTransparency=shape.AccentStrokeTransparency or 0.72
+	elseif role=="Hidden" then
+		roleTransparency=1
+	end
+
+	if role=="Slider" then
+		return math.clamp(baseTransparency,0,1)
+	elseif role=="Window" or role=="Accent" then
+		return math.clamp(math.max(baseTransparency,roleTransparency),0,1)
+	end
+
+	return math.clamp(math.max(baseTransparency,styleTransparency,roleTransparency),0,1)
+end
+
 applyUIStrokeTheme=function()
 	local color=getUIStrokeColor()
 	local color2=getUIStrokeGradientColor()
@@ -1491,78 +1535,12 @@ applyUIStrokeTheme=function()
 	if not SG then return end
 
 	local libShape=(getUILibRuntimeStyle(UI_STYLE.UILib) or {}).Shape or {}
-	local function getStrokeRole(stroke)
-		local explicit=stroke:GetAttribute("StrokeRole")
-		if explicit then
-			return explicit
-		end
-
-		local parent=stroke.Parent
-		local themeRole=parent and parent:GetAttribute("ThemeRole") or nil
-		local cornerRole=parent and parent:GetAttribute("CornerRole") or nil
-
-		if cornerRole=="Window" then
-			return "Window"
-		elseif themeRole=="SLIDER_FILL" or themeRole=="RED" or themeRole=="GREEN" or themeRole=="BLUE" then
-			return "Accent"
-		elseif themeRole=="SLIDER_BG" or cornerRole=="Slider" then
-			return "Slider"
-		elseif themeRole=="SECTION" or themeRole=="TOPBAR" or cornerRole=="Section" then
-			return "Section"
-		elseif themeRole=="BUTTON" or themeRole=="INPUT" or cornerRole=="Control" then
-			return "Control"
-		end
-
-		return "Control"
-	end
-
-	local function strokeRoleRadius(role)
-		if role=="Window" then
-			return tonumber(libShape.WindowRadius) or 0
-		elseif role=="Section" then
-			return tonumber(libShape.SectionRadius) or 0
-		elseif role=="Slider" then
-			return tonumber(libShape.SliderRadius) or 0
-		elseif role=="Control" or role=="Accent" then
-			return tonumber(libShape.ControlRadius) or 0
-		end
-
-		return 0
-	end
-
-	local function getRoleStrokeTransparency(role,baseTransparency,styleTransparency)
-		local roleTransparency=0.82
-
-		if role=="Window" then
-			roleTransparency=libShape.WindowStrokeTransparency or 0.62
-		elseif role=="Section" then
-			roleTransparency=libShape.SectionStrokeTransparency or 0.92
-		elseif role=="Control" then
-			roleTransparency=libShape.ControlStrokeTransparency or 0.9
-		elseif role=="Slider" then
-			roleTransparency=libShape.SliderStrokeTransparency or 0.9
-		elseif role=="Accent" then
-			roleTransparency=libShape.AccentStrokeTransparency or 0.72
-		elseif role=="Hidden" then
-			roleTransparency=1
-		end
-
-		if role=="Slider" then
-			return math.clamp(baseTransparency,0,1)
-		end
-
-		if role=="Window" or role=="Accent" then
-			return math.clamp(math.max(baseTransparency,roleTransparency),0,1)
-		end
-
-		return math.clamp(math.max(baseTransparency,styleTransparency,roleTransparency),0,1)
-	end
 
 	for obj in pairs(THEMED_STROKES) do
 		if not obj.Parent then
 			THEMED_STROKES[obj]=nil
 		elseif obj:IsDescendantOf(SG) then
-			local role=getStrokeRole(obj)
+			local role=resolveStrokeRole(obj)
 			if role~="Fixed" then
 				local accentRole=role=="Window" or role=="Accent"
 				local softColor=THEME.STROKE_SOFT or (THEME.CARD and THEME.CARD:Lerp(THEME.TEXT or color,0.12)) or color
@@ -1575,13 +1553,13 @@ applyUIStrokeTheme=function()
 
 				local baseTransparency=tonumber(obj:GetAttribute("BaseStrokeTransparency")) or obj.Transparency
 				local styleTransparency=tonumber(UI_STYLE.StrokeTransparency) or 0.84
-				obj.Transparency=getRoleStrokeTransparency(role,baseTransparency,styleTransparency)
+				obj.Transparency=strokeTransparencyForRole(role,libShape,baseTransparency,styleTransparency)
 				pcall(function()
 					obj.Enabled=obj.Transparency<strokeHideTransparency and obj.Thickness>0
 				end)
 
 				pcall(function()
-					obj.LineJoinMode=strokeRoleRadius(role)>0 and Enum.LineJoinMode.Round or Enum.LineJoinMode.Miter
+					obj.LineJoinMode=strokeRoleRadius(role,libShape)>0 and Enum.LineJoinMode.Round or Enum.LineJoinMode.Miter
 				end)
 
 				local gradient=obj:FindFirstChild("StrokeGradient")
@@ -1623,19 +1601,8 @@ applyUIStrokeTheme=function()
 		if not obj.Parent then
 			THEMED_CORNERS[obj]=nil
 		elseif obj:IsDescendantOf(SG) then
-			local shape=(getUILibRuntimeStyle(UI_STYLE.UILib) or {}).Shape or {}
 			local role=obj.Parent and obj.Parent:GetAttribute("CornerRole") or "Control"
-			local radius=shape.ControlRadius or 0
-
-			if role=="Window" then
-				radius=shape.WindowRadius or radius
-			elseif role=="Section" then
-				radius=shape.SectionRadius or radius
-			elseif role=="Slider" then
-				radius=shape.SliderRadius or radius
-			end
-
-			obj.CornerRadius=UDim.new(0,radius)
+			obj.CornerRadius=UDim.new(0,strokeRoleRadius(role,libShape))
 		end
 	end
 
