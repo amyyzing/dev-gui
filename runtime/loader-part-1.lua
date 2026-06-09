@@ -552,6 +552,37 @@ MODULE_PATHS={
 	DiscordLogic="page-6/discord/logic.lua",
 	DataSave="data-save/data-save.lua",
 }
+MODULE_GLOBAL_NAMES={GuiFusion="FusionModule"}
+STARTUP_MODULE_NAMES={"GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GravityLogic","Page1Gravity","Page1SpeedLogic","Page1Speed","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","DataSave"}
+OPTIONAL_MODULE_NAMES={"PrimaryColour","SecondaryColour"}
+PAGE1_RELOAD_NAMES={"Page1Hitbox","Page1HitboxLogic","Page1Gravity","Page1GravityLogic","Page1Speed","Page1SpeedLogic","Page1GameParams","Page1GameParamsLogic","Page1Boost","Page1BoostLogic","Page1ESP","Page1ESPLogic","Page1ESPDefense","Page1ESPDefenseLogic","Page1ESPOffense","Page1ESPOffenseLogic","Page1QBAim","Page1QBAimLogic","Page1Testing","Page1TestingLogic"}
+PAGE2_RELOAD_NAMES={"HitboxPreset","HitboxPresetLogic","KeybindSettings","KeybindSettingsLogic","PresetEditor","PresetEditorLogic"}
+CUSTOMIZE_RELOAD_NAMES={"StrokeColour","StrokeColourLogic","PrimaryColour","PrimaryColourLogic","SecondaryColour","SecondaryColourLogic"}
+MAP_RELOAD_NAMES={"MapEditor","MapEditorLogic","AntiMaterial","AntiMaterialLogic","MapCleaner","MapCleanerLogic","RemoveAds","RemoveAdsLogic"}
+SETTINGS_RELOAD_NAMES={"PlayerData","PlayerDataLogic","Discord","DiscordLogic"}
+
+function moduleGlobalName(name)
+	return MODULE_GLOBAL_NAMES[name] or (tostring(name).."Module")
+end
+
+function setLoadedModule(name,module)
+	getfenv()[moduleGlobalName(name)]=module
+	return module
+end
+
+function modulePathsFromNames(names)
+	local paths={}
+
+	for _,name in ipairs(names or {}) do
+		local path=MODULE_PATHS[name]
+		if path then
+			table.insert(paths,path)
+		end
+	end
+
+	return paths
+end
+
 AUTO_REFRESH_WATCH_PATHS={AUTO_REFRESH_RELOAD_PATH}
 for _,path in pairs(MODULE_PATHS) do
 	table.insert(AUTO_REFRESH_WATCH_PATHS,path)
@@ -571,34 +602,7 @@ MODULE_PATH_SET[AUTO_REFRESH_RELOAD_PATH]=true
 for path in pairs(APP_RUNTIME_PATH_SET) do
 	MODULE_PATH_SET[path]=true
 end
-STARTUP_MODULE_PATHS={
-	MODULE_PATHS.GuiFusion,
-	MODULE_PATHS.GuiLogic,
-	MODULE_PATHS.MainFrame,
-	MODULE_PATHS.Description,
-	MODULE_PATHS.Announcement,
-	MODULE_PATHS.Page1HitboxLogic,
-	MODULE_PATHS.Page1Hitbox,
-	MODULE_PATHS.Page1GravityLogic,
-	MODULE_PATHS.Page1Gravity,
-	MODULE_PATHS.Page1SpeedLogic,
-	MODULE_PATHS.Page1Speed,
-	MODULE_PATHS.Page1GameParamsLogic,
-	MODULE_PATHS.Page1GameParams,
-	MODULE_PATHS.Page1BoostLogic,
-	MODULE_PATHS.Page1Boost,
-	MODULE_PATHS.Page1ESPDefenseLogic,
-	MODULE_PATHS.Page1ESPDefense,
-	MODULE_PATHS.Page1ESPOffenseLogic,
-	MODULE_PATHS.Page1ESPOffense,
-	MODULE_PATHS.Page1ESPLogic,
-	MODULE_PATHS.Page1ESP,
-	MODULE_PATHS.Page1QBAimLogic,
-	MODULE_PATHS.Page1QBAim,
-	MODULE_PATHS.Page1TestingLogic,
-	MODULE_PATHS.Page1Testing,
-	MODULE_PATHS.DataSave,
-}
+STARTUP_MODULE_PATHS=modulePathsFromNames(STARTUP_MODULE_NAMES)
 STARTUP_MODULE_PATH_SET={}
 for _,path in ipairs(STARTUP_MODULE_PATHS) do
 	STARTUP_MODULE_PATH_SET[path]=true
@@ -609,10 +613,10 @@ for _,path in pairs(MODULE_PATHS) do
 		DEFERRED_MODULE_PATH_SET[path]=true
 	end
 end
-OPTIONAL_MODULE_PATH_SET={
-	[MODULE_PATHS.PrimaryColour]=true,
-	[MODULE_PATHS.SecondaryColour]=true,
-}
+OPTIONAL_MODULE_PATH_SET={}
+for _,path in ipairs(modulePathsFromNames(OPTIONAL_MODULE_NAMES)) do
+	OPTIONAL_MODULE_PATH_SET[path]=true
+end
 MAX_REMOTE_MODULE_BYTES=300000
 REMOTE_MODULE_MARKERS={[AUTO_REFRESH_RELOAD_PATH]="HB_LOADER_V2"}
 
@@ -1138,6 +1142,16 @@ function loadRemoteModuleStep(name,path)
 	return module
 end
 
+function loadRemoteModuleStepByName(name)
+	local path=MODULE_PATHS[name]
+	if not path then
+		warn("Missing module path for:",name)
+		return nil
+	end
+
+	return setLoadedModule(name,loadRemoteModuleStep(name,path))
+end
+
 function loadDeferredModule(name,path,current)
 	if current~=nil then
 		return current
@@ -1155,33 +1169,15 @@ if not batchLoaded then
 	warn("Module batch unavailable; falling back to individual loads:",batchErr)
 end
 
-FusionModule=loadRemoteModuleStep("GuiFusion",MODULE_PATHS.GuiFusion)
-GuiLogicModule=loadRemoteModuleStep("GuiLogic",MODULE_PATHS.GuiLogic)
-MainFrameModule=loadRemoteModuleStep("MainFrame",MODULE_PATHS.MainFrame)
-AutoRefreshModule=AUTO_REFRESH_ENABLED and loadRemoteModuleStep("AutoRefresh",MODULE_PATHS.AutoRefresh) or nil
-DescriptionModule=loadRemoteModuleStep("Description",MODULE_PATHS.Description)
-AnnouncementModule=loadRemoteModuleStep("Announcement",MODULE_PATHS.Announcement)
-Page1HitboxLogicModule=loadRemoteModuleStep("Page1HitboxLogic",MODULE_PATHS.Page1HitboxLogic)
-Page1HitboxModule=loadRemoteModuleStep("Page1Hitbox",MODULE_PATHS.Page1Hitbox)
-Page1GravityLogicModule=loadRemoteModuleStep("Page1GravityLogic",MODULE_PATHS.Page1GravityLogic)
-Page1GravityModule=loadRemoteModuleStep("Page1Gravity",MODULE_PATHS.Page1Gravity)
-Page1SpeedLogicModule=loadRemoteModuleStep("Page1SpeedLogic",MODULE_PATHS.Page1SpeedLogic)
-Page1SpeedModule=loadRemoteModuleStep("Page1Speed",MODULE_PATHS.Page1Speed)
-Page1GameParamsLogicModule=loadRemoteModuleStep("Page1GameParamsLogic",MODULE_PATHS.Page1GameParamsLogic)
-Page1GameParamsModule=loadRemoteModuleStep("Page1GameParams",MODULE_PATHS.Page1GameParams)
-Page1BoostLogicModule=loadRemoteModuleStep("Page1BoostLogic",MODULE_PATHS.Page1BoostLogic)
-Page1BoostModule=loadRemoteModuleStep("Page1Boost",MODULE_PATHS.Page1Boost)
-Page1ESPLogicModule=loadRemoteModuleStep("Page1ESPLogic",MODULE_PATHS.Page1ESPLogic)
-Page1ESPModule=loadRemoteModuleStep("Page1ESP",MODULE_PATHS.Page1ESP)
-Page1ESPDefenseLogicModule=loadRemoteModuleStep("Page1ESPDefenseLogic",MODULE_PATHS.Page1ESPDefenseLogic)
-Page1ESPDefenseModule=loadRemoteModuleStep("Page1ESPDefense",MODULE_PATHS.Page1ESPDefense)
-Page1ESPOffenseLogicModule=loadRemoteModuleStep("Page1ESPOffenseLogic",MODULE_PATHS.Page1ESPOffenseLogic)
-Page1ESPOffenseModule=loadRemoteModuleStep("Page1ESPOffense",MODULE_PATHS.Page1ESPOffense)
-Page1QBAimLogicModule=loadRemoteModuleStep("Page1QBAimLogic",MODULE_PATHS.Page1QBAimLogic)
-Page1QBAimModule=loadRemoteModuleStep("Page1QBAim",MODULE_PATHS.Page1QBAim)
-Page1TestingLogicModule=loadRemoteModuleStep("Page1TestingLogic",MODULE_PATHS.Page1TestingLogic)
-Page1TestingModule=loadRemoteModuleStep("Page1Testing",MODULE_PATHS.Page1Testing)
-DataSaveModule=loadRemoteModuleStep("DataSave",MODULE_PATHS.DataSave)
+for _,name in ipairs(STARTUP_MODULE_NAMES) do
+	loadRemoteModuleStepByName(name)
+end
+
+if AUTO_REFRESH_ENABLED then
+	loadRemoteModuleStepByName("AutoRefresh")
+else
+	AutoRefreshModule=nil
+end
 
 function runLoaderCheck()
 	local missing={}
@@ -1204,60 +1200,28 @@ end
 
 runLoaderCheck()
 
-PAGE1_RELOAD_PATHS={
-	[MODULE_PATHS.Page1Hitbox]=function(module) Page1HitboxModule=module end,
-	[MODULE_PATHS.Page1HitboxLogic]=function(module) Page1HitboxLogicModule=module end,
-	[MODULE_PATHS.Page1Gravity]=function(module) Page1GravityModule=module end,
-	[MODULE_PATHS.Page1GravityLogic]=function(module) Page1GravityLogicModule=module end,
-	[MODULE_PATHS.Page1Speed]=function(module) Page1SpeedModule=module end,
-	[MODULE_PATHS.Page1SpeedLogic]=function(module) Page1SpeedLogicModule=module end,
-	[MODULE_PATHS.Page1GameParams]=function(module) Page1GameParamsModule=module end,
-	[MODULE_PATHS.Page1GameParamsLogic]=function(module) Page1GameParamsLogicModule=module end,
-	[MODULE_PATHS.Page1Boost]=function(module) Page1BoostModule=module end,
-	[MODULE_PATHS.Page1BoostLogic]=function(module) Page1BoostLogicModule=module end,
-	[MODULE_PATHS.Page1ESP]=function(module) Page1ESPModule=module end,
-	[MODULE_PATHS.Page1ESPLogic]=function(module) Page1ESPLogicModule=module end,
-	[MODULE_PATHS.Page1ESPDefense]=function(module) Page1ESPDefenseModule=module end,
-	[MODULE_PATHS.Page1ESPDefenseLogic]=function(module) Page1ESPDefenseLogicModule=module end,
-	[MODULE_PATHS.Page1ESPOffense]=function(module) Page1ESPOffenseModule=module end,
-	[MODULE_PATHS.Page1ESPOffenseLogic]=function(module) Page1ESPOffenseLogicModule=module end,
-	[MODULE_PATHS.Page1QBAim]=function(module) Page1QBAimModule=module end,
-	[MODULE_PATHS.Page1QBAimLogic]=function(module) Page1QBAimLogicModule=module end,
-	[MODULE_PATHS.Page1Testing]=function(module) Page1TestingModule=module end,
-	[MODULE_PATHS.Page1TestingLogic]=function(module) Page1TestingLogicModule=module end,
-}
-PAGE2_RELOAD_PATHS={
-	[MODULE_PATHS.HitboxPreset]=function(module) HitboxPresetModule=module end,
-	[MODULE_PATHS.HitboxPresetLogic]=function(module) HitboxPresetLogicModule=module end,
-	[MODULE_PATHS.KeybindSettings]=function(module) KeybindSettingsModule=module end,
-	[MODULE_PATHS.KeybindSettingsLogic]=function(module) KeybindSettingsLogicModule=module end,
-	[MODULE_PATHS.PresetEditor]=function(module) PresetEditorModule=module end,
-	[MODULE_PATHS.PresetEditorLogic]=function(module) PresetEditorLogicModule=module end,
-}
-CUSTOMIZE_RELOAD_PATHS={
-	[MODULE_PATHS.StrokeColour]=function(module) StrokeColourModule=module end,
-	[MODULE_PATHS.StrokeColourLogic]=function(module) StrokeColourLogicModule=module end,
-	[MODULE_PATHS.PrimaryColour]=function(module) PrimaryColourModule=module end,
-	[MODULE_PATHS.PrimaryColourLogic]=function(module) PrimaryColourLogicModule=module end,
-	[MODULE_PATHS.SecondaryColour]=function(module) SecondaryColourModule=module end,
-	[MODULE_PATHS.SecondaryColourLogic]=function(module) SecondaryColourLogicModule=module end,
-}
-MAP_RELOAD_PATHS={
-	[MODULE_PATHS.MapEditor]=function(module) MapEditorModule=module end,
-	[MODULE_PATHS.MapEditorLogic]=function(module) MapEditorLogicModule=module end,
-	[MODULE_PATHS.AntiMaterial]=function(module) AntiMaterialModule=module end,
-	[MODULE_PATHS.AntiMaterialLogic]=function(module) AntiMaterialLogicModule=module end,
-	[MODULE_PATHS.MapCleaner]=function(module) MapCleanerModule=module end,
-	[MODULE_PATHS.MapCleanerLogic]=function(module) MapCleanerLogicModule=module end,
-	[MODULE_PATHS.RemoveAds]=function(module) RemoveAdsModule=module end,
-	[MODULE_PATHS.RemoveAdsLogic]=function(module) RemoveAdsLogicModule=module end,
-}
-SETTINGS_RELOAD_PATHS={
-	[MODULE_PATHS.PlayerData]=function(module) PlayerDataModule=module end,
-	[MODULE_PATHS.PlayerDataLogic]=function(module) PlayerDataLogicModule=module end,
-	[MODULE_PATHS.Discord]=function(module) DiscordModule=module end,
-	[MODULE_PATHS.DiscordLogic]=function(module) DiscordLogicModule=module end,
-}
+function makeReloadPathMap(names)
+	local map={}
+
+	for _,name in ipairs(names or {}) do
+		local moduleName=name
+		local path=MODULE_PATHS[moduleName]
+
+		if path then
+			map[path]=function(module)
+				setLoadedModule(moduleName,module)
+			end
+		end
+	end
+
+	return map
+end
+
+PAGE1_RELOAD_PATHS=makeReloadPathMap(PAGE1_RELOAD_NAMES)
+PAGE2_RELOAD_PATHS=makeReloadPathMap(PAGE2_RELOAD_NAMES)
+CUSTOMIZE_RELOAD_PATHS=makeReloadPathMap(CUSTOMIZE_RELOAD_NAMES)
+MAP_RELOAD_PATHS=makeReloadPathMap(MAP_RELOAD_NAMES)
+SETTINGS_RELOAD_PATHS=makeReloadPathMap(SETTINGS_RELOAD_NAMES)
 
 function getUIStrokeColor()
 	return Color3.fromRGB(math.clamp(math.floor(UI_STYLE.StrokeR+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.StrokeG+0.5), 0, 255), math.clamp(math.floor(UI_STYLE.StrokeB+0.5), 0, 255))
