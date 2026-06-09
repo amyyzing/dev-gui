@@ -1272,6 +1272,13 @@ function GuiLogic.new(ctx)
 		valueStroke:SetAttribute("BaseStrokeTransparency",valueStrokeTransparency)
 		local value=startVal
 		local dragging=false
+		local connections={}
+
+		local function connect(signal,fn)
+			local conn=signal:Connect(fn)
+			table.insert(connections,conn)
+			return conn
+		end
 
 		local function roundTo(v,d)
 			local m=10^d
@@ -1315,29 +1322,39 @@ function GuiLogic.new(ctx)
 			end
 		end
 
-		hit.InputBegan:Connect(beginDrag)
-		track.InputBegan:Connect(beginDrag)
-		fill.InputBegan:Connect(beginDrag)
-		valueLabel.InputBegan:Connect(beginDrag)
+		connect(hit.InputBegan,beginDrag)
+		connect(track.InputBegan,beginDrag)
+		connect(fill.InputBegan,beginDrag)
+		connect(valueLabel.InputBegan,beginDrag)
 
-		UIS.InputChanged:Connect(function(i)
+		connect(UIS.InputChanged,function(i)
 			if dragging and i.UserInputType==Enum.UserInputType.MouseMovement then
 				setValue(valueFromMouseX(UIS:GetMouseLocation().X),true)
 			end
 		end)
 
-		UIS.InputEnded:Connect(function(i)
+		connect(UIS.InputEnded,function(i)
 			if i.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=false
 			end
 		end)
 
-		valueBox.FocusLost:Connect(function()
+		connect(valueBox.FocusLost,function()
 			setValue(valueBox.Text,true)
 		end)
 
+		local function destroySlider()
+			dragging=false
+			for _,conn in ipairs(connections) do
+				pcall(function()
+					conn:Disconnect()
+				end)
+			end
+			table.clear(connections)
+		end
+
 		setValue(startVal,false)
-		return{set=function(v) setValue(v,false) end,get=function() return value end,box=valueBox,valueLabel=valueLabel,fill=fill,knob=knob,track=track}
+		return{set=function(v) setValue(v,false) end,get=function() return value end,Destroy=destroySlider,destroy=destroySlider,box=valueBox,valueLabel=valueLabel,fill=fill,knob=knob,track=track}
 	end
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)
