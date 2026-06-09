@@ -202,54 +202,6 @@ function MainFrame.new(ctx)
 	end
 
 	local api={}
-	local cleanupTasks={}
-	local cleaned=false
-
-	local function trackCleanup(taskItem)
-		if taskItem then
-			table.insert(cleanupTasks,taskItem)
-		end
-
-		return taskItem
-	end
-
-	local function connect(signal,fn)
-		return trackCleanup(signal:Connect(fn))
-	end
-
-	local function activate(button,fn)
-		if button and button:IsA("GuiButton") then
-			button.Selectable=true
-		end
-
-		return connect(button.Activated,fn)
-	end
-
-	local function cleanupAll()
-		if cleaned then return end
-		cleaned=true
-
-		for index=#cleanupTasks,1,-1 do
-			local taskItem=cleanupTasks[index]
-			cleanupTasks[index]=nil
-
-			if typeof(taskItem)=="RBXScriptConnection" then
-				pcall(function()
-					taskItem:Disconnect()
-				end)
-			elseif typeof(taskItem)=="Instance" then
-				pcall(function()
-					taskItem:Destroy()
-				end)
-			elseif type(taskItem)=="function" then
-				pcall(taskItem)
-			elseif type(taskItem)=="table" and type(taskItem.Destroy)=="function" then
-				pcall(function()
-					taskItem:Destroy()
-				end)
-			end
-		end
-	end
 
 	local root=New("Frame",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,rootStartY),Size=UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),AutomaticSize=Enum.AutomaticSize.None,ClipsDescendants=true,BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=2,Visible=true,CornerRole="Window"},SG)
 	local uiMinimized=false
@@ -278,9 +230,6 @@ function MainFrame.new(ctx)
 
 		return Enum.ContextActionResult.Pass
 	end,false,Enum.ContextActionPriority.High.Value+1000,Enum.UserInputType.MouseButton1,Enum.UserInputType.MouseButton2,Enum.UserInputType.MouseButton3)
-	trackCleanup(function()
-		ContextActionService:UnbindAction("HitboxUI_MouseInputSink")
-	end)
 
 	local function tweenRootPosition(position,duration)
 		if rootPositionTween then
@@ -324,8 +273,8 @@ function MainFrame.new(ctx)
 
 	task.defer(function()
 		local cam=workspace.CurrentCamera
-		if cam and not cleaned then
-			connect(cam:GetPropertyChangedSignal("ViewportSize"),updateScale)
+		if cam then
+			cam:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
 		end
 	end)
 
@@ -343,16 +292,16 @@ function MainFrame.new(ctx)
 	local modeSubtitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerSubtitleY),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
 
 	local function makeTopButton(text,xOffset)
-		local b=New("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text=text,Font=controlFont,TextSize=17,TextColor3=THEME.TEXT,AutoButtonColor=false,Selectable=true,ZIndex=6,ThemeRole="BUTTON"},header)
+		local b=New("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text=text,Font=controlFont,TextSize=17,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6,ThemeRole="BUTTON"},header)
 		local wrap=wrapTextButton(b,THEME.BUTTON or THEME.BG,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 		wrap:SetAttribute("CornerRole","Control")
 
-		connect(b.MouseEnter,function()
+		b.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=THEME.CARD
 		end)
 
-		connect(b.MouseLeave,function()
+		b.MouseLeave:Connect(function()
 			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
 		end)
 
@@ -576,12 +525,12 @@ function MainFrame.new(ctx)
 		end
 	end
 
-	activate(settingsTab,function() setActivePage("main") end)
-	activate(mapsPageTab,function() setActivePage("maps") end)
-	activate(serverPageTab,function() setActivePage("server") end)
-	activate(uiSettingsTab,function() setActivePage("customize") end)
-	activate(futureTab,function() setActivePage("page2") end)
-	activate(settingsPageTab,function() setActivePage("settings") end)
+	settingsTab.MouseButton1Click:Connect(function() setActivePage("main") end)
+	mapsPageTab.MouseButton1Click:Connect(function() setActivePage("maps") end)
+	serverPageTab.MouseButton1Click:Connect(function() setActivePage("server") end)
+	uiSettingsTab.MouseButton1Click:Connect(function() setActivePage("customize") end)
+	futureTab.MouseButton1Click:Connect(function() setActivePage("page2") end)
+	settingsPageTab.MouseButton1Click:Connect(function() setActivePage("settings") end)
 
 	local contentWrap=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,ZIndex=3,LayoutOrder=1},settingsPage)
 	local contentLayout=New("UIListLayout",{Padding=UDim.new(0,columnGap),SortOrder=Enum.SortOrder.LayoutOrder,FillDirection=Enum.FillDirection.Horizontal},contentWrap)
@@ -643,16 +592,16 @@ function MainFrame.new(ctx)
 	function api.RefreshActionStatus() end
 
 	local function makeFooterBtn(text,width)
-		local b=New("TextButton",{Size=UDim2.fromOffset(width or 96,30),BackgroundColor3=THEME.BUTTON or THEME.BG,Text=string.upper(text),TextColor3=THEME.TEXT,Font=controlFont,TextSize=12,AutoButtonColor=false,Selectable=true,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON"},footer)
+		local b=New("TextButton",{Size=UDim2.fromOffset(width or 96,30),BackgroundColor3=THEME.BUTTON or THEME.BG,Text=string.upper(text),TextColor3=THEME.TEXT,Font=controlFont,TextSize=12,AutoButtonColor=false,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON"},footer)
 		local wrap=wrapTextButton(b,THEME.BUTTON or THEME.BG,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 		wrap:SetAttribute("CornerRole","Control")
 
-		connect(b.MouseEnter,function()
+		b.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=THEME.CARD
 		end)
 
-		connect(b.MouseLeave,function()
+		b.MouseLeave:Connect(function()
 			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
 		end)
 
@@ -670,14 +619,14 @@ function MainFrame.new(ctx)
 
 	refreshFooterResetButton()
 
-	local fab=New("TextButton",{Name="FAB",Visible=false,AutoButtonColor=false,Selectable=true,Size=UDim2.fromOffset(fabSize,fabSize),AnchorPoint=Vector2.new(1,1),Position=UDim2.new(1,-16,1,-16),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text="[]",TextColor3=THEME.TEXT,Font=controlFont,TextSize=16,ZIndex=20,ThemeRole="BUTTON",CornerRole="Control"},SG)
+	local fab=New("TextButton",{Name="FAB",Visible=false,AutoButtonColor=false,Size=UDim2.fromOffset(fabSize,fabSize),AnchorPoint=Vector2.new(1,1),Position=UDim2.new(1,-16,1,-16),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text="[]",TextColor3=THEME.TEXT,Font=controlFont,TextSize=16,ZIndex=20,ThemeRole="BUTTON",CornerRole="Control"},SG)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},fab)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},fab)
-	connect(fab.MouseEnter,function()
+	fab.MouseEnter:Connect(function()
 		fab.BackgroundColor3=THEME.CARD
 	end)
 
-	connect(fab.MouseLeave,function()
+	fab.MouseLeave:Connect(function()
 		fab.BackgroundColor3=THEME.BUTTON or THEME.BG
 	end)
 
@@ -834,12 +783,12 @@ function MainFrame.new(ctx)
 		}):Play()
 	end
 
-	connect(resizeHandle.MouseEnter,function()
+	resizeHandle.MouseEnter:Connect(function()
 		resizeHovering=true
 		paintResizeHandle(resizing)
 	end)
 
-	connect(resizeHandle.MouseLeave,function()
+	resizeHandle.MouseLeave:Connect(function()
 		resizeHovering=false
 		paintResizeHandle(resizing)
 	end)
@@ -857,7 +806,7 @@ function MainFrame.new(ctx)
 			resizeMoveConn=nil
 		end
 
-		connect(resizeHandle.InputBegan,function(input)
+		resizeHandle.InputBegan:Connect(function(input)
 			if input.UserInputType~=Enum.UserInputType.MouseButton1 then return end
 
 			resizing=true
@@ -867,7 +816,7 @@ function MainFrame.new(ctx)
 			startPos=root.Position
 			safeDisconnect(resizeMoveConn)
 
-			resizeMoveConn=connect(UIS.InputChanged,function(changed)
+			resizeMoveConn=UIS.InputChanged:Connect(function(changed)
 				if not resizing or not isAlive() then return end
 				if changed.UserInputType~=Enum.UserInputType.MouseMovement then return end
 
@@ -890,7 +839,7 @@ function MainFrame.new(ctx)
 			end)
 		end)
 
-		connect(UIS.InputEnded,function(input)
+		UIS.InputEnded:Connect(function(input)
 			if input.UserInputType==Enum.UserInputType.MouseButton1 then
 				stopResize()
 			end
@@ -934,7 +883,7 @@ function MainFrame.new(ctx)
 		tweenRootSize(UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),0.22)
 	end
 
-	activate(miniBtn,function()
+	miniBtn.MouseButton1Click:Connect(function()
 		if uiMinimized then
 			restore()
 		else
@@ -942,7 +891,7 @@ function MainFrame.new(ctx)
 		end
 	end)
 
-	activate(fab,restore)
+	fab.MouseButton1Click:Connect(restore)
 
 	local dragConn=nil
 
@@ -981,7 +930,7 @@ function MainFrame.new(ctx)
 			end
 		end
 
-		connect(header.InputBegan,function(i)
+		header.InputBegan:Connect(function(i)
 			if i.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=true
 				startMouse=UIS:GetMouseLocation()
@@ -995,11 +944,11 @@ function MainFrame.new(ctx)
 				end
 
 				safeDisconnect(dragConn)
-				dragConn=connect(RunService.RenderStepped,updateDrag)
+				dragConn=RunService.RenderStepped:Connect(updateDrag)
 			end
 		end)
 
-		connect(UIS.InputEnded,function(i)
+		UIS.InputEnded:Connect(function(i)
 			if i.UserInputType==Enum.UserInputType.MouseButton1 and dragging then
 				stopDrag()
 			end
@@ -1086,7 +1035,9 @@ function MainFrame.new(ctx)
 	function api.Destroy()
 		safeDisconnect(dragConn)
 		dragConn=nil
-		cleanupAll()
+		pcall(function()
+			ContextActionService:UnbindAction("HitboxUI_MouseInputSink")
+		end)
 	end
 
 	api.root=root

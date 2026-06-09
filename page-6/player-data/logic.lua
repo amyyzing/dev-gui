@@ -52,7 +52,6 @@ function PlayerData.new(ctx,page,deps)
 			TextSize=12,
 			TextColor3=textColor,
 			AutoButtonColor=false,
-			Selectable=true,
 			ZIndex=102,
 		},parent)
 
@@ -128,11 +127,11 @@ function PlayerData.new(ctx,page,deps)
 		local no=modalButton(box,"CANCEL",160,false)
 		local yes=modalButton(box,yesText or"YES",274,danger)
 
-		no.Activated:Connect(function()
+		no.MouseButton1Click:Connect(function()
 			modal:Destroy()
 		end)
 
-		yes.Activated:Connect(function()
+		yes.MouseButton1Click:Connect(function()
 			modal:Destroy()
 			if onYes then onYes() end
 		end)

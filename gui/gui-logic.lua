@@ -134,13 +134,6 @@ function GuiLogic.new(ctx)
 		local state=startState and true or false
 		local hovering=false
 		local activeTweens={}
-		local connections={}
-
-		local function connect(signal,fn)
-			local conn=signal:Connect(fn)
-			table.insert(connections,conn)
-			return conn
-		end
 
 		local wrap=New("Frame",{
 			Size=UDim2.fromOffset(width,height),
@@ -269,7 +262,6 @@ function GuiLogic.new(ctx)
 			Size=UDim2.new(1,0,1,0),
 			BorderSizePixel=0,
 			AutoButtonColor=false,
-			Selectable=true,
 			ZIndex=zIndex+8,
 		},wrap)
 
@@ -360,42 +352,22 @@ function GuiLogic.new(ctx)
 			end
 		end
 
-		connect(hit.Activated,function()
+		hit.MouseButton1Click:Connect(function()
 			setState(not state,true,true)
 		end)
 
-		connect(hit.MouseEnter,function()
+		hit.MouseEnter:Connect(function()
 			hovering=true
 			applyVisuals(true)
 		end)
 
-		connect(hit.MouseLeave,function()
+		hit.MouseLeave:Connect(function()
 			hovering=false
 			applyVisuals(true)
 		end)
 
 		setState(state,false,false)
-		return{
-			set=function(v) setState(v,false,false) end,
-			get=function() return state end,
-			destroy=function()
-				cancelTweens()
-				for _,conn in ipairs(connections) do
-					pcall(function()
-						conn:Disconnect()
-					end)
-				end
-				table.clear(connections)
-				if wrap then
-					wrap:Destroy()
-				end
-			end,
-			wrap=wrap,
-			knob=core,
-			hit=hit,
-			width=width,
-			height=height,
-		}
+		return{set=function(v) setState(v,false,false) end,get=function() return state end,wrap=wrap,knob=core,hit=hit,width=width,height=height}
 	end
 
 	local function createHeaderSwitch(parent,startState,onChange,zIndex)
@@ -652,7 +624,6 @@ function GuiLogic.new(ctx)
 			BorderSizePixel=0,
 			Text="",
 			AutoButtonColor=false,
-			Selectable=true,
 			Size=UDim2.new(1,0,1,0),
 			ZIndex=z+10,
 		},switch)
@@ -786,7 +757,7 @@ function GuiLogic.new(ctx)
 			end
 		end
 
-		clickConn=hit.Activated:Connect(function()
+		clickConn=hit.MouseButton1Click:Connect(function()
 			setState(not state,true,true)
 		end)
 
@@ -1022,7 +993,7 @@ function GuiLogic.new(ctx)
 			local hoverBg=headerButtonOptions.hoverBackgroundColor or headerButtonOptions.HoverBackgroundColor3 or (headerButtonOptions.danger and Color3.fromRGB(255,124,118)) or THEME.CARD
 			local textColor=headerButtonOptions.textColor or headerButtonOptions.TextColor3 or (headerButtonOptions.danger and Color3.fromRGB(0,0,0)) or THEME.TEXT
 			local headerButtonHeight=componentNumber("HeaderButtonHeight",22)
-			local button=New("TextButton",{Size=UDim2.fromOffset(headerButtonWidth,headerButtonHeight),Position=UDim2.new(1,-headerRightOffset-headerButtonWidth,0.5,-headerButtonHeight/2),BackgroundColor3=normalBg,BorderSizePixel=0,Text=headerButtonOptions.text or headerButtonOptions.Text or "ACTION",Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=11,TextColor3=textColor,AutoButtonColor=false,Selectable=true,ZIndex=6},header)
+			local button=New("TextButton",{Size=UDim2.fromOffset(headerButtonWidth,headerButtonHeight),Position=UDim2.new(1,-headerRightOffset-headerButtonWidth,0.5,-headerButtonHeight/2),BackgroundColor3=normalBg,BorderSizePixel=0,Text=headerButtonOptions.text or headerButtonOptions.Text or "ACTION",Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=11,TextColor3=textColor,AutoButtonColor=false,ZIndex=6},header)
 			local buttonWrap=api.wrapTextButton(button,normalBg,2)
 			buttonWrap.BackgroundColor3=normalBg
 			if headerButtonOptions.themeRole or headerButtonOptions.ThemeRole then
@@ -1041,7 +1012,7 @@ function GuiLogic.new(ctx)
 				buttonWrap.BackgroundColor3=customBg or (headerButtonOptions.danger and THEME.RED) or themeColor("BUTTON",THEME.BG)
 			end)
 
-			button.Activated:Connect(function()
+			button.MouseButton1Click:Connect(function()
 				local fn=headerButtonOptions.onClick or headerButtonOptions.OnClick
 				if fn then
 					fn()
@@ -1195,8 +1166,7 @@ function GuiLogic.new(ctx)
 			end
 		end
 
-		titleButton.Selectable=true
-		titleButton.Activated:Connect(function()
+		titleButton.MouseButton1Click:Connect(function()
 			collapsed=not collapsed
 			paint(true)
 		end)
@@ -1291,10 +1261,10 @@ function GuiLogic.new(ctx)
 			addCorner(knob,"Slider")
 		end
 
-		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=10,AutoButtonColor=false,Selectable=true},track)
+		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=10,AutoButtonColor=false,Selectable=false},track)
 		local valueLabel=New("TextLabel",{BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=9,Selectable=false},track)
 		local valueBoxHeight=componentNumber("SliderValueBoxHeight",math.max(componentNumber("TextBoxHeight",24),sliderHeight))
-		local valueBox=New("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor(valueRole,THEME.PANEL),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole=valueRole,CornerRole="Control",Selectable=true},container)
+		local valueBox=New("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor(valueRole,THEME.PANEL),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole=valueRole,CornerRole="Control",Selectable=false},container)
 		valueBox.Visible=valueBoxVisible
 		addCorner(valueBox,"Control")
 		local valueStrokeTransparency=componentNumber("SliderValueBoxStrokeTransparency",componentNumber("ControlStrokeTransparency",0.65))
@@ -1302,14 +1272,6 @@ function GuiLogic.new(ctx)
 		valueStroke:SetAttribute("BaseStrokeTransparency",valueStrokeTransparency)
 		local value=startVal
 		local dragging=false
-		local dragInputType=nil
-		local connections={}
-
-		local function connect(signal,fn)
-			local conn=signal:Connect(fn)
-			table.insert(connections,conn)
-			return conn
-		end
 
 		local function roundTo(v,d)
 			local m=10^d
@@ -1335,14 +1297,6 @@ function GuiLogic.new(ctx)
 			return roundTo(minVal+(maxVal-minVal)*pct,decimals)
 		end
 
-		local function valueFromInput(input)
-			if input and input.Position then
-				return valueFromMouseX(input.Position.X)
-			end
-
-			return valueFromMouseX(UIS:GetMouseLocation().X)
-		end
-
 		local function setValue(v,fire)
 			v=roundTo(math.clamp(tonumber(v) or value,minVal,maxVal),decimals)
 			value=v
@@ -1353,99 +1307,37 @@ function GuiLogic.new(ctx)
 			end
 		end
 
-		local function keyboardStep()
-			local step=10^(-(tonumber(decimals) or 0))
-			if UIS:IsKeyDown(Enum.KeyCode.LeftShift) or UIS:IsKeyDown(Enum.KeyCode.RightShift) then
-				step*=10
-			elseif UIS:IsKeyDown(Enum.KeyCode.LeftControl) or UIS:IsKeyDown(Enum.KeyCode.RightControl) then
-				step/=10
-			end
-
-			return math.max(step,10^-4)
-		end
-
-		local function handleStep(input)
-			if input.KeyCode==Enum.KeyCode.Left or input.KeyCode==Enum.KeyCode.Down or input.KeyCode==Enum.KeyCode.DPadLeft or input.KeyCode==Enum.KeyCode.DPadDown then
-				setValue(value-keyboardStep(),true)
-				return true
-			elseif input.KeyCode==Enum.KeyCode.Right or input.KeyCode==Enum.KeyCode.Up or input.KeyCode==Enum.KeyCode.DPadRight or input.KeyCode==Enum.KeyCode.DPadUp then
-				setValue(value+keyboardStep(),true)
-				return true
-			end
-
-			return false
-		end
-
 		local function beginDrag(i)
-			if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+			if i.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=true
-				dragInputType=i.UserInputType
 				valueBox:ReleaseFocus()
-				setValue(valueFromInput(i),true)
+				setValue(valueFromMouseX(UIS:GetMouseLocation().X),true)
 			end
 		end
 
-		local function handleInputBegan(input)
-			if handleStep(input) then
-				return
-			end
+		hit.InputBegan:Connect(beginDrag)
+		track.InputBegan:Connect(beginDrag)
+		fill.InputBegan:Connect(beginDrag)
+		valueLabel.InputBegan:Connect(beginDrag)
 
-			beginDrag(input)
-		end
-
-		connect(hit.InputBegan,handleInputBegan)
-		connect(track.InputBegan,handleInputBegan)
-		connect(fill.InputBegan,handleInputBegan)
-		connect(valueLabel.InputBegan,handleInputBegan)
-
-		connect(UIS.InputChanged,function(i)
-			if not dragging then
-				return
-			end
-
-			if dragInputType==Enum.UserInputType.Touch then
-				if i.UserInputType==Enum.UserInputType.Touch then
-					setValue(valueFromInput(i),true)
-				end
-			elseif i.UserInputType==Enum.UserInputType.MouseMovement then
-				setValue(valueFromInput(i),true)
+		UIS.InputChanged:Connect(function(i)
+			if dragging and i.UserInputType==Enum.UserInputType.MouseMovement then
+				setValue(valueFromMouseX(UIS:GetMouseLocation().X),true)
 			end
 		end)
 
-		connect(UIS.InputEnded,function(i)
-			if i.UserInputType==dragInputType or i.UserInputType==Enum.UserInputType.MouseButton1 then
+		UIS.InputEnded:Connect(function(i)
+			if i.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=false
-				dragInputType=nil
 			end
 		end)
 
-		connect(valueBox.FocusLost,function()
+		valueBox.FocusLost:Connect(function()
 			setValue(valueBox.Text,true)
 		end)
 
-		local function destroySlider()
-			dragging=false
-			dragInputType=nil
-			for _,conn in ipairs(connections) do
-				pcall(function()
-					conn:Disconnect()
-				end)
-			end
-			table.clear(connections)
-		end
-
 		setValue(startVal,false)
-		return{
-			set=function(v) setValue(v,false) end,
-			get=function() return value end,
-			Destroy=destroySlider,
-			destroy=destroySlider,
-			box=valueBox,
-			valueLabel=valueLabel,
-			fill=fill,
-			knob=knob,
-			track=track,
-		}
+		return{set=function(v) setValue(v,false) end,get=function() return value end,box=valueBox,valueLabel=valueLabel,fill=fill,knob=knob,track=track}
 	end
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)

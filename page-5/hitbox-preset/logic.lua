@@ -158,7 +158,7 @@ function HitboxPreset.new(ctx,ownedSection)
 
 			local toggle=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-8,0,30),Position=UDim2.fromOffset(4,1),Text=(expandedOwned[code] and"[-] " or"[+] ")..name.."  |  "..code,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=7},row)
 
-			toggle.Activated:Connect(function()
+			toggle.MouseButton1Click:Connect(function()
 				expandedOwned[code]=not expandedOwned[code]
 				api.Refresh()
 			end)
@@ -181,12 +181,12 @@ function HitboxPreset.new(ctx,ownedSection)
 				local equipBtn=makePresetActionButton(actionRow,"EQUIP")
 				local deleteBtn=makePresetActionButton(actionRow,"DELETE")
 
-				equipBtn.Activated:Connect(function()
+				equipBtn.MouseButton1Click:Connect(function()
 					applyOwnedPreset(preset,editor)
 					requestRefresh()
 				end)
 
-				deleteBtn.Activated:Connect(function()
+				deleteBtn.MouseButton1Click:Connect(function()
 					if deleteOwnedPreset(code,presetIndex) then
 						requestRefresh()
 					end
@@ -280,9 +280,9 @@ function HitboxPreset.new(ctx,ownedSection)
 		local cancel=modalButton(box,"CANCEL",146)
 		local save=modalButton(box,"SAVE",248)
 
-		cancel.Activated:Connect(closePresetModal)
+		cancel.MouseButton1Click:Connect(closePresetModal)
 
-		save.Activated:Connect(function()
+		save.MouseButton1Click:Connect(function()
 			local ok,result=api.AddPreset(nameBox.Text,collectFn)
 			if not ok then
 				warning.Text=tostring(result)
@@ -313,8 +313,8 @@ function HitboxPreset.new(ctx,ownedSection)
 		local no=modalButton(box,"NO",146)
 		local yes=modalButton(box,"YES",248)
 
-		no.Activated:Connect(closePresetModal)
-		yes.Activated:Connect(function()
+		no.MouseButton1Click:Connect(closePresetModal)
+		yes.MouseButton1Click:Connect(function()
 			showNamePrompt(collectFn)
 		end)
 	end
