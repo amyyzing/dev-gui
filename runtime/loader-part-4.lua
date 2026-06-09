@@ -44,6 +44,7 @@ end
 function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	local modal=New("Frame", {BackgroundColor3=Color3.fromRGB(0, 0, 0), BackgroundTransparency=0.25, BorderSizePixel=0, Size=UDim2.new(1, 0, 1, 0), ZIndex=100}, SG)
 	local modalConnections={}
+	local closed=false
 	local function connectModal(signal,fn)
 		local conn=signal:Connect(fn)
 		table.insert(modalConnections,conn)
@@ -53,6 +54,9 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 		return conn
 	end
 	local function closeModal()
+		if closed then return end
+		closed=true
+
 		for _,conn in ipairs(modalConnections) do
 			safeDisconnect(conn)
 			if untrackRuntimeConnection then
@@ -110,6 +114,13 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	connectModal(yes.MouseButton1Click,function()
 		closeModal()
 		if onYes then onYes() end
+	end)
+
+	connectModal(UIS.InputBegan,function(input,processed)
+		if processed then return end
+		if input.KeyCode==Enum.KeyCode.Escape or input.KeyCode==Enum.KeyCode.ButtonB then
+			closeModal()
+		end
 	end)
 end
 
