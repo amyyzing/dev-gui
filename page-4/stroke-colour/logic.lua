@@ -2,6 +2,7 @@ local StrokeColour={}
 
 local TweenService=game:GetService("TweenService")
 local RunService=game:GetService("RunService")
+local GuiService=game:GetService("GuiService")
 
 local DEFAULTS={
 	PrimaryR=28,
@@ -194,6 +195,29 @@ function StrokeColour.new(ctx,page)
 	local getActiveColor=function() return colorFromStyle(UI_STYLE,"Primary") end
 	local connections={}
 	local collapsiblePanels={}
+
+	local function pointerPosition(input)
+		local raw
+		local position=input and input.Position
+
+		if typeof(position)=="Vector3" then
+			raw=Vector2.new(position.X,position.Y)
+		elseif typeof(position)=="Vector2" then
+			raw=position
+		else
+			raw=UIS:GetMouseLocation()
+		end
+
+		local ok,inset=pcall(function()
+			return GuiService:GetGuiInset()
+		end)
+
+		if ok and typeof(inset)=="Vector2" then
+			return raw-inset
+		end
+
+		return raw
+	end
 
 	local function trackConnection(conn)
 		connections[#connections+1]=conn
@@ -1016,8 +1040,8 @@ function StrokeColour.new(ctx,page)
 			valueBox.Text=decimals==0 and tostring(math.floor(v+0.5)) or string.format("%."..decimals.."f",v)
 		end
 
-		local function valueFromMouse()
-			local mouse=UIS:GetMouseLocation()
+		local function valueFromMouse(input)
+			local mouse=pointerPosition(input)
 			local pct=math.clamp((mouse.X-track.AbsolutePosition.X)/math.max(track.AbsoluteSize.X,1),0,1)
 			return roundTo(minVal+(maxVal-minVal)*pct,decimals)
 		end
@@ -1035,13 +1059,13 @@ function StrokeColour.new(ctx,page)
 			if input.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=true
 				valueBox:ReleaseFocus()
-				setValue(valueFromMouse(),true)
+				setValue(valueFromMouse(input),true)
 			end
 		end))
 
 		trackConnection(UIS.InputChanged:Connect(function(input)
 			if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then
-				setValue(valueFromMouse(),true)
+				setValue(valueFromMouse(input),true)
 			end
 		end))
 
@@ -1449,8 +1473,8 @@ function StrokeColour.new(ctx,page)
 		ZIndex=6,
 	},squareBody)
 
-	local function updateColorDrag()
-		local mouse=UIS:GetMouseLocation()
+	local function updateColorDrag(input)
+		local mouse=pointerPosition(input)
 
 		if colorDrag=="SV" and svSquare.AbsoluteSize.X>0 then
 			pickerSat=math.clamp((mouse.X-svSquare.AbsolutePosition.X)/svSquare.AbsoluteSize.X,0,1)
@@ -1465,20 +1489,20 @@ function StrokeColour.new(ctx,page)
 	trackConnection(svSquare.InputBegan:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 then
 			colorDrag="SV"
-			updateColorDrag()
+			updateColorDrag(input)
 		end
 	end))
 
 	trackConnection(hueStrip.InputBegan:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 then
 			colorDrag="Hue"
-			updateColorDrag()
+			updateColorDrag(input)
 		end
 	end))
 
 	trackConnection(UIS.InputChanged:Connect(function(input)
 		if colorDrag and input.UserInputType==Enum.UserInputType.MouseMovement then
-			updateColorDrag()
+			updateColorDrag(input)
 		end
 	end))
 

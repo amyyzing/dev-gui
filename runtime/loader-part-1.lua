@@ -1942,6 +1942,10 @@ applyUIStrokeTheme=function()
 			roleTransparency=1
 		end
 
+		if role=="Slider" then
+			return math.clamp(baseTransparency,0,1)
+		end
+
 		if role=="Window" or role=="Accent" then
 			return math.clamp(math.max(baseTransparency,roleTransparency),0,1)
 		end

@@ -248,7 +248,7 @@ function GuiLogic.new(ctx)
 			local currentMuted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 			local onTextColor=readableOn(currentAccent)
 			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
-			local fillTransparency=state and 0.18 or 1
+			local fillTransparency=state and 0 or 1
 			local bgColor=currentBg
 
 			wrap:SetAttribute("ThemeRole","SLIDER_BG")
@@ -330,17 +330,21 @@ function GuiLogic.new(ctx)
 
 		local state=startState and true or false
 		local stateValue=makeFusionValue(state)
+		local categoryExpanded=true
 		local function visualState(enabled)
 			local currentAccent=themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(74,208,128))
 			local currentMuted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 			local currentBg=themeColor("SLIDER_BG",themeColor("INPUT",THEME.INPUT or THEME.PANEL or Color3.fromRGB(18,18,24)))
+			local bgColor=categoryExpanded and currentBg or currentBg:Lerp(THEME.TEXT or currentMuted,0.12)
+			local bgTransparency=categoryExpanded and 0.04 or 0
 
 			if enabled then
 				return{
 					fillSize=UDim2.new(1,0,1,0),
-					fillTransparency=0.08,
+					fillTransparency=0,
 					fillColor=currentAccent,
-					bgColor=currentBg,
+					bgColor=bgColor,
+					bgTransparency=bgTransparency,
 					tickColor=currentAccent,
 					tickTransparency=0.34,
 				}
@@ -350,7 +354,8 @@ function GuiLogic.new(ctx)
 				fillSize=UDim2.new(0,0,1,0),
 				fillTransparency=1,
 				fillColor=currentAccent,
-				bgColor=currentBg,
+				bgColor=bgColor,
+				bgTransparency=bgTransparency,
 				tickColor=currentMuted,
 				tickTransparency=0.86,
 			}
@@ -372,7 +377,7 @@ function GuiLogic.new(ctx)
 			Position=UDim2.fromScale(0.5,0.5),
 			Size=UDim2.new(1,0,0,railHeight),
 			BackgroundColor3=initialVisuals.bgColor,
-			BackgroundTransparency=0.04,
+			BackgroundTransparency=initialVisuals.bgTransparency,
 			BorderSizePixel=0,
 			ClipsDescendants=true,
 			ZIndex=z+1,
@@ -434,7 +439,6 @@ function GuiLogic.new(ctx)
 			ZIndex=z+10,
 		},switch)
 
-		local categoryExpanded=true
 		local expandedValue=makeFusionValue(categoryExpanded)
 		local activeTweens={}
 		local visualTweenCount=0
@@ -480,7 +484,7 @@ function GuiLogic.new(ctx)
 			local visuals=visualState(state)
 
 			if not animate then
-				applyProps(rail,{BackgroundColor3=visuals.bgColor})
+				applyProps(rail,{BackgroundColor3=visuals.bgColor,BackgroundTransparency=visuals.bgTransparency})
 				applyProps(railFillClip,{Size=visuals.fillSize})
 				applyProps(railFill,{BackgroundColor3=visuals.fillColor,BackgroundTransparency=visuals.fillTransparency})
 				for _,tick in ipairs(ticks) do
@@ -491,7 +495,7 @@ function GuiLogic.new(ctx)
 
 			local shapeInfo=state and expandInfo or collapseInfo
 
-			playTrackedTween(rail,softInfo,{BackgroundColor3=visuals.bgColor})
+			playTrackedTween(rail,softInfo,{BackgroundColor3=visuals.bgColor,BackgroundTransparency=visuals.bgTransparency})
 			playTrackedTween(railFillClip,shapeInfo,{Size=visuals.fillSize})
 			playTrackedTween(railFill,softInfo,{BackgroundColor3=visuals.fillColor,BackgroundTransparency=visuals.fillTransparency})
 
@@ -553,6 +557,7 @@ function GuiLogic.new(ctx)
 			setExpanded=function(value,animate)
 				categoryExpanded=value and true or false
 				applyExpandedVisuals(animate~=false)
+				applyVisuals(animate~=false)
 			end,
 			expandedValue=expandedValue,
 			Destroy=destroyHeaderSwitch,
@@ -1077,7 +1082,6 @@ function GuiLogic.new(ctx)
 		end
 
 		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=12,AutoButtonColor=false,Selectable=true},track)
-		local valueLabel=New("TextLabel",{BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=11,Selectable=false},track)
 		local valueBoxHeight=componentNumber("SliderValueBoxHeight",math.max(componentNumber("TextBoxHeight",24),sliderHeight))
 		local valueBox=New("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor(valueRole,THEME.PANEL),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole=valueRole,CornerRole="Control",Selectable=true},container)
 		valueBox.Visible=valueBoxVisible
@@ -1173,7 +1177,6 @@ function GuiLogic.new(ctx)
 			if knobVisible then
 				knob.Position=knobPosition
 			end
-			valueLabel.Text=fmtNumber(v,decimals)
 			valueBox.Text=fmtNumber(v,decimals)
 		end
 
@@ -1250,7 +1253,6 @@ function GuiLogic.new(ctx)
 		connect(hit.InputBegan,handleInputBegan)
 		connect(track.InputBegan,handleInputBegan)
 		connect(fill.InputBegan,handleInputBegan)
-		connect(valueLabel.InputBegan,handleInputBegan)
 
 		connect(UIS.InputChanged,function(i)
 			if not dragging then
@@ -1292,7 +1294,7 @@ function GuiLogic.new(ctx)
 		end
 
 		setValue(startVal,false)
-		return{set=function(v) setValue(v,false) end,get=function() return value end,Destroy=destroySlider,destroy=destroySlider,valueState=valueState,box=valueBox,valueLabel=valueLabel,fill=fill,fillGlow=fillGlow,knob=knob,track=track}
+		return{set=function(v) setValue(v,false) end,get=function() return value end,Destroy=destroySlider,destroy=destroySlider,valueState=valueState,box=valueBox,fill=fill,fillGlow=fillGlow,knob=knob,track=track}
 	end
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)
