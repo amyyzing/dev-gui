@@ -129,35 +129,77 @@ trackRuntimeConnection(UIS.InputBegan:Connect(function(inp,processed)
 	handleGlobalInput(inp,processed)
 end))
 
+local RUNTIME_ENV=(getfenv and getfenv()) or _G
+local PERSISTENT_GLOBAL_KEYS={
+	CURRENT_MODE_KEY=true,
+	CURRENT_MODE_LABEL=true,
+	TOGGLE_UI_KEY=true,
+	TOGGLE_HB_KEY=true,
+	TOGGLE_JB_KEY=true,
+	TOGGLE_AB_KEY=true,
+	TOGGLE_ACTION_KEY=true,
+	TOGGLE_SPEED_KEY=true,
+	QB_AIM_LOCK_KEY=true,
+	QB_AIM_THROW_KEY=true,
+	QB_AIM_TOGGLE_KEY=true,
+}
+local PERSISTENT_STRING_DEFAULTS={
+	CURRENT_MODE_KEY="mode1",
+	CURRENT_MODE_LABEL="Gameplay",
+}
+local RUNTIME_REFRESH_APIS={
+	"StrokeColourAPI",
+	"MapEditorAPI",
+	"AntiMaterialAPI",
+	"RemoveAdsAPI",
+	"MapCleanerAPI",
+	"DiscordAPI",
+}
+local RUNTIME_REFRESH_FNS={
+	"refreshPage2UI",
+	"applyUIStrokeTheme",
+	"updateResponsiveLayout",
+	"refreshActionStatus",
+}
+local AUTO_REFRESH_RESET_VALUES={
+	hitboxOn=false,
+	gravityEnabled=false,
+	gravityValue=196.2,
+	speedEnabled=false,
+	speedValue=18,
+	gameParamsEnabled=false,
+	staminaRegenValue=10,
+	staminaDepleteValue=10,
+	jumpPowerValue=53.5,
+	divePowerValue=1.9,
+	jumpBoostOn=false,
+	jumpBoostTradeMode=false,
+	actionStatusOn=false,
+	qbAimEnabled=false,
+	testingEnabled=false,
+}
+
 function getPersistentValue(name,default)
-	if name=="CURRENT_MODE_KEY" then return CURRENT_MODE_KEY end
-	if name=="CURRENT_MODE_LABEL" then return CURRENT_MODE_LABEL end
-	if PAGE1_STATE[name]~=nil then return PAGE1_STATE[name] end
-	if name=="TOGGLE_UI_KEY" then return TOGGLE_UI_KEY end
-	if name=="TOGGLE_HB_KEY" then return TOGGLE_HB_KEY end
-	if name=="TOGGLE_JB_KEY" then return TOGGLE_JB_KEY end
-	if name=="TOGGLE_AB_KEY" then return TOGGLE_AB_KEY end
-	if name=="TOGGLE_ACTION_KEY" then return TOGGLE_ACTION_KEY end
-	if name=="TOGGLE_SPEED_KEY" then return TOGGLE_SPEED_KEY end
-	if name=="QB_AIM_LOCK_KEY" then return QB_AIM_LOCK_KEY end
-	if name=="QB_AIM_THROW_KEY" then return QB_AIM_THROW_KEY end
-	if name=="QB_AIM_TOGGLE_KEY" then return QB_AIM_TOGGLE_KEY end
+	if PAGE1_STATE and PAGE1_STATE[name]~=nil then return PAGE1_STATE[name] end
+	if PERSISTENT_GLOBAL_KEYS[name] and RUNTIME_ENV[name]~=nil then return RUNTIME_ENV[name] end
 	return default
 end
 
 function setPersistentValue(name,value)
-	if name=="CURRENT_MODE_KEY" then CURRENT_MODE_KEY=tostring(value or "mode1") return end
-	if name=="CURRENT_MODE_LABEL" then CURRENT_MODE_LABEL=tostring(value or "Gameplay") return end
-	if PAGE1_STATE[name]~=nil then PAGE1_STATE[name]=value; syncPage1State(); return end
-	if name=="TOGGLE_UI_KEY" then TOGGLE_UI_KEY=value return end
-	if name=="TOGGLE_HB_KEY" then TOGGLE_HB_KEY=value return end
-	if name=="TOGGLE_JB_KEY" then TOGGLE_JB_KEY=value return end
-	if name=="TOGGLE_AB_KEY" then TOGGLE_AB_KEY=value return end
-	if name=="TOGGLE_ACTION_KEY" then TOGGLE_ACTION_KEY=value return end
-	if name=="TOGGLE_SPEED_KEY" then TOGGLE_SPEED_KEY=value return end
-	if name=="QB_AIM_LOCK_KEY" then QB_AIM_LOCK_KEY=value return end
-	if name=="QB_AIM_THROW_KEY" then QB_AIM_THROW_KEY=value return end
-	if name=="QB_AIM_TOGGLE_KEY" then QB_AIM_TOGGLE_KEY=value return end
+	if PAGE1_STATE and PAGE1_STATE[name]~=nil then
+		PAGE1_STATE[name]=value
+		syncPage1State()
+		return
+	end
+
+	local stringDefault=PERSISTENT_STRING_DEFAULTS[name]
+	if stringDefault then
+		value=tostring(value or stringDefault)
+	end
+
+	if PERSISTENT_GLOBAL_KEYS[name] then
+		RUNTIME_ENV[name]=value
+	end
 end
 
 function refreshAllUI()
@@ -170,16 +212,14 @@ function refreshAllUI()
 		syncPage1State()
 	end
 
-	if StrokeColourAPI and StrokeColourAPI.Refresh then pcall(StrokeColourAPI.Refresh) end
-	if MapEditorAPI and MapEditorAPI.Refresh then pcall(MapEditorAPI.Refresh) end
-	if AntiMaterialAPI and AntiMaterialAPI.Refresh then pcall(AntiMaterialAPI.Refresh) end
-	if RemoveAdsAPI and RemoveAdsAPI.Refresh then pcall(RemoveAdsAPI.Refresh) end
-	if MapCleanerAPI and MapCleanerAPI.Refresh then pcall(MapCleanerAPI.Refresh) end
-	if DiscordAPI and DiscordAPI.Refresh then pcall(DiscordAPI.Refresh) end
-	if refreshPage2UI then pcall(refreshPage2UI) end
-	if applyUIStrokeTheme then pcall(applyUIStrokeTheme) end
-	if updateResponsiveLayout then pcall(updateResponsiveLayout) end
-	if refreshActionStatus then pcall(refreshActionStatus) end
+	if refreshRuntimeAPIs then
+		refreshRuntimeAPIs(RUNTIME_REFRESH_APIS)
+	end
+
+	for _,fnName in ipairs(RUNTIME_REFRESH_FNS) do
+		local fn=RUNTIME_ENV[fnName]
+		if type(fn)=="function" then pcall(fn) end
+	end
 end
 
 AUTO_REFRESH_EFFECT_RESETTING=false
@@ -247,21 +287,9 @@ function resetRuntimeEffectsBeforeAutoRefresh()
 	end
 
 	if PAGE1_STATE then
-		PAGE1_STATE.hitboxOn=false
-		PAGE1_STATE.gravityEnabled=false
-		PAGE1_STATE.gravityValue=196.2
-		PAGE1_STATE.speedEnabled=false
-		PAGE1_STATE.speedValue=18
-		PAGE1_STATE.gameParamsEnabled=false
-		PAGE1_STATE.staminaRegenValue=10
-		PAGE1_STATE.staminaDepleteValue=10
-		PAGE1_STATE.jumpPowerValue=53.5
-		PAGE1_STATE.divePowerValue=1.9
-		PAGE1_STATE.jumpBoostOn=false
-		PAGE1_STATE.jumpBoostTradeMode=false
-		PAGE1_STATE.actionStatusOn=false
-		PAGE1_STATE.qbAimEnabled=false
-		PAGE1_STATE.testingEnabled=false
+		for key,value in pairs(AUTO_REFRESH_RESET_VALUES) do
+			PAGE1_STATE[key]=value
+		end
 	end
 
 	if PAGE1_STATE then
@@ -284,8 +312,72 @@ function resetRuntimeEffectsBeforeAutoRefresh()
 	AUTO_REFRESH_EFFECT_RESETTING=false
 end
 
+local DATA_SAVE_STATE_SETTERS={
+	setTransparency={"targetTransparency"},
+	setGravity={"gravityValue"},
+	setHitboxLock={"hitboxOn",true},
+	setSpeedValue={"speedValue"},
+	setSpeedState={"speedEnabled",true},
+	setStaminaRegenValue={"staminaRegenValue"},
+	setStaminaDepleteValue={"staminaDepleteValue"},
+	setJumpPowerValue={"jumpPowerValue"},
+	setDivePowerValue={"divePowerValue"},
+	setJumpBoostState={"jumpBoostOn",true},
+	setGravityState={"gravityEnabled",true,"Gravity","SetGravityState",true},
+	setGameParamsState={"gameParamsEnabled",true,"GameParams","SetGameParamsState",true},
+	setESPState={"actionStatusOn",true,"ESP","SetESPState",true},
+	setQBAimState={"qbAimEnabled",true,"QBAim","SetQBAimState"},
+	setQBAimTeamFilter={"qbAimTeamFilter",true,"QBAim","SetTeamFilterState",true},
+	setQBAimShowArc={"qbAimShowArc",true,"QBAim","SetShowArcState",true},
+	setQBAimLeadDelay={"qbAimLeadDelay",false,"QBAim","SetLeadDelay",true},
+	setQBAimPeakHeight={"qbAimPeakHeight",false,"QBAim","SetPeakHeight",true},
+	setTestingState={"testingEnabled",true,"Testing","SetTestingState",true},
+}
+
+local function callPage1Api(apiName,method,...)
+	local api=PAGE1_APIS and PAGE1_APIS[apiName]
+	local fn=api and api[method]
+	if type(fn)=="function" then
+		pcall(fn,...)
+	end
+end
+
+local function setPage1Field(key,value,coerceBool)
+	PAGE1_STATE[key]=coerceBool and (value and true or false) or value
+	syncPage1State()
+	return PAGE1_STATE[key]
+end
+
+local function refreshPage2RuntimeUI()
+	if refreshPage2UI then refreshPage2UI() end
+end
+
+local function attachDataSaveSetters(ctx)
+	ctx.setHitboxSize=function(x,y,z)
+		PAGE1_STATE.sizeX=x
+		PAGE1_STATE.sizeY=y
+		PAGE1_STATE.sizeZ=z
+		syncPage1State()
+	end
+
+	for setterName,spec in pairs(DATA_SAVE_STATE_SETTERS) do
+		ctx[setterName]=function(value)
+			local stateValue=setPage1Field(spec[1],value,spec[2])
+			if spec[3] then
+				if spec[5] then
+					callPage1Api(spec[3],spec[4],stateValue,false)
+				else
+					callPage1Api(spec[3],spec[4],stateValue)
+				end
+			end
+		end
+	end
+
+	return ctx
+end
+
 function buildDataSaveContext()
-	return {
+	return attachDataSaveSetters({
 		BOT_API=BOT_API,
 		me=me,
 		playerId=tostring(me.UserId),
@@ -307,88 +399,13 @@ function buildDataSaveContext()
 		getDefaultUIStyle=getDefaultUIStyle,
 
 		RefreshAll=refreshAllUI,
-		refreshPage2UI=function() if refreshPage2UI then refreshPage2UI() end end,
-		rebuildOwnedList=function() if refreshPage2UI then refreshPage2UI() end end,
+		refreshPage2UI=refreshPage2RuntimeUI,
+		rebuildOwnedList=refreshPage2RuntimeUI,
 		refreshSettingsPage=refreshSettingsPage,
 		applyUIStrokeTheme=applyUIStrokeTheme,
 		updateResponsiveLayout=updateResponsiveLayout,
 		refreshActionStatus=refreshActionStatus,
-
-		setHitboxSize=function(x,y,z) PAGE1_STATE.sizeX=x; PAGE1_STATE.sizeY=y; PAGE1_STATE.sizeZ=z; syncPage1State() end,
-		setTransparency=function(v) PAGE1_STATE.targetTransparency=v; syncPage1State() end,
-		setGravity=function(v) PAGE1_STATE.gravityValue=v; syncPage1State() end,
-		setGravityState=function(v)
-			PAGE1_STATE.gravityEnabled=v and true or false
-			syncPage1State()
-			if PAGE1_APIS.Gravity and PAGE1_APIS.Gravity.SetGravityState then
-				pcall(PAGE1_APIS.Gravity.SetGravityState,PAGE1_STATE.gravityEnabled,false)
-			end
-		end,
-		setHitboxLock=function(v) PAGE1_STATE.hitboxOn=v and true or false; syncPage1State() end,
-		setSpeedValue=function(v) PAGE1_STATE.speedValue=v; syncPage1State() end,
-		setSpeedState=function(v) PAGE1_STATE.speedEnabled=v and true or false; syncPage1State() end,
-		setGameParamsState=function(v)
-			PAGE1_STATE.gameParamsEnabled=v and true or false
-			syncPage1State()
-			if PAGE1_APIS.GameParams and PAGE1_APIS.GameParams.SetGameParamsState then
-				pcall(PAGE1_APIS.GameParams.SetGameParamsState,PAGE1_STATE.gameParamsEnabled,false)
-			end
-		end,
-		setStaminaRegenValue=function(v) PAGE1_STATE.staminaRegenValue=v; syncPage1State() end,
-		setStaminaDepleteValue=function(v) PAGE1_STATE.staminaDepleteValue=v; syncPage1State() end,
-		setJumpPowerValue=function(v) PAGE1_STATE.jumpPowerValue=v; syncPage1State() end,
-		setDivePowerValue=function(v) PAGE1_STATE.divePowerValue=v; syncPage1State() end,
-		setJumpBoostState=function(v) PAGE1_STATE.jumpBoostOn=v and true or false; syncPage1State() end,
-		setESPState=function(v)
-			PAGE1_STATE.actionStatusOn=v and true or false
-			syncPage1State()
-			if PAGE1_APIS.ESP and PAGE1_APIS.ESP.SetESPState then
-				pcall(PAGE1_APIS.ESP.SetESPState,PAGE1_STATE.actionStatusOn,false)
-			end
-		end,
-		setQBAimState=function(v)
-			PAGE1_STATE.qbAimEnabled=v and true or false
-			syncPage1State()
-			if PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.SetQBAimState then
-				pcall(PAGE1_APIS.QBAim.SetQBAimState,PAGE1_STATE.qbAimEnabled)
-			end
-		end,
-		setQBAimTeamFilter=function(v)
-			PAGE1_STATE.qbAimTeamFilter=v and true or false
-			syncPage1State()
-			if PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.SetTeamFilterState then
-				pcall(PAGE1_APIS.QBAim.SetTeamFilterState,PAGE1_STATE.qbAimTeamFilter,false)
-			end
-		end,
-		setQBAimShowArc=function(v)
-			PAGE1_STATE.qbAimShowArc=v and true or false
-			syncPage1State()
-			if PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.SetShowArcState then
-				pcall(PAGE1_APIS.QBAim.SetShowArcState,PAGE1_STATE.qbAimShowArc,false)
-			end
-		end,
-		setQBAimLeadDelay=function(v)
-			PAGE1_STATE.qbAimLeadDelay=v
-			syncPage1State()
-			if PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.SetLeadDelay then
-				pcall(PAGE1_APIS.QBAim.SetLeadDelay,PAGE1_STATE.qbAimLeadDelay,false)
-			end
-		end,
-		setQBAimPeakHeight=function(v)
-			PAGE1_STATE.qbAimPeakHeight=v
-			syncPage1State()
-			if PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.SetPeakHeight then
-				pcall(PAGE1_APIS.QBAim.SetPeakHeight,PAGE1_STATE.qbAimPeakHeight,false)
-			end
-		end,
-		setTestingState=function(v)
-			PAGE1_STATE.testingEnabled=v and true or false
-			syncPage1State()
-			if PAGE1_APIS.Testing and PAGE1_APIS.Testing.SetTestingState then
-				pcall(PAGE1_APIS.Testing.SetTestingState,PAGE1_STATE.testingEnabled,false)
-			end
-		end,
-	}
+	})
 end
 
 function rebuildDataSaveFromModule(loadRemoteData)
