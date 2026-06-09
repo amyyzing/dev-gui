@@ -1,0 +1,42 @@
+{
+  "name": "gui-rojo-preview",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "GuiSource": {
+        "$className": "Folder",
+        "announcement": {
+          "$path": "announcement.lua"
+        },
+        "data-save": {
+          "$path": "data-save"
+        },
+        "gui": {
+          "$path": "gui"
+        },
+        "page-1": {
+          "$path": "page-1"
+        },
+        "page-2": {
+          "$path": "page-2"
+        },
+        "page-4": {
+          "$path": "page-4"
+        },
+        "page-5": {
+          "$path": "page-5"
+        },
+        "page-6": {
+          "$path": "page-6"
+        }
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "GuiRojoPreview": {
+          "$path": "rojo-preview/GuiRojoPreview.client.lua"
+        }
+      }
+    }
+  }
+}
