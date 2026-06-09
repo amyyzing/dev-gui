@@ -362,6 +362,7 @@ API_ALLOWED_PATHS={
 	["/preset/create"]=true,
 	["/preset/equip"]=true,
 	["/preset/delete"]=true,
+	["/preset/load"]=true,
 	["/preset/list-owned"]=true,
 	["/invite-link/get"]=true,
 	["/announcement/latest"]=true,
