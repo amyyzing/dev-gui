@@ -96,10 +96,10 @@ function MainFrame.new(ctx)
 	local navTabInset=6
 	local pageShellTransparency=0
 	local pageSliderTransparency=0
-	local rootStrokeTransparency=0.15
-	local headerStrokeTransparency=0.25
-	local pageShellStrokeTransparency=0.35
-	local pageSliderStrokeTransparency=0.45
+	local rootStrokeTransparency=0.62
+	local headerStrokeTransparency=0.86
+	local pageShellStrokeTransparency=0.9
+	local pageSliderStrokeTransparency=0.92
 	local headerSubtitleVisible=true
 	local headerSearchVisible=false
 	local headerSearchPlaceholder="Search"
@@ -140,10 +140,10 @@ function MainFrame.new(ctx)
 		navTabInset=layoutNumber(layoutProfile,"NavTabInset",6)
 		pageShellTransparency=layoutNumber(layoutProfile,"PageShellTransparency",0)
 		pageSliderTransparency=layoutNumber(layoutProfile,"PageSliderTransparency",0)
-		rootStrokeTransparency=layoutNumber(layoutProfile,"RootStrokeTransparency",0.15)
-		headerStrokeTransparency=layoutNumber(layoutProfile,"HeaderStrokeTransparency",0.25)
-		pageShellStrokeTransparency=layoutNumber(layoutProfile,"PageShellStrokeTransparency",0.35)
-		pageSliderStrokeTransparency=layoutNumber(layoutProfile,"PageSliderStrokeTransparency",0.45)
+		rootStrokeTransparency=layoutNumber(layoutProfile,"RootStrokeTransparency",0.62)
+		headerStrokeTransparency=layoutNumber(layoutProfile,"HeaderStrokeTransparency",0.86)
+		pageShellStrokeTransparency=layoutNumber(layoutProfile,"PageShellStrokeTransparency",0.9)
+		pageSliderStrokeTransparency=layoutNumber(layoutProfile,"PageSliderStrokeTransparency",0.92)
 		headerSubtitleVisible=layoutProfile.HeaderSubtitleVisible~=false
 		headerSearchVisible=layoutProfile.HeaderSearchVisible==true
 		headerSearchPlaceholder=tostring(layoutProfile.HeaderSearchPlaceholder or "Search")

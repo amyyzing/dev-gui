@@ -1281,10 +1281,10 @@ local function fallbackOriginalUILibProfile()
 			Gradient=Color3.fromRGB(45,45,45),
 			GradientOn=false,
 			StrokeThickness=1,
-			StrokeTransparency=0.72,
+			StrokeTransparency=0.84,
 		},
 		Theme={},
-		Shape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original",WindowStrokeTransparency=0.42,SectionStrokeTransparency=0.84,ControlStrokeTransparency=0.78,SliderStrokeTransparency=0.78,AccentStrokeTransparency=0.58},
+		Shape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original",WindowStrokeTransparency=0.62,SectionStrokeTransparency=0.92,ControlStrokeTransparency=0.9,SliderStrokeTransparency=0.9,AccentStrokeTransparency=0.72},
 		Components={
 			TextFont=Enum.Font.Gotham,
 			TitleFont=Enum.Font.GothamBold,
@@ -1297,7 +1297,7 @@ local function fallbackOriginalUILibProfile()
 			SectionTitleSize=14,
 			SectionSubtitleSize=11,
 			SectionBackgroundTransparency=0,
-			SectionStrokeTransparency=0.62,
+			SectionStrokeTransparency=0.84,
 			SectionBodyInset=2,
 			SectionBodyGap=6,
 			SliderLabelPlacement="above",
@@ -1319,13 +1319,15 @@ local function fallbackOriginalUILibProfile()
 			ToggleKnobSize=16,
 			TogglePad=2,
 			ToggleStyle="switch",
-			ToggleOffRole="RED",
-			ToggleStrokeTransparency=0.72,
+			ToggleOffRole="INPUT",
+			ToggleStrokeTransparency=0.86,
+			ToggleActiveStrokeTransparency=0.64,
+			ToggleHoverStrokeTransparency=0.74,
 			TextBoxHeight=28,
 			ButtonHeight=30,
-			ControlStrokeTransparency=0.55,
+			ControlStrokeTransparency=0.78,
 		},
-		Defaults={PrimaryR=28,PrimaryG=28,PrimaryB=28,StrokeR=76,StrokeG=76,StrokeB=76,GradientR=45,GradientG=45,GradientB=45,StrokeGradient=false,LiquidStroke=false,LiquidStrokeSpeed=1,LiquidStrokeDirection="Right",StrokeThickness=1,StrokeTransparency=0.72,CornerRadius=0,UILib="original",ThemePanelExpanded=false,ColoursPanelExpanded=false},
+		Defaults={PrimaryR=28,PrimaryG=28,PrimaryB=28,StrokeR=76,StrokeG=76,StrokeB=76,GradientR=45,GradientG=45,GradientB=45,StrokeGradient=false,LiquidStroke=false,LiquidStrokeSpeed=1,LiquidStrokeDirection="Right",StrokeThickness=1,StrokeTransparency=0.84,CornerRadius=0,UILib="original",ThemePanelExpanded=false,ColoursPanelExpanded=false},
 		MainFrame={
 			Window={W=880,H=540,MinW=560,MinH=360,MaxW=1220,MaxH=820,StartY=80,MinimizedH=68},
 			Layout={RootPadding=8,MainGap=8,PageGap=8,ColumnGap=8,FooterGap=8,HeaderHeight=52,PageBarHeight=30,PageTabWidth=106,PageTabHeight=28,PageHostReserve=156,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=10,FabSize=42},
@@ -1926,15 +1928,15 @@ applyUIStrokeTheme=function()
 		local roleTransparency=0.82
 
 		if role=="Window" then
-			roleTransparency=libShape.WindowStrokeTransparency or 0.42
+			roleTransparency=libShape.WindowStrokeTransparency or 0.62
 		elseif role=="Section" then
-			roleTransparency=libShape.SectionStrokeTransparency or 0.86
+			roleTransparency=libShape.SectionStrokeTransparency or 0.92
 		elseif role=="Control" then
-			roleTransparency=libShape.ControlStrokeTransparency or 0.82
+			roleTransparency=libShape.ControlStrokeTransparency or 0.9
 		elseif role=="Slider" then
-			roleTransparency=libShape.SliderStrokeTransparency or 0.8
+			roleTransparency=libShape.SliderStrokeTransparency or 0.9
 		elseif role=="Accent" then
-			roleTransparency=libShape.AccentStrokeTransparency or 0.58
+			roleTransparency=libShape.AccentStrokeTransparency or 0.72
 		elseif role=="Hidden" then
 			roleTransparency=1
 		end

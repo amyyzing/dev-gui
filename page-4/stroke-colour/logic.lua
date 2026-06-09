@@ -23,7 +23,7 @@ local DEFAULTS={
 	LiquidStrokeDirection="Right",
 
 	StrokeThickness=1,
-	StrokeTransparency=0.72,
+	StrokeTransparency=0.84,
 	CornerRadius=0,
 	UILib="original",
 	ThemePanelExpanded=false,
@@ -1204,15 +1204,16 @@ function StrokeColour.new(ctx,page)
 		},card)
 		addCorner(marker,"Slider")
 
-		New("TextLabel",{
+		local label=New("TextLabel",{
 			BackgroundTransparency=1,
-			Position=UDim2.fromOffset(9,8),
-			Size=UDim2.new(1,-18,0,18),
+			Position=UDim2.fromOffset(12,0),
+			Size=UDim2.new(1,-24,1,0),
 			Text=preset.Name,
 			Font=Enum.Font.GothamBold,
 			TextSize=12,
 			TextColor3=textColor,
 			TextXAlignment=Enum.TextXAlignment.Left,
+			TextYAlignment=Enum.TextYAlignment.Center,
 			ZIndex=7,
 		},card)
 
@@ -1220,7 +1221,7 @@ function StrokeColour.new(ctx,page)
 			applyThemePreset(preset)
 		end))
 
-		themeCards[#themeCards+1]={Preset=preset,Card=card,Marker=marker}
+		themeCards[#themeCards+1]={Preset=preset,Card=card,Marker=marker,Label=label}
 	end
 
 	local colorPanel=makePanel(3,"Colours","ColoursPanelExpanded")
@@ -1590,6 +1591,7 @@ function StrokeColour.new(ctx,page)
 			entry.Card.BackgroundColor3=selected and preset.Primary:Lerp(readableTextColor(preset.Primary),0.06) or preset.Primary
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=preset.Stroke
+			entry.Label.TextColor3=readableTextColor(entry.Card.BackgroundColor3)
 		end
 
 		for key,entry in pairs(targetButtons) do

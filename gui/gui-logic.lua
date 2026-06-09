@@ -139,14 +139,15 @@ function GuiLogic.new(ctx)
 		zIndex=zIndex or 6
 
 		local onRole=tostring(c.ToggleOnRole or "SLIDER_FILL")
-		local offRole=tostring(c.ToggleOffRole or "INPUT")
 		local accent=themeRoleColor(onRole,themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(32,202,106)))
 		local input=themeColor("INPUT",THEME.PANEL or Color3.fromRGB(18,18,24))
 		local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 		local strokeColor=themeColor("STROKE",THEME.STROKE or muted)
 		local tickHeight=math.max(6,height-10)
 		local onTextColor=readableOn(accent)
-		local offStrokeTransparency=componentNumber("ToggleStrokeTransparency",0.50)
+		local offStrokeTransparency=componentNumber("ToggleStrokeTransparency",0.86)
+		local activeStrokeTransparency=componentNumber("ToggleActiveStrokeTransparency",0.64)
+		local hoverStrokeTransparency=componentNumber("ToggleHoverStrokeTransparency",0.74)
 		local softInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 		local snapInfo=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 		local state=startState and true or false
@@ -163,7 +164,7 @@ function GuiLogic.new(ctx)
 
 		local wrap=New("Frame",{
 			Size=UDim2.fromOffset(width,height),
-			BackgroundColor3=input:Lerp(Color3.new(0,0,0),0.10),
+			BackgroundColor3=input,
 			BorderSizePixel=0,
 			ClipsDescendants=true,
 			ZIndex=zIndex,
@@ -198,7 +199,7 @@ function GuiLogic.new(ctx)
 			BackgroundTransparency=0.18,
 			BorderSizePixel=0,
 			ZIndex=zIndex+1,
-			SkipThemeRole=true,
+			ThemeRole=onRole,
 		},fillClip)
 		addCorner(fill,"Control")
 		New("UIGradient",{
@@ -234,21 +235,6 @@ function GuiLogic.new(ctx)
 			table.insert(ticks,tick)
 		end
 
-		local stateText=New("TextLabel",{
-			BackgroundTransparency=1,
-			BorderSizePixel=0,
-			Position=UDim2.fromOffset(0,0),
-			Size=UDim2.new(1,0,1,0),
-			Text="OFF",
-			Font=componentFont("ControlFont",Enum.Font.GothamBold),
-			TextSize=componentNumber("ToggleTextSize",9),
-			TextColor3=muted,
-			TextTransparency=0.20,
-			TextXAlignment=Enum.TextXAlignment.Center,
-			ZIndex=zIndex+3,
-			SkipThemeRole=true,
-		},wrap)
-
 		local hit=New("TextButton",{
 			BackgroundTransparency=1,
 			Text="",
@@ -279,22 +265,17 @@ function GuiLogic.new(ctx)
 			cancelTweens()
 
 			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
-			local bgColor=state and input:Lerp(accent,0.12) or input:Lerp(Color3.new(0,0,0),0.10)
+			local bgColor=state and input:Lerp(accent,0.05) or input
 			local strokeTarget=state and accent or (hovering and muted or strokeColor)
-			local strokeTransparency=state and 0.22 or (hovering and 0.32 or offStrokeTransparency)
-			local text=state and "ON" or "OFF"
-			local textColorTarget=state and onTextColor or muted
+			local strokeTransparency=state and activeStrokeTransparency or (hovering and hoverStrokeTransparency or offStrokeTransparency)
 
-			stateText.Text=text
-			wrap:SetAttribute("ThemeRole",state and onRole or offRole)
+			wrap:SetAttribute("ThemeRole","INPUT")
 
 			if not animate then
 				wrap.BackgroundColor3=bgColor
 				wrapStroke.Color=strokeTarget
 				wrapStroke.Transparency=strokeTransparency
 				fillClip.Size=fillSize
-				stateText.TextColor3=textColorTarget
-				stateText.TextTransparency=state and 0.02 or 0.22
 				for _,tick in ipairs(ticks) do
 					tick.BackgroundColor3=state and onTextColor or muted
 					tick.BackgroundTransparency=state and 0.74 or 0.86
@@ -305,7 +286,6 @@ function GuiLogic.new(ctx)
 			tween(wrap,softInfo,{BackgroundColor3=bgColor})
 			tween(wrapStroke,softInfo,{Color=strokeTarget,Transparency=strokeTransparency})
 			tween(fillClip,snapInfo,{Size=fillSize})
-			tween(stateText,softInfo,{TextColor3=textColorTarget,TextTransparency=state and 0.02 or 0.22})
 
 			for _,tick in ipairs(ticks) do
 				tween(tick,softInfo,{BackgroundColor3=state and onTextColor or muted,BackgroundTransparency=state and 0.74 or 0.86})
@@ -381,7 +361,7 @@ function GuiLogic.new(ctx)
 		local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 		local input=themeColor("INPUT",THEME.INPUT or THEME.PANEL or Color3.fromRGB(18,18,24))
 		local strokeColor=themeColor("STROKE",THEME.STROKE or muted)
-		local dark=input:Lerp(Color3.new(0,0,0),0.25)
+		local dark=input
 		local light=(THEME.TEXT or Color3.fromRGB(245,245,245))
 		local state=startState and true or false
 		local stateValue=makeFusionValue(state)
@@ -424,16 +404,17 @@ function GuiLogic.new(ctx)
 			BorderSizePixel=0,
 			ClipsDescendants=true,
 			ZIndex=z+1,
+			ThemeRole="INPUT",
 		},switch)
 
 		local railStroke=New("UIStroke",{
 			Color=strokeColor,
 			Thickness=1,
-			Transparency=0.48,
+			Transparency=0.88,
 			LineJoinMode=Enum.LineJoinMode.Miter,
 		},rail)
 		railStroke:SetAttribute("StrokeRole","Fixed")
-		railStroke:SetAttribute("BaseStrokeTransparency",0.48)
+		railStroke:SetAttribute("BaseStrokeTransparency",0.88)
 
 		local railFillClip=New("Frame",{
 			AnchorPoint=Vector2.new(0,0.5),
@@ -453,6 +434,7 @@ function GuiLogic.new(ctx)
 			BackgroundTransparency=initialVisuals.fillTransparency,
 			BorderSizePixel=0,
 			ZIndex=z+2,
+			ThemeRole="SLIDER_FILL",
 		},railFillClip)
 
 		New("UIGradient",{
@@ -545,7 +527,7 @@ function GuiLogic.new(ctx)
 
 			local visuals=visualState(state)
 			local strokeTarget=state and accent or strokeColor
-			local strokeTransparency=state and 0.28 or 0.48
+			local strokeTransparency=state and 0.64 or 0.88
 
 			if not animate then
 				applyProps(railFillClip,{Size=visuals.fillSize})
@@ -599,7 +581,7 @@ function GuiLogic.new(ctx)
 			if hoverTween then
 				hoverTween:Cancel()
 			end
-			hoverTween=TweenService:Create(railStroke,hoverInfo,{Transparency=0.28})
+			hoverTween=TweenService:Create(railStroke,hoverInfo,{Transparency=state and 0.58 or 0.74})
 			hoverTween:Play()
 		end)
 
@@ -609,7 +591,7 @@ function GuiLogic.new(ctx)
 			end
 			hoverTween=TweenService:Create(railStroke,hoverInfo,{
 				Color=state and accent or strokeColor,
-				Transparency=state and 0.28 or 0.48,
+				Transparency=state and 0.64 or 0.88,
 			})
 			hoverTween:Play()
 		end)
@@ -705,8 +687,9 @@ function GuiLogic.new(ctx)
 		markThemeRole(wrap,wrap.BackgroundColor3)
 		addCorner(wrap,"Control")
 
-		local stroke=New("UIStroke",{Color=THEME.STROKE,Thickness=math.min(strokeThickness or 1,1),Transparency=componentNumber("ControlStrokeTransparency",0.55)},wrap)
-		stroke:SetAttribute("BaseStrokeTransparency",componentNumber("ControlStrokeTransparency",0.55))
+		local strokeTransparency=componentNumber("ControlStrokeTransparency",0.78)
+		local stroke=New("UIStroke",{Color=THEME.STROKE,Thickness=math.min(strokeThickness or 1,1),Transparency=strokeTransparency},wrap)
+		stroke:SetAttribute("BaseStrokeTransparency",strokeTransparency)
 
 		box.Parent=wrap
 		box.BackgroundTransparency=1
@@ -745,8 +728,9 @@ function GuiLogic.new(ctx)
 		markThemeRole(wrap,wrap.BackgroundColor3)
 		addCorner(wrap,"Control")
 
-		local stroke=New("UIStroke",{Color=THEME.STROKE,Thickness=math.min(strokeThickness or 1,1),Transparency=componentNumber("ControlStrokeTransparency",0.55)},wrap)
-		stroke:SetAttribute("BaseStrokeTransparency",componentNumber("ControlStrokeTransparency",0.55))
+		local strokeTransparency=componentNumber("ControlStrokeTransparency",0.78)
+		local stroke=New("UIStroke",{Color=THEME.STROKE,Thickness=math.min(strokeThickness or 1,1),Transparency=strokeTransparency},wrap)
+		stroke:SetAttribute("BaseStrokeTransparency",strokeTransparency)
 
 		button.Parent=wrap
 		button.BackgroundTransparency=1
@@ -785,8 +769,9 @@ function GuiLogic.new(ctx)
 		local sec=New("Frame",{BackgroundColor3=themeColor("SECTION",THEME.CARD),BackgroundTransparency=componentNumber("SectionBackgroundTransparency",0),BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ClipsDescendants=true,ZIndex=4,LayoutOrder=order,ThemeRole="SECTION",CornerRole="Section"},parent)
 
 		addCorner(sec,"Section")
-		local sectionStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=componentNumber("SectionStrokeTransparency",0.62)},sec)
-		sectionStroke:SetAttribute("BaseStrokeTransparency",componentNumber("SectionStrokeTransparency",0.62))
+		local sectionStrokeTransparency=componentNumber("SectionStrokeTransparency",0.84)
+		local sectionStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=sectionStrokeTransparency},sec)
+		sectionStroke:SetAttribute("BaseStrokeTransparency",sectionStrokeTransparency)
 		New("UIPadding",{PaddingTop=UDim.new(0,componentNumber("SectionPaddingY",10)),PaddingLeft=UDim.new(0,componentNumber("SectionPaddingX",12)),PaddingRight=UDim.new(0,componentNumber("SectionPaddingX",12)),PaddingBottom=UDim.new(0,componentNumber("SectionPaddingY",10))},sec)
 		New("UIListLayout",{Padding=UDim.new(0,componentNumber("SectionGap",6)),SortOrder=Enum.SortOrder.LayoutOrder},sec)
 
@@ -1146,8 +1131,9 @@ function GuiLogic.new(ctx)
 
 		local track=New("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor(trackRole,THEME.PANEL),BackgroundTransparency=sliderTrackTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=6,ThemeRole=trackRole,CornerRole="Slider"},container)
 		addCorner(track,"Slider")
-		local trackStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=componentNumber("SliderTrackStrokeTransparency",0.55)},track)
-		trackStroke:SetAttribute("BaseStrokeTransparency",componentNumber("SliderTrackStrokeTransparency",0.55))
+		local trackStrokeTransparency=componentNumber("SliderTrackStrokeTransparency",0.78)
+		local trackStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=trackStrokeTransparency},track)
+		trackStroke:SetAttribute("BaseStrokeTransparency",trackStrokeTransparency)
 
 		local fillGlow=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",THEME.STROKE),BackgroundTransparency=sliderGlowIdleTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=7,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
 		addCorner(fillGlow,"Slider")
@@ -1171,7 +1157,7 @@ function GuiLogic.new(ctx)
 		local valueBox=New("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor(valueRole,THEME.PANEL),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole=valueRole,CornerRole="Control",Selectable=true},container)
 		valueBox.Visible=valueBoxVisible
 		addCorner(valueBox,"Control")
-		local valueStrokeTransparency=componentNumber("SliderValueBoxStrokeTransparency",componentNumber("ControlStrokeTransparency",0.65))
+		local valueStrokeTransparency=componentNumber("SliderValueBoxStrokeTransparency",componentNumber("ControlStrokeTransparency",0.78))
 		local valueStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=valueStrokeTransparency},valueBox)
 		valueStroke:SetAttribute("BaseStrokeTransparency",valueStrokeTransparency)
 		local value=startVal
