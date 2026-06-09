@@ -1879,6 +1879,7 @@ end
 applyUIStrokeTheme=function()
 	local color=getUIStrokeColor()
 	local color2=getUIStrokeGradientColor()
+	local strokeHideTransparency=0.86
 	THEME.STROKE=color
 	applyUIPrimaryTheme()
 
@@ -1966,6 +1967,9 @@ applyUIStrokeTheme=function()
 				local baseTransparency=tonumber(obj:GetAttribute("BaseStrokeTransparency")) or obj.Transparency
 				local styleTransparency=tonumber(UI_STYLE.StrokeTransparency) or 0.84
 				obj.Transparency=getRoleStrokeTransparency(role,baseTransparency,styleTransparency)
+				pcall(function()
+					obj.Enabled=obj.Transparency<strokeHideTransparency and obj.Thickness>0
+				end)
 
 				pcall(function()
 					obj.LineJoinMode=strokeRoleRadius(role)>0 and Enum.LineJoinMode.Round or Enum.LineJoinMode.Miter
