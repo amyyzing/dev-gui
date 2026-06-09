@@ -12,116 +12,116 @@ function tintSlider(slider, color)
 	end
 end
 
-StrokeColourAPI=nil
-resetCustomizePageDefaults=function() end
+function clearRuntimePage(parent,keepPadding)
+	if not parent then return end
 
-function clearCustomizePage()
-	if not uiSettingsPage then return end
-
-	for _,child in ipairs(uiSettingsPage:GetChildren()) do
-		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
+	for _,child in ipairs(parent:GetChildren()) do
+		if not child:IsA("UIListLayout") and (not keepPadding or not child:IsA("UIPadding")) then
 			child:Destroy()
 		end
 	end
 end
 
-function buildCustomizePage()
-	if StrokeColourAPI and StrokeColourAPI.Destroy then
-		pcall(function()
-			StrokeColourAPI.Destroy()
+function destroyRuntimeAPIs(apiNames)
+	local env=getfenv()
+	for _,apiName in ipairs(apiNames or {}) do
+		local api=env[apiName]
+		if api and api.Destroy then
+			pcall(function()
+				api.Destroy()
+			end)
+		end
+		env[apiName]=nil
+	end
+end
+
+function loadDeferredModuleByName(name)
+	return setLoadedModule(name,loadDeferredModule(name,MODULE_PATHS[name],getfenv()[moduleGlobalName(name)]))
+end
+
+function loadDeferredModuleNames(names)
+	for _,name in ipairs(names or {}) do
+		loadDeferredModuleByName(name)
+	end
+end
+
+function addRuntimeModuleError(parent,order,title,text)
+	local section=makeSection(parent,order,title,"Remote module failed to load.")
+	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+end
+
+function buildRuntimeModule(spec,ctx,parent)
+	local module=getfenv()[moduleGlobalName(spec.name)]
+	if module and module.new then
+		local ok,result=pcall(function()
+			return module.new(ctx,parent)
 		end)
+		if ok then
+			getfenv()[spec.api]=result
+			return result
+		end
+		addRuntimeModuleError(parent,spec.order or 1,spec.title,spec.title.." module failed: "..tostring(result))
+	else
+		addRuntimeModuleError(parent,spec.order or 1,spec.title,"Missing remote module: "..tostring(MODULE_PATHS[spec.name] or spec.name))
 	end
 
-	StrokeColourAPI=nil
+	return nil
+end
+
+StrokeColourAPI=nil
+resetCustomizePageDefaults=function() end
+
+function clearCustomizePage()
+	clearRuntimePage(uiSettingsPage,true)
+end
+
+function makeCustomizeCtx()
+	return{
+		New=New,
+		Fusion=FusionModule,
+		THEME=THEME,
+		UI_STYLE=UI_STYLE,
+		UIS=UIS,
+		DEFAULT_UI_STYLE=getDefaultUIStyle and getDefaultUIStyle() or UI_STYLE,
+		SG=SG,
+		StrokeColourLogicModule=StrokeColourLogicModule,
+		PrimaryColourModule=PrimaryColourModule,
+		PrimaryColourLogicModule=PrimaryColourLogicModule,
+		SecondaryColourModule=SecondaryColourModule,
+		SecondaryColourLogicModule=SecondaryColourLogicModule,
+		makeSection=makeSection,
+		buildSlider=buildSlider,
+		buildToggleRow=buildToggleRow,
+		wrapTextButton=wrapTextButton,
+		getUIStrokeColor=getUIStrokeColor,
+		getUIStrokeGradientColor=getUIStrokeGradientColor,
+		getUIPrimaryColor=getUIPrimaryColor,
+		applyUIStrokeTheme=applyUIStrokeTheme,
+		applyUIPrimaryTheme=applyUIPrimaryTheme,
+		tintSlider=tintSlider,
+		onChanged=function()
+			applyUIStrokeTheme()
+			requestPlayerAutosave()
+		end,
+	}
+end
+
+function buildCustomizePage()
+	destroyRuntimeAPIs({"StrokeColourAPI"})
 	resetCustomizePageDefaults=function() end
-
 	clearCustomizePage()
+	loadDeferredModuleNames(CUSTOMIZE_RELOAD_NAMES)
 
-	StrokeColourLogicModule=loadDeferredModule("StrokeColourLogic",MODULE_PATHS.StrokeColourLogic,StrokeColourLogicModule)
-	StrokeColourModule=loadDeferredModule("StrokeColour",MODULE_PATHS.StrokeColour,StrokeColourModule)
-	PrimaryColourLogicModule=loadDeferredModule("PrimaryColourLogic",MODULE_PATHS.PrimaryColourLogic,PrimaryColourLogicModule)
-	PrimaryColourModule=loadDeferredModule("PrimaryColour",MODULE_PATHS.PrimaryColour,PrimaryColourModule)
-	SecondaryColourLogicModule=loadDeferredModule("SecondaryColourLogic",MODULE_PATHS.SecondaryColourLogic,SecondaryColourLogicModule)
-	SecondaryColourModule=loadDeferredModule("SecondaryColour",MODULE_PATHS.SecondaryColour,SecondaryColourModule)
-
-	if StrokeColourModule and StrokeColourModule.new then
-		local ok,result=pcall(function()
-			return StrokeColourModule.new({
-				New=New,
-				Fusion=FusionModule,
-				THEME=THEME,
-				UI_STYLE=UI_STYLE,
-				UIS=UIS,
-
-				DEFAULT_UI_STYLE=getDefaultUIStyle and getDefaultUIStyle() or UI_STYLE,
-
-				SG=SG,
-				StrokeColourLogicModule=StrokeColourLogicModule,
-				PrimaryColourModule=PrimaryColourModule,
-				PrimaryColourLogicModule=PrimaryColourLogicModule,
-				SecondaryColourModule=SecondaryColourModule,
-				SecondaryColourLogicModule=SecondaryColourLogicModule,
-
-				makeSection=makeSection,
-				buildSlider=buildSlider,
-				buildToggleRow=buildToggleRow,
-				wrapTextButton=wrapTextButton,
-
-				getUIStrokeColor=getUIStrokeColor,
-				getUIStrokeGradientColor=getUIStrokeGradientColor,
-				getUIPrimaryColor=getUIPrimaryColor,
-				applyUIStrokeTheme=applyUIStrokeTheme,
-				applyUIPrimaryTheme=applyUIPrimaryTheme,
-				tintSlider=tintSlider,
-
-				onChanged=function()
-					applyUIStrokeTheme()
-					requestPlayerAutosave()
-				end
-			},uiSettingsPage)
-		end)
-
-		if ok then
-			StrokeColourAPI=result
-
-			resetCustomizePageDefaults=function()
-				if StrokeColourAPI and StrokeColourAPI.Reset then
-					StrokeColourAPI.Reset()
-				end
+	StrokeColourAPI=buildRuntimeModule({name="StrokeColour",api="StrokeColourAPI",order=1,title="Stroke Colour"},makeCustomizeCtx(),uiSettingsPage)
+	if StrokeColourAPI then
+		resetCustomizePageDefaults=function()
+			if StrokeColourAPI and StrokeColourAPI.Reset then
+				StrokeColourAPI.Reset()
 			end
-		else
-			warn("Stroke colour module failed:",result)
-
-			local fallbackSection=makeSection(uiSettingsPage,1,"Stroke Colour","Remote module failed to load.")
-			New("TextLabel",{
-				BackgroundTransparency=1,
-				Size=UDim2.new(1,0,0,22),
-				Text="page-4/stroke-colour/gui.lua failed: "..tostring(result),
-				Font=Enum.Font.Gotham,
-				TextSize=12,
-				TextColor3=THEME.RED,
-				TextXAlignment=Enum.TextXAlignment.Left,
-				ZIndex=6,
-			},fallbackSection)
 		end
-	else
-		warn("Missing remote module: page-4/stroke-colour/gui.lua")
-
-		local fallbackSection=makeSection(uiSettingsPage,1,"Stroke Colour","Remote module failed to load.")
-		New("TextLabel",{
-			BackgroundTransparency=1,
-			Size=UDim2.new(1,0,0,22),
-			Text="Missing page-4/stroke-colour/gui.lua",
-			Font=Enum.Font.Gotham,
-			TextSize=12,
-			TextColor3=THEME.RED,
-			TextXAlignment=Enum.TextXAlignment.Left,
-			ZIndex=6,
-		},fallbackSection)
 	end
 
 	applyUIStrokeTheme()
-
 	if updateResponsiveLayout then
 		pcall(updateResponsiveLayout)
 	end
@@ -134,13 +134,7 @@ rebuildCustomizeFromModules=function()
 		return
 	end
 
-	if StrokeColourAPI and StrokeColourAPI.Destroy then
-		pcall(function()
-			StrokeColourAPI.Destroy()
-		end)
-	end
-
-	StrokeColourAPI=nil
+	destroyRuntimeAPIs({"StrokeColourAPI"})
 	resetCustomizePageDefaults=function() end
 	clearCustomizePage()
 	LAZY_PAGE_BUILT.customize=false
@@ -152,48 +146,19 @@ MapEditorAPI=nil
 AntiMaterialAPI=nil
 MapCleanerAPI=nil
 RemoveAdsAPI=nil
+MAP_API_NAMES={"MapEditorAPI","AntiMaterialAPI","MapCleanerAPI","RemoveAdsAPI"}
+MAP_MODULE_SPECS={
+	{name="MapEditor",api="MapEditorAPI",order=0,title="Map Editor"},
+	{name="AntiMaterial",api="AntiMaterialAPI",order=1,title="Anti Material"},
+	{name="MapCleaner",api="MapCleanerAPI",order=2,title="Map Cleaner"},
+	{name="RemoveAds",api="RemoveAdsAPI",order=3,title="Remove Ads"},
+}
 
 function clearMapPage()
-	if not mapPage then return end
-
-	for _,child in ipairs(mapPage:GetChildren()) do
-		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
-			child:Destroy()
-		end
-	end
+	clearRuntimePage(mapPage,true)
 end
 
-function buildMapPage()
-	if MapEditorAPI and MapEditorAPI.Destroy then
-		pcall(function()
-			MapEditorAPI.Destroy()
-		end)
-	end
-
-	if AntiMaterialAPI and AntiMaterialAPI.Destroy then
-		pcall(function()
-			AntiMaterialAPI.Destroy()
-		end)
-	end
-
-	if MapCleanerAPI and MapCleanerAPI.Destroy then
-		pcall(function()
-			MapCleanerAPI.Destroy()
-		end)
-	end
-
-	if RemoveAdsAPI and RemoveAdsAPI.Destroy then
-		pcall(function()
-			RemoveAdsAPI.Destroy()
-		end)
-	end
-
-	MapEditorAPI=nil
-	AntiMaterialAPI=nil
-	MapCleanerAPI=nil
-	RemoveAdsAPI=nil
-	clearMapPage()
-
+function ensureWorldSettings()
 	if WORLD_SETTINGS.SmoothPlastic==nil then
 		WORLD_SETTINGS.SmoothPlastic=false
 	end
@@ -201,125 +166,51 @@ function buildMapPage()
 	if type(WORLD_SETTINGS.OriginalMaterials)~="table" then
 		WORLD_SETTINGS.OriginalMaterials=setmetatable({}, {__mode="k"})
 	end
+end
 
-	MapEditorLogicModule=loadDeferredModule("MapEditorLogic",MODULE_PATHS.MapEditorLogic,MapEditorLogicModule)
-	MapEditorModule=loadDeferredModule("MapEditor",MODULE_PATHS.MapEditor,MapEditorModule)
-	AntiMaterialLogicModule=loadDeferredModule("AntiMaterialLogic",MODULE_PATHS.AntiMaterialLogic,AntiMaterialLogicModule)
-	AntiMaterialModule=loadDeferredModule("AntiMaterial",MODULE_PATHS.AntiMaterial,AntiMaterialModule)
-	MapCleanerLogicModule=loadDeferredModule("MapCleanerLogic",MODULE_PATHS.MapCleanerLogic,MapCleanerLogicModule)
-	MapCleanerModule=loadDeferredModule("MapCleaner",MODULE_PATHS.MapCleaner,MapCleanerModule)
-	RemoveAdsLogicModule=loadDeferredModule("RemoveAdsLogic",MODULE_PATHS.RemoveAdsLogic,RemoveAdsLogicModule)
-	RemoveAdsModule=loadDeferredModule("RemoveAds",MODULE_PATHS.RemoveAds,RemoveAdsModule)
+function makeMapCtx(name)
+	local ctx={
+		New=New,
+		Fusion=FusionModule,
+		THEME=THEME,
+		makeSection=makeSection,
+		buildSlider=buildSlider,
+		buildToggleRow=buildToggleRow,
+		wrapTextButton=wrapTextButton,
+		safeDisconnect=safeDisconnect,
+		getCurrentModeKey=function()
+			return CURRENT_MODE_KEY
+		end,
+		onChanged=function()
+			requestPlayerAutosave()
+		end,
+	}
 
-	if MapEditorModule and MapEditorModule.new then
-		local ok,result=pcall(function()
-			return MapEditorModule.new({
-				New=New,
-				Fusion=FusionModule,
-				THEME=THEME,
-				MapEditorLogicModule=MapEditorLogicModule,
-				makeSection=makeSection,
-				buildSlider=buildSlider,
-				buildToggleRow=buildToggleRow,
-				wrapTextButton=wrapTextButton,
-			},mapPage)
-		end)
-
-		if ok then
-			MapEditorAPI=result
-		else
-			warn("Map editor module failed:",result)
+	if name=="MapEditor" then
+		ctx.MapEditorLogicModule=MapEditorLogicModule
+	elseif name=="AntiMaterial" then
+		ctx.WORLD_SETTINGS=WORLD_SETTINGS
+		ctx.AntiMaterialLogicModule=AntiMaterialLogicModule
+		ctx.onChanged=function(state)
+			potatoMode=state and true or false
 		end
+	elseif name=="MapCleaner" then
+		ctx.MapCleanerLogicModule=MapCleanerLogicModule
+	elseif name=="RemoveAds" then
+		ctx.RemoveAdsLogicModule=RemoveAdsLogicModule
 	end
 
-	if AntiMaterialModule and AntiMaterialModule.new then
-		local ok,result=pcall(function()
-			return AntiMaterialModule.new({
-				New=New,
-				Fusion=FusionModule,
-				THEME=THEME,
-				WORLD_SETTINGS=WORLD_SETTINGS,
-				safeDisconnect=safeDisconnect,
-				AntiMaterialLogicModule=AntiMaterialLogicModule,
+	return ctx
+end
 
-				makeSection=makeSection,
-				buildToggleRow=buildToggleRow,
+function buildMapPage()
+	destroyRuntimeAPIs(MAP_API_NAMES)
+	clearMapPage()
+	ensureWorldSettings()
+	loadDeferredModuleNames(MAP_RELOAD_NAMES)
 
-				onChanged=function(state)
-					potatoMode=state and true or false
-				end,
-			},mapPage)
-		end)
-
-		if ok then
-			AntiMaterialAPI=result
-		else
-			local section=makeSection(mapPage,1,"Anti Material","Remote module failed to load.")
-			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Anti Material module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
-		end
-	else
-		local section=makeSection(mapPage,1,"Anti Material","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-2/anti-material/gui.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
-	end
-
-	if MapCleanerModule and MapCleanerModule.new then
-		local ok,result=pcall(function()
-			return MapCleanerModule.new({
-				New=New,
-				Fusion=FusionModule,
-				THEME=THEME,
-				safeDisconnect=safeDisconnect,
-				MapCleanerLogicModule=MapCleanerLogicModule,
-				makeSection=makeSection,
-				buildToggleRow=buildToggleRow,
-				getCurrentModeKey=function()
-					return CURRENT_MODE_KEY
-				end,
-				onChanged=function()
-					requestPlayerAutosave()
-				end,
-			},mapPage)
-		end)
-
-		if ok then
-			MapCleanerAPI=result
-		else
-			local section=makeSection(mapPage,2,"Map Cleaner","Remote module failed to load.")
-			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Map Cleaner module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
-		end
-	else
-		local section=makeSection(mapPage,2,"Map Cleaner","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-2/map-cleaner/gui.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
-	end
-
-	if RemoveAdsModule and RemoveAdsModule.new then
-		local ok,result=pcall(function()
-			return RemoveAdsModule.new({
-				New=New,
-				Fusion=FusionModule,
-				THEME=THEME,
-				safeDisconnect=safeDisconnect,
-				RemoveAdsLogicModule=RemoveAdsLogicModule,
-				makeSection=makeSection,
-				buildToggleRow=buildToggleRow,
-				getCurrentModeKey=function()
-					return CURRENT_MODE_KEY
-				end,
-				onChanged=function()
-					requestPlayerAutosave()
-				end,
-			},mapPage)
-		end)
-
-		if ok then
-			RemoveAdsAPI=result
-		else
-			local section=makeSection(mapPage,3,"Remove Ads","Remote module failed to load.")
-			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Remove Ads module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
-		end
-	else
-		local section=makeSection(mapPage,3,"Remove Ads","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-2/remove-ads/gui.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	for _,spec in ipairs(MAP_MODULE_SPECS) do
+		buildRuntimeModule(spec,makeMapCtx(spec.name),mapPage)
 	end
 
 	applyUIStrokeTheme()
@@ -332,34 +223,7 @@ rebuildMapFromModules=function()
 		return
 	end
 
-	if MapEditorAPI and MapEditorAPI.Destroy then
-		pcall(function()
-			MapEditorAPI.Destroy()
-		end)
-	end
-
-	if AntiMaterialAPI and AntiMaterialAPI.Destroy then
-		pcall(function()
-			AntiMaterialAPI.Destroy()
-		end)
-	end
-
-	if MapCleanerAPI and MapCleanerAPI.Destroy then
-		pcall(function()
-			MapCleanerAPI.Destroy()
-		end)
-	end
-
-	if RemoveAdsAPI and RemoveAdsAPI.Destroy then
-		pcall(function()
-			RemoveAdsAPI.Destroy()
-		end)
-	end
-
-	MapEditorAPI=nil
-	AntiMaterialAPI=nil
-	MapCleanerAPI=nil
-	RemoveAdsAPI=nil
+	destroyRuntimeAPIs(MAP_API_NAMES)
 	clearMapPage()
 	LAZY_PAGE_BUILT.maps=false
 end

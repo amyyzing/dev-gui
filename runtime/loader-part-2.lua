@@ -283,64 +283,47 @@ function deleteOwnedPresetFromDataSave(code,index)
 	return true
 end
 
-PAGE1_STATE={
-	hitboxOn=hitboxOn,
-	sizeX=sizeX,
-	sizeY=sizeY,
-	sizeZ=sizeZ,
-	targetTransparency=targetTransparency,
-	gravityEnabled=gravityEnabled,
-	gravityValue=gravityValue,
-	speedEnabled=speedEnabled,
-	speedValue=speedValue,
-	gameParamsEnabled=gameParamsEnabled,
-	staminaRegenValue=staminaRegenValue,
-	staminaDepleteValue=staminaDepleteValue,
-	jumpPowerValue=jumpPowerValue,
-	divePowerValue=divePowerValue,
-	jumpBoostOn=jumpBoostOn,
-	jumpBoostTradeMode=jumpBoostTradeMode,
-	boostForceY=boostForceY,
-	boostCooldown=boostCooldown,
-	boostChance=boostChance,
-	ballDetectionRadius=ballDetectionRadius,
-	actionStatusOn=actionStatusOn,
-	qbAimEnabled=qbAimEnabled,
-	qbAimTeamFilter=qbAimTeamFilter,
-	qbAimShowArc=qbAimShowArc,
-	qbAimLeadDelay=qbAimLeadDelay,
-	qbAimPeakHeight=qbAimPeakHeight,
-	testingEnabled=testingEnabled,
+PAGE1_DEFAULTS={
+	hitboxOn=false,
+	sizeX=2.52,
+	sizeY=5.4,
+	sizeZ=1.41,
+	targetTransparency=0.7,
+	gravityEnabled=false,
+	gravityValue=196.2,
+	speedEnabled=false,
+	speedValue=18,
+	gameParamsEnabled=false,
+	staminaRegenValue=10,
+	staminaDepleteValue=10,
+	jumpPowerValue=53.5,
+	divePowerValue=1.9,
+	jumpBoostOn=false,
+	jumpBoostTradeMode=false,
+	boostForceY=32,
+	boostCooldown=5,
+	boostChance=100,
+	ballDetectionRadius=10,
+	actionStatusOn=false,
+	qbAimEnabled=false,
+	qbAimTeamFilter=true,
+	qbAimShowArc=true,
+	qbAimLeadDelay=0.38,
+	qbAimPeakHeight=14.00,
+	testingEnabled=false,
 }
 
+PAGE1_STATE={}
+for key,default in pairs(PAGE1_DEFAULTS) do
+	local value=getfenv()[key]
+	PAGE1_STATE[key]=value~=nil and value or default
+end
+
 function syncPage1State()
-	hitboxOn=PAGE1_STATE.hitboxOn
-	sizeX=PAGE1_STATE.sizeX
-	sizeY=PAGE1_STATE.sizeY
-	sizeZ=PAGE1_STATE.sizeZ
-	targetTransparency=PAGE1_STATE.targetTransparency
-	gravityEnabled=PAGE1_STATE.gravityEnabled
-	gravityValue=PAGE1_STATE.gravityValue
-	speedEnabled=PAGE1_STATE.speedEnabled
-	speedValue=PAGE1_STATE.speedValue
-	gameParamsEnabled=PAGE1_STATE.gameParamsEnabled
-	staminaRegenValue=PAGE1_STATE.staminaRegenValue
-	staminaDepleteValue=PAGE1_STATE.staminaDepleteValue
-	jumpPowerValue=PAGE1_STATE.jumpPowerValue
-	divePowerValue=PAGE1_STATE.divePowerValue
-	jumpBoostOn=PAGE1_STATE.jumpBoostOn
-	jumpBoostTradeMode=PAGE1_STATE.jumpBoostTradeMode
-	boostForceY=PAGE1_STATE.boostForceY
-	boostCooldown=PAGE1_STATE.boostCooldown
-	boostChance=PAGE1_STATE.boostChance
-	ballDetectionRadius=PAGE1_STATE.ballDetectionRadius
-	actionStatusOn=PAGE1_STATE.actionStatusOn
-	qbAimEnabled=PAGE1_STATE.qbAimEnabled
-	qbAimTeamFilter=PAGE1_STATE.qbAimTeamFilter
-	qbAimShowArc=PAGE1_STATE.qbAimShowArc
-	qbAimLeadDelay=PAGE1_STATE.qbAimLeadDelay
-	qbAimPeakHeight=PAGE1_STATE.qbAimPeakHeight
-	testingEnabled=PAGE1_STATE.testingEnabled
+	local env=getfenv()
+	for key in pairs(PAGE1_DEFAULTS) do
+		env[key]=PAGE1_STATE[key]
+	end
 end
 
 function refreshRuntimePageControls(name,forceTheme)
@@ -461,79 +444,43 @@ function addPage1Error(parent,order,title,path)
 	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),Text=path.." could not be loaded.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 end
 
+PAGE1_MODULE_SPECS={
+	{api="Hitbox",name="Page1Hitbox",column="left",order=1,title="Hitbox"},
+	{api="Gravity",name="Page1Gravity",column="left",order=2,title="Gravity"},
+	{api="Speed",name="Page1Speed",column="left",order=3,title="Speed"},
+	{api="GameParams",name="Page1GameParams",column="left",order=4,title="Game Params"},
+	{api="Boost",name="Page1Boost",column="right",order=2,title="Boost"},
+	{api="ESP",name="Page1ESP",column="right",order=3,title="ESP"},
+	{api="QBAim",name="Page1QBAim",column="right",order=4,title="QB Aim"},
+	{api="Testing",name="Page1Testing",column="right",order=5,title="Testing"},
+}
+
+function getPage1Column(name)
+	return name=="left" and leftCol or rightCol
+end
+
+function buildPage1Module(spec,ctx)
+	local parent=getPage1Column(spec.column)
+	local module=getfenv()[moduleGlobalName(spec.name)]
+	if module and module.new then
+		local ok,result=pcall(function()
+			return module.new(ctx,parent)
+		end)
+		if ok then
+			PAGE1_APIS[spec.api]=result
+		else
+			addPage1Error(parent,spec.order,spec.title,tostring(result))
+		end
+	else
+		addPage1Error(parent,spec.order,spec.title,MODULE_PATHS[spec.name] or tostring(spec.name))
+	end
+end
+
 function buildPage1()
 	local ctx=makePage1Ctx()
 
-	if Page1HitboxModule and Page1HitboxModule.new then
-		local ok,result=pcall(function()
-			return Page1HitboxModule.new(ctx,leftCol)
-		end)
-		if ok then PAGE1_APIS.Hitbox=result else addPage1Error(leftCol,1,"Hitbox",tostring(result)) end
-	else
-		addPage1Error(leftCol,1,"Hitbox","page-1/hitbox/gui.lua")
-	end
-
-	if Page1GravityModule and Page1GravityModule.new then
-		local ok,result=pcall(function()
-			return Page1GravityModule.new(ctx,leftCol)
-		end)
-		if ok then PAGE1_APIS.Gravity=result else addPage1Error(leftCol,2,"Gravity",tostring(result)) end
-	else
-		addPage1Error(leftCol,2,"Gravity","page-1/gravity/gui.lua")
-	end
-
-	if Page1SpeedModule and Page1SpeedModule.new then
-		local ok,result=pcall(function()
-			return Page1SpeedModule.new(ctx,leftCol)
-		end)
-		if ok then PAGE1_APIS.Speed=result else addPage1Error(leftCol,3,"Speed",tostring(result)) end
-	else
-		addPage1Error(leftCol,3,"Speed","page-1/speed/gui.lua")
-	end
-
-	if Page1GameParamsModule and Page1GameParamsModule.new then
-		local ok,result=pcall(function()
-			return Page1GameParamsModule.new(ctx,leftCol)
-		end)
-		if ok then PAGE1_APIS.GameParams=result else addPage1Error(leftCol,4,"Game Params",tostring(result)) end
-	else
-		addPage1Error(leftCol,4,"Game Params","page-1/game-params/gui.lua")
-	end
-
-	if Page1BoostModule and Page1BoostModule.new then
-		local ok,result=pcall(function()
-			return Page1BoostModule.new(ctx,rightCol)
-		end)
-		if ok then PAGE1_APIS.Boost=result else addPage1Error(rightCol,2,"Boost",tostring(result)) end
-	else
-		addPage1Error(rightCol,2,"Boost","page-1/boost/gui.lua")
-	end
-
-	if Page1ESPModule and Page1ESPModule.new then
-		local ok,result=pcall(function()
-			return Page1ESPModule.new(ctx,rightCol)
-		end)
-		if ok then PAGE1_APIS.ESP=result else addPage1Error(rightCol,3,"ESP",tostring(result)) end
-	else
-		addPage1Error(rightCol,3,"ESP","page-1/esp/gui.lua")
-	end
-
-	if Page1QBAimModule and Page1QBAimModule.new then
-		local ok,result=pcall(function()
-			return Page1QBAimModule.new(ctx,rightCol)
-		end)
-		if ok then PAGE1_APIS.QBAim=result else addPage1Error(rightCol,4,"QB Aim",tostring(result)) end
-	else
-		addPage1Error(rightCol,4,"QB Aim","page-1/qb-aim/gui.lua")
-	end
-
-	if Page1TestingModule and Page1TestingModule.new then
-		local ok,result=pcall(function()
-			return Page1TestingModule.new(ctx,rightCol)
-		end)
-		if ok then PAGE1_APIS.Testing=result else addPage1Error(rightCol,5,"Testing",tostring(result)) end
-	else
-		addPage1Error(rightCol,5,"Testing","page-1/testing/gui.lua")
+	for _,spec in ipairs(PAGE1_MODULE_SPECS) do
+		buildPage1Module(spec,ctx)
 	end
 
 	syncPage1State()
@@ -570,33 +517,9 @@ end
 buildPage1()
 
 function resetMainPageDefaults()
-	PAGE1_STATE.hitboxOn=false
-	PAGE1_STATE.sizeX=2.52
-	PAGE1_STATE.sizeY=5.4
-	PAGE1_STATE.sizeZ=1.41
-	PAGE1_STATE.targetTransparency=0.7
-	PAGE1_STATE.gravityEnabled=false
-	PAGE1_STATE.gravityValue=196.2
-	PAGE1_STATE.speedEnabled=false
-	PAGE1_STATE.speedValue=18
-	PAGE1_STATE.gameParamsEnabled=false
-	PAGE1_STATE.staminaRegenValue=10
-	PAGE1_STATE.staminaDepleteValue=10
-	PAGE1_STATE.jumpPowerValue=53.5
-	PAGE1_STATE.divePowerValue=1.9
-	PAGE1_STATE.jumpBoostOn=false
-	PAGE1_STATE.jumpBoostTradeMode=false
-	PAGE1_STATE.boostForceY=32
-	PAGE1_STATE.boostCooldown=5
-	PAGE1_STATE.boostChance=100
-	PAGE1_STATE.ballDetectionRadius=10
-	PAGE1_STATE.actionStatusOn=false
-	PAGE1_STATE.qbAimEnabled=false
-	PAGE1_STATE.qbAimTeamFilter=true
-	PAGE1_STATE.qbAimShowArc=true
-	PAGE1_STATE.qbAimLeadDelay=0.38
-	PAGE1_STATE.qbAimPeakHeight=14.00
-	PAGE1_STATE.testingEnabled=false
+	for key,value in pairs(PAGE1_DEFAULTS) do
+		PAGE1_STATE[key]=value
+	end
 
 	for _,api in pairs(PAGE1_APIS) do
 		if api and api.Refresh then
