@@ -2,8 +2,22 @@
 -- Runtime chunk 4. Loaded by loader.lua with a shared environment.
 refreshPage2UI=function() end
 PAGE2_EXPANDED_OWNED={}
+PAGE2_APIS={}
 PlayerDataAPI=nil
 DiscordAPI=nil
+
+function destroyPage2APIs()
+	for key,api in pairs(PAGE2_APIS) do
+		if api and api.Destroy then
+			pcall(function()
+				api.Destroy()
+			end)
+		end
+		PAGE2_APIS[key]=nil
+	end
+
+	refreshPage2UI=function() end
+end
 
 function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	local modal=New("Frame", {BackgroundColor3=Color3.fromRGB(0, 0, 0), BackgroundTransparency=0.25, BorderSizePixel=0, Size=UDim2.new(1, 0, 1, 0), ZIndex=100}, SG)
@@ -273,6 +287,8 @@ function addPage2Error(parent,text)
 end
 
 function buildPage2()
+	destroyPage2APIs()
+
 	HitboxPresetLogicModule=loadDeferredModule("HitboxPresetLogic",MODULE_PATHS.HitboxPresetLogic,HitboxPresetLogicModule)
 	HitboxPresetModule=loadDeferredModule("HitboxPreset",MODULE_PATHS.HitboxPreset,HitboxPresetModule)
 	KeybindSettingsLogicModule=loadDeferredModule("KeybindSettingsLogic",MODULE_PATHS.KeybindSettingsLogic,KeybindSettingsLogicModule)
@@ -394,10 +410,15 @@ function buildPage2()
 	if keybindSettings and keybindSettings.SetRefreshAll then keybindSettings.SetRefreshAll(refreshAll) end
 	if presetEditor and presetEditor.SetRefreshAll then presetEditor.SetRefreshAll(refreshAll) end
 
+	PAGE2_APIS.hitboxPresets=hitboxPresets
+	PAGE2_APIS.keybindSettings=keybindSettings
+	PAGE2_APIS.presetEditor=presetEditor
+
 	refreshPage2UI()
 end
 
 function clearPage2()
+	destroyPage2APIs()
 	if not futurePage then return end
 
 	for _,child in ipairs(futurePage:GetChildren()) do

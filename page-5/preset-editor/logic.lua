@@ -16,6 +16,12 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 	local presetRows={}
 	local refreshAll=nil
 	local suppressKeyButtonClickUntil=0
+	local connections={}
+	local function connect(signal,fn)
+		local conn=signal:Connect(fn)
+		table.insert(connections,conn)
+		return conn
+	end
 
 	function api.SetRefreshAll(fn)
 		refreshAll=fn
@@ -111,12 +117,12 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 		local wrap,stroke=wrapTextBox(b,normalBg,2)
 		wrap:SetAttribute("ThemeRole","INPUT")
 
-		b.Focused:Connect(function()
+		connect(b.Focused,function()
 			wrap.BackgroundColor3=THEME.INPUT or THEME.PANEL
 			stroke.Thickness=2
 		end)
 
-		b.FocusLost:Connect(function()
+		connect(b.FocusLost,function()
 			wrap.BackgroundColor3=THEME.INPUT or THEME.PANEL
 			stroke.Thickness=2
 		end)
@@ -145,7 +151,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 	placeWrappedButton(saveBtn,UDim2.new(1,-150,0,0))
 	saveBtn.Text="SAVE PRESET"
 
-	saveBtn.MouseButton1Click:Connect(function()
+	connect(saveBtn.MouseButton1Click,function()
 		if hitboxPresets and hitboxPresets.ShowSaveConfirm then
 			hitboxPresets.ShowSaveConfirm(api.Collect)
 		elseif hitboxPresets and hitboxPresets.AddPreset then
@@ -187,11 +193,11 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			zBox.Text=fmtNumber(p.size.Z,2)
 		end
 
-		xBox.FocusLost:Connect(applyPresetSize)
-		yBox.FocusLost:Connect(applyPresetSize)
-		zBox.FocusLost:Connect(applyPresetSize)
+		connect(xBox.FocusLost,applyPresetSize)
+		connect(yBox.FocusLost,applyPresetSize)
+		connect(zBox.FocusLost,applyPresetSize)
 
-		keyBtn.MouseButton1Click:Connect(function()
+		connect(keyBtn.MouseButton1Click,function()
 			if os.clock()<suppressKeyButtonClickUntil then
 				return
 			end
@@ -213,7 +219,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			end)
 		end)
 
-		keyBtn.InputBegan:Connect(function(input)
+		connect(keyBtn.InputBegan,function(input)
 			local active=keybinds.GetActiveCapture and keybinds.GetActiveCapture()
 			if not(active and active.button==keyBtn) then return end
 
@@ -226,7 +232,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			end
 		end)
 
-		resetBtn.MouseButton1Click:Connect(function()
+		connect(resetBtn.MouseButton1Click,function()
 			resetPreset(i)
 			api.Refresh()
 			if refreshAll then refreshAll() end
@@ -254,6 +260,16 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			item.yBox.Text=fmtNumber(p.size.Y,2)
 			item.zBox.Text=fmtNumber(p.size.Z,2)
 		end
+	end
+
+	function api.Destroy()
+		for _,conn in ipairs(connections) do
+			pcall(function()
+				conn:Disconnect()
+			end)
+		end
+		table.clear(connections)
+		refreshAll=nil
 	end
 
 	api.Refresh()

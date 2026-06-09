@@ -55,6 +55,12 @@ function KeybindSettings.new(ctx,bindSection)
 	local refreshAll=nil
 	local inputConn=nil
 	local suppressMouseButton1ClickUntil=0
+	local connections={}
+	local function connect(signal,fn)
+		local conn=signal:Connect(fn)
+		table.insert(connections,conn)
+		return conn
+	end
 
 	function api.GetActiveCapture()
 		return activeCapture
@@ -102,12 +108,12 @@ function KeybindSettings.new(ctx,bindSection)
 		local wrap=wrapTextButton(btn,normalBg,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 
-		btn.MouseEnter:Connect(function()
+		connect(btn.MouseEnter,function()
 			if activeCapture and activeCapture.button==btn then return end
 			wrap.BackgroundColor3=THEME.CARD
 		end)
 
-		btn.MouseLeave:Connect(function()
+		connect(btn.MouseLeave,function()
 			if activeCapture and activeCapture.button==btn then return end
 			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
 		end)
@@ -191,7 +197,7 @@ function KeybindSettings.new(ctx,bindSection)
 			hoverTween:Play()
 		end
 
-		labelButton.MouseEnter:Connect(function()
+		connect(labelButton.MouseEnter,function()
 			strike.BackgroundColor3=THEME.STROKE or THEME.GREEN
 			tweenLabel({TextColor3=THEME.STROKE or THEME.GREEN})
 			TweenService:Create(strike,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
@@ -200,7 +206,7 @@ function KeybindSettings.new(ctx,bindSection)
 			}):Play()
 		end)
 
-		labelButton.MouseLeave:Connect(function()
+		connect(labelButton.MouseLeave,function()
 			tweenLabel({TextColor3=THEME.TEXT})
 			TweenService:Create(strike,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
 				Size=UDim2.fromOffset(0,1),
@@ -208,7 +214,7 @@ function KeybindSettings.new(ctx,bindSection)
 			}):Play()
 		end)
 
-		labelButton.MouseButton1Click:Connect(function()
+		connect(labelButton.MouseButton1Click,function()
 			if activeCapture then
 				activeCapture=nil
 			end
@@ -219,7 +225,7 @@ function KeybindSettings.new(ctx,bindSection)
 		local btn=api.MakeBindButton(row,0,0,122)
 		placeWrappedButton(btn,UDim2.new(1,-122,0.5,-14))
 
-		btn.MouseButton1Click:Connect(function()
+		connect(btn.MouseButton1Click,function()
 			if os.clock()<suppressMouseButton1ClickUntil then
 				return
 			end
@@ -232,7 +238,7 @@ function KeybindSettings.new(ctx,bindSection)
 			api.StartCapture(btn,getter,setter)
 		end)
 
-		btn.InputBegan:Connect(function(input)
+		connect(btn.InputBegan,function(input)
 			if not(activeCapture and activeCapture.button==btn) then return end
 
 			api.CaptureInput(input)
@@ -272,7 +278,7 @@ function KeybindSettings.new(ctx,bindSection)
 		api.Refresh()
 	end
 
-	inputConn=UIS.InputBegan:Connect(function(inp)
+	inputConn=connect(UIS.InputBegan,function(inp)
 		if not activeCapture then return end
 
 		if inp.KeyCode==Enum.KeyCode.Escape then
@@ -290,11 +296,15 @@ function KeybindSettings.new(ctx,bindSection)
 	end)
 
 	function api.Destroy()
-		if inputConn then
-			inputConn:Disconnect()
-			inputConn=nil
+		for _,conn in ipairs(connections) do
+			pcall(function()
+				conn:Disconnect()
+			end)
 		end
+		table.clear(connections)
+		inputConn=nil
 		activeCapture=nil
+		refreshAll=nil
 	end
 
 	api.Build()

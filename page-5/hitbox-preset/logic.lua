@@ -29,6 +29,24 @@ function HitboxPreset.new(ctx,ownedSection)
 
 	local modalOverlay=nil
 	local refreshAll=nil
+	local connections={}
+	local listConnections={}
+	local modalConnections={}
+
+	local function trackConnection(conn,bucket)
+		bucket=bucket or connections
+		table.insert(bucket,conn)
+		return conn
+	end
+
+	local function disconnectAll(bucket)
+		for _,conn in ipairs(bucket) do
+			pcall(function()
+				conn:Disconnect()
+			end)
+		end
+		table.clear(bucket)
+	end
 
 	local ownedList=New("ScrollingFrame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,190),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BorderSizePixel=0,ZIndex=5},ownedSection)
 	New("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},ownedList)
@@ -111,6 +129,7 @@ function HitboxPreset.new(ctx,ownedSection)
 	end
 
 	local function clearOwnedList()
+		disconnectAll(listConnections)
 		for _,child in ipairs(ownedList:GetChildren()) do
 			if not child:IsA("UIListLayout") then
 				child:Destroy()
@@ -122,19 +141,19 @@ function HitboxPreset.new(ctx,ownedSection)
 		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text=text,Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8,LayoutOrder=order},parent)
 	end
 
-	local function makePresetActionButton(parent,label)
+	local function makePresetActionButton(parent,label,bucket)
 		local normalBg=THEME.BUTTON or THEME.BG
 		local btn=New("TextButton",{Size=UDim2.fromOffset(92,26),BackgroundColor3=normalBg,BorderSizePixel=0,Text=label,Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=9,ThemeRole="BUTTON"},parent)
 		local wrap=wrapTextButton(btn,normalBg,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 
-		btn.MouseEnter:Connect(function()
+		trackConnection(btn.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=THEME.CARD
-		end)
+		end),bucket)
 
-		btn.MouseLeave:Connect(function()
+		trackConnection(btn.MouseLeave:Connect(function()
 			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
-		end)
+		end),bucket)
 
 		return btn
 	end
@@ -158,10 +177,10 @@ function HitboxPreset.new(ctx,ownedSection)
 
 			local toggle=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-8,0,30),Position=UDim2.fromOffset(4,1),Text=(expandedOwned[code] and"[-] " or"[+] ")..name.."  |  "..code,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=7},row)
 
-			toggle.MouseButton1Click:Connect(function()
+			trackConnection(toggle.MouseButton1Click:Connect(function()
 				expandedOwned[code]=not expandedOwned[code]
 				api.Refresh()
-			end)
+			end),listConnections)
 
 			if expandedOwned[code] then
 				local detail=New("Frame",{BackgroundTransparency=1,Position=UDim2.fromOffset(10,34),Size=UDim2.new(1,-20,0,136),ZIndex=7},row)
@@ -178,19 +197,19 @@ function HitboxPreset.new(ctx,ownedSection)
 				local actionRow=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,28),ZIndex=8,LayoutOrder=7},detail)
 				New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},actionRow)
 
-				local equipBtn=makePresetActionButton(actionRow,"EQUIP")
-				local deleteBtn=makePresetActionButton(actionRow,"DELETE")
+				local equipBtn=makePresetActionButton(actionRow,"EQUIP",listConnections)
+				local deleteBtn=makePresetActionButton(actionRow,"DELETE",listConnections)
 
-				equipBtn.MouseButton1Click:Connect(function()
+				trackConnection(equipBtn.MouseButton1Click:Connect(function()
 					applyOwnedPreset(preset,editor)
 					requestRefresh()
-				end)
+				end),listConnections)
 
-				deleteBtn.MouseButton1Click:Connect(function()
+				trackConnection(deleteBtn.MouseButton1Click:Connect(function()
 					if deleteOwnedPreset(code,presetIndex) then
 						requestRefresh()
 					end
-				end)
+				end),listConnections)
 			end
 		end
 	end
@@ -239,6 +258,7 @@ function HitboxPreset.new(ctx,ownedSection)
 	end
 
 	local function closePresetModal()
+		disconnectAll(modalConnections)
 		if modalOverlay then
 			modalOverlay:Destroy()
 			modalOverlay=nil
@@ -251,13 +271,13 @@ function HitboxPreset.new(ctx,ownedSection)
 		local wrap=wrapTextButton(btn,normalBg,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 
-		btn.MouseEnter:Connect(function()
+		trackConnection(btn.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=THEME.CARD
-		end)
+		end),modalConnections)
 
-		btn.MouseLeave:Connect(function()
+		trackConnection(btn.MouseLeave:Connect(function()
 			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
-		end)
+		end),modalConnections)
 
 		return btn
 	end
@@ -280,16 +300,16 @@ function HitboxPreset.new(ctx,ownedSection)
 		local cancel=modalButton(box,"CANCEL",146)
 		local save=modalButton(box,"SAVE",248)
 
-		cancel.MouseButton1Click:Connect(closePresetModal)
+		trackConnection(cancel.MouseButton1Click:Connect(closePresetModal),modalConnections)
 
-		save.MouseButton1Click:Connect(function()
+		trackConnection(save.MouseButton1Click:Connect(function()
 			local ok,result=api.AddPreset(nameBox.Text,collectFn)
 			if not ok then
 				warning.Text=tostring(result)
 				return
 			end
 			closePresetModal()
-		end)
+		end),modalConnections)
 
 		task.defer(function()
 			pcall(function()
@@ -313,10 +333,17 @@ function HitboxPreset.new(ctx,ownedSection)
 		local no=modalButton(box,"NO",146)
 		local yes=modalButton(box,"YES",248)
 
-		no.MouseButton1Click:Connect(closePresetModal)
-		yes.MouseButton1Click:Connect(function()
+		trackConnection(no.MouseButton1Click:Connect(closePresetModal),modalConnections)
+		trackConnection(yes.MouseButton1Click:Connect(function()
 			showNamePrompt(collectFn)
-		end)
+		end),modalConnections)
+	end
+
+	function api.Destroy()
+		closePresetModal()
+		clearOwnedList()
+		disconnectAll(connections)
+		refreshAll=nil
 	end
 
 	api.Refresh()
