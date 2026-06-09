@@ -20,6 +20,7 @@ function MainFrame.new(ctx)
 	local getUIStrokeGradientColor=ctx.getUIStrokeGradientColor or function() return THEME.GREEN or THEME.ACC or THEME.TEXT end
 	local getCurrentUILibProfile=ctx.getCurrentUILibProfile
 	local onPageActivated=ctx.onPageActivated
+	local onRefreshRequested=ctx.onRefreshRequested
 	local uiProfile=type(ctx.UI_PROFILE)=="table" and ctx.UI_PROFILE or {}
 	local mainFrameProfile={}
 	local windowProfile={}
@@ -308,10 +309,19 @@ function MainFrame.new(ctx)
 		return b,wrap
 	end
 
-	local miniBtn,miniWrap=makeTopButton("-", -(topButtonSize*2+topButtonGap+topButtonOuter))
-	local closeBtn,closeWrap=makeTopButton("x", -(topButtonSize+topButtonOuter))
+	local function topButtonX(index)
+		return -(topButtonOuter+(topButtonSize*index)+(topButtonGap*(index-1)))
+	end
 
-	local headerSearch=New("Frame",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-(topButtonOuter+(topButtonSize*2)+topButtonGap+12),0.5,0),Size=UDim2.fromOffset(headerSearchWidth,headerSearchHeight),BackgroundColor3=THEME.INPUT or THEME.PANEL,BorderSizePixel=0,ZIndex=5,Visible=headerSearchVisible,ThemeRole="INPUT",CornerRole="Control"},header)
+	local function headerSearchInset()
+		return topButtonOuter+(topButtonSize*3)+(topButtonGap*2)+12
+	end
+
+	local refreshBtn,refreshWrap=makeTopButton("R",topButtonX(3))
+	local miniBtn,miniWrap=makeTopButton("-",topButtonX(2))
+	local closeBtn,closeWrap=makeTopButton("x",topButtonX(1))
+
+	local headerSearch=New("Frame",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-headerSearchInset(),0.5,0),Size=UDim2.fromOffset(headerSearchWidth,headerSearchHeight),BackgroundColor3=THEME.INPUT or THEME.PANEL,BorderSizePixel=0,ZIndex=5,Visible=headerSearchVisible,ThemeRole="INPUT",CornerRole="Control"},header)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},headerSearch)
 	local headerSearchStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.78},headerSearch)
 	headerSearchStroke:SetAttribute("BaseStrokeTransparency",0.78)
@@ -482,7 +492,7 @@ function MainFrame.new(ctx)
 
 		headerSearch.Visible=headerSearchVisible
 		headerSearch.Size=UDim2.fromOffset(headerSearchWidth,headerSearchHeight)
-		headerSearch.Position=UDim2.new(1,-(topButtonOuter+(topButtonSize*2)+topButtonGap+12),0.5,0)
+		headerSearch.Position=UDim2.new(1,-headerSearchInset(),0.5,0)
 		local searchText=headerSearch:FindFirstChildWhichIsA("TextLabel")
 		if searchText then
 			searchText.Text=headerSearchPlaceholder
@@ -790,6 +800,30 @@ function MainFrame.new(ctx)
 		end
 	end)
 
+	local refreshBusy=false
+	refreshBtn.MouseButton1Click:Connect(function()
+		if refreshBusy then return end
+		refreshBusy=true
+
+		local oldText=refreshBtn.Text
+		refreshBtn.Text="..."
+
+		task.spawn(function()
+			if type(onRefreshRequested)=="function" then
+				local ok,err=pcall(onRefreshRequested)
+				if not ok then
+					warn("Manual refresh failed:",err)
+				end
+			end
+
+			task.wait(0.35)
+			if refreshBtn and refreshBtn.Parent then
+				refreshBtn.Text=oldText
+			end
+			refreshBusy=false
+		end)
+	end)
+
 	fab.MouseButton1Click:Connect(restore)
 
 	local dragConn=nil
@@ -897,12 +931,16 @@ function MainFrame.new(ctx)
 		mainLayout.Padding=UDim.new(0,mainGap)
 		header.Size=UDim2.new(1,0,0,headerHeight)
 		footer.Size=UDim2.new(1,0,0,footerHeight)
+		refreshWrap.Size=UDim2.fromOffset(topButtonSize,topButtonSize)
+		refreshWrap.Position=UDim2.new(1,topButtonX(3),0.5,-topButtonSize/2)
+		refreshBtn.Size=UDim2.new(1,0,1,0)
+		refreshBtn.Position=UDim2.fromOffset(0,0)
 		miniWrap.Size=UDim2.fromOffset(topButtonSize,topButtonSize)
-		miniWrap.Position=UDim2.new(1,-(topButtonSize*2+topButtonGap+topButtonOuter),0.5,-topButtonSize/2)
+		miniWrap.Position=UDim2.new(1,topButtonX(2),0.5,-topButtonSize/2)
 		miniBtn.Size=UDim2.new(1,0,1,0)
 		miniBtn.Position=UDim2.fromOffset(0,0)
 		closeWrap.Size=UDim2.fromOffset(topButtonSize,topButtonSize)
-		closeWrap.Position=UDim2.new(1,-(topButtonSize+topButtonOuter),0.5,-topButtonSize/2)
+		closeWrap.Position=UDim2.new(1,topButtonX(1),0.5,-topButtonSize/2)
 		closeBtn.Size=UDim2.new(1,0,1,0)
 		closeBtn.Position=UDim2.fromOffset(0,0)
 		titleLabel.Font=titleFont
@@ -944,6 +982,7 @@ function MainFrame.new(ctx)
 	api.main=main
 	api.header=header
 	api.modeSubtitle=modeSubtitle
+	api.refreshBtn=refreshBtn
 	api.closeBtn=closeBtn
 	api.resetBtn=resetBtn
 	api.pageBar=pageBar

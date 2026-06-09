@@ -447,6 +447,7 @@ function BOT_API.Post(path,body)
 end
 
 AUTO_REFRESH_ENABLED=false
+MANUAL_REFRESH_ENABLED=true
 AUTO_REFRESH_INTERVAL=5
 AUTO_REFRESH_RELOAD_PATH="loader.lua"
 
@@ -526,6 +527,7 @@ STARTUP_MODULE_PATHS={
 	MODULE_PATHS.MainFrame,
 	MODULE_PATHS.Description,
 	MODULE_PATHS.Announcement,
+	MODULE_PATHS.AutoRefresh,
 	MODULE_PATHS.Page1HitboxLogic,
 	MODULE_PATHS.Page1Hitbox,
 	MODULE_PATHS.Page1GravityLogic,
@@ -1106,7 +1108,7 @@ end
 
 GuiLogicModule=loadRemoteModuleStep("GuiLogic",MODULE_PATHS.GuiLogic)
 MainFrameModule=loadRemoteModuleStep("MainFrame",MODULE_PATHS.MainFrame)
-AutoRefreshModule=AUTO_REFRESH_ENABLED and loadRemoteModuleStep("AutoRefresh",MODULE_PATHS.AutoRefresh) or nil
+AutoRefreshModule=(AUTO_REFRESH_ENABLED or MANUAL_REFRESH_ENABLED) and loadRemoteModuleStep("AutoRefresh",MODULE_PATHS.AutoRefresh) or nil
 DescriptionModule=loadRemoteModuleStep("Description",MODULE_PATHS.Description)
 AnnouncementModule=loadRemoteModuleStep("Announcement",MODULE_PATHS.Announcement)
 Page1HitboxLogicModule=loadRemoteModuleStep("Page1HitboxLogic",MODULE_PATHS.Page1HitboxLogic)
@@ -1618,11 +1620,18 @@ function applyAutoRefreshModuleChange(changedPath,module)
 	return false
 end
 
-function startAutoRefresh()
-	if not AUTO_REFRESH_ENABLED then return end
+function ensureAutoRefreshAPI()
+	if AutoRefreshAPI then
+		return AutoRefreshAPI
+	end
+
+	if not(AUTO_REFRESH_ENABLED or MANUAL_REFRESH_ENABLED) then
+		return nil
+	end
+
 	if not(AutoRefreshModule and AutoRefreshModule.new) then
 		warn("Missing remote module: gui/auto-refresh.lua")
-		return
+		return nil
 	end
 
 	AutoRefreshAPI=AutoRefreshModule.new({
@@ -1672,7 +1681,45 @@ function startAutoRefresh()
 		onError=closeAfterAutoRefreshError,
 	})
 
-	AutoRefreshAPI.Start()
+	return AutoRefreshAPI
+end
+
+function refreshRemoteModulesNow()
+	if not MANUAL_REFRESH_ENABLED then
+		return false
+	end
+
+	local api=ensureAutoRefreshAPI()
+	if not(api and api.RefreshOnce) then
+		warn("Manual module refresh unavailable.")
+		return false
+	end
+
+	warn("Refreshing remote modules on demand.")
+	return api.RefreshOnce(true)
+end
+
+function exposeManualModuleRefresh()
+	local refresh=function()
+		return refreshRemoteModulesNow()
+	end
+	_G.HB_REFRESH_MODULES=refresh
+
+	if type(getgenv)=="function" then
+		local ok,env=pcall(getgenv)
+		if ok and type(env)=="table" then
+			env.HB_REFRESH_MODULES=refresh
+		end
+	end
+end
+
+function startAutoRefresh()
+	local api=ensureAutoRefreshAPI()
+	exposeManualModuleRefresh()
+
+	if AUTO_REFRESH_ENABLED and api and api.Start then
+		api.Start()
+	end
 end
 
 function stopLiquidStrokeAnimation()
