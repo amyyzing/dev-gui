@@ -517,6 +517,10 @@ MODULE_PATHS={
 MODULE_GLOBAL_NAMES={GuiFusion="FusionModule"}
 STARTUP_MODULE_NAMES={"GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GravityLogic","Page1Gravity","Page1SpeedLogic","Page1Speed","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","DataSave"}
 OPTIONAL_MODULE_NAMES={"PrimaryColour","SecondaryColour"}
+MAP_RELOAD_NAMES={"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds"}
+CUSTOMIZE_RELOAD_NAMES={"StrokeColourLogic","StrokeColour"}
+PAGE2_RELOAD_NAMES={"HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor"}
+SETTINGS_RELOAD_NAMES={"PlayerDataLogic","PlayerData","DiscordLogic","Discord"}
 
 function moduleGlobalName(name)
 	return MODULE_GLOBAL_NAMES[name] or (tostring(name).."Module")

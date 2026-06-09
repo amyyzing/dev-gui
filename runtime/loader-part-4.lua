@@ -374,6 +374,10 @@ function buildPage2Module(spec,ctx,sections)
 	end
 
 	local module=getfenv()[moduleGlobalName(spec.name)]
+	if not module then
+		module=loadDeferredModuleByName(spec.name)
+	end
+
 	if not(module and type(module.new)=="function") then
 		addPage2Error(sections[spec.section],"Missing remote module: "..tostring(MODULE_PATHS[spec.name] or spec.name))
 		return nil

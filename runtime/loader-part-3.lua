@@ -63,6 +63,10 @@ end
 function buildRuntimeModule(spec,ctx,parent,...)
 	local extra={...}
 	local module=getfenv()[moduleGlobalName(spec.name)]
+	if not module then
+		module=loadDeferredModuleByName(spec.name)
+	end
+
 	if module and module.new then
 		local ok,result=pcall(function()
 			return module.new(ctx,parent,table.unpack(extra))
