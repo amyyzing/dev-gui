@@ -6,6 +6,10 @@ PlayerDataAPI=nil
 DiscordAPI=nil
 
 function showConfirmModal(titleText, bodyText, yesText, onYes, options)
+	local GuiService=game:GetService("GuiService")
+	local previousSelection=GuiService.SelectedObject
+	local closed=false
+	local modalInputConn=nil
 	local modal=New("Frame", {BackgroundColor3=Color3.fromRGB(0, 0, 0), BackgroundTransparency=0.25, BorderSizePixel=0, Size=UDim2.new(1, 0, 1, 0), ZIndex=100}, SG)
 
 	local box=New("Frame", {AnchorPoint=Vector2.new(0.5, 0.5), Position=UDim2.new(0.5, 0, 0.5, 0), Size=UDim2.fromOffset(390, 170), BackgroundColor3=THEME.SECTION or THEME.BG, BorderSizePixel=0, ZIndex=101, ThemeRole="SECTION", CornerRole="Section"}, modal)
@@ -22,7 +26,7 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 		local hoverBg=danger and Color3.fromRGB(255,124,118) or THEME.CARD
 		local leaveBg=danger and THEME.RED or (THEME.BUTTON or THEME.BG)
 		local textColor=danger and Color3.fromRGB(0,0,0) or THEME.TEXT
-		local b=New("TextButton", {Position=UDim2.fromOffset(x, 120), Size=UDim2.fromOffset(104, 30), BackgroundColor3=normalBg, BorderSizePixel=0, Text=text, Font=Enum.Font.Gotham, TextSize=12, TextColor3=textColor, AutoButtonColor=false, ZIndex=102}, box)
+		local b=New("TextButton", {Position=UDim2.fromOffset(x, 120), Size=UDim2.fromOffset(104, 30), BackgroundColor3=normalBg, BorderSizePixel=0, Text=text, Font=Enum.Font.Gotham, TextSize=12, TextColor3=textColor, AutoButtonColor=false, Selectable=true, ZIndex=102}, box)
 
 		local wrap=wrapTextButton(b, normalBg, 2)
 		wrap.BackgroundColor3=normalBg
@@ -48,13 +52,41 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	local no=modalButton("CANCEL", 160, false)
 	local yes=modalButton(yesText or"YES", 274, danger)
 
-	no.MouseButton1Click:Connect(function()
-		modal:Destroy()
+	local function closeModal()
+		if closed then return end
+		closed=true
+		if modalInputConn then
+			modalInputConn:Disconnect()
+			modalInputConn=nil
+		end
+		if modal then
+			modal:Destroy()
+		end
+		if previousSelection and previousSelection.Parent then
+			GuiService.SelectedObject=previousSelection
+		end
+	end
+
+	no.Activated:Connect(function()
+		closeModal()
 	end)
 
-	yes.MouseButton1Click:Connect(function()
-		modal:Destroy()
+	yes.Activated:Connect(function()
+		closeModal()
 		if onYes then onYes() end
+	end)
+
+	modalInputConn=UIS.InputBegan:Connect(function(input,processed)
+		if processed then return end
+		if input.KeyCode==Enum.KeyCode.Escape or input.KeyCode==Enum.KeyCode.ButtonB then
+			closeModal()
+		end
+	end)
+
+	task.defer(function()
+		if yes and yes.Parent then
+			GuiService.SelectedObject=yes
+		end
 	end)
 end
 
@@ -98,6 +130,7 @@ function buildUpdateSection()
 		TextSize=12,
 		TextColor3=THEME.TEXT,
 		AutoButtonColor=false,
+		Selectable=true,
 		ZIndex=6,
 	},section)
 
@@ -450,7 +483,7 @@ resetKeybindPresetPageDefaults=function()
 	requestPlayerAutosave()
 end
 
-resetBtn.MouseButton1Click:Connect(function()
+resetBtn.Activated:Connect(function()
 	local activePageName=getActivePageName()
 
 	if activePageName=="main" then

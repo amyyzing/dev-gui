@@ -1,10 +1,23 @@
 -- HB_RUNTIME_PART_5
 -- Runtime chunk 5. Loaded by loader.lua with a shared environment.
+local closeButtonConn=nil
+local globalInputConn=nil
+
 function shutdownTool()
 	if not toolAlive then return end
 
 	sendPlayerSessionUpdate(true)
 	toolAlive=false
+
+	if closeButtonConn then
+		closeButtonConn:Disconnect()
+		closeButtonConn=nil
+	end
+
+	if globalInputConn then
+		globalInputConn:Disconnect()
+		globalInputConn=nil
+	end
 
 	if AnnouncementAPI and AnnouncementAPI.Destroy then
 		pcall(function()
@@ -23,7 +36,7 @@ function shutdownTool()
 	end
 end
 
-closeBtn.MouseButton1Click:Connect(shutdownTool)
+closeButtonConn=closeBtn.Activated:Connect(shutdownTool)
 
 function applyHitboxPreset(index)
 	local preset=PRESETS[index]
@@ -110,7 +123,7 @@ function handleGlobalInput(inp,processed)
 	return handled
 end
 
-UIS.InputBegan:Connect(function(inp,processed)
+globalInputConn=UIS.InputBegan:Connect(function(inp,processed)
 	handleGlobalInput(inp,processed)
 end)
 

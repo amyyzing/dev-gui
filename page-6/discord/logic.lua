@@ -100,6 +100,7 @@ function Discord.new(ctx,page)
 		TextXAlignment=Enum.TextXAlignment.Left,
 		TextTruncate=Enum.TextTruncate.AtEnd,
 		AutoButtonColor=false,
+		Selectable=true,
 		ZIndex=6,
 	},section)
 
@@ -121,7 +122,7 @@ function Discord.new(ctx,page)
 		end
 	end)
 
-	linkButton.MouseButton1Click:Connect(copyInvite)
+	linkButton.Activated:Connect(copyInvite)
 
 	statusLabel=New("TextLabel",{
 		BackgroundTransparency=1,

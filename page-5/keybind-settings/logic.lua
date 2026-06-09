@@ -208,7 +208,7 @@ function KeybindSettings.new(ctx,bindSection)
 			}):Play()
 		end)
 
-		labelButton.MouseButton1Click:Connect(function()
+		labelButton.Activated:Connect(function()
 			if activeCapture then
 				activeCapture=nil
 			end
@@ -219,7 +219,7 @@ function KeybindSettings.new(ctx,bindSection)
 		local btn=api.MakeBindButton(row,0,0,122)
 		placeWrappedButton(btn,UDim2.new(1,-122,0.5,-14))
 
-		btn.MouseButton1Click:Connect(function()
+		btn.Activated:Connect(function()
 			if os.clock()<suppressMouseButton1ClickUntil then
 				return
 			end

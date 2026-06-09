@@ -71,7 +71,7 @@ function Secondary.new(ctx,parent)
 			Transparency=0,
 		},swatch)
 
-		swatch.MouseButton1Click:Connect(function()
+		swatch.Activated:Connect(function()
 			applyMainColour(colour)
 		end)
 	end
@@ -112,7 +112,7 @@ function Secondary.new(ctx,parent)
 		})
 		grad.Parent=btn
 
-		btn.MouseButton1Click:Connect(function()
+		btn.Activated:Connect(function()
 			applyGradient(pair[1],pair[2])
 		end)
 	end

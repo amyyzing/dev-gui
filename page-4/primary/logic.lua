@@ -64,7 +64,7 @@ function Primary.new(ctx,parent)
 			Transparency=0,
 		},swatch)
 
-		swatch.MouseButton1Click:Connect(function()
+		swatch.Activated:Connect(function()
 			applyPrimaryColour(colour)
 		end)
 	end

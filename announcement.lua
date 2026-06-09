@@ -209,13 +209,13 @@ function Announcement.new(ctx)
 
 		local closeConn=nil
 		local okConn=nil
-		closeConn=close.MouseButton1Click:Connect(function()
+		closeConn=close.Activated:Connect(function()
 			safeDisconnect(closeConn)
 			safeDisconnect(okConn)
 			destroyModal(true)
 		end)
 
-		okConn=okButton.MouseButton1Click:Connect(function()
+		okConn=okButton.Activated:Connect(function()
 			safeDisconnect(closeConn)
 			safeDisconnect(okConn)
 			destroyModal(true)
