@@ -6,6 +6,13 @@ function shutdownTool()
 	sendPlayerSessionUpdate(true)
 	toolAlive=false
 
+	if AutoRefreshAPI and AutoRefreshAPI.Destroy then
+		pcall(function()
+			AutoRefreshAPI.Destroy()
+		end)
+		AutoRefreshAPI=nil
+	end
+
 	if AnnouncementAPI and AnnouncementAPI.Destroy then
 		pcall(function()
 			AnnouncementAPI.Destroy()
@@ -18,12 +25,20 @@ function shutdownTool()
 		end)
 	end
 
+	if stopLiquidStrokeAnimation then
+		pcall(stopLiquidStrokeAnimation)
+	end
+
+	if disconnectRuntimeConnections then
+		disconnectRuntimeConnections()
+	end
+
 	if SG and SG.Parent then
 		SG:Destroy()
 	end
 end
 
-closeBtn.MouseButton1Click:Connect(shutdownTool)
+trackRuntimeConnection(closeBtn.MouseButton1Click:Connect(shutdownTool))
 
 function applyHitboxPreset(index)
 	local preset=PRESETS[index]
@@ -110,9 +125,9 @@ function handleGlobalInput(inp,processed)
 	return handled
 end
 
-UIS.InputBegan:Connect(function(inp,processed)
+trackRuntimeConnection(UIS.InputBegan:Connect(function(inp,processed)
 	handleGlobalInput(inp,processed)
-end)
+end))
 
 function getPersistentValue(name,default)
 	if name=="CURRENT_MODE_KEY" then return CURRENT_MODE_KEY end

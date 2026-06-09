@@ -17,6 +17,7 @@ function AutoRefresh.new(ctx)
 	local optionalPaths=ctx.optionalPaths or {}
 	local reloading=false
 	local failed=false
+	local stopped=false
 	local manifestFailed=false
 	local buildId=nil
 	local pathVersions={}
@@ -308,12 +309,12 @@ function AutoRefresh.new(ctx)
 	end
 
 	function api.Start()
-		if not enabled then return end
+		if not enabled or stopped then return end
 
 		task.spawn(function()
 			task.wait(interval)
 
-			while alive() and not failed do
+			while not stopped and alive() and not failed do
 				if manifestPoll() then
 					return
 				end
@@ -321,6 +322,12 @@ function AutoRefresh.new(ctx)
 				task.wait(interval)
 			end
 		end)
+	end
+
+	function api.Destroy()
+		stopped=true
+		enabled=false
+		failed=true
 	end
 
 	return api

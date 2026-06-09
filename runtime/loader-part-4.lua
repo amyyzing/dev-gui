@@ -5,6 +5,28 @@ PAGE2_EXPANDED_OWNED={}
 PAGE2_APIS={}
 PlayerDataAPI=nil
 DiscordAPI=nil
+SETTINGS_CONNECTIONS={}
+
+function trackSettingsConnection(conn)
+	if conn then
+		table.insert(SETTINGS_CONNECTIONS,conn)
+		if trackRuntimeConnection then
+			trackRuntimeConnection(conn)
+		end
+	end
+
+	return conn
+end
+
+function disconnectSettingsConnections()
+	for _,conn in ipairs(SETTINGS_CONNECTIONS) do
+		safeDisconnect(conn)
+		if untrackRuntimeConnection then
+			untrackRuntimeConnection(conn)
+		end
+	end
+	table.clear(SETTINGS_CONNECTIONS)
+end
 
 function destroyPage2APIs()
 	for key,api in pairs(PAGE2_APIS) do
@@ -21,6 +43,27 @@ end
 
 function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	local modal=New("Frame", {BackgroundColor3=Color3.fromRGB(0, 0, 0), BackgroundTransparency=0.25, BorderSizePixel=0, Size=UDim2.new(1, 0, 1, 0), ZIndex=100}, SG)
+	local modalConnections={}
+	local function connectModal(signal,fn)
+		local conn=signal:Connect(fn)
+		table.insert(modalConnections,conn)
+		if trackRuntimeConnection then
+			trackRuntimeConnection(conn)
+		end
+		return conn
+	end
+	local function closeModal()
+		for _,conn in ipairs(modalConnections) do
+			safeDisconnect(conn)
+			if untrackRuntimeConnection then
+				untrackRuntimeConnection(conn)
+			end
+		end
+		table.clear(modalConnections)
+		if modal and modal.Parent then
+			modal:Destroy()
+		end
+	end
 
 	local box=New("Frame", {AnchorPoint=Vector2.new(0.5, 0.5), Position=UDim2.new(0.5, 0, 0.5, 0), Size=UDim2.fromOffset(390, 170), BackgroundColor3=THEME.SECTION or THEME.BG, BorderSizePixel=0, ZIndex=101, ThemeRole="SECTION", CornerRole="Section"}, modal)
 	New("UICorner", {CornerRadius=UDim.new(0, 0)}, box)
@@ -47,11 +90,11 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 		end
 		wrap:SetAttribute("CornerRole","Control")
 
-		b.MouseEnter:Connect(function()
+		connectModal(b.MouseEnter,function()
 			wrap.BackgroundColor3=hoverBg
 		end)
 
-		b.MouseLeave:Connect(function()
+		connectModal(b.MouseLeave,function()
 			wrap.BackgroundColor3=leaveBg
 		end)
 
@@ -62,12 +105,10 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	local no=modalButton("CANCEL", 160, false)
 	local yes=modalButton(yesText or"YES", 274, danger)
 
-	no.MouseButton1Click:Connect(function()
-		modal:Destroy()
-	end)
+	connectModal(no.MouseButton1Click,closeModal)
 
-	yes.MouseButton1Click:Connect(function()
-		modal:Destroy()
+	connectModal(yes.MouseButton1Click,function()
+		closeModal()
 		if onYes then onYes() end
 	end)
 end
@@ -123,16 +164,16 @@ function buildUpdateSection()
 	button.Size=UDim2.new(1,0,1,0)
 	button.Position=UDim2.fromOffset(0,0)
 
-	button.MouseEnter:Connect(function()
+	trackSettingsConnection(button.MouseEnter:Connect(function()
 		wrap.BackgroundColor3=hoverBg
-	end)
+	end))
 
-	button.MouseLeave:Connect(function()
+	trackSettingsConnection(button.MouseLeave:Connect(function()
 		wrap.BackgroundColor3=normalBg
-	end)
+	end))
 
 	local busy=false
-	button.Activated:Connect(function()
+	trackSettingsConnection(button.Activated:Connect(function()
 		if busy then return end
 		busy=true
 		button.Text="UPDATING..."
@@ -160,7 +201,7 @@ function buildUpdateSection()
 			end
 			busy=false
 		end)
-	end)
+	end))
 end
 
 function buildActualSettingsPage()
@@ -250,6 +291,7 @@ end
 LAZY_PAGE_BUILDERS.settings=buildActualSettingsPage
 
 function clearActualSettingsPage()
+	disconnectSettingsConnections()
 	for _,child in ipairs(actualSettingsPage:GetChildren()) do
 		if not child:IsA("UIListLayout") then
 			child:Destroy()
@@ -471,7 +513,7 @@ resetKeybindPresetPageDefaults=function()
 	requestPlayerAutosave()
 end
 
-resetBtn.MouseButton1Click:Connect(function()
+trackRuntimeConnection(resetBtn.MouseButton1Click:Connect(function()
 	local activePageName=getActivePageName()
 
 	if activePageName=="main" then
@@ -484,4 +526,4 @@ resetBtn.MouseButton1Click:Connect(function()
 
 	refreshActionStatus()
 	requestPlayerAutosave()
-end)
+end))

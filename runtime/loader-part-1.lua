@@ -73,6 +73,38 @@ THEMED_TEXT_OBJECTS=setmetatable({}, {__mode="k"})
 THEMED_STROKES=setmetatable({}, {__mode="k"})
 THEMED_CORNERS=setmetatable({}, {__mode="k"})
 LIQUID_STROKE_GRADIENTS=setmetatable({}, {__mode="k"})
+RUNTIME_CONNECTIONS={}
+
+function trackRuntimeConnection(conn)
+	if conn then
+		table.insert(RUNTIME_CONNECTIONS,conn)
+	end
+
+	return conn
+end
+
+function untrackRuntimeConnection(conn)
+	for index=#RUNTIME_CONNECTIONS,1,-1 do
+		if RUNTIME_CONNECTIONS[index]==conn then
+			table.remove(RUNTIME_CONNECTIONS,index)
+			return
+		end
+	end
+end
+
+function disconnectRuntimeConnections()
+	for _,conn in ipairs(RUNTIME_CONNECTIONS) do
+		if typeof(conn)=="RBXScriptConnection" then
+			pcall(function()
+				conn:Disconnect()
+			end)
+		elseif type(conn)=="function" then
+			pcall(conn)
+		end
+	end
+
+	table.clear(RUNTIME_CONNECTIONS)
+end
 
 function registerThemeObject(obj)
 	if not obj then return end
@@ -241,19 +273,19 @@ function New(class, props, parent)
 	end
 
 	if class=="TextBox" then
-		obj.Focused:Connect(function()
+		trackRuntimeConnection(obj.Focused:Connect(function()
 			obj.TextSize=13
 			obj.TextScaled=false
 			obj.TextWrapped=false
 			obj.TextYAlignment=Enum.TextYAlignment.Center
-		end)
+		end))
 
-		obj.FocusLost:Connect(function()
+		trackRuntimeConnection(obj.FocusLost:Connect(function()
 			obj.TextSize=13
 			obj.TextScaled=false
 			obj.TextWrapped=false
 			obj.TextYAlignment=Enum.TextYAlignment.Center
-		end)
+		end))
 	end
 
 	return obj
@@ -1640,6 +1672,18 @@ function refreshRemoteModulesNow()
 
 	warn("Reloading GUI from fresh loader source.")
 	toolAlive=false
+	if AutoRefreshAPI and AutoRefreshAPI.Destroy then
+		pcall(function()
+			AutoRefreshAPI.Destroy()
+		end)
+		AutoRefreshAPI=nil
+	end
+	if stopLiquidStrokeAnimation then
+		pcall(stopLiquidStrokeAnimation)
+	end
+	if disconnectRuntimeConnections then
+		disconnectRuntimeConnections()
+	end
 	task.defer(function()
 		local ok,reloadErr=pcall(chunk)
 		if not ok then
@@ -1725,6 +1769,9 @@ end
 
 function stopLiquidStrokeAnimation()
 	safeDisconnect(liquidStrokeConn)
+	if untrackRuntimeConnection then
+		untrackRuntimeConnection(liquidStrokeConn)
+	end
 	liquidStrokeConn=nil
 end
 
@@ -1747,7 +1794,7 @@ function updateLiquidStrokeAnimation()
 	local t=0
 	local elapsed=0
 
-	liquidStrokeConn=RunService.RenderStepped:Connect(function(dt)
+	liquidStrokeConn=trackRuntimeConnection(RunService.RenderStepped:Connect(function(dt)
 		if not toolAlive or not SG or not SG.Parent or not UI_STYLE.LiquidStroke then
 			stopLiquidStrokeAnimation()
 			return
@@ -1805,7 +1852,7 @@ function updateLiquidStrokeAnimation()
 				end
 			end
 		end
-	end)
+	end))
 end
 
 applyUIStrokeTheme=function()
