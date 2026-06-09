@@ -245,11 +245,27 @@ function New(class, props, parent)
 		end
 	end
 
-	local obj=Instance.new(class)
-	for k, v in pairs(props) do
-		obj[k]=v
+	local obj=nil
+	if FusionModule and type(FusionModule.New)=="function" then
+		local ok,result=pcall(function()
+			return FusionModule.New(class)(props)
+		end)
+		if ok and typeof(result)=="Instance" then
+			obj=result
+		else
+			warn("Fusion New failed; using Instance.new fallback:",class,result)
+		end
 	end
-	obj.Parent=parent
+
+	if not obj then
+		obj=Instance.new(class)
+		for k, v in pairs(props) do
+			obj[k]=v
+		end
+	end
+	if parent~=nil then
+		obj.Parent=parent
+	end
 	registerThemeObject(obj)
 
 	if forcedThemeRole then
@@ -485,6 +501,7 @@ AUTO_REFRESH_RELOAD_PATH="loader.lua"
 
 MODULE_PATHS={
 	Announcement="announcement.lua",
+	GuiFusion="gui/fusion.lua",
 	GuiLogic="gui/gui-logic.lua",
 	MainFrame="gui/mainframe.lua",
 	AutoRefresh="gui/auto-refresh.lua",
@@ -555,6 +572,7 @@ for path in pairs(APP_RUNTIME_PATH_SET) do
 	MODULE_PATH_SET[path]=true
 end
 STARTUP_MODULE_PATHS={
+	MODULE_PATHS.GuiFusion,
 	MODULE_PATHS.GuiLogic,
 	MODULE_PATHS.MainFrame,
 	MODULE_PATHS.Description,
@@ -1137,6 +1155,7 @@ if not batchLoaded then
 	warn("Module batch unavailable; falling back to individual loads:",batchErr)
 end
 
+FusionModule=loadRemoteModuleStep("GuiFusion",MODULE_PATHS.GuiFusion)
 GuiLogicModule=loadRemoteModuleStep("GuiLogic",MODULE_PATHS.GuiLogic)
 MainFrameModule=loadRemoteModuleStep("MainFrame",MODULE_PATHS.MainFrame)
 AutoRefreshModule=AUTO_REFRESH_ENABLED and loadRemoteModuleStep("AutoRefresh",MODULE_PATHS.AutoRefresh) or nil

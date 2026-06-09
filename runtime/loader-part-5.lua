@@ -432,6 +432,7 @@ if AnnouncementModule and AnnouncementModule.new then
 	local ok,result=pcall(function()
 		return AnnouncementModule.new({
 			New=New,
+			Fusion=FusionModule,
 			THEME=THEME,
 			SG=SG,
 			BOT_API=BOT_API,

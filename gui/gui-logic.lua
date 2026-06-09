@@ -2,6 +2,7 @@ local GuiLogic={}
 
 function GuiLogic.new(ctx)
 	local New=ctx.New
+	local Fusion=ctx.Fusion
 	local THEME=ctx.THEME
 	local UI_STYLE=ctx.UI_STYLE or {}
 	local UIS=ctx.UIS
@@ -14,6 +15,25 @@ function GuiLogic.new(ctx)
 
 	local api={}
 	local WRAP_INSET=0
+
+	local function makeFusionValue(initial)
+		if type(Fusion)=="table" and type(Fusion.Value)=="function" then
+			return Fusion.Value(initial)
+		end
+		return nil
+	end
+
+	local function destroyFusionValue(value)
+		if value and type(value.Destroy)=="function" then
+			pcall(function()
+				value:Destroy()
+			end)
+		elseif value and type(value.destroy)=="function" then
+			pcall(function()
+				value:destroy()
+			end)
+		end
+	end
 
 	local function currentLib()
 		return tostring(UI_STYLE.UILib or "original"):lower()
@@ -132,6 +152,7 @@ function GuiLogic.new(ctx)
 		local softInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 		local snapInfo=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 		local state=startState and true or false
+		local stateValue=makeFusionValue(state)
 		local hovering=false
 		local activeTweens={}
 		local connections={}
@@ -353,6 +374,9 @@ function GuiLogic.new(ctx)
 			local nextState=v and true or false
 			local changed=nextState~=state
 			state=nextState
+			if stateValue then
+				stateValue:set(state)
+			end
 			applyVisuals(animate~=false)
 
 			if fire and changed and onChange then
@@ -376,6 +400,7 @@ function GuiLogic.new(ctx)
 
 		local function destroySwitch()
 			cancelTweens()
+			destroyFusionValue(stateValue)
 			for _,conn in ipairs(connections) do
 				pcall(function()
 					conn:Disconnect()
@@ -388,7 +413,7 @@ function GuiLogic.new(ctx)
 		end
 
 		setState(state,false,false)
-		return{set=function(v) setState(v,false,false) end,get=function() return state end,Destroy=destroySwitch,destroy=destroySwitch,wrap=wrap,knob=core,hit=hit,width=width,height=height}
+		return{set=function(v) setState(v,false,false) end,get=function() return state end,Destroy=destroySwitch,destroy=destroySwitch,stateValue=stateValue,wrap=wrap,knob=core,hit=hit,width=width,height=height}
 	end
 
 	local function createHeaderSwitch(parent,startState,onChange,zIndex)
@@ -426,6 +451,7 @@ function GuiLogic.new(ctx)
 		local dark=input:Lerp(Color3.new(0,0,0),0.25)
 		local light=(THEME.TEXT or Color3.fromRGB(245,245,245))
 		local state=startState and true or false
+		local stateValue=makeFusionValue(state)
 		local onPosition=UDim2.new(1,-(indicatorSize/2+indicatorInset),0.5,0)
 		local offPosition=UDim2.new(0,indicatorSize/2+indicatorInset,0.5,0)
 		local activeInnerSize=headerNumber("HeaderToggleActiveInnerSize",math.max(10,math.floor(outerCoreSize*0.54)))
@@ -651,6 +677,7 @@ function GuiLogic.new(ctx)
 		},switch)
 
 		local categoryExpanded=true
+		local expandedValue=makeFusionValue(categoryExpanded)
 		local activeTweens={}
 		local scaleTween=nil
 		local hoverTween=nil
@@ -688,6 +715,10 @@ function GuiLogic.new(ctx)
 		end
 
 		local function applyExpandedVisuals(animate)
+			if expandedValue then
+				expandedValue:set(categoryExpanded)
+			end
+
 			local targetScale=categoryExpanded and expandedScale or collapsedScale
 
 			if scaleTween then
@@ -773,6 +804,9 @@ function GuiLogic.new(ctx)
 			end
 
 			state=nextState
+			if stateValue then
+				stateValue:set(state)
+			end
 			applyVisuals((animate~=false) and changed)
 
 			if fire and changed and onChange then
@@ -815,6 +849,8 @@ function GuiLogic.new(ctx)
 				hoverTween:Cancel()
 				hoverTween=nil
 			end
+			destroyFusionValue(stateValue)
+			destroyFusionValue(expandedValue)
 			if clickConn then clickConn:Disconnect() clickConn=nil end
 			if hoverEnterConn then hoverEnterConn:Disconnect() hoverEnterConn=nil end
 			if hoverLeaveConn then hoverLeaveConn:Disconnect() hoverLeaveConn=nil end
@@ -830,10 +866,12 @@ function GuiLogic.new(ctx)
 			get=function()
 				return state
 			end,
+			stateValue=stateValue,
 			setExpanded=function(value,animate)
 				categoryExpanded=value and true or false
 				applyExpandedVisuals(animate~=false)
 			end,
+			expandedValue=expandedValue,
 			Destroy=destroyHeaderSwitch,
 			destroy=destroyHeaderSwitch,
 			wrap=switch,
@@ -1346,6 +1384,7 @@ function GuiLogic.new(ctx)
 		local valueStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=valueStrokeTransparency},valueBox)
 		valueStroke:SetAttribute("BaseStrokeTransparency",valueStrokeTransparency)
 		local value=startVal
+		local valueState=makeFusionValue(value)
 		local dragging=false
 		local dragInputType=nil
 		local connections={}
@@ -1391,6 +1430,9 @@ function GuiLogic.new(ctx)
 		local function setValue(v,fire)
 			v=roundTo(math.clamp(tonumber(v) or value,minVal,maxVal),decimals)
 			value=v
+			if valueState then
+				valueState:set(value)
+			end
 			setVisual(v)
 
 			if fire and onChange then
@@ -1471,6 +1513,7 @@ function GuiLogic.new(ctx)
 		local function destroySlider()
 			dragging=false
 			dragInputType=nil
+			destroyFusionValue(valueState)
 			for _,conn in ipairs(connections) do
 				pcall(function()
 					conn:Disconnect()
@@ -1480,7 +1523,7 @@ function GuiLogic.new(ctx)
 		end
 
 		setValue(startVal,false)
-		return{set=function(v) setValue(v,false) end,get=function() return value end,Destroy=destroySlider,destroy=destroySlider,box=valueBox,valueLabel=valueLabel,fill=fill,knob=knob,track=track}
+		return{set=function(v) setValue(v,false) end,get=function() return value end,Destroy=destroySlider,destroy=destroySlider,valueState=valueState,box=valueBox,valueLabel=valueLabel,fill=fill,knob=knob,track=track}
 	end
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)

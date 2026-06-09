@@ -2,6 +2,7 @@
 -- Runtime chunk 2. Loaded by loader.lua with a shared environment.
 GuiLogic=GuiLogicModule.new({
 	New=New,
+	Fusion=FusionModule,
 	THEME=THEME,
 	UI_STYLE=UI_STYLE,
 	UIS=UIS,
@@ -71,6 +72,7 @@ end
 
 MainFrame=MainFrameModule.new({
 	New=New,
+	Fusion=FusionModule,
 	THEME=THEME,
 	Description=Description,
 	UI_WINDOW=UI_WINDOW,
@@ -390,6 +392,7 @@ refreshActionStatus=function() end
 function makePage1Ctx()
 	return{
 		New=New,
+		Fusion=FusionModule,
 		THEME=THEME,
 		State=PAGE1_STATE,
 		makeSection=makeSection,

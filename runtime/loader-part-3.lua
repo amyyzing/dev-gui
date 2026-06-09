@@ -48,6 +48,7 @@ function buildCustomizePage()
 		local ok,result=pcall(function()
 			return StrokeColourModule.new({
 				New=New,
+				Fusion=FusionModule,
 				THEME=THEME,
 				UI_STYLE=UI_STYLE,
 				UIS=UIS,
@@ -214,6 +215,7 @@ function buildMapPage()
 		local ok,result=pcall(function()
 			return MapEditorModule.new({
 				New=New,
+				Fusion=FusionModule,
 				THEME=THEME,
 				MapEditorLogicModule=MapEditorLogicModule,
 				makeSection=makeSection,
@@ -234,6 +236,7 @@ function buildMapPage()
 		local ok,result=pcall(function()
 			return AntiMaterialModule.new({
 				New=New,
+				Fusion=FusionModule,
 				THEME=THEME,
 				WORLD_SETTINGS=WORLD_SETTINGS,
 				safeDisconnect=safeDisconnect,
@@ -263,6 +266,7 @@ function buildMapPage()
 		local ok,result=pcall(function()
 			return MapCleanerModule.new({
 				New=New,
+				Fusion=FusionModule,
 				THEME=THEME,
 				safeDisconnect=safeDisconnect,
 				MapCleanerLogicModule=MapCleanerLogicModule,
@@ -292,6 +296,7 @@ function buildMapPage()
 		local ok,result=pcall(function()
 			return RemoveAdsModule.new({
 				New=New,
+				Fusion=FusionModule,
 				THEME=THEME,
 				safeDisconnect=safeDisconnect,
 				RemoveAdsLogicModule=RemoveAdsLogicModule,

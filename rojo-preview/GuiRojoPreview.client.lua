@@ -108,6 +108,8 @@ local function moduleAt(path)
 	return require(node)
 end
 
+local FusionModule=moduleAt("gui/fusion")
+
 local function colorClose(a,b)
 	if not(a and b) then return false end
 	return math.abs(a.R-b.R)<0.002 and math.abs(a.G-b.G)<0.002 and math.abs(a.B-b.B)<0.002
@@ -189,11 +191,27 @@ local function New(class,props,parent)
 		props.TextYAlignment=props.TextYAlignment or Enum.TextYAlignment.Center
 	end
 
-	local obj=Instance.new(class)
-	for k,v in pairs(props) do
-		obj[k]=v
+	local obj=nil
+	if FusionModule and type(FusionModule.New)=="function" then
+		local ok,result=pcall(function()
+			return FusionModule.New(class)(props)
+		end)
+		if ok and typeof(result)=="Instance" then
+			obj=result
+		else
+			warn("Fusion New failed; using Instance.new fallback:",class,result)
+		end
 	end
-	obj.Parent=parent
+
+	if not obj then
+		obj=Instance.new(class)
+		for k,v in pairs(props) do
+			obj[k]=v
+		end
+	end
+	if parent~=nil then
+		obj.Parent=parent
+	end
 	registerThemeObject(obj)
 
 	if forcedThemeRole then
@@ -378,6 +396,7 @@ local Page1TestingModule=moduleAt("page-1/testing/gui")
 
 local GuiLogic=GuiLogicModule.new({
 	New=New,
+	Fusion=FusionModule,
 	THEME=THEME,
 	UI_STYLE=UI_STYLE,
 	UserInputService=UserInputService,
@@ -414,6 +433,7 @@ end
 
 mainFrame=MainFrameModule.new({
 	New=New,
+	Fusion=FusionModule,
 	THEME=THEME,
 	Description=Description,
 	UI_WINDOW=UI_WINDOW,
@@ -449,6 +469,7 @@ end
 local function makePage1Ctx()
 	return{
 		New=New,
+		Fusion=FusionModule,
 		THEME=THEME,
 		State=PAGE1_STATE,
 		makeSection=makeSection,

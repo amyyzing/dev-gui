@@ -2,6 +2,7 @@ local MainFrame={}
 
 function MainFrame.new(ctx)
 	local New=ctx.New
+	local Fusion=ctx.Fusion
 	local THEME=ctx.THEME
 	local Description=ctx.Description or {}
 	local UI_WINDOW=ctx.UI_WINDOW
@@ -247,8 +248,24 @@ function MainFrame.new(ctx)
 		end
 	end
 
+	local fusionScope=nil
+	if type(Fusion)=="table" and type(Fusion.scoped)=="function" then
+		fusionScope=Fusion.scoped(Fusion)
+		trackCleanup(function()
+			fusionScope:doCleanup()
+		end)
+	end
+
+	local function makeFusionValue(initial)
+		if fusionScope and type(fusionScope.Value)=="function" then
+			return fusionScope:Value(initial)
+		end
+		return nil
+	end
+
 	local root=New("Frame",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,rootStartY),Size=UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),AutomaticSize=Enum.AutomaticSize.None,ClipsDescendants=true,BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=2,Visible=true,CornerRole="Window"},SG)
 	local uiMinimized=false
+	local uiMinimizedValue=makeFusionValue(uiMinimized)
 	local rootSizeTween=nil
 	local rootPositionTween=nil
 
@@ -442,6 +459,7 @@ function MainFrame.new(ctx)
 	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},actualSettingsPage)
 
 	local activePageName="main"
+	local activePageValue=makeFusionValue(activePageName)
 	local function getPageIndex(name)
 		return ({main=1,maps=2,server=3,customize=4,page2=5,settings=6})[name] or 1
 	end
@@ -549,6 +567,9 @@ function MainFrame.new(ctx)
 
 	local function setActivePage(name)
 		activePageName=name or "main"
+		if activePageValue then
+			activePageValue:set(activePageName)
+		end
 		settingsPage.Visible=activePageName=="main"
 		mapPage.Visible=activePageName=="maps"
 		serverPage.Visible=activePageName=="server"
@@ -907,6 +928,9 @@ function MainFrame.new(ctx)
 	local function minimize()
 		if uiMinimized then return end
 		uiMinimized=true
+		if uiMinimizedValue then
+			uiMinimizedValue:set(true)
+		end
 		fab.Visible=false
 		miniBtn.Text="+"
 		root.Visible=true
@@ -923,6 +947,9 @@ function MainFrame.new(ctx)
 	local function restore()
 		if not uiMinimized then return end
 		uiMinimized=false
+		if uiMinimizedValue then
+			uiMinimizedValue:set(false)
+		end
 		fab.Visible=false
 		miniBtn.Text="-"
 		root.Visible=true
@@ -1086,6 +1113,9 @@ function MainFrame.new(ctx)
 	end
 
 	api.root=root
+	api.fusionScope=fusionScope
+	api.activePageValue=activePageValue
+	api.uiMinimizedValue=uiMinimizedValue
 	api.uiScale=uiScale
 	api.main=main
 	api.header=header

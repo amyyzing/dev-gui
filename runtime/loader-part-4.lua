@@ -239,6 +239,7 @@ function buildActualSettingsPage()
 		local ok,result=pcall(function()
 			return PlayerDataModule.new({
 				New=New,
+				Fusion=FusionModule,
 				THEME=THEME,
 				SG=SG,
 				BOT_API=BOT_API,
@@ -289,6 +290,7 @@ function buildActualSettingsPage()
 		local ok,result=pcall(function()
 			return DiscordModule.new({
 				New=New,
+				Fusion=FusionModule,
 				THEME=THEME,
 				BOT_API=BOT_API,
 				DiscordLogicModule=DiscordLogicModule,
@@ -371,6 +373,7 @@ function buildPage2()
 
 	local page2Ctx={
 		New=New,
+		Fusion=FusionModule,
 		THEME=THEME,
 		SG=SG,
 		PRESETS=PRESETS,
