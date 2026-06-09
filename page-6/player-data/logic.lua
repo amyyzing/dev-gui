@@ -71,6 +71,7 @@ function PlayerData.new(ctx,page,deps)
 			TextSize=12,
 			TextColor3=textColor,
 			AutoButtonColor=false,
+			Selectable=true,
 			ZIndex=102,
 		},parent)
 
@@ -153,9 +154,9 @@ function PlayerData.new(ctx,page,deps)
 		local no=modalButton(box,"CANCEL",160,false,modalConnections)
 		local yes=modalButton(box,yesText or"YES",274,danger,modalConnections)
 
-		trackConnection(no.MouseButton1Click:Connect(closeModal),modalConnections)
+		trackConnection(no.Activated:Connect(closeModal),modalConnections)
 
-		trackConnection(yes.MouseButton1Click:Connect(function()
+		trackConnection(yes.Activated:Connect(function()
 			closeModal()
 			if onYes then onYes() end
 		end),modalConnections)

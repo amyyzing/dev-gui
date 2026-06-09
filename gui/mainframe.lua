@@ -221,6 +221,14 @@ function MainFrame.new(ctx)
 		return trackCleanup(signal:Connect(fn))
 	end
 
+	local function activate(button,fn)
+		if button and button:IsA("GuiButton") then
+			button.Selectable=true
+		end
+
+		return connect(button.Activated,fn)
+	end
+
 	local function cleanupAll()
 		if destroyed then return end
 		destroyed=true
@@ -331,7 +339,7 @@ function MainFrame.new(ctx)
 	local modeSubtitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerSubtitleY),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
 
 	local function makeTopButton(text,xOffset)
-		local b=New("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text=text,Font=controlFont,TextSize=17,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6,ThemeRole="BUTTON"},header)
+		local b=New("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text=text,Font=controlFont,TextSize=17,TextColor3=THEME.TEXT,AutoButtonColor=false,Selectable=true,ZIndex=6,ThemeRole="BUTTON"},header)
 		local wrap=wrapTextButton(b,THEME.BUTTON or THEME.BG,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 		wrap:SetAttribute("CornerRole","Control")
@@ -564,12 +572,12 @@ function MainFrame.new(ctx)
 		end
 	end
 
-	connect(settingsTab.MouseButton1Click,function() setActivePage("main") end)
-	connect(mapsPageTab.MouseButton1Click,function() setActivePage("maps") end)
-	connect(serverPageTab.MouseButton1Click,function() setActivePage("server") end)
-	connect(uiSettingsTab.MouseButton1Click,function() setActivePage("customize") end)
-	connect(futureTab.MouseButton1Click,function() setActivePage("page2") end)
-	connect(settingsPageTab.MouseButton1Click,function() setActivePage("settings") end)
+	activate(settingsTab,function() setActivePage("main") end)
+	activate(mapsPageTab,function() setActivePage("maps") end)
+	activate(serverPageTab,function() setActivePage("server") end)
+	activate(uiSettingsTab,function() setActivePage("customize") end)
+	activate(futureTab,function() setActivePage("page2") end)
+	activate(settingsPageTab,function() setActivePage("settings") end)
 
 	local contentWrap=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,ZIndex=3,LayoutOrder=1},settingsPage)
 	local contentLayout=New("UIListLayout",{Padding=UDim.new(0,columnGap),SortOrder=Enum.SortOrder.LayoutOrder,FillDirection=Enum.FillDirection.Horizontal},contentWrap)
@@ -631,7 +639,7 @@ function MainFrame.new(ctx)
 	function api.RefreshActionStatus() end
 
 	local function makeFooterBtn(text,width)
-		local b=New("TextButton",{Size=UDim2.fromOffset(width or 96,30),BackgroundColor3=THEME.BUTTON or THEME.BG,Text=string.upper(text),TextColor3=THEME.TEXT,Font=controlFont,TextSize=12,AutoButtonColor=false,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON"},footer)
+		local b=New("TextButton",{Size=UDim2.fromOffset(width or 96,30),BackgroundColor3=THEME.BUTTON or THEME.BG,Text=string.upper(text),TextColor3=THEME.TEXT,Font=controlFont,TextSize=12,AutoButtonColor=false,Selectable=true,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON"},footer)
 		local wrap=wrapTextButton(b,THEME.BUTTON or THEME.BG,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 		wrap:SetAttribute("CornerRole","Control")
@@ -658,7 +666,7 @@ function MainFrame.new(ctx)
 
 	refreshFooterResetButton()
 
-	local fab=New("TextButton",{Name="FAB",Visible=false,AutoButtonColor=false,Size=UDim2.fromOffset(fabSize,fabSize),AnchorPoint=Vector2.new(1,1),Position=UDim2.new(1,-16,1,-16),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text="[]",TextColor3=THEME.TEXT,Font=controlFont,TextSize=16,ZIndex=20,ThemeRole="BUTTON",CornerRole="Control"},SG)
+	local fab=New("TextButton",{Name="FAB",Visible=false,AutoButtonColor=false,Selectable=true,Size=UDim2.fromOffset(fabSize,fabSize),AnchorPoint=Vector2.new(1,1),Position=UDim2.new(1,-16,1,-16),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text="[]",TextColor3=THEME.TEXT,Font=controlFont,TextSize=16,ZIndex=20,ThemeRole="BUTTON",CornerRole="Control"},SG)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},fab)
 	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},fab)
 	connect(fab.MouseEnter,function()
@@ -922,7 +930,7 @@ function MainFrame.new(ctx)
 		tweenRootSize(UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),0.22)
 	end
 
-	connect(miniBtn.MouseButton1Click,function()
+	activate(miniBtn,function()
 		if uiMinimized then
 			restore()
 		else
@@ -930,7 +938,7 @@ function MainFrame.new(ctx)
 		end
 	end)
 
-	connect(fab.MouseButton1Click,restore)
+	activate(fab,restore)
 
 	local dragConn=nil
 

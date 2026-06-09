@@ -151,7 +151,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 	placeWrappedButton(saveBtn,UDim2.new(1,-150,0,0))
 	saveBtn.Text="SAVE PRESET"
 
-	connect(saveBtn.MouseButton1Click,function()
+	connect(saveBtn.Activated,function()
 		if hitboxPresets and hitboxPresets.ShowSaveConfirm then
 			hitboxPresets.ShowSaveConfirm(api.Collect)
 		elseif hitboxPresets and hitboxPresets.AddPreset then
@@ -197,7 +197,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 		connect(yBox.FocusLost,applyPresetSize)
 		connect(zBox.FocusLost,applyPresetSize)
 
-		connect(keyBtn.MouseButton1Click,function()
+		connect(keyBtn.Activated,function()
 			if os.clock()<suppressKeyButtonClickUntil then
 				return
 			end
@@ -232,7 +232,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			end
 		end)
 
-		connect(resetBtn.MouseButton1Click,function()
+		connect(resetBtn.Activated,function()
 			resetPreset(i)
 			api.Refresh()
 			if refreshAll then refreshAll() end

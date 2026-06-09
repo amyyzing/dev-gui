@@ -38,7 +38,7 @@ function shutdownTool()
 	end
 end
 
-trackRuntimeConnection(closeBtn.MouseButton1Click:Connect(shutdownTool))
+trackRuntimeConnection(closeBtn.Activated:Connect(shutdownTool))
 
 function applyHitboxPreset(index)
 	local preset=PRESETS[index]

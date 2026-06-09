@@ -177,7 +177,7 @@ function HitboxPreset.new(ctx,ownedSection)
 
 			local toggle=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-8,0,30),Position=UDim2.fromOffset(4,1),Text=(expandedOwned[code] and"[-] " or"[+] ")..name.."  |  "..code,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=7},row)
 
-			trackConnection(toggle.MouseButton1Click:Connect(function()
+			trackConnection(toggle.Activated:Connect(function()
 				expandedOwned[code]=not expandedOwned[code]
 				api.Refresh()
 			end),listConnections)
@@ -200,12 +200,12 @@ function HitboxPreset.new(ctx,ownedSection)
 				local equipBtn=makePresetActionButton(actionRow,"EQUIP",listConnections)
 				local deleteBtn=makePresetActionButton(actionRow,"DELETE",listConnections)
 
-				trackConnection(equipBtn.MouseButton1Click:Connect(function()
+				trackConnection(equipBtn.Activated:Connect(function()
 					applyOwnedPreset(preset,editor)
 					requestRefresh()
 				end),listConnections)
 
-				trackConnection(deleteBtn.MouseButton1Click:Connect(function()
+				trackConnection(deleteBtn.Activated:Connect(function()
 					if deleteOwnedPreset(code,presetIndex) then
 						requestRefresh()
 					end
@@ -300,9 +300,9 @@ function HitboxPreset.new(ctx,ownedSection)
 		local cancel=modalButton(box,"CANCEL",146)
 		local save=modalButton(box,"SAVE",248)
 
-		trackConnection(cancel.MouseButton1Click:Connect(closePresetModal),modalConnections)
+		trackConnection(cancel.Activated:Connect(closePresetModal),modalConnections)
 
-		trackConnection(save.MouseButton1Click:Connect(function()
+		trackConnection(save.Activated:Connect(function()
 			local ok,result=api.AddPreset(nameBox.Text,collectFn)
 			if not ok then
 				warning.Text=tostring(result)
@@ -333,8 +333,8 @@ function HitboxPreset.new(ctx,ownedSection)
 		local no=modalButton(box,"NO",146)
 		local yes=modalButton(box,"YES",248)
 
-		trackConnection(no.MouseButton1Click:Connect(closePresetModal),modalConnections)
-		trackConnection(yes.MouseButton1Click:Connect(function()
+		trackConnection(no.Activated:Connect(closePresetModal),modalConnections)
+		trackConnection(yes.Activated:Connect(function()
 			showNamePrompt(collectFn)
 		end),modalConnections)
 	end

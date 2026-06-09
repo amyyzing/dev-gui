@@ -70,7 +70,7 @@ function Primary.new(ctx,parent)
 			Transparency=0,
 		},swatch)
 
-		connect(swatch.MouseButton1Click,function()
+		connect(swatch.Activated,function()
 			applyPrimaryColour(colour)
 		end)
 	end

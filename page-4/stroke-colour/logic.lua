@@ -867,7 +867,7 @@ function StrokeColour.new(ctx,page)
 			end
 		end
 
-		trackConnection(titleButton.MouseButton1Click:Connect(function()
+		trackConnection(titleButton.Activated:Connect(function()
 			setExpanded(not expanded,true,true)
 		end))
 
@@ -1216,7 +1216,7 @@ function StrokeColour.new(ctx,page)
 			ZIndex=7,
 		},card)
 
-		trackConnection(card.MouseButton1Click:Connect(function()
+		trackConnection(card.Activated:Connect(function()
 			applyThemePreset(preset)
 		end))
 
@@ -1240,7 +1240,7 @@ function StrokeColour.new(ctx,page)
 
 	for i,target in ipairs({"Primary","Stroke","Gradient"}) do
 		local button,marker=makeFlatButton(targetRow,target,i)
-		trackConnection(button.MouseButton1Click:Connect(function()
+		trackConnection(button.Activated:Connect(function()
 			setActiveTarget(target)
 		end))
 
@@ -1262,7 +1262,7 @@ function StrokeColour.new(ctx,page)
 
 	for i,mode in ipairs({"Square","RGB","HSV","Hex"}) do
 		local button,marker=makeFlatButton(modeRow,mode,i,0.25)
-		trackConnection(button.MouseButton1Click:Connect(function()
+		trackConnection(button.Activated:Connect(function()
 			setActiveMode(mode)
 		end))
 
@@ -1319,7 +1319,7 @@ function StrokeColour.new(ctx,page)
 		},swatch)
 		addCorner(marker,"Slider")
 
-		trackConnection(swatch.MouseButton1Click:Connect(function()
+		trackConnection(swatch.Activated:Connect(function()
 			applyActiveColor(color,false)
 		end))
 
@@ -1568,7 +1568,7 @@ function StrokeColour.new(ctx,page)
 		commitHex()
 	end))
 
-	trackConnection(applyHex.MouseButton1Click:Connect(commitHex))
+	trackConnection(applyHex.Activated:Connect(commitHex))
 
 	paintChoices=function()
 		local primary=getUIPrimaryColor()

@@ -228,11 +228,11 @@ function Announcement.new(ctx)
 
 		local closeConn=nil
 		local okConn=nil
-		closeConn=trackModalConnection(close.MouseButton1Click:Connect(function()
+		closeConn=trackModalConnection(close.Activated:Connect(function()
 			destroyModal(true)
 		end),modalConnections)
 
-		okConn=trackModalConnection(okButton.MouseButton1Click:Connect(function()
+		okConn=trackModalConnection(okButton.Activated:Connect(function()
 			destroyModal(true)
 		end),modalConnections)
 
