@@ -19,11 +19,25 @@ local DEFAULT_WR_MAX_Y=14.00 -- clean default catch peak; original jump formula 
 local WR_MAX_Y=DEFAULT_WR_MAX_Y
 local C1_SOLVE_Y_BIAS=0.00
 local MAX_RUN_SPEED=21
+local NORMAL_ROUTE_MIN_SPEED=19
+local ROUTE_LOCK_MIN_SPEED=2.5
+local ROUTE_SPEED_PARTIAL_GAIN=1.08
 local CLEAN_MOVING_SPEED_MIN=5.0
 local CLEAN_CATCH_Y_TOLERANCE=0.35
 local CLEAN_TARGET_MISS_TOLERANCE=0.35
 local CLEAN_NEAR_TARGET_MISS_TOLERANCE=0.05
 local WR_LEAD_DELAY=0.38
+local LEAD_DELAY_ZERO_FLIGHT_TIME=0.70
+local LEAD_DELAY_FULL_FLIGHT_TIME=1.35
+local PREDICTOR_HISTORY_MAX_AGE=1.25
+local PREDICTOR_MIN_SAMPLES=3
+local PREDICTOR_LS_BLEND=0.45
+local PREDICTOR_VELOCITY_BLEND=0.42
+local PREDICTOR_ACCEL_BLEND=0.28
+local PREDICTOR_ACCEL_MAX=48
+local PREDICTOR_CONFIDENCE_MIN=0.30
+local PREDICTOR_CONFIDENCE_MAX=1.00
+local PREDICTOR_AVERAGE_SAMPLES=5
 local QB_RELEASE_DELAY=0.25
 local QB_LAUNCH_Y_BIAS=0
 local QB_GROUND_ROOT_Y=3.648
@@ -96,8 +110,36 @@ local function clampMagnitude(v,maxMagnitude)
 	return v
 end
 
+local function smoothstep(edge0,edge1,value)
+	if edge1<=edge0 then
+		return value>=edge1 and 1 or 0
+	end
+
+	local alpha=math.clamp((value-edge0)/(edge1-edge0),0,1)
+	return alpha*alpha*(3-2*alpha)
+end
+
+local function safeVectorLerp(a,b,alpha)
+	if not a then return b or Vector3.zero end
+	if not b then return a or Vector3.zero end
+	return a:Lerp(b,math.clamp(alpha or 0,0,1))
+end
+
 local function leadDelayForFlightTime(time)
-	return math.max(WR_LEAD_DELAY,0)
+	return math.max(WR_LEAD_DELAY,0)*smoothstep(LEAD_DELAY_ZERO_FLIGHT_TIME,LEAD_DELAY_FULL_FLIGHT_TIME,time or 0)
+end
+
+local function routeSpeed(speed)
+	local clamped=math.clamp(speed or 0,0,MAX_RUN_SPEED)
+	if clamped<ROUTE_LOCK_MIN_SPEED then
+		return 0
+	end
+
+	if clamped>=NORMAL_ROUTE_MIN_SPEED then
+		return MAX_RUN_SPEED
+	end
+
+	return math.clamp(clamped*ROUTE_SPEED_PARTIAL_GAIN,ROUTE_LOCK_MIN_SPEED,MAX_RUN_SPEED)
 end
 
 local function root(character)
@@ -761,7 +803,12 @@ function QBAim.new(ctx,parent)
 			pos=receiverRoot.Position,
 			vel=receiverRoot.AssemblyLinearVelocity or Vector3.zero,
 			rawVel=receiverRoot.AssemblyLinearVelocity or Vector3.zero,
+			accel=Vector3.zero,
+			confidence=PREDICTOR_CONFIDENCE_MIN,
+			lastSeen=now,
 			t=now,
+			vh={},
+			ph={{t=now,pos=receiverRoot.Position}},
 		}
 
 		return receiverData[player]
@@ -926,25 +973,81 @@ function QBAim.new(ctx,parent)
 		No slant/streak/radial/tangent dominance is used for targeting. Route labels below are diagnostics only.
 	]]
 
+	local function leastSquaresVelocity(data,now)
+		if not(data and data.ph and #data.ph>=PREDICTOR_MIN_SAMPLES) then
+			return nil,0
+		end
+
+		local count=0
+		local sumT,sumX,sumZ=0,0,0
+		local minT,maxT=nil,nil
+
+		for _,sample in ipairs(data.ph) do
+			if sample.t and sample.pos and now-sample.t<=PREDICTOR_HISTORY_MAX_AGE then
+				local t=sample.t-now
+				count+=1
+				sumT+=t
+				sumX+=sample.pos.X
+				sumZ+=sample.pos.Z
+				minT=minT and math.min(minT,t) or t
+				maxT=maxT and math.max(maxT,t) or t
+			end
+		end
+
+		if count<PREDICTOR_MIN_SAMPLES then
+			return nil,0
+		end
+
+		local meanT=sumT/count
+		local meanX=sumX/count
+		local meanZ=sumZ/count
+		local denom=0
+		local numX,numZ=0,0
+
+		for _,sample in ipairs(data.ph) do
+			if sample.t and sample.pos and now-sample.t<=PREDICTOR_HISTORY_MAX_AGE then
+				local centeredT=(sample.t-now)-meanT
+				denom+=centeredT*centeredT
+				numX+=centeredT*(sample.pos.X-meanX)
+				numZ+=centeredT*(sample.pos.Z-meanZ)
+			end
+		end
+
+		if denom<1e-6 then
+			return nil,0
+		end
+
+		local velocity=clampMagnitude(Vector3.new(numX/denom,0,numZ/denom),MAX_RUN_SPEED)
+		local span=(maxT or 0)-(minT or 0)
+		local quality=math.clamp((count-PREDICTOR_MIN_SAMPLES+1)/5,0,1)*math.clamp(span/0.48,0,1)
+		return velocity,quality
+	end
+
 	local function currentReceiverRawVelocity(data,receiverRoot,fallbackVelocity)
+		local now=os.clock()
 		local assembly=receiverRoot and receiverRoot.AssemblyLinearVelocity or nil
 		local assemblyXZ=assembly and flat(assembly) or Vector3.zero
 		local rawXZ=flat((data and data.rawVel) or fallbackVelocity or Vector3.zero)
 		local storedXZ=flat((data and data.vel) or Vector3.zero)
+		local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
 
-		-- AssemblyLinearVelocity is preferred when it is clearly moving; otherwise use the
-		-- immediate position-delta velocity from the heartbeat tracker. No route-shape basis.
 		local velocity=Vector3.zero
 		local source="none"
-		if assemblyXZ.Magnitude>=CLEAN_MOVING_SPEED_MIN then
+		if storedXZ.Magnitude>=ROUTE_LOCK_MIN_SPEED then
+			velocity=storedXZ
+			source="tracked"
+		elseif assemblyXZ.Magnitude>=ROUTE_LOCK_MIN_SPEED then
 			velocity=assemblyXZ
 			source="assembly"
-		elseif rawXZ.Magnitude>=CLEAN_MOVING_SPEED_MIN then
+		elseif rawXZ.Magnitude>=ROUTE_LOCK_MIN_SPEED then
 			velocity=rawXZ
 			source="raw_delta"
-		elseif storedXZ.Magnitude>=CLEAN_MOVING_SPEED_MIN then
-			velocity=storedXZ
-			source="stored"
+		end
+
+		if lsVelocity and lsVelocity.Magnitude>=ROUTE_LOCK_MIN_SPEED then
+			local alpha=PREDICTOR_LS_BLEND*lsQuality
+			velocity=velocity.Magnitude>0 and safeVectorLerp(velocity,lsVelocity,alpha) or lsVelocity
+			source=source=="none" and "least_squares" or source.."+ls"
 		end
 
 		if velocity.Magnitude<CLEAN_MOVING_SPEED_MIN then
@@ -961,7 +1064,8 @@ function QBAim.new(ctx,parent)
 			return Vector3.zero
 		end
 
-		return velocity.Unit*MAX_RUN_SPEED
+		local speed=routeSpeed(velocity.Magnitude)
+		return speed>0 and velocity.Unit*speed or Vector3.zero
 	end
 
 	local function receiverMaxAt(position)
@@ -1668,20 +1772,61 @@ function QBAim.new(ctx,parent)
 					local data=receiverData[player]
 
 					if not data then
-						data={pos=receiverRoot.Position,vel=Vector3.zero,rawVel=Vector3.zero,t=now}
+						data={
+							pos=receiverRoot.Position,
+							vel=Vector3.zero,
+							rawVel=Vector3.zero,
+							accel=Vector3.zero,
+							confidence=PREDICTOR_CONFIDENCE_MIN,
+							lastSeen=now,
+							t=now,
+							vh={},
+							ph={{t=now,pos=receiverRoot.Position}},
+						}
 						receiverData[player]=data
 					end
 
 					local sampleDt=math.min(now-data.t,0.1)
 					if sampleDt>0 then
-						local positionVelocity=(receiverRoot.Position-data.pos)/sampleDt
+						local rawVelocity=(receiverRoot.Position-data.pos)/sampleDt
+						local previousRawVelocity=data.rawVel or data.vel or Vector3.zero
+						local rawAcceleration=clampMagnitude((rawVelocity-previousRawVelocity)/sampleDt,PREDICTOR_ACCEL_MAX)
 						local assemblyVelocity=receiverRoot.AssemblyLinearVelocity or Vector3.zero
-						local chosenVelocity=flat(assemblyVelocity).Magnitude>=CLEAN_MOVING_SPEED_MIN and assemblyVelocity or positionVelocity
+						local chosenVelocity=flat(assemblyVelocity).Magnitude>=CLEAN_MOVING_SPEED_MIN and assemblyVelocity or rawVelocity
 
 						data.rawVel=clampMagnitude(chosenVelocity,MAX_RUN_SPEED)
-						data.vel=data.rawVel
+						data.vh=data.vh or {}
+						table.insert(data.vh,data.rawVel)
+						if #data.vh>PREDICTOR_AVERAGE_SAMPLES then
+							table.remove(data.vh,1)
+						end
+
+						local average=Vector3.zero
+						for _,velocity in ipairs(data.vh) do
+							average+=velocity
+						end
+						average=#data.vh>0 and average/#data.vh or data.rawVel
+
 						data.pos=receiverRoot.Position
 						data.t=now
+						data.lastSeen=now
+						data.ph=data.ph or {}
+						table.insert(data.ph,{t=now,pos=receiverRoot.Position})
+						while #data.ph>0 and now-data.ph[1].t>PREDICTOR_HISTORY_MAX_AGE do
+							table.remove(data.ph,1)
+						end
+
+						local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
+						if lsVelocity and lsQuality>0 then
+							average=safeVectorLerp(average,lsVelocity,PREDICTOR_LS_BLEND*lsQuality)
+						end
+
+						data.vel=safeVectorLerp(data.vel,average,PREDICTOR_VELOCITY_BLEND)
+						data.vel=clampMagnitude(data.vel,MAX_RUN_SPEED)
+						data.accel=safeVectorLerp(data.accel,rawAcceleration,PREDICTOR_ACCEL_BLEND)
+						data.accel=clampMagnitude(data.accel,PREDICTOR_ACCEL_MAX)
+						local speedConfidence=math.clamp(data.vel.Magnitude/NORMAL_ROUTE_MIN_SPEED,0,1)
+						data.confidence=math.clamp(0.25+0.45*(lsQuality or 0)+0.30*speedConfidence,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
 					end
 				end
 			end
