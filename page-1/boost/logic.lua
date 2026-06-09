@@ -337,6 +337,8 @@ function Boost.new(ctx,parent)
 		safeDisconnect(destroyConn)
 		destroyConn=nil
 		clearJumpBoostTouchConnection()
+		destroyControl(jumpBoostToggle)
+		destroyControl(jumpBoostModeToggle)
 		destroyControl(forceSlider)
 		destroyControl(chanceSlider)
 		destroyControl(radiusSlider)

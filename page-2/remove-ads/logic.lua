@@ -6,6 +6,14 @@ local function firstChild(parent)
 	return children[1]
 end
 
+local function destroyControl(control)
+	if control and type(control.destroy)=="function" then
+		pcall(control.destroy)
+	elseif control and type(control.Destroy)=="function" then
+		pcall(control.Destroy)
+	end
+end
+
 function RemoveAds.new(ctx,page)
 	local THEME=ctx.THEME
 	local safeDisconnect=ctx.safeDisconnect
@@ -196,9 +204,7 @@ function RemoveAds.new(ctx,page)
 		enabled=false
 		disconnectWatchers()
 		restoreAds()
-		if toggle and toggle.destroy then
-			toggle.destroy()
-		end
+		destroyControl(toggle)
 		toggle=nil
 	end
 

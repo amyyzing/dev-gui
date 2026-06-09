@@ -399,6 +399,7 @@ function GameParams.new(ctx,parent)
 
 	function api.Destroy()
 		disconnectWatchers()
+		destroyControl(toggle)
 		destroyControl(staminaRegenSlider)
 		destroyControl(staminaDepleteSlider)
 		destroyControl(jumpSlider)

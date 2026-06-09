@@ -17,6 +17,14 @@ local function firstChild(parent)
 	return parent:GetChildren()[1]
 end
 
+local function destroyControl(control)
+	if control and type(control.destroy)=="function" then
+		pcall(control.destroy)
+	elseif control and type(control.Destroy)=="function" then
+		pcall(control.Destroy)
+	end
+end
+
 local function getPlayerTeamID(player)
 	local replicated=player and player:FindFirstChild("Replicated")
 	local teamValue=replicated and replicated:FindFirstChild("TeamID")
@@ -224,6 +232,8 @@ function ESP.new(ctx,parent)
 
 		if defenseApi and defenseApi.Destroy then pcall(defenseApi.Destroy) end
 		if offenseApi and offenseApi.Destroy then pcall(offenseApi.Destroy) end
+
+		destroyControl(toggle)
 
 		if sectionFrame and sectionFrame.Parent then
 			sectionFrame:Destroy()

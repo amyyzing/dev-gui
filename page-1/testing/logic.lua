@@ -23,6 +23,14 @@ local function firstFolder(container)
 	return nil
 end
 
+local function destroyControl(control)
+	if control and type(control.destroy)=="function" then
+		pcall(control.destroy)
+	elseif control and type(control.Destroy)=="function" then
+		pcall(control.Destroy)
+	end
+end
+
 local function attachmentCFrame(attachment)
 	if not(attachment and attachment.Parent) then return nil end
 
@@ -356,6 +364,7 @@ function Testing.new(ctx,parent)
 			safeDisconnect(conn)
 		end
 		table.clear(lifetimeConnections)
+		destroyControl(toggle)
 		destroyMarker()
 	end
 

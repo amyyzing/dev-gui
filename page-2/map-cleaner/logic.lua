@@ -5,6 +5,14 @@ local function firstChild(parent)
 	return parent:GetChildren()[1]
 end
 
+local function destroyControl(control)
+	if control and type(control.destroy)=="function" then
+		pcall(control.destroy)
+	elseif control and type(control.Destroy)=="function" then
+		pcall(control.Destroy)
+	end
+end
+
 local function gameReplicated()
 	local games=workspace:FindFirstChild("Games")
 	local gameFolder=firstChild(games)
@@ -187,6 +195,8 @@ function MapCleaner.new(ctx,page)
 		enabled=false
 		disconnectWatchers()
 		restoreRemoved()
+		destroyControl(toggle)
+		toggle=nil
 	end
 
 	local section,sectionControls=makeSection(page,2,"Map Cleaner","Gameplay only",{

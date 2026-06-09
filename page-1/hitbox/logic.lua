@@ -566,6 +566,7 @@ function Hitbox.new(ctx,parent)
 		workspaceConn=nil
 		safeDisconnect(destroyConn)
 		destroyConn=nil
+		destroyControl(toggle)
 		destroyControl(transparencySlider)
 		clearAllWatchersAndRestore()
 	end

@@ -103,6 +103,7 @@ function Gravity.new(ctx,parent)
 	end
 
 	function api.Destroy()
+		destroyControl(toggle)
 		destroyControl(slider)
 	end
 

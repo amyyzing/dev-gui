@@ -15,6 +15,14 @@ local function ensureWorldSettings(ctx)
 	return ws
 end
 
+local function destroyControl(control)
+	if control and type(control.destroy)=="function" then
+		pcall(control.destroy)
+	elseif control and type(control.Destroy)=="function" then
+		pcall(control.Destroy)
+	end
+end
+
 local function applySmoothPlasticToPart(worldSettings,part)
 	if not part or not part:IsA("BasePart") then return end
 
@@ -86,6 +94,8 @@ function AntiMaterial.new(ctx,page)
 
 	function api.Destroy()
 		api.SetEnabled(false,false)
+		destroyControl(materialToggle)
+		materialToggle=nil
 	end
 
 	local section,sectionControls=makeSection(page,1,"Anti Material","",{

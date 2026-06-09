@@ -2203,6 +2203,9 @@ function QBAim.new(ctx,parent)
 	end
 
 	function api.Destroy()
+		destroyControl(enabledToggle)
+		destroyControl(teamFilterToggle)
+		destroyControl(arcToggle)
 		destroyControl(leadDelaySliderControl)
 		destroyControl(peakHeightSliderControl)
 

@@ -164,6 +164,7 @@ function Speed.new(ctx,parent)
 		inputConn=nil
 		safeDisconnect(destroyConn)
 		destroyConn=nil
+		destroyControl(toggle)
 		destroyControl(slider)
 		stopForcing(state.speedEnabled)
 	end
