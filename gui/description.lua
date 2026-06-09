@@ -4,8 +4,8 @@ local Description={}
 
 Description.Categories={
 	Main={
-		Title="untitled gui",
-		Description="hello",
+		Title="Control Panel",
+		Description="Gameplay tools and settings",
 		LoadedSuffix=EMPTY,
 	},
 
@@ -19,12 +19,12 @@ Description.Categories={
 	},
 
 	PageDescriptions={
-		Main=EMPTY,
-		Maps=EMPTY,
-		Server=EMPTY,
-		Customize=EMPTY,
-		Keybinds=EMPTY,
-		Settings=EMPTY,
+		Main="Gameplay tools",
+		Maps="Map and workspace cleanup",
+		Server="Server tools",
+		Customize="Theme, layout, and color settings",
+		Keybinds="Keyboard, mouse, and controller shortcuts",
+		Settings="Profile, update, and community options",
 	},
 
 	Sections={
@@ -33,39 +33,40 @@ Description.Categories={
 			["Gravity"]={Title="GRAVITY",Description="Player Gravity"},
 			["Speed"]={Title="SPEED",Description="Forced Speed"},
 			["Game Params"]={Title="PARAMS",Description="Stamina, jump, and dive tuning"},
-			["Boost"]={Title="AUTO BOOST",Description="Configure your boost"},
-			["ESP"]={Title="ESP",Description="WR/DB coverage esp, self-explanatory for league players"},
+			["Boost"]={Title="AUTO BOOST",Description="Boost force, chance, and radius"},
+			["ESP"]={Title="ESP",Description="Player highlights and possession filters"},
 			["QB Aim"]={Title="QB AIM",Description="Receiver lock, arc preview, and throw timing"},
 			["Testing"]={Title="TESTING",Description="Incoming throw C1 capture"},
 		},
 
 		Maps={
-			["Map Editor"]={Title="MAP EDITOR",Description="Change the map how you want!"},
-			["Anti Material"]={Title="ANTI-MATERIAL",Description="Get rid of materials"},
-			["Map Cleaner"]={Title="MAP CLEANER",Description="Remove the large chunk of the map you'll never touch under the field"},
-			["Remove Ads"]={Title="REMOVE BILLBOARD",Description="Remove the ad billboard. I KNOW your pain"},
+			["Map Editor"]={Title="MAP EDITOR",Description="Adjust map visuals"},
+			["Anti Material"]={Title="ANTI-MATERIAL",Description="Simplify workspace materials"},
+			["Map Cleaner"]={Title="MAP CLEANER",Description="Hide unused map geometry"},
+			["Remove Ads"]={Title="REMOVE BILLBOARD",Description="Hide billboard advertisements"},
 			["Workspace"]={Title="WORKSPACE",Description="Workspace visual cleanup"},
 		},
 
 		Customize={
-			["Customisation"]={Title="CUSTOMIZATION",Description="Customize your GUI here"},
-			["Colours"]={Title="COLORS",Description="Precise customization of GUI color"},
+			["Customisation"]={Title="CUSTOMIZATION",Description="Theme, layout, and window controls"},
+			["Colours"]={Title="COLORS",Description="Fine-tune GUI colors"},
 			["Primary Colours"]={Title="PRIMARY COLOURS",Description=EMPTY},
 			["Secondary Colours"]={Title="SECONDARY COLOURS",Description=EMPTY},
-			["Pulse Accent"]={Title="STROKE PATTERN",Description="Some stuff that moves around in your GUI secondary."},
-			["Border Shape"]={Title="BORDER",Description="Your Border Thing"},
-			["Stroke Colour"]={Title="STROKE",Description="Change stroke in GUI"},
+			["Pulse Accent"]={Title="STROKE PATTERN",Description="Animated border accent style"},
+			["Border Shape"]={Title="BORDER",Description="Window and control corner styling"},
+			["Stroke Colour"]={Title="STROKE",Description="Border color and gradient settings"},
 		},
 
 		Keybinds={
 			["Hitbox Presets"]={Title="PRESETS",Description="Your saved hitbox presets"},
-			["Preset Editor"]={Title="SET EDITOR",Description="Edit sets here"},
-			["Keybind Settings"]={Title="KEYBINDS",Description="Change your keybinds here. There ARE a lot of things. Get used to it!"},
+			["Preset Editor"]={Title="SET EDITOR",Description="Edit preset sizes and bindings"},
+			["Keybind Settings"]={Title="KEYBINDS",Description="Keyboard, mouse, and controller shortcuts"},
 		},
 
 		Settings={
-			["Player Data"]={Title="WIPE DATA",Description="Yes. Self explanatory. Applies to all gamemodes."},
-			["Discord"]={Title="SOCIALS",Description="Discord invite link"},
+			["Update"]={Title="UPDATE",Description="Reload latest GUI build"},
+			["Player Data"]={Title="PLAYER DATA",Description="Saved settings and reset actions"},
+			["Discord"]={Title="COMMUNITY",Description="Discord invite link"},
 		},
 	},
 
@@ -78,7 +79,7 @@ Description.Categories={
 
 	Text={
 		MainFrame={
-			["untitled gui"]="untitled gui",
+			["untitled gui"]="Control Panel",
 			["MAIN"]="Main",
 			["MAPS"]="Maps",
 			["SERVER"]="Server",
@@ -103,6 +104,9 @@ Description.Categories={
 			["ACTION"]="ACTION",
 			["CANCEL"]="CANCEL",
 			["SAVE"]="SAVE",
+			["UPDATE GUI"]="UPDATE GUI",
+			["UPDATING..."]="UPDATING...",
+			["UPDATE FAILED"]="UPDATE FAILED",
 			["YES"]="YES",
 			["NO"]="NO",
 			["DELETE"]="Delete",

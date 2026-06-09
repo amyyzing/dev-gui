@@ -118,10 +118,13 @@ function buildUpdateSection()
 	end)
 
 	local busy=false
-	button.MouseButton1Click:Connect(function()
+	button.Activated:Connect(function()
 		if busy then return end
 		busy=true
 		button.Text="UPDATING..."
+		if MainFrame and MainFrame.ShowToast then
+			MainFrame.ShowToast("Updating GUI...", "info", 1.2)
+		end
 
 		task.spawn(function()
 			local ok,result=pcall(refreshRemoteModulesNow)
@@ -130,6 +133,9 @@ function buildUpdateSection()
 			end
 
 			warn("Manual refresh failed:",ok and "refresh returned false" or result)
+			if MainFrame and MainFrame.ShowToast then
+				MainFrame.ShowToast("Update failed. Run /update, then try again.", "error", 3)
+			end
 			if button and button.Parent then
 				button.Text="UPDATE FAILED"
 			end

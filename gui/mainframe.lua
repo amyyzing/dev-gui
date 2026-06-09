@@ -630,6 +630,99 @@ function MainFrame.new(ctx)
 		fab.BackgroundColor3=THEME.BUTTON or THEME.BG
 	end)
 
+	local toastHost=New("Frame",{
+		Name="ToastHost",
+		AnchorPoint=Vector2.new(1,1),
+		Position=UDim2.new(1,-18,1,-18),
+		Size=UDim2.fromOffset(320,190),
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		ZIndex=80,
+	},SG)
+	New("UIListLayout",{
+		FillDirection=Enum.FillDirection.Vertical,
+		Padding=UDim.new(0,8),
+		SortOrder=Enum.SortOrder.LayoutOrder,
+		HorizontalAlignment=Enum.HorizontalAlignment.Right,
+		VerticalAlignment=Enum.VerticalAlignment.Bottom,
+	},toastHost)
+
+	local toastOrder=0
+	local function showToast(message,variant,duration)
+		toastOrder+=1
+		variant=tostring(variant or "info"):lower()
+		duration=tonumber(duration) or 2.2
+
+		local color=THEME.BUTTON or THEME.BG
+		local textColor=THEME.TEXT
+		if variant=="error" or variant=="danger" then
+			color=THEME.RED
+			textColor=Color3.fromRGB(0,0,0)
+		elseif variant=="success" then
+			color=THEME.GREEN
+			textColor=Color3.fromRGB(0,0,0)
+		end
+
+		local toast=New("Frame",{
+			BackgroundColor3=color,
+			BackgroundTransparency=0.04,
+			BorderSizePixel=0,
+			Size=UDim2.fromOffset(300,34),
+			ZIndex=81,
+			LayoutOrder=toastOrder,
+			SkipThemeRole=true,
+			CornerRole="Control",
+		},toastHost)
+		New("UICorner",{CornerRadius=UDim.new(0,0)},toast)
+		local toastStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.35},toast)
+		toastStroke:SetAttribute("BaseStrokeTransparency",0.35)
+		New("TextLabel",{
+			BackgroundTransparency=1,
+			Position=UDim2.fromOffset(12,0),
+			Size=UDim2.new(1,-24,1,0),
+			Text=tostring(message or ""),
+			Font=textFont,
+			TextSize=12,
+			TextColor3=textColor,
+			TextXAlignment=Enum.TextXAlignment.Left,
+			TextTruncate=Enum.TextTruncate.AtEnd,
+			ZIndex=82,
+			SkipThemeRole=true,
+		},toast)
+
+		toast.BackgroundTransparency=1
+		toastStroke.Transparency=1
+		for _,obj in ipairs(toast:GetDescendants()) do
+			if obj:IsA("TextLabel") then
+				obj.TextTransparency=1
+			end
+		end
+
+		TweenService:Create(toast,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundTransparency=0.04}):Play()
+		TweenService:Create(toastStroke,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Transparency=0.35}):Play()
+		for _,obj in ipairs(toast:GetDescendants()) do
+			if obj:IsA("TextLabel") then
+				TweenService:Create(obj,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
+			end
+		end
+
+		task.delay(duration,function()
+			if not toast or not toast.Parent then return end
+			local fade=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.In)
+			TweenService:Create(toast,fade,{BackgroundTransparency=1}):Play()
+			TweenService:Create(toastStroke,fade,{Transparency=1}):Play()
+			for _,obj in ipairs(toast:GetDescendants()) do
+				if obj:IsA("TextLabel") then
+					TweenService:Create(obj,fade,{TextTransparency=1}):Play()
+				end
+			end
+
+			task.delay(0.2,function()
+				if toast then toast:Destroy() end
+			end)
+		end)
+	end
+
 	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=THEME.CARD,BackgroundTransparency=0.02,BorderSizePixel=0,Text="",ZIndex=30,ThemeRole="CARD"},root)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},resizeHandle)
 	local resizeStroke=New("UIStroke",{Color=getUIStrokeColor(),Thickness=1,Transparency=0.05},resizeHandle)
@@ -954,6 +1047,8 @@ function MainFrame.new(ctx)
 	api.modeSubtitle=modeSubtitle
 	api.closeBtn=closeBtn
 	api.resetBtn=resetBtn
+	api.toastHost=toastHost
+	api.ShowToast=showToast
 	api.pageBar=pageBar
 	api.pageViewport=pageViewport
 	api.pageHost=pageHost
