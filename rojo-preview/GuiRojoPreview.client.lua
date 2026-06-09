@@ -252,73 +252,71 @@ local function inputToBinding(input)
 	return nil
 end
 
-local function fallbackOriginalUILibProfile()
-	return{
-		Id="original",
-		Name="Original",
-		Style={
-			Primary=THEME.BG,
-			Stroke=THEME.STROKE,
-			Gradient=Color3.fromRGB(45,45,45),
-			GradientOn=false,
-			StrokeThickness=1,
-			StrokeTransparency=0.84,
-		},
-		Shape={
-			WindowRadius=0,
-			SectionRadius=0,
-			ControlRadius=0,
-			SliderRadius=0,
-			SliderHeight=26,
-			SliderStyle="original",
-			WindowStrokeTransparency=0.62,
-			SectionStrokeTransparency=0.92,
-			ControlStrokeTransparency=0.9,
-			SliderStrokeTransparency=0.9,
-			AccentStrokeTransparency=0.72,
-		},
-		Components={
-			TextFont=Enum.Font.Gotham,
-			TitleFont=Enum.Font.GothamBold,
-			ControlFont=Enum.Font.GothamMedium,
-			SectionPrefix=true,
-			SectionPaddingX=12,
-			SectionPaddingY=10,
-			SectionGap=6,
-			SectionHeaderHeight=22,
-			SectionTitleSize=14,
-			SectionSubtitleSize=11,
-			SectionBackgroundTransparency=0,
-			SectionStrokeTransparency=0.84,
-			SectionBodyInset=2,
-			SectionBodyGap=6,
-			SliderRowHeight=48,
-			SliderValueBoxWidth=58,
-			SliderValueBoxVisible=true,
-			SliderContainerTransparency=1,
-			SliderContainerStrokeTransparency=1,
-			SliderLabelX=12,
-			SliderRightPadding=8,
-			ToggleWidth=48,
-			ToggleHeight=20,
-			ToggleStyle="switch",
-			TextBoxHeight=28,
-			ButtonHeight=30,
-			ControlStrokeTransparency=0.78,
-		},
-		MainFrame={
-			Window={W=880,H=540,MinW=560,MinH=360,MaxW=1220,MaxH=820,StartY=80,MinimizedH=68},
-			Layout={RootPadding=8,MainGap=8,PageGap=8,ColumnGap=8,FooterGap=8,HeaderHeight=52,PageBarHeight=30,PageTabWidth=106,PageTabHeight=28,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=10},
-		},
-	}
-end
+local UILibOriginalProfile={
+	Id="original",
+	Name="Original",
+	Style={
+		Primary=THEME.BG,
+		Stroke=THEME.STROKE,
+		Gradient=Color3.fromRGB(45,45,45),
+		GradientOn=false,
+		StrokeThickness=1,
+		StrokeTransparency=0.84,
+	},
+	Shape={
+		WindowRadius=0,
+		SectionRadius=0,
+		ControlRadius=0,
+		SliderRadius=0,
+		SliderHeight=26,
+		SliderStyle="original",
+		WindowStrokeTransparency=0.62,
+		SectionStrokeTransparency=0.92,
+		ControlStrokeTransparency=0.9,
+		SliderStrokeTransparency=0.9,
+		AccentStrokeTransparency=0.72,
+	},
+	Components={
+		TextFont=Enum.Font.Gotham,
+		TitleFont=Enum.Font.GothamBold,
+		ControlFont=Enum.Font.GothamMedium,
+		SectionPrefix=true,
+		SectionPaddingX=12,
+		SectionPaddingY=10,
+		SectionGap=6,
+		SectionHeaderHeight=22,
+		SectionTitleSize=14,
+		SectionSubtitleSize=11,
+		SectionBackgroundTransparency=0,
+		SectionStrokeTransparency=0.84,
+		SectionBodyInset=2,
+		SectionBodyGap=6,
+		SliderRowHeight=48,
+		SliderValueBoxWidth=58,
+		SliderValueBoxVisible=true,
+		SliderContainerTransparency=1,
+		SliderContainerStrokeTransparency=1,
+		SliderLabelX=12,
+		SliderRightPadding=8,
+		ToggleWidth=48,
+		ToggleHeight=20,
+		ToggleStyle="switch",
+		TextBoxHeight=28,
+		ButtonHeight=30,
+		ControlStrokeTransparency=0.78,
+	},
+	MainFrame={
+		Window={W=880,H=540,MinW=560,MinH=360,MaxW=1220,MaxH=820,StartY=80,MinimizedH=68},
+		Layout={RootPadding=8,MainGap=8,PageGap=8,ColumnGap=8,FooterGap=8,HeaderHeight=52,PageBarHeight=30,PageTabWidth=106,PageTabHeight=28,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=10},
+	},
+}
 
 local function getUILibRuntimeStyle()
-	return fallbackOriginalUILibProfile()
+	return UILibOriginalProfile
 end
 
 local function getCurrentUILibProfile()
-	return getUILibRuntimeStyle()
+	return UILibOriginalProfile
 end
 
 local function getUIStrokeColor()

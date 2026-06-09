@@ -24,6 +24,26 @@ local FALLBACK_UI_STYLE={
 	ColoursPanelExpanded=false,
 }
 
+local UI_STYLE_NUMBER_FIELDS={
+	{"primaryR","PrimaryR",0,255,28},
+	{"primaryG","PrimaryG",0,255,28},
+	{"primaryB","PrimaryB",0,255,28},
+	{"strokeR","StrokeR",0,255,255},
+	{"strokeG","StrokeG",0,255,255},
+	{"strokeB","StrokeB",0,255,255},
+	{"gradientR","GradientR",0,255,255},
+	{"gradientG","GradientG",0,255,255},
+	{"gradientB","GradientB",0,255,255},
+	{"liquidStrokeSpeed","LiquidStrokeSpeed",0,2,1},
+	{"strokeThickness","StrokeThickness",0,8,1},
+	{"strokeTransparency","StrokeTransparency",0,1,0.55},
+}
+
+local UI_STYLE_BOOL_FIELDS={
+	{"strokeGradient","StrokeGradient"},
+	{"liquidStroke","LiquidStroke"},
+}
+
 local function cloneRoot()
 	return{
 		version=2,
@@ -243,6 +263,16 @@ local function setValue(ctx,name,value)
 	end
 
 	ctx[name]=value
+end
+
+local function applyValue(ctx,setterName,stateName,value)
+	local setter=ctx[setterName]
+	if setter then
+		local ok=pcall(setter,value)
+		if ok then return end
+	end
+
+	setValue(ctx,stateName,value)
 end
 
 local function getModeKey(ctx)
@@ -550,64 +580,60 @@ function DataSave.new(ctx)
 
 		if hitbox.transparency~=nil then
 			local tv=clampNumber(hitbox.transparency,0,1,getValue(ctx,"targetTransparency",0.7))
-			if ctx.setTransparency then pcall(ctx.setTransparency,tv) else setValue(ctx,"targetTransparency",tv) end
+			applyValue(ctx,"setTransparency","targetTransparency",tv)
 		end
 
 		if hitbox.enabled~=nil then
-			if ctx.setHitboxLock then
-				pcall(ctx.setHitboxLock,hitbox.enabled)
-			else
-				setValue(ctx,"hitboxOn",hitbox.enabled and true or false)
-			end
+			applyValue(ctx,"setHitboxLock","hitboxOn",hitbox.enabled and true or false)
 		end
 
 		if settings.gravity~=nil then
 			local gv=clampNumber(settings.gravity,0,1000,196.2)
-			if ctx.setGravity then pcall(ctx.setGravity,gv) else setValue(ctx,"gravityValue",gv) end
+			applyValue(ctx,"setGravity","gravityValue",gv)
 		end
 
 		if settings.gravityEnabled~=nil then
-			if ctx.setGravityState then pcall(ctx.setGravityState,settings.gravityEnabled) else setValue(ctx,"gravityEnabled",settings.gravityEnabled and true or false) end
+			applyValue(ctx,"setGravityState","gravityEnabled",settings.gravityEnabled and true or false)
 		end
 
 		local speed=settings.speed or {}
 		if speed.value~=nil then
 			local sv=clampNumber(speed.value,0,100,18)
-			if ctx.setSpeedValue then pcall(ctx.setSpeedValue,sv) else setValue(ctx,"speedValue",sv) end
+			applyValue(ctx,"setSpeedValue","speedValue",sv)
 		end
 
 		if speed.enabled~=nil then
-			if ctx.setSpeedState then pcall(ctx.setSpeedState,speed.enabled) else setValue(ctx,"speedEnabled",speed.enabled and true or false) end
+			applyValue(ctx,"setSpeedState","speedEnabled",speed.enabled and true or false)
 		end
 
 		local gameParams=settings.gameParams or {}
 		if gameParams.enabled~=nil then
-			if ctx.setGameParamsState then pcall(ctx.setGameParamsState,gameParams.enabled) else setValue(ctx,"gameParamsEnabled",gameParams.enabled and true or false) end
+			applyValue(ctx,"setGameParamsState","gameParamsEnabled",gameParams.enabled and true or false)
 		end
 
 		if gameParams.staminaRegen~=nil then
 			local sr=clampNumber(gameParams.staminaRegen,0,50,10)
-			if ctx.setStaminaRegenValue then pcall(ctx.setStaminaRegenValue,sr) else setValue(ctx,"staminaRegenValue",sr) end
+			applyValue(ctx,"setStaminaRegenValue","staminaRegenValue",sr)
 		end
 
 		if gameParams.staminaDeplete~=nil then
 			local sd=clampStaminaDeplete(gameParams.staminaDeplete)
-			if ctx.setStaminaDepleteValue then pcall(ctx.setStaminaDepleteValue,sd) else setValue(ctx,"staminaDepleteValue",sd) end
+			applyValue(ctx,"setStaminaDepleteValue","staminaDepleteValue",sd)
 		end
 
 		if gameParams.jumpPower~=nil then
 			local jp=clampNumber(gameParams.jumpPower,0,300,53.5)
-			if ctx.setJumpPowerValue then pcall(ctx.setJumpPowerValue,jp) else setValue(ctx,"jumpPowerValue",jp) end
+			applyValue(ctx,"setJumpPowerValue","jumpPowerValue",jp)
 		end
 
 		if gameParams.divePower~=nil then
 			local dp=clampNumber(gameParams.divePower,0,15,1.9)
-			if ctx.setDivePowerValue then pcall(ctx.setDivePowerValue,dp) else setValue(ctx,"divePowerValue",dp) end
+			applyValue(ctx,"setDivePowerValue","divePowerValue",dp)
 		end
 
 		local boost=settings.boost or {}
 		if boost.enabled~=nil then
-			if ctx.setJumpBoostState then pcall(ctx.setJumpBoostState,boost.enabled) else setValue(ctx,"jumpBoostOn",boost.enabled and true or false) end
+			applyValue(ctx,"setJumpBoostState","jumpBoostOn",boost.enabled and true or false)
 		end
 
 		if boost.always~=nil then setValue(ctx,"jumpBoostTradeMode",boost.always and true or false) end
@@ -618,31 +644,31 @@ function DataSave.new(ctx)
 
 		local esp=settings.esp or {}
 		if esp.enabled~=nil then
-			if ctx.setESPState then pcall(ctx.setESPState,esp.enabled) else setValue(ctx,"actionStatusOn",esp.enabled and true or false) end
+			applyValue(ctx,"setESPState","actionStatusOn",esp.enabled and true or false)
 		end
 
 		local qbAim=settings.qbAim or {}
 		if qbAim.enabled~=nil then
-			if ctx.setQBAimState then pcall(ctx.setQBAimState,qbAim.enabled) else setValue(ctx,"qbAimEnabled",qbAim.enabled and true or false) end
+			applyValue(ctx,"setQBAimState","qbAimEnabled",qbAim.enabled and true or false)
 		end
 		if qbAim.teamFilter~=nil then
-			if ctx.setQBAimTeamFilter then pcall(ctx.setQBAimTeamFilter,qbAim.teamFilter) else setValue(ctx,"qbAimTeamFilter",qbAim.teamFilter and true or false) end
+			applyValue(ctx,"setQBAimTeamFilter","qbAimTeamFilter",qbAim.teamFilter and true or false)
 		end
 		if qbAim.showArc~=nil then
-			if ctx.setQBAimShowArc then pcall(ctx.setQBAimShowArc,qbAim.showArc) else setValue(ctx,"qbAimShowArc",qbAim.showArc and true or false) end
+			applyValue(ctx,"setQBAimShowArc","qbAimShowArc",qbAim.showArc and true or false)
 		end
 		if qbAim.leadDelay~=nil then
 			local leadDelay=clampNumber(qbAim.leadDelay,0,1.5,0.38)
-			if ctx.setQBAimLeadDelay then pcall(ctx.setQBAimLeadDelay,leadDelay) else setValue(ctx,"qbAimLeadDelay",leadDelay) end
+			applyValue(ctx,"setQBAimLeadDelay","qbAimLeadDelay",leadDelay)
 		end
 		if qbAim.peakHeight~=nil then
 			local peakHeight=clampNumber(qbAim.peakHeight,8,20,14.00)
-			if ctx.setQBAimPeakHeight then pcall(ctx.setQBAimPeakHeight,peakHeight) else setValue(ctx,"qbAimPeakHeight",peakHeight) end
+			applyValue(ctx,"setQBAimPeakHeight","qbAimPeakHeight",peakHeight)
 		end
 
 		local testing=settings.testing or {}
 		if testing.enabled~=nil then
-			if ctx.setTestingState then pcall(ctx.setTestingState,testing.enabled) else setValue(ctx,"testingEnabled",testing.enabled and true or false) end
+			applyValue(ctx,"setTestingState","testingEnabled",testing.enabled and true or false)
 		end
 
 		local keybinds=settings.keybinds or {}
@@ -689,26 +715,29 @@ function DataSave.new(ctx)
 				end
 			end
 
-			if uiStyle.primaryR~=nil then ctx.UI_STYLE.PrimaryR=clampNumber(uiStyle.primaryR,0,255,ctx.UI_STYLE.PrimaryR or 28) end
-			if uiStyle.primaryG~=nil then ctx.UI_STYLE.PrimaryG=clampNumber(uiStyle.primaryG,0,255,ctx.UI_STYLE.PrimaryG or 28) end
-			if uiStyle.primaryB~=nil then ctx.UI_STYLE.PrimaryB=clampNumber(uiStyle.primaryB,0,255,ctx.UI_STYLE.PrimaryB or 28) end
-			if uiStyle.strokeR~=nil then ctx.UI_STYLE.StrokeR=clampNumber(uiStyle.strokeR,0,255,ctx.UI_STYLE.StrokeR or 255) end
-			if uiStyle.strokeG~=nil then ctx.UI_STYLE.StrokeG=clampNumber(uiStyle.strokeG,0,255,ctx.UI_STYLE.StrokeG or 255) end
-			if uiStyle.strokeB~=nil then ctx.UI_STYLE.StrokeB=clampNumber(uiStyle.strokeB,0,255,ctx.UI_STYLE.StrokeB or 255) end
-			if uiStyle.gradientR~=nil then ctx.UI_STYLE.GradientR=clampNumber(uiStyle.gradientR,0,255,ctx.UI_STYLE.GradientR or 255) end
-			if uiStyle.gradientG~=nil then ctx.UI_STYLE.GradientG=clampNumber(uiStyle.gradientG,0,255,ctx.UI_STYLE.GradientG or 255) end
-			if uiStyle.gradientB~=nil then ctx.UI_STYLE.GradientB=clampNumber(uiStyle.gradientB,0,255,ctx.UI_STYLE.GradientB or 255) end
-			if uiStyle.strokeGradient~=nil then ctx.UI_STYLE.StrokeGradient=uiStyle.strokeGradient and true or false end
-			if uiStyle.liquidStroke~=nil then ctx.UI_STYLE.LiquidStroke=uiStyle.liquidStroke and true or false end
-			if uiStyle.liquidStrokeSpeed~=nil then ctx.UI_STYLE.LiquidStrokeSpeed=clampNumber(uiStyle.liquidStrokeSpeed,0,2,ctx.UI_STYLE.LiquidStrokeSpeed or 1) end
+			for _,field in ipairs(UI_STYLE_NUMBER_FIELDS) do
+				local savedKey,styleKey,min,max,fallback=field[1],field[2],field[3],field[4],field[5]
+				if uiStyle[savedKey]~=nil then
+					ctx.UI_STYLE[styleKey]=clampNumber(uiStyle[savedKey],min,max,ctx.UI_STYLE[styleKey] or fallback)
+				end
+			end
+
+			for _,field in ipairs(UI_STYLE_BOOL_FIELDS) do
+				if uiStyle[field[1]]~=nil then
+					ctx.UI_STYLE[field[2]]=uiStyle[field[1]] and true or false
+				end
+			end
+
 			if uiStyle.liquidStrokeDirection~=nil then ctx.UI_STYLE.LiquidStrokeDirection=tostring(uiStyle.liquidStrokeDirection) end
-			if uiStyle.strokeThickness~=nil then ctx.UI_STYLE.StrokeThickness=clampNumber(uiStyle.strokeThickness,0,8,ctx.UI_STYLE.StrokeThickness or 1) end
-			if uiStyle.strokeTransparency~=nil then ctx.UI_STYLE.StrokeTransparency=clampNumber(uiStyle.strokeTransparency,0,1,ctx.UI_STYLE.StrokeTransparency or 0.55) end
-			if uiStyle.themePanelExpanded~=nil then ctx.UI_STYLE.ThemePanelExpanded=uiStyle.themePanelExpanded and true or false end
-			if uiStyle.ThemePanelExpanded~=nil then ctx.UI_STYLE.ThemePanelExpanded=uiStyle.ThemePanelExpanded and true or false end
-			if uiStyle.coloursPanelExpanded~=nil then ctx.UI_STYLE.ColoursPanelExpanded=uiStyle.coloursPanelExpanded and true or false end
-			if uiStyle.ColorsPanelExpanded~=nil then ctx.UI_STYLE.ColoursPanelExpanded=uiStyle.ColorsPanelExpanded and true or false end
-			if uiStyle.ColoursPanelExpanded~=nil then ctx.UI_STYLE.ColoursPanelExpanded=uiStyle.ColoursPanelExpanded and true or false end
+			local themeExpanded=uiStyle.themePanelExpanded
+			if themeExpanded==nil then themeExpanded=uiStyle.ThemePanelExpanded end
+			if themeExpanded~=nil then ctx.UI_STYLE.ThemePanelExpanded=themeExpanded and true or false end
+
+			local coloursExpanded=uiStyle.coloursPanelExpanded
+			if coloursExpanded==nil then coloursExpanded=uiStyle.ColorsPanelExpanded end
+			if coloursExpanded==nil then coloursExpanded=uiStyle.ColoursPanelExpanded end
+			if coloursExpanded~=nil then ctx.UI_STYLE.ColoursPanelExpanded=coloursExpanded and true or false end
+
 			if uiStyle.uiLib~=nil and tostring(uiStyle.uiLib)~="" then
 				ctx.UI_STYLE.UILib=tostring(uiStyle.uiLib)
 			else

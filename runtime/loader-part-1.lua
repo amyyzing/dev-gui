@@ -700,17 +700,6 @@ function loadRemoteModule(modulePath)
 	return module
 end
 
-function modulePathList(pathsSource)
-	local paths={}
-
-	for _,path in pairs(pathsSource or MODULE_PATHS) do
-		table.insert(paths,path)
-	end
-
-	table.sort(paths)
-	return paths
-end
-
 function loadRemoteModuleBatch(paths)
 	if type(paths)~="table" or #paths==0 then
 		return false,"No module paths requested."
@@ -1091,7 +1080,7 @@ function loadDeferredModule(name,path,current)
 	return module
 end
 
-local batchLoaded,batchErr=loadRemoteModuleBatch(modulePathList(STARTUP_MODULE_PATHS))
+local batchLoaded,batchErr=loadRemoteModuleBatch(STARTUP_MODULE_PATHS)
 if not batchLoaded then
 	warn("Module batch unavailable; falling back to individual loads:",batchErr)
 end
@@ -1133,117 +1122,85 @@ function getUIPrimaryColor()
 	return Color3.fromRGB(math.clamp(math.floor((UI_STYLE.PrimaryR or 28)+0.5),0,255),math.clamp(math.floor((UI_STYLE.PrimaryG or 28)+0.5),0,255),math.clamp(math.floor((UI_STYLE.PrimaryB or 28)+0.5),0,255))
 end
 
-local function fallbackOriginalUILibProfile()
-	return{
-		Id="original",
-		Name="Original",
-		Style={
-			Primary=Color3.fromRGB(28,28,28),
-			Stroke=Color3.fromRGB(76,76,76),
-			Gradient=Color3.fromRGB(45,45,45),
-			GradientOn=false,
-			StrokeThickness=1,
-			StrokeTransparency=0.84,
-		},
-		Theme={},
-		Shape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original",WindowStrokeTransparency=0.62,SectionStrokeTransparency=0.92,ControlStrokeTransparency=0.9,SliderStrokeTransparency=0.9,AccentStrokeTransparency=0.72},
-		Components={
-			TextFont=Enum.Font.Gotham,
-			TitleFont=Enum.Font.GothamBold,
-			ControlFont=Enum.Font.GothamMedium,
-			SectionPrefix=true,
-			SectionPaddingX=12,
-			SectionPaddingY=10,
-			SectionGap=6,
-			SectionHeaderHeight=22,
-			SectionTitleSize=14,
-			SectionSubtitleSize=11,
-			SectionBackgroundTransparency=0,
-			SectionStrokeTransparency=0.84,
-			SectionBodyInset=2,
-			SectionBodyGap=6,
-			SliderRowHeight=48,
-			SliderValueBoxWidth=58,
-			SliderValueBoxVisible=true,
-			SliderContainerTransparency=1,
-			SliderContainerStrokeTransparency=1,
-			SliderLabelX=12,
-			SliderRightPadding=8,
-			ToggleWidth=48,
-			ToggleHeight=20,
-			ToggleStyle="switch",
-			TextBoxHeight=28,
-			ButtonHeight=30,
-			ControlStrokeTransparency=0.78,
-		},
-		Defaults={PrimaryR=28,PrimaryG=28,PrimaryB=28,StrokeR=76,StrokeG=76,StrokeB=76,GradientR=45,GradientG=45,GradientB=45,StrokeGradient=false,LiquidStroke=false,LiquidStrokeSpeed=1,LiquidStrokeDirection="Right",StrokeThickness=1,StrokeTransparency=0.84,CornerRadius=0,UILib="original",ThemePanelExpanded=false,ColoursPanelExpanded=false},
-		MainFrame={
-			Window={W=880,H=540,MinW=560,MinH=360,MaxW=1220,MaxH=820,StartY=80,MinimizedH=68},
-			Layout={RootPadding=8,MainGap=8,PageGap=8,ColumnGap=8,FooterGap=8,HeaderHeight=52,PageBarHeight=30,PageTabWidth=106,PageTabHeight=28,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=10},
-		},
-	}
-end
-
-UILibOriginalModule=fallbackOriginalUILibProfile()
-
-local function tableField(module,key,base)
-	if type(module)=="table" and type(module[key])=="table" then
-		return module[key]
-	end
-
-	return base and base[key] or {}
-end
-
-local function normalizeUILibProfile(module,base)
-	base=base or fallbackOriginalUILibProfile()
-	module=type(module)=="table" and module or {}
-
-	return{
-		Id=tostring(module.Id or base.Id or "original"):lower(),
-		Name=module.Name or base.Name or "Original",
-		Style=tableField(module,"Style",base),
-		Theme=tableField(module,"Theme",base),
-		Shape=tableField(module,"Shape",base),
-		Components=tableField(module,"Components",base),
-		Tones=tableField(module,"Tones",base),
-		Defaults=tableField(module,"Defaults",base),
-		MainFrame=tableField(module,"MainFrame",base),
-	}
-end
+UILibOriginalModule={
+	Id="original",
+	Name="Original",
+	Style={
+		Primary=Color3.fromRGB(28,28,28),
+		Stroke=Color3.fromRGB(76,76,76),
+		Gradient=Color3.fromRGB(45,45,45),
+		GradientOn=false,
+		StrokeThickness=1,
+		StrokeTransparency=0.84,
+	},
+	Theme={},
+	Shape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original",WindowStrokeTransparency=0.62,SectionStrokeTransparency=0.92,ControlStrokeTransparency=0.9,SliderStrokeTransparency=0.9,AccentStrokeTransparency=0.72},
+	Components={
+		TextFont=Enum.Font.Gotham,
+		TitleFont=Enum.Font.GothamBold,
+		ControlFont=Enum.Font.GothamMedium,
+		SectionPrefix=true,
+		SectionPaddingX=12,
+		SectionPaddingY=10,
+		SectionGap=6,
+		SectionHeaderHeight=22,
+		SectionTitleSize=14,
+		SectionSubtitleSize=11,
+		SectionBackgroundTransparency=0,
+		SectionStrokeTransparency=0.84,
+		SectionBodyInset=2,
+		SectionBodyGap=6,
+		SliderRowHeight=48,
+		SliderValueBoxWidth=58,
+		SliderValueBoxVisible=true,
+		SliderContainerTransparency=1,
+		SliderContainerStrokeTransparency=1,
+		SliderLabelX=12,
+		SliderRightPadding=8,
+		ToggleWidth=48,
+		ToggleHeight=20,
+		ToggleStyle="switch",
+		TextBoxHeight=28,
+		ButtonHeight=30,
+		ControlStrokeTransparency=0.78,
+	},
+	Defaults={PrimaryR=28,PrimaryG=28,PrimaryB=28,StrokeR=76,StrokeG=76,StrokeB=76,GradientR=45,GradientG=45,GradientB=45,StrokeGradient=false,LiquidStroke=false,LiquidStrokeSpeed=1,LiquidStrokeDirection="Right",StrokeThickness=1,StrokeTransparency=0.84,CornerRadius=0,UILib="original",ThemePanelExpanded=false,ColoursPanelExpanded=false},
+	MainFrame={
+		Window={W=880,H=540,MinW=560,MinH=360,MaxW=1220,MaxH=820,StartY=80,MinimizedH=68},
+		Layout={RootPadding=8,MainGap=8,PageGap=8,ColumnGap=8,FooterGap=8,HeaderHeight=52,PageBarHeight=30,PageTabWidth=106,PageTabHeight=28,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=10},
+	},
+}
 
 function getDefaultUILibProfile()
-	return normalizeUILibProfile(UILibOriginalModule,fallbackOriginalUILibProfile())
+	return UILibOriginalModule
 end
 
 function getDefaultUILibId()
-	local profile=getDefaultUILibProfile()
-	return tostring(profile.Id or "original"):lower()
+	return "original"
 end
 
 function getUILibRuntimeStyle(id)
-	return getDefaultUILibProfile()
+	return UILibOriginalModule
 end
 
 function getCurrentUILibProfile()
-	return getUILibRuntimeStyle(UI_STYLE and UI_STYLE.UILib or getDefaultUILibId())
+	return UILibOriginalModule
 end
 
 function getDefaultUIStyle()
-	local defaults=(getDefaultUILibProfile() or {}).Defaults or fallbackOriginalUILibProfile().Defaults
+	local defaults=UILibOriginalModule.Defaults
 	local result={}
 
 	for k,v in pairs(defaults) do
 		result[k]=v
 	end
 
-	result.UILib=tostring(result.UILib or getDefaultUILibId())
+	result.UILib=tostring(result.UILib or "original")
 	return result
 end
 
 function getDefaultUIWindow()
-	local profile=getDefaultUILibProfile() or fallbackOriginalUILibProfile()
-	local mainFrame=type(profile.MainFrame)=="table" and profile.MainFrame or {}
-	local window=type(mainFrame.Window)=="table" and mainFrame.Window or fallbackOriginalUILibProfile().MainFrame.Window
+	local window=UILibOriginalModule.MainFrame.Window
 	local result={}
 
 	for k,v in pairs(window) do
