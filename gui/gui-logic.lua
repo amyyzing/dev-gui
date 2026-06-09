@@ -15,6 +15,16 @@ function GuiLogic.new(ctx)
 
 	local api={}
 	local WRAP_INSET=0
+	local EMPTY_TABLE={}
+	local DEFAULT_SHAPE={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original"}
+	local BUILTIN_PROFILES={
+		windui={Shape={WindowRadius=12,SectionRadius=10,ControlRadius=8,SliderRadius=10,SliderHeight=24,SliderStyle="windui"}},
+		rayfield={Shape={WindowRadius=6,SectionRadius=5,ControlRadius=4,SliderRadius=4,SliderHeight=26,SliderStyle="rayfield"}},
+		linoria={Shape={WindowRadius=3,SectionRadius=2,ControlRadius=2,SliderRadius=2,SliderHeight=22,SliderStyle="thin"}},
+		obsidian={Shape={WindowRadius=9,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=24,SliderStyle="glow"}},
+		visual={Shape={WindowRadius=8,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=28,SliderStyle="pill"}},
+		original={Shape=DEFAULT_SHAPE},
+	}
 
 	local function makeFusionValue(initial)
 		if type(Fusion)=="table" and type(Fusion.Value)=="function" then
@@ -49,29 +59,17 @@ function GuiLogic.new(ctx)
 			end
 		end
 
-		if lib=="windui" then
-			return{Shape={WindowRadius=12,SectionRadius=10,ControlRadius=8,SliderRadius=10,SliderHeight=24,SliderStyle="windui"}}
-		elseif lib=="rayfield" then
-			return{Shape={WindowRadius=6,SectionRadius=5,ControlRadius=4,SliderRadius=4,SliderHeight=26,SliderStyle="rayfield"}}
-		elseif lib=="linoria" then
-			return{Shape={WindowRadius=3,SectionRadius=2,ControlRadius=2,SliderRadius=2,SliderHeight=22,SliderStyle="thin"}}
-		elseif lib=="obsidian" then
-			return{Shape={WindowRadius=9,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=24,SliderStyle="glow"}}
-		elseif lib=="visual" then
-			return{Shape={WindowRadius=8,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=28,SliderStyle="pill"}}
-		end
-
-		return{Shape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original"}}
+		return BUILTIN_PROFILES[lib] or BUILTIN_PROFILES.original
 	end
 
 	local function shape()
 		local style=profile()
-		return type(style.Shape)=="table" and style.Shape or {WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original"}
+		return type(style.Shape)=="table" and style.Shape or DEFAULT_SHAPE
 	end
 
 	local function components()
 		local style=profile()
-		return type(style.Components)=="table" and style.Components or {}
+		return type(style.Components)=="table" and style.Components or EMPTY_TABLE
 	end
 
 	local function componentValue(key,fallback)
