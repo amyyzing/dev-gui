@@ -320,18 +320,18 @@ function MainFrame.new(ctx)
 	local pageShellWidth=navIsLeft and navWidth or ((pageTabWidth*6)+2)
 	local pageArea=nil
 	local pageParent=main
-	local pageHostParent=main
+	local pageViewportParent=main
 	local pageBarLayoutOrder=2
-	local pageHostLayoutOrder=3
+	local pageViewportLayoutOrder=3
 	local pageBarSize=UDim2.new(1,0,0,pageBarHeight)
 
 	if navIsLeft then
 		pageArea=New("Frame",{Size=UDim2.new(1,0,0,384),BackgroundTransparency=1,ZIndex=3,LayoutOrder=2},main)
 		New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,navGap),SortOrder=Enum.SortOrder.LayoutOrder,VerticalAlignment=Enum.VerticalAlignment.Top},pageArea)
 		pageParent=pageArea
-		pageHostParent=pageArea
+		pageViewportParent=pageArea
 		pageBarLayoutOrder=1
-		pageHostLayoutOrder=2
+		pageViewportLayoutOrder=2
 		pageBarSize=UDim2.fromOffset(navWidth,384)
 	end
 
@@ -363,7 +363,8 @@ function MainFrame.new(ctx)
 
 	local pageTabs={settingsTab,mapsPageTab,serverPageTab,uiSettingsTab,futureTab,settingsPageTab}
 
-	local pageHost=New("ScrollingFrame",{Size=navIsLeft and UDim2.new(1,-(navWidth+navGap),1,0) or UDim2.new(1,0,0,384),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=3,LayoutOrder=pageHostLayoutOrder},pageHostParent)
+	local pageViewport=New("Frame",{Size=navIsLeft and UDim2.new(1,-(navWidth+navGap),1,0) or UDim2.new(1,0,0,384),BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=3,LayoutOrder=pageViewportLayoutOrder},pageViewportParent)
+	local pageHost=New("ScrollingFrame",{Size=UDim2.new(1,0,1,0),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=3},pageViewport)
 	New("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},pageHost)
 	New("UIPadding",{PaddingTop=UDim.new(0,2),PaddingLeft=UDim.new(0,3),PaddingRight=UDim.new(0,7),PaddingBottom=UDim.new(0,2)},pageHost)
 
@@ -413,13 +414,13 @@ function MainFrame.new(ctx)
 
 			pageBar.Parent=pageArea
 			pageBar.LayoutOrder=1
-			pageHost.Parent=pageArea
-			pageHost.LayoutOrder=2
+			pageViewport.Parent=pageArea
+			pageViewport.LayoutOrder=2
 		else
 			pageBar.Parent=main
 			pageBar.LayoutOrder=2
-			pageHost.Parent=main
-			pageHost.LayoutOrder=3
+			pageViewport.Parent=main
+			pageViewport.LayoutOrder=3
 
 			if pageArea and pageArea.Parent then
 				pageArea:Destroy()
@@ -551,12 +552,14 @@ function MainFrame.new(ctx)
 			pageArea.Size=UDim2.new(1,0,0,pageHeight)
 			pageBar.Size=UDim2.fromOffset(navWidth,pageHeight)
 			pageShell.Size=UDim2.new(1,0,1,0)
-			pageHost.Size=UDim2.new(1,-(navWidth+navGap),1,0)
+			pageViewport.Size=UDim2.new(1,-(navWidth+navGap),1,0)
+			pageHost.Size=UDim2.new(1,0,1,0)
 			pageShellScale.Scale=1
 		else
 			pageBar.Size=UDim2.new(1,0,0,pageBarHeight)
 			pageShell.Size=UDim2.fromOffset(pageShellWidth,pageBarHeight)
-			pageHost.Size=UDim2.new(1,0,0,pageHeight)
+			pageViewport.Size=UDim2.new(1,0,0,pageHeight)
+			pageHost.Size=UDim2.new(1,0,1,0)
 			pageShellScale.Scale=math.min(1,math.max(0.72,(UI_WINDOW.W-16)/pageShellWidth))
 		end
 
@@ -747,6 +750,7 @@ function MainFrame.new(ctx)
 			pageArea.Visible=visible
 		end
 		pageBar.Visible=visible
+		pageViewport.Visible=visible
 		pageHost.Visible=visible
 		footer.Visible=visible
 		resizeHandle.Visible=visible
@@ -943,6 +947,7 @@ function MainFrame.new(ctx)
 	api.closeBtn=closeBtn
 	api.resetBtn=resetBtn
 	api.pageBar=pageBar
+	api.pageViewport=pageViewport
 	api.pageHost=pageHost
 	api.settingsPage=settingsPage
 	api.futurePage=futurePage
