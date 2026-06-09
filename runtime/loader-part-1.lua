@@ -1323,6 +1323,8 @@ local function fallbackOriginalUILibProfile()
 			ToggleStrokeTransparency=0.86,
 			ToggleActiveStrokeTransparency=0.64,
 			ToggleHoverStrokeTransparency=0.74,
+			ToggleOffFillScale=0.24,
+			HeaderToggleOffFillScale=0.24,
 			TextBoxHeight=28,
 			ButtonHeight=30,
 			ControlStrokeTransparency=0.78,
@@ -1964,7 +1966,7 @@ applyUIStrokeTheme=function()
 				end
 
 				local baseTransparency=tonumber(obj:GetAttribute("BaseStrokeTransparency")) or obj.Transparency
-				local styleTransparency=tonumber(UI_STYLE.StrokeTransparency) or 0.72
+				local styleTransparency=tonumber(UI_STYLE.StrokeTransparency) or 0.84
 				obj.Transparency=getRoleStrokeTransparency(role,baseTransparency,styleTransparency)
 
 				pcall(function()

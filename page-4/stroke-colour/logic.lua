@@ -1145,14 +1145,14 @@ function StrokeColour.new(ctx,page)
 
 	local themeGrid=New("Frame",{
 		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,92),
+		Size=UDim2.new(1,0,0,34),
 		ZIndex=5,
 		LayoutOrder=1,
 	},themePanel)
 
 	New("UIGridLayout",{
-		CellPadding=UDim2.fromOffset(8,8),
-		CellSize=UDim2.new(0.333,-6,0,42),
+		CellPadding=UDim2.fromOffset(6,0),
+		CellSize=UDim2.new(0.1666667,-5,0,34),
 		SortOrder=Enum.SortOrder.LayoutOrder,
 	},themeGrid)
 
@@ -1169,7 +1169,7 @@ function StrokeColour.new(ctx,page)
 		setPrimaryColour(preset.Primary)
 		UI_STYLE.LiquidStroke=false
 		UI_STYLE.StrokeThickness=math.clamp(numberOrDefault(currentLibStyleValue("StrokeThickness",1),1),0,8)
-		UI_STYLE.StrokeTransparency=math.clamp(numberOrDefault(currentLibStyleValue("StrokeTransparency",0.72),0.72),0,1)
+		UI_STYLE.StrokeTransparency=math.clamp(numberOrDefault(currentLibStyleValue("StrokeTransparency",0.84),0.84),0,1)
 		syncColourControls()
 		updateEverything()
 		tweenStyleTo(preset.Stroke,preset.Gradient,preset.GradientOn)
@@ -1195,8 +1195,8 @@ function StrokeColour.new(ctx,page)
 		local marker=New("Frame",{
 			BackgroundColor3=preset.Stroke,
 			BorderSizePixel=0,
-			Size=rounded and UDim2.new(1,-22,0,2) or UDim2.new(1,0,0,3),
-			Position=rounded and UDim2.new(0,11,1,-5) or UDim2.new(0,0,1,-3),
+			Size=rounded and UDim2.new(1,-16,0,2) or UDim2.new(1,0,0,2),
+			Position=rounded and UDim2.new(0,8,1,-4) or UDim2.new(0,0,1,-2),
 			Visible=false,
 			SkipThemeRole=true,
 			ZIndex=8,
@@ -1206,13 +1206,13 @@ function StrokeColour.new(ctx,page)
 
 		local label=New("TextLabel",{
 			BackgroundTransparency=1,
-			Position=UDim2.fromOffset(12,0),
-			Size=UDim2.new(1,-24,1,0),
+			Position=UDim2.fromOffset(6,0),
+			Size=UDim2.new(1,-12,1,0),
 			Text=preset.Name,
 			Font=Enum.Font.GothamBold,
-			TextSize=12,
+			TextSize=11,
 			TextColor3=textColor,
-			TextXAlignment=Enum.TextXAlignment.Left,
+			TextXAlignment=Enum.TextXAlignment.Center,
 			TextYAlignment=Enum.TextYAlignment.Center,
 			ZIndex=7,
 		},card)

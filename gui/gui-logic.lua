@@ -131,6 +131,15 @@ function GuiLogic.new(ctx)
 		return Color3.fromRGB(22,22,22)
 	end
 
+	local function fillGradient(color,base)
+		base=base or Color3.new(0,0,0)
+		return ColorSequence.new({
+			ColorSequenceKeypoint.new(0,color:Lerp(base,0.18)),
+			ColorSequenceKeypoint.new(0.55,color),
+			ColorSequenceKeypoint.new(1,color:Lerp(Color3.new(1,1,1),0.24)),
+		})
+	end
+
 	local function createSwitch(parent,startState,onChange,width,height,_knobSize,_pad,zIndex)
 		local c=components()
 		local checkbox=tostring(c.ToggleStyle or "switch"):lower()=="checkbox"
@@ -142,9 +151,12 @@ function GuiLogic.new(ctx)
 		local accent=themeRoleColor(onRole,themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(32,202,106)))
 		local input=themeColor("INPUT",THEME.PANEL or Color3.fromRGB(18,18,24))
 		local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
+		local offAccent=themeColor("RED",THEME.RED or muted):Lerp(input,0.28)
 		local strokeColor=themeColor("STROKE",THEME.STROKE or muted)
 		local tickHeight=math.max(6,height-10)
 		local onTextColor=readableOn(accent)
+		local offTextColor=readableOn(offAccent)
+		local offFillScale=math.clamp(componentNumber("ToggleOffFillScale",0.24),0.08,0.45)
 		local offStrokeTransparency=componentNumber("ToggleStrokeTransparency",0.86)
 		local activeStrokeTransparency=componentNumber("ToggleActiveStrokeTransparency",0.64)
 		local hoverStrokeTransparency=componentNumber("ToggleHoverStrokeTransparency",0.74)
@@ -199,16 +211,12 @@ function GuiLogic.new(ctx)
 			BackgroundTransparency=0.18,
 			BorderSizePixel=0,
 			ZIndex=zIndex+1,
-			ThemeRole=onRole,
+			SkipThemeRole=true,
 		},fillClip)
 		addCorner(fill,"Control")
-		New("UIGradient",{
+		local fillGrad=New("UIGradient",{
 			Rotation=0,
-			Color=ColorSequence.new({
-				ColorSequenceKeypoint.new(0,accent:Lerp(Color3.new(0,0,0),0.20)),
-				ColorSequenceKeypoint.new(0.55,accent),
-				ColorSequenceKeypoint.new(1,accent:Lerp(Color3.new(1,1,1),0.28)),
-			}),
+			Color=fillGradient(state and accent or offAccent,input),
 		},fill)
 
 		local tickHolder=New("Frame",{
@@ -264,21 +272,26 @@ function GuiLogic.new(ctx)
 		local function applyVisuals(animate)
 			cancelTweens()
 
-			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
+			local fillColor=state and accent or offAccent
+			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(offFillScale,0,1,0)
+			local fillTransparency=state and 0.18 or 0.28
 			local bgColor=state and input:Lerp(accent,0.05) or input
-			local strokeTarget=state and accent or (hovering and muted or strokeColor)
+			local strokeTarget=state and accent or (hovering and offAccent or strokeColor)
 			local strokeTransparency=state and activeStrokeTransparency or (hovering and hoverStrokeTransparency or offStrokeTransparency)
 
 			wrap:SetAttribute("ThemeRole","INPUT")
+			fillGrad.Color=fillGradient(fillColor,input)
 
 			if not animate then
 				wrap.BackgroundColor3=bgColor
 				wrapStroke.Color=strokeTarget
 				wrapStroke.Transparency=strokeTransparency
 				fillClip.Size=fillSize
+				fill.BackgroundColor3=fillColor
+				fill.BackgroundTransparency=fillTransparency
 				for _,tick in ipairs(ticks) do
-					tick.BackgroundColor3=state and onTextColor or muted
-					tick.BackgroundTransparency=state and 0.74 or 0.86
+					tick.BackgroundColor3=state and onTextColor or offTextColor
+					tick.BackgroundTransparency=state and 0.74 or 0.84
 				end
 				return
 			end
@@ -286,9 +299,10 @@ function GuiLogic.new(ctx)
 			tween(wrap,softInfo,{BackgroundColor3=bgColor})
 			tween(wrapStroke,softInfo,{Color=strokeTarget,Transparency=strokeTransparency})
 			tween(fillClip,snapInfo,{Size=fillSize})
+			tween(fill,softInfo,{BackgroundColor3=fillColor,BackgroundTransparency=fillTransparency})
 
 			for _,tick in ipairs(ticks) do
-				tween(tick,softInfo,{BackgroundColor3=state and onTextColor or muted,BackgroundTransparency=state and 0.74 or 0.86})
+				tween(tick,softInfo,{BackgroundColor3=state and onTextColor or offTextColor,BackgroundTransparency=state and 0.74 or 0.84})
 			end
 		end
 
@@ -360,23 +374,26 @@ function GuiLogic.new(ctx)
 		local accent=themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(74,208,128))
 		local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 		local input=themeColor("INPUT",THEME.INPUT or THEME.PANEL or Color3.fromRGB(18,18,24))
+		local offAccent=themeColor("RED",THEME.RED or muted):Lerp(input,0.28)
 		local strokeColor=themeColor("STROKE",THEME.STROKE or muted)
 		local dark=input
-		local light=(THEME.TEXT or Color3.fromRGB(245,245,245))
+		local offTextColor=readableOn(offAccent)
 		local state=startState and true or false
 		local stateValue=makeFusionValue(state)
 		local stateVisuals={
 			[true]={
 				fillSize=UDim2.new(1,0,1,0),
 				fillTransparency=0.08,
+				fillColor=accent,
 				tickColor=accent,
 				tickTransparency=0.34,
 			},
 			[false]={
-				fillSize=UDim2.new(0,0,1,0),
-				fillTransparency=1,
-				tickColor=muted,
-				tickTransparency=0.82,
+				fillSize=UDim2.new(math.clamp(headerNumber("HeaderToggleOffFillScale",0.24),0.08,0.45),0,1,0),
+				fillTransparency=0.28,
+				fillColor=offAccent,
+				tickColor=offTextColor,
+				tickTransparency=0.84,
 			},
 		}
 
@@ -434,16 +451,12 @@ function GuiLogic.new(ctx)
 			BackgroundTransparency=initialVisuals.fillTransparency,
 			BorderSizePixel=0,
 			ZIndex=z+2,
-			ThemeRole="SLIDER_FILL",
+			SkipThemeRole=true,
 		},railFillClip)
 
-		New("UIGradient",{
+		local railFillGradient=New("UIGradient",{
 			Rotation=0,
-			Color=ColorSequence.new({
-				ColorSequenceKeypoint.new(0,accent:Lerp(dark,0.2)),
-				ColorSequenceKeypoint.new(0.55,accent),
-				ColorSequenceKeypoint.new(1,light:Lerp(accent,0.25)),
-			}),
+			Color=fillGradient(initialVisuals.fillColor,dark),
 		},railFill)
 
 		local tickHolder=New("Frame",{
@@ -526,12 +539,13 @@ function GuiLogic.new(ctx)
 			cancelTrackedTweens()
 
 			local visuals=visualState(state)
-			local strokeTarget=state and accent or strokeColor
+			local strokeTarget=state and accent or offAccent
 			local strokeTransparency=state and 0.64 or 0.88
+			railFillGradient.Color=fillGradient(visuals.fillColor,dark)
 
 			if not animate then
 				applyProps(railFillClip,{Size=visuals.fillSize})
-				applyProps(railFill,{BackgroundTransparency=visuals.fillTransparency})
+				applyProps(railFill,{BackgroundColor3=visuals.fillColor,BackgroundTransparency=visuals.fillTransparency})
 				applyProps(railStroke,{Color=strokeTarget,Transparency=strokeTransparency})
 				for _,tick in ipairs(ticks) do
 					applyProps(tick,{BackgroundColor3=visuals.tickColor,BackgroundTransparency=visuals.tickTransparency})
@@ -542,7 +556,7 @@ function GuiLogic.new(ctx)
 			local shapeInfo=state and expandInfo or collapseInfo
 
 			playTrackedTween(railFillClip,shapeInfo,{Size=visuals.fillSize})
-			playTrackedTween(railFill,softInfo,{BackgroundTransparency=visuals.fillTransparency})
+			playTrackedTween(railFill,softInfo,{BackgroundColor3=visuals.fillColor,BackgroundTransparency=visuals.fillTransparency})
 			playTrackedTween(railStroke,softInfo,{Color=strokeTarget,Transparency=strokeTransparency})
 
 			for _,tick in ipairs(ticks) do
@@ -581,7 +595,10 @@ function GuiLogic.new(ctx)
 			if hoverTween then
 				hoverTween:Cancel()
 			end
-			hoverTween=TweenService:Create(railStroke,hoverInfo,{Transparency=state and 0.58 or 0.74})
+			hoverTween=TweenService:Create(railStroke,hoverInfo,{
+				Color=state and accent or offAccent,
+				Transparency=state and 0.58 or 0.74,
+			})
 			hoverTween:Play()
 		end)
 
@@ -590,7 +607,7 @@ function GuiLogic.new(ctx)
 				hoverTween:Cancel()
 			end
 			hoverTween=TweenService:Create(railStroke,hoverInfo,{
-				Color=state and accent or strokeColor,
+				Color=state and accent or offAccent,
 				Transparency=state and 0.64 or 0.88,
 			})
 			hoverTween:Play()
