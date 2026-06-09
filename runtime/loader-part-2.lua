@@ -432,7 +432,9 @@ function makePage1Ctx()
 		setCurrentMode=function(key,label)
 			CURRENT_MODE_KEY=tostring(key or"mode1")
 			CURRENT_MODE_LABEL=tostring(label or"Gameplay")
-			if modeSubtitle then
+			if MainFrame and MainFrame.RefreshText then
+				MainFrame.RefreshText(Description)
+			elseif modeSubtitle then
 				modeSubtitle.Text=getMainDescriptionText()
 			end
 			if PAGE1_APIS.GameParams and PAGE1_APIS.GameParams.Refresh then

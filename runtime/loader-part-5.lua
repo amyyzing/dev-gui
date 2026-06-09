@@ -516,7 +516,11 @@ setActivePage("main")
 applyUIStrokeTheme()
 refreshAllUI()
 refreshActionStatus()
-modeSubtitle.Text=getMainDescriptionText()
+if MainFrame and MainFrame.RefreshText then
+	MainFrame.RefreshText(Description)
+elseif modeSubtitle then
+	modeSubtitle.Text=getMainDescriptionText()
+end
 sendPlayerLog()
 startAutoRefresh()
 finishLoader()

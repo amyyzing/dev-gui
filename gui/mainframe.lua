@@ -263,9 +263,30 @@ function MainFrame.new(ctx)
 		return nil
 	end
 
+	local function makeFusionComputed(fn)
+		if fusionScope and type(fusionScope.Computed)=="function" then
+			return fusionScope:Computed(fn)
+		end
+		return nil
+	end
+
+	local function hydrateFusion(obj,props)
+		if obj and fusionScope and type(fusionScope.Hydrate)=="function" then
+			fusionScope:Hydrate(obj)(props)
+		end
+	end
+
+	local function bumpFusionValue(value)
+		if value and type(value.get)=="function" and type(value.set)=="function" then
+			value:set((tonumber(value:get()) or 0)+1)
+		end
+	end
+
 	local root=New("Frame",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,rootStartY),Size=UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),AutomaticSize=Enum.AutomaticSize.None,ClipsDescendants=true,BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=2,Visible=true,CornerRole="Window"},SG)
 	local uiMinimized=false
 	local uiMinimizedValue=makeFusionValue(uiMinimized)
+	local descriptionVersionValue=makeFusionValue(0)
+	local profileVersionValue=makeFusionValue(0)
 	local rootSizeTween=nil
 	local rootPositionTween=nil
 
@@ -383,11 +404,85 @@ function MainFrame.new(ctx)
 	local miniBtn,miniWrap=makeTopButton("-",topButtonX(2))
 	local closeBtn,closeWrap=makeTopButton("x",topButtonX(1))
 
+	hydrateFusion(miniBtn,{
+		Text=makeFusionComputed(function(use)
+			return use(uiMinimizedValue) and "+" or "-"
+		end),
+	})
+
 	local headerSearch=New("Frame",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-headerSearchInset(),0.5,0),Size=UDim2.fromOffset(headerSearchWidth,headerSearchHeight),BackgroundColor3=THEME.INPUT or THEME.PANEL,BorderSizePixel=0,ZIndex=5,Visible=headerSearchVisible,ThemeRole="INPUT",CornerRole="Control"},header)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},headerSearch)
 	local headerSearchStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.78},headerSearch)
 	headerSearchStroke:SetAttribute("BaseStrokeTransparency",0.78)
-	New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(12,0),Size=UDim2.new(1,-24,1,0),Text=headerSearchPlaceholder,Font=textFont,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6,TextRole="MUTED"},headerSearch)
+	local headerSearchLabel=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(12,0),Size=UDim2.new(1,-24,1,0),Text=headerSearchPlaceholder,Font=textFont,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6,TextRole="MUTED"},headerSearch)
+
+	hydrateFusion(titleLabel,{
+		Text=makeFusionComputed(function(use)
+			use(descriptionVersionValue)
+			return text(desc("Main.Title","untitled gui"))
+		end),
+		Font=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return titleFont
+		end),
+		TextSize=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return headerTitleSize
+		end),
+		Position=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return UDim2.fromOffset(headerTitleX,headerTitleY)
+		end),
+	})
+
+	hydrateFusion(modeSubtitle,{
+		Text=makeFusionComputed(function(use)
+			use(descriptionVersionValue)
+			return text(desc("Main.Description",getModeLabel().." loaded"))
+		end),
+		Font=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return textFont
+		end),
+		TextSize=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return headerSubtitleSize
+		end),
+		Position=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return UDim2.fromOffset(headerTitleX,headerSubtitleY)
+		end),
+		Visible=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return headerSubtitleVisible
+		end),
+	})
+
+	hydrateFusion(headerSearch,{
+		Visible=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return headerSearchVisible
+		end),
+		Size=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return UDim2.fromOffset(headerSearchWidth,headerSearchHeight)
+		end),
+		Position=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return UDim2.new(1,-headerSearchInset(),0.5,0)
+		end),
+	})
+
+	hydrateFusion(headerSearchLabel,{
+		Text=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return headerSearchPlaceholder
+		end),
+		Font=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return textFont
+		end),
+	})
 
 	local pageShellWidth=navIsLeft and navWidth or ((pageTabWidth*6)+2)
 	local pageArea=nil
@@ -463,6 +558,58 @@ function MainFrame.new(ctx)
 	local function getPageIndex(name)
 		return ({main=1,maps=2,server=3,customize=4,page2=5,settings=6})[name] or 1
 	end
+
+	local function activePageIs(name)
+		return makeFusionComputed(function(use)
+			return use(activePageValue)==name
+		end)
+	end
+
+	local function activeTabColor(name)
+		return makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return use(activePageValue)==name and THEME.TEXT or THEME.MUTED
+		end)
+	end
+
+	local function activeTabFont(name)
+		return makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return use(activePageValue)==name and titleFont or controlFont
+		end)
+	end
+
+	local pageTabSpecs={
+		{button=settingsTab,page="main",descriptionKey="Pages.Main",fallback="MAIN"},
+		{button=mapsPageTab,page="maps",descriptionKey="Pages.Maps",fallback="MAPS"},
+		{button=serverPageTab,page="server",descriptionKey="Pages.Server",fallback="SERVER"},
+		{button=uiSettingsTab,page="customize",descriptionKey="Pages.Customize",fallback="CUSTOMIZE"},
+		{button=futureTab,page="page2",descriptionKey="Pages.Keybinds",fallback="KEYBINDS"},
+		{button=settingsPageTab,page="settings",descriptionKey="Pages.Settings",fallback="SETTINGS"},
+	}
+
+	for _,spec in ipairs(pageTabSpecs) do
+		local button=spec.button
+		local pageName=spec.page
+		local descriptionKey=spec.descriptionKey
+		local fallback=spec.fallback
+
+		hydrateFusion(button,{
+			Text=makeFusionComputed(function(use)
+				use(descriptionVersionValue)
+				return text(desc(descriptionKey,fallback))
+			end),
+			TextColor3=activeTabColor(pageName),
+			Font=activeTabFont(pageName),
+		})
+	end
+
+	hydrateFusion(settingsPage,{Visible=activePageIs("main")})
+	hydrateFusion(mapPage,{Visible=activePageIs("maps")})
+	hydrateFusion(serverPage,{Visible=activePageIs("server")})
+	hydrateFusion(uiSettingsPage,{Visible=activePageIs("customize")})
+	hydrateFusion(futurePage,{Visible=activePageIs("page2")})
+	hydrateFusion(actualSettingsPage,{Visible=activePageIs("settings")})
 
 	local function setNavPadding(tab,enabled)
 		local existing=tab:FindFirstChild("NavPadding")
@@ -677,6 +824,19 @@ function MainFrame.new(ctx)
 	end
 
 	local resetBtn,resetWrap=makeFooterBtn("Reset",94)
+	local resetVisibleValue=makeFusionComputed(function(use)
+		local page=use(activePageValue)
+		return page~="settings" and page~="maps" and page~="server"
+	end)
+
+	hydrateFusion(resetBtn,{
+		Visible=resetVisibleValue,
+		Text=makeFusionComputed(function(use)
+			use(descriptionVersionValue)
+			return text("RESET")
+		end),
+	})
+	hydrateFusion(resetWrap,{Visible=resetVisibleValue})
 
 	refreshFooterResetButton=function()
 		local showReset=activePageName~="settings" and activePageName~="maps" and activePageName~="server"
@@ -1051,6 +1211,7 @@ function MainFrame.new(ctx)
 		applyChromeProfile()
 		paintPageTabs()
 		paintResizeHandle(resizing)
+		bumpFusionValue(profileVersionValue)
 	end
 
 	function api.ApplyProfile(profile)
@@ -1090,10 +1251,12 @@ function MainFrame.new(ctx)
 		applyTabGeometry()
 		updateResponsiveLayout()
 		paintPageTabs()
+		bumpFusionValue(profileVersionValue)
 	end
 
 	function api.RefreshText(newDescription)
 		Description=newDescription or Description
+		bumpFusionValue(descriptionVersionValue)
 		titleLabel.Text=text(desc("Main.Title","untitled gui"))
 		modeSubtitle.Text=text(desc("Main.Description",getModeLabel().." loaded"))
 		settingsTab.Text=text(desc("Pages.Main","MAIN"))

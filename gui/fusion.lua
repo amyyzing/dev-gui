@@ -109,8 +109,16 @@ function Fusion.Value(initial)
 		end
 
 		self._value=nextValue
+		local listeners={}
 		for listener in pairs(self._listeners) do
-			task.spawn(listener,nextValue,oldValue)
+			table.insert(listeners,listener)
+		end
+
+		for _,listener in ipairs(listeners) do
+			local ok,err=pcall(listener,nextValue,oldValue)
+			if not ok then
+				warn("Fusion listener failed:",err)
+			end
 		end
 	end
 
