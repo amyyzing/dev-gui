@@ -2,11 +2,6 @@ local DataSave={}
 
 local HttpService=game:GetService("HttpService")
 
-local DEFAULT_ROOT={
-	version=2,
-	modes={},
-}
-
 local FALLBACK_UI_STYLE={
 	PrimaryR=28,
 	PrimaryG=28,
@@ -27,18 +22,6 @@ local FALLBACK_UI_STYLE={
 	UILib="original",
 	ThemePanelExpanded=false,
 	ColoursPanelExpanded=false,
-}
-
-local KEYBIND_FIELDS={
-	{"toggleUI","TOGGLE_UI_KEY"},
-	{"toggleHitbox","TOGGLE_HB_KEY"},
-	{"toggleJumpBoost","TOGGLE_JB_KEY"},
-	{"toggleAlwaysBoost","TOGGLE_AB_KEY"},
-	{"toggleESP","TOGGLE_ACTION_KEY"},
-	{"toggleSpeed","TOGGLE_SPEED_KEY"},
-	{"qbAimLock","QB_AIM_LOCK_KEY"},
-	{"qbAimThrow","QB_AIM_THROW_KEY"},
-	{"qbAimToggle","QB_AIM_TOGGLE_KEY"},
 }
 
 local function cloneRoot()

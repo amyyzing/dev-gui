@@ -16,9 +16,7 @@ function MainFrame.new(ctx)
 	local attachHover=ctx.attachHover
 	local isAlive=ctx.isAlive or function() return true end
 	local getModeLabel=ctx.getModeLabel or function() return "Gameplay" end
-	local getUIPrimaryColor=ctx.getUIPrimaryColor or function() return THEME.BG end
 	local getUIStrokeColor=ctx.getUIStrokeColor or function() return THEME.STROKE end
-	local getUIStrokeGradientColor=ctx.getUIStrokeGradientColor or function() return THEME.GREEN or THEME.ACC or THEME.TEXT end
 	local getCurrentUILibProfile=ctx.getCurrentUILibProfile
 	local onPageActivated=ctx.onPageActivated
 	local uiProfile=type(ctx.UI_PROFILE)=="table" and ctx.UI_PROFILE or {}
@@ -81,12 +79,10 @@ function MainFrame.new(ctx)
 	local pageBarHeight=30
 	local pageTabWidth=106
 	local pageTabHeight=28
-	local pageHostReserve=156
 	local footerHeight=34
 	local topButtonSize=28
 	local topButtonGap=6
 	local topButtonOuter=10
-	local fabSize=42
 	local navPlacement="top"
 	local navIsLeft=false
 	local navWidth=150
@@ -125,12 +121,10 @@ function MainFrame.new(ctx)
 		pageBarHeight=layoutNumber(layoutProfile,"PageBarHeight",30)
 		pageTabWidth=layoutNumber(layoutProfile,"PageTabWidth",106)
 		pageTabHeight=layoutNumber(layoutProfile,"PageTabHeight",28)
-		pageHostReserve=layoutNumber(layoutProfile,"PageHostReserve",156)
 		footerHeight=layoutNumber(layoutProfile,"FooterHeight",34)
 		topButtonSize=layoutNumber(layoutProfile,"TopButtonSize",28)
 		topButtonGap=layoutNumber(layoutProfile,"TopButtonGap",6)
 		topButtonOuter=layoutNumber(layoutProfile,"TopButtonOuter",10)
-		fabSize=layoutNumber(layoutProfile,"FabSize",42)
 		navPlacement=tostring(layoutProfile.NavPlacement or "top"):lower()
 		navIsLeft=navPlacement=="left"
 		navWidth=layoutNumber(layoutProfile,"NavWidth",150)
@@ -663,24 +657,13 @@ function MainFrame.new(ctx)
 	end
 
 	local function paintPageTabs()
-		settingsTab:SetAttribute("ThemeTextRole",activePageName=="main" and "TEXT" or "MUTED")
-		mapsPageTab:SetAttribute("ThemeTextRole",activePageName=="maps" and "TEXT" or "MUTED")
-		serverPageTab:SetAttribute("ThemeTextRole",activePageName=="server" and "TEXT" or "MUTED")
-		uiSettingsTab:SetAttribute("ThemeTextRole",activePageName=="customize" and "TEXT" or "MUTED")
-		futureTab:SetAttribute("ThemeTextRole",activePageName=="page2" and "TEXT" or "MUTED")
-		settingsPageTab:SetAttribute("ThemeTextRole",activePageName=="settings" and "TEXT" or "MUTED")
-		settingsTab.TextColor3=activePageName=="main" and THEME.TEXT or THEME.MUTED
-		mapsPageTab.TextColor3=activePageName=="maps" and THEME.TEXT or THEME.MUTED
-		serverPageTab.TextColor3=activePageName=="server" and THEME.TEXT or THEME.MUTED
-		uiSettingsTab.TextColor3=activePageName=="customize" and THEME.TEXT or THEME.MUTED
-		futureTab.TextColor3=activePageName=="page2" and THEME.TEXT or THEME.MUTED
-		settingsPageTab.TextColor3=activePageName=="settings" and THEME.TEXT or THEME.MUTED
-		settingsTab.Font=activePageName=="main" and titleFont or controlFont
-		mapsPageTab.Font=activePageName=="maps" and titleFont or controlFont
-		serverPageTab.Font=activePageName=="server" and titleFont or controlFont
-		uiSettingsTab.Font=activePageName=="customize" and titleFont or controlFont
-		futureTab.Font=activePageName=="page2" and titleFont or controlFont
-		settingsPageTab.Font=activePageName=="settings" and titleFont or controlFont
+		for _,spec in ipairs(pageTabSpecs) do
+			local active=activePageName==spec.page
+			local button=spec.button
+			button:SetAttribute("ThemeTextRole",active and "TEXT" or "MUTED")
+			button.TextColor3=active and THEME.TEXT or THEME.MUTED
+			button.Font=active and titleFont or controlFont
+		end
 	end
 
 	local function applyChromeProfile()
@@ -847,17 +830,6 @@ function MainFrame.new(ctx)
 
 	refreshFooterResetButton()
 
-	local fab=New("TextButton",{Name="FAB",Visible=false,AutoButtonColor=false,Selectable=true,Size=UDim2.fromOffset(fabSize,fabSize),AnchorPoint=Vector2.new(1,1),Position=UDim2.new(1,-16,1,-16),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text="[]",TextColor3=THEME.TEXT,Font=controlFont,TextSize=16,ZIndex=20,ThemeRole="BUTTON",CornerRole="Control"},SG)
-	New("UICorner",{CornerRadius=UDim.new(0,0)},fab)
-	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},fab)
-	connect(fab.MouseEnter,function()
-		fab.BackgroundColor3=THEME.CARD
-	end)
-
-	connect(fab.MouseLeave,function()
-		fab.BackgroundColor3=THEME.BUTTON or THEME.BG
-	end)
-
 	local toastHost=New("Frame",{
 		Name="ToastHost",
 		AnchorPoint=Vector2.new(1,1),
@@ -954,60 +926,24 @@ function MainFrame.new(ctx)
 	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=THEME.CARD,BackgroundTransparency=0.02,BorderSizePixel=0,Text="",ZIndex=30,ThemeRole="CARD"},root)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},resizeHandle)
 	local resizeStroke=New("UIStroke",{Color=getUIStrokeColor(),Thickness=1,Transparency=0.05},resizeHandle)
-	local resizeGlow=New("UIGradient",{Rotation=45,Color=ColorSequence.new({ColorSequenceKeypoint.new(0,getUIStrokeColor()),ColorSequenceKeypoint.new(1,getUIStrokeGradientColor())})},resizeHandle)
 
 	local resizeHovering=false
 	local resizing=false
 
-	local function resizeColorSet(held)
-		local stroke=getUIStrokeColor()
-		local accent=getUIStrokeGradientColor()
-		local primary=getUIPrimaryColor()
-		local base=primary:Lerp(stroke,0.18)
-
-		if held then
-			return primary:Lerp(accent,0.35),accent:Lerp(stroke,0.2),ColorSequence.new({
-				ColorSequenceKeypoint.new(0,primary:Lerp(accent,0.25)),
-				ColorSequenceKeypoint.new(0.5,accent:Lerp(primary,0.2)),
-				ColorSequenceKeypoint.new(1,primary:Lerp(stroke,0.35)),
-			})
-		end
-
-		if resizeHovering then
-			return primary:Lerp(accent,0.22),stroke:Lerp(accent,0.65),ColorSequence.new({
-				ColorSequenceKeypoint.new(0,primary:Lerp(stroke,0.16)),
-				ColorSequenceKeypoint.new(0.45,accent:Lerp(primary,0.25)),
-				ColorSequenceKeypoint.new(1,primary:Lerp(accent,0.32)),
-			})
-		end
-
-		return base,stroke,ColorSequence.new({
-			ColorSequenceKeypoint.new(0,primary),
-			ColorSequenceKeypoint.new(1,stroke),
-		})
-	end
-
 	local function paintResizeHandle(held)
 		local targetSize=held and 18 or (resizeHovering and 16 or 14)
-		local targetColor,targetStroke,targetGradient=resizeColorSet(held)
 		local targetTransparency=held and 0 or (resizeHovering and 0.01 or 0.02)
-
-		resizeGlow.Color=targetGradient
 
 		TweenService:Create(resizeHandle,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
 			Size=UDim2.fromOffset(targetSize,targetSize),
-			BackgroundColor3=targetColor,
+			BackgroundColor3=held and (THEME.GREEN or THEME.CARD) or THEME.CARD,
 			BackgroundTransparency=targetTransparency,
 		}):Play()
 
 		TweenService:Create(resizeStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
-			Color=targetStroke,
-			Thickness=held and 2 or 1,
+			Color=getUIStrokeColor(),
+			Thickness=1,
 			Transparency=(held or resizeHovering) and 0 or 0.05,
-		}):Play()
-
-		TweenService:Create(resizeGlow,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
-			Rotation=held and 180 or (resizeHovering and 90 or 45),
 		}):Play()
 	end
 
@@ -1091,7 +1027,6 @@ function MainFrame.new(ctx)
 		if uiMinimizedValue then
 			uiMinimizedValue:set(true)
 		end
-		fab.Visible=false
 		miniBtn.Text="+"
 		root.Visible=true
 		setBodyVisible(true)
@@ -1110,7 +1045,6 @@ function MainFrame.new(ctx)
 		if uiMinimizedValue then
 			uiMinimizedValue:set(false)
 		end
-		fab.Visible=false
 		miniBtn.Text="-"
 		root.Visible=true
 		setBodyVisible(true)
@@ -1124,8 +1058,6 @@ function MainFrame.new(ctx)
 			minimize()
 		end
 	end)
-
-	activate(fab,restore)
 
 	local dragConn=nil
 

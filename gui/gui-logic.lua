@@ -316,7 +316,6 @@ function GuiLogic.new(ctx)
 		local railHeight=tonumber(c.HeaderToggleRailHeight) or 22
 		local z=zIndex or 6
 		local expanded=true
-		local expandedValue=makeFusionValue(expanded)
 		local destroyed=false
 
 		local holder=New("Frame",{
@@ -334,9 +333,6 @@ function GuiLogic.new(ctx)
 
 		local function setExpanded(value)
 			expanded=value and true or false
-			if expandedValue then
-				expandedValue:set(expanded)
-			end
 		end
 
 		local function destroyHeaderSwitch()
@@ -345,7 +341,6 @@ function GuiLogic.new(ctx)
 			if control and control.destroy then
 				control.destroy()
 			end
-			destroyFusionValue(expandedValue)
 			if holder then
 				holder:Destroy()
 			end
@@ -358,7 +353,6 @@ function GuiLogic.new(ctx)
 			get=control.get,
 			stateValue=control.stateValue,
 			setExpanded=setExpanded,
-			expandedValue=expandedValue,
 			Destroy=destroyHeaderSwitch,
 			destroy=destroyHeaderSwitch,
 			wrap=holder,
@@ -802,42 +796,21 @@ function GuiLogic.new(ctx)
 		return b
 	end
 
-	function api.buildSlider(parent,labelText,minVal,maxVal,startVal,decimals,onChange)
+	function api.buildSlider(parent,_labelText,minVal,maxVal,startVal,decimals,onChange)
 		local s=shape()
 		local sliderHeight=s.SliderHeight or componentNumber("SliderHeight",26)
 		local rowHeight=math.max(componentNumber("SliderRowHeight",38),sliderHeight+10)
-		local rounded=(tonumber(s.SliderRadius) or 0)>0
 		local valueBoxVisible=componentValue("SliderValueBoxVisible",true)~=false
 		local valueBoxWidth=valueBoxVisible and componentNumber("SliderValueBoxWidth",58) or 0
 		local valueBoxGap=valueBoxVisible and componentNumber("SliderValueBoxGap",8) or 0
-		local labelWidth=componentNumber("SliderLabelWidth",s.SliderStyle=="thin" and 116 or 128)
-		local trackGap=componentNumber("SliderTrackGap",8)
 		local rightPadding=componentNumber("SliderRightPadding",8)
 		local labelX=componentNumber("SliderLabelX",12)
-		local labelPlacement=tostring(componentValue("SliderLabelPlacement","above")):lower()
-		local labelHeight=componentNumber("SliderLabelHeight",s.SliderStyle=="thin" and 12 or 14)
-		local labelY=componentNumber("SliderLabelY",0)
-		local controlGap=componentNumber("SliderControlGap",4)
-		local bottomPadding=componentNumber("SliderBottomPadding",4)
-		local trackLeft=labelX+labelWidth+trackGap
+		local trackLeft=labelX
 		local trackRight=valueBoxWidth+valueBoxGap+rightPadding
 		local trackYScale=0.5
 		local trackYOffset=0
-		local labelPosition=UDim2.fromOffset(labelX,0)
-		local labelSize=UDim2.fromOffset(labelWidth,rowHeight)
 		local valueBoxYScale=0.5
 		local valueBoxYOffset=0
-
-		if labelPlacement=="above" then
-			rowHeight=math.max(rowHeight,labelY+labelHeight+controlGap+sliderHeight+bottomPadding)
-			trackLeft=labelX
-			trackYScale=0
-			trackYOffset=labelY+labelHeight+controlGap+(sliderHeight/2)
-			labelPosition=UDim2.fromOffset(labelX,labelY)
-			labelSize=UDim2.new(1,-(labelX+rightPadding),0,labelHeight)
-			valueBoxYScale=trackYScale
-			valueBoxYOffset=trackYOffset
-		end
 
 		local containerRole=tostring(componentValue("SliderContainerRole","SECTION"))
 		local containerCorner=tostring(componentValue("SliderContainerCornerRole",containerRole=="BUTTON" and "Control" or "Section"))
@@ -856,7 +829,6 @@ function GuiLogic.new(ctx)
 		local containerStrokeTransparency=componentNumber("SliderContainerStrokeTransparency",1)
 		local containerStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=containerStrokeTransparency},container)
 		containerStroke:SetAttribute("BaseStrokeTransparency",containerStrokeTransparency)
-		New("TextLabel",{BackgroundTransparency=1,Position=labelPosition,Size=labelSize,Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false},container)
 
 		local track=New("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor(trackRole,THEME.PANEL),BackgroundTransparency=sliderTrackTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=6,ThemeRole=trackRole,CornerRole="Slider"},container)
 		addCorner(track,"Slider")

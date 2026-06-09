@@ -86,20 +86,6 @@ local PAGE1_STATE={
 	testingEnabled=false,
 }
 
-local DEFAULT_PRESETS={
-	{key=Enum.KeyCode.Unknown,size=Vector3.new(0.1,0.1,0.1)},
-	{key=Enum.KeyCode.Unknown,size=Vector3.new(2.7,5.8,1.65)},
-	{key=Enum.KeyCode.Unknown,size=Vector3.new(3.1,5.8,1.70)},
-	{key=Enum.KeyCode.Unknown,size=Vector3.new(2.52,5.4,1.41)},
-}
-
-local PRESETS={
-	{key=Enum.KeyCode.Unknown,size=Vector3.new(0.1,0.1,0.1)},
-	{key=Enum.KeyCode.Unknown,size=Vector3.new(2.7,5.8,1.65)},
-	{key=Enum.KeyCode.Unknown,size=Vector3.new(3.1,5.8,1.70)},
-	{key=Enum.KeyCode.Unknown,size=Vector3.new(2.52,5.4,1.41)},
-}
-
 local function moduleAt(path)
 	local node=sourceRoot
 	for segment in string.gmatch(path,"[^/]+") do
@@ -306,14 +292,7 @@ local function fallbackOriginalUILibProfile()
 			SectionStrokeTransparency=0.84,
 			SectionBodyInset=2,
 			SectionBodyGap=6,
-			SliderLabelPlacement="above",
 			SliderRowHeight=48,
-			SliderTrackWidth=172,
-			SliderLabelWidth=150,
-			SliderLabelHeight=14,
-			SliderLabelY=2,
-			SliderControlGap=4,
-			SliderBottomPadding=6,
 			SliderValueBoxWidth=58,
 			SliderValueBoxVisible=true,
 			SliderContainerTransparency=1,
@@ -322,20 +301,14 @@ local function fallbackOriginalUILibProfile()
 			SliderRightPadding=8,
 			ToggleWidth=48,
 			ToggleHeight=20,
-			ToggleKnobSize=16,
-			TogglePad=2,
 			ToggleStyle="switch",
-			ToggleOffRole="INPUT",
-			ToggleStrokeTransparency=0.86,
-			ToggleActiveStrokeTransparency=0.64,
-			ToggleHoverStrokeTransparency=0.74,
 			TextBoxHeight=28,
 			ButtonHeight=30,
 			ControlStrokeTransparency=0.78,
 		},
 		MainFrame={
 			Window={W=880,H=540,MinW=560,MinH=360,MaxW=1220,MaxH=820,StartY=80,MinimizedH=68},
-			Layout={RootPadding=8,MainGap=8,PageGap=8,ColumnGap=8,FooterGap=8,HeaderHeight=52,PageBarHeight=30,PageTabWidth=106,PageTabHeight=28,PageHostReserve=156,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=10,FabSize=42},
+			Layout={RootPadding=8,MainGap=8,PageGap=8,ColumnGap=8,FooterGap=8,HeaderHeight=52,PageBarHeight=30,PageTabWidth=106,PageTabHeight=28,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=10},
 		},
 	}
 end

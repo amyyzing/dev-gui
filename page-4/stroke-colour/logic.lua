@@ -1,7 +1,6 @@
 local StrokeColour={}
 
 local TweenService=game:GetService("TweenService")
-local RunService=game:GetService("RunService")
 local GuiService=game:GetService("GuiService")
 
 local DEFAULTS={
@@ -170,9 +169,7 @@ function StrokeColour.new(ctx,page)
 	local New=ctx.New
 	local THEME=ctx.THEME
 	local UI_STYLE=ctx.UI_STYLE
-	local SG=ctx.SG
 	local UIS=ctx.UIS or game:GetService("UserInputService")
-	local externalThemeApplier=ctx.applyUIStrokeTheme~=nil
 
 	applyDefaultOverrides(ctx.DEFAULT_UI_STYLE)
 	ensureStyleDefaults(UI_STYLE)
@@ -186,8 +183,6 @@ function StrokeColour.new(ctx,page)
 	local speedSlider,thicknessSlider,transparencySlider
 	local gradientToggle,liquidToggle
 	local colourTweenToken=0
-	local liquidConn=nil
-	local liquidClock=0
 	local updatePreview=function() end
 	local paintChoices=function() end
 	local syncPickerControls=function() paintChoices() end
@@ -265,151 +260,10 @@ function StrokeColour.new(ctx,page)
 		end
 	end
 
-	local function setGradientColors(grad,c1,c2)
-		grad.Offset=Vector2.new(0,0)
-		grad.Rotation=0
-		grad.Color=ColorSequence.new({
-			ColorSequenceKeypoint.new(0,c1),
-			ColorSequenceKeypoint.new(1,c2),
-		})
-	end
-
-	local function getPulseAlpha()
-		if not UI_STYLE.LiquidStroke then
-			return 0
-		end
-
-		return (math.sin(liquidClock*math.pi*2)+1)*0.5
-	end
-
-	local function getPulseColor()
-		local c1=getUIStrokeColor()
-		local c2=getUIStrokeGradientColor()
-
-		if not UI_STYLE.LiquidStroke then
-			return c1
-		end
-
-		return c1:Lerp(c2,0.18+(getPulseAlpha()*0.26))
-	end
-
-	local function isTextObject(obj)
-		return obj and (obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox"))
-	end
-
-	local function stopLiquidAnimation()
-		if liquidConn then
-			liquidConn:Disconnect()
-			liquidConn=nil
-		end
-	end
-
-	local function startLiquidAnimation()
-		stopLiquidAnimation()
-
-		if not UI_STYLE.LiquidStroke then
-			return
-		end
-
-		if (tonumber(UI_STYLE.LiquidStrokeSpeed) or 0)<=0 then
-			return
-		end
-
-		liquidConn=RunService.RenderStepped:Connect(function(dt)
-			if not SG or not SG.Parent then
-				stopLiquidAnimation()
-				return
-			end
-
-			liquidClock=liquidClock+(dt*(tonumber(UI_STYLE.LiquidStrokeSpeed) or 1))
-
-			if not externalThemeApplier then
-				local pulseColor=getPulseColor()
-				local pulseTransparency=math.clamp(UI_STYLE.StrokeTransparency+(getPulseAlpha()*0.08),0,1)
-
-				for _,obj in ipairs(SG:GetDescendants()) do
-					if obj:IsA("UIStroke") and not isTextObject(obj.Parent) then
-						obj.Color=pulseColor
-						obj.Transparency=pulseTransparency
-					end
-				end
-			end
-
-			updatePreview()
-		end)
-	end
-
-	local function refreshLiquidAnimation()
-		if UI_STYLE.LiquidStroke and (tonumber(UI_STYLE.LiquidStrokeSpeed) or 0)>0 then
-			startLiquidAnimation()
-		else
-			stopLiquidAnimation()
-		end
-	end
-
 	local function applyUIStrokeTheme()
 		if ctx.applyUIStrokeTheme then
 			ctx.applyUIStrokeTheme()
-		else
-			local color=getUIStrokeColor()
-			local color2=getUIStrokeGradientColor()
-			THEME.STROKE=color
-
-			if SG then
-				for _,obj in ipairs(SG:GetDescendants()) do
-					if isTextObject(obj) then
-						obj.TextStrokeTransparency=1
-
-					elseif obj:IsA("UIStroke") then
-						local textParent=isTextObject(obj.Parent)
-						local gradient=obj:FindFirstChild("StrokeGradient")
-
-						if textParent then
-							if gradient then
-								gradient:Destroy()
-							end
-							if tostring(obj.Parent.Text or "")~="" then
-								obj.Transparency=1
-							else
-								obj.Color=Color3.fromRGB(76,76,76)
-							end
-						else
-							if obj:GetAttribute("BaseStrokeTransparency")==nil then
-								obj:SetAttribute("BaseStrokeTransparency",obj.Transparency)
-							end
-
-							local baseTransparency=tonumber(obj:GetAttribute("BaseStrokeTransparency")) or obj.Transparency
-							local styleTransparency=tonumber(UI_STYLE.StrokeTransparency) or DEFAULTS.StrokeTransparency
-
-							obj.Color=UI_STYLE.LiquidStroke and getPulseColor() or color
-							obj.Thickness=UI_STYLE.StrokeThickness
-							obj.Transparency=math.clamp(math.max(baseTransparency,styleTransparency),0,1)
-
-							pcall(function()
-								local role=obj.Parent and obj.Parent:GetAttribute("CornerRole") or "Control"
-								obj.LineJoinMode=cornerRoleRadius(role)>0 and Enum.LineJoinMode.Round or Enum.LineJoinMode.Miter
-							end)
-
-							if UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke then
-								if not gradient then
-									gradient=Instance.new("UIGradient")
-									gradient.Name="StrokeGradient"
-									gradient.Parent=obj
-								end
-
-								setGradientColors(gradient,color,color2)
-							else
-								if gradient then
-									gradient:Destroy()
-								end
-							end
-						end
-					end
-				end
-			end
 		end
-
-		refreshLiquidAnimation()
 	end
 
 	local function clearPage()
@@ -556,7 +410,6 @@ function StrokeColour.new(ctx,page)
 
 	function api.Destroy()
 		colourTweenToken=colourTweenToken+1
-		stopLiquidAnimation()
 
 		for _,conn in ipairs(connections) do
 			pcall(function()
@@ -673,27 +526,6 @@ function StrokeColour.new(ctx,page)
 		return THEME[role] or fallback
 	end
 
-	local function currentLibStyleValue(key,fallback)
-		return fallback
-	end
-
-	local function currentLibShape()
-		return{}
-	end
-
-	local function cornerRoleRadius(role)
-		local shape=currentLibShape()
-		if role=="Window" then
-			return tonumber(shape.WindowRadius) or 0
-		elseif role=="Section" then
-			return tonumber(shape.SectionRadius) or 0
-		elseif role=="Slider" then
-			return tonumber(shape.SliderRadius) or 0
-		end
-
-		return tonumber(shape.ControlRadius) or 0
-	end
-
 	local function addCorner(obj,role)
 		if not obj then
 			return nil
@@ -739,20 +571,6 @@ function StrokeColour.new(ctx,page)
 			tonumber(hex:sub(3,4),16),
 			tonumber(hex:sub(5,6),16)
 		)
-	end
-
-	local function makeLabel(parent,text,order,size,muted)
-		return New("TextLabel",{
-			BackgroundTransparency=1,
-			Size=UDim2.new(1,0,0,size and 20 or 18),
-			Text=text,
-			Font=Enum.Font.GothamBold,
-			TextSize=size or 13,
-			TextColor3=muted and THEME.MUTED or THEME.TEXT,
-			TextXAlignment=Enum.TextXAlignment.Left,
-			ZIndex=6,
-			LayoutOrder=order,
-		},parent)
 	end
 
 	local function makePanel(order,title,stateKey)
@@ -918,11 +736,10 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function makeFlatButton(parent,text,order,scale)
-		local rounded=cornerRoleRadius("Control")>0
 		local button=New("TextButton",{
 			BackgroundColor3=themeColor("BUTTON",THEME.PANEL),
 			BorderSizePixel=0,
-			ClipsDescendants=rounded,
+			ClipsDescendants=false,
 			Text=text,
 			Font=Enum.Font.GothamMedium,
 			TextSize=12,
@@ -939,8 +756,8 @@ function StrokeColour.new(ctx,page)
 		local marker=New("Frame",{
 			BackgroundColor3=getUIStrokeColor(),
 			BorderSizePixel=0,
-			Size=rounded and UDim2.new(1,-24,0,2) or UDim2.new(1,0,0,3),
-			Position=rounded and UDim2.new(0,12,1,-4) or UDim2.new(0,0,1,-3),
+			Size=UDim2.new(1,0,0,3),
+			Position=UDim2.new(0,0,1,-3),
 			Visible=false,
 			SkipThemeRole=true,
 			ZIndex=7,
@@ -1192,8 +1009,8 @@ function StrokeColour.new(ctx,page)
 	local function applyThemePreset(preset)
 		setPrimaryColour(preset.Primary)
 		UI_STYLE.LiquidStroke=false
-		UI_STYLE.StrokeThickness=math.clamp(numberOrDefault(currentLibStyleValue("StrokeThickness",1),1),0,8)
-		UI_STYLE.StrokeTransparency=math.clamp(numberOrDefault(currentLibStyleValue("StrokeTransparency",0.84),0.84),0,1)
+		UI_STYLE.StrokeThickness=1
+		UI_STYLE.StrokeTransparency=0.84
 		syncColourControls()
 		updateEverything()
 		tweenStyleTo(preset.Stroke,preset.Gradient,preset.GradientOn)
@@ -1203,11 +1020,10 @@ function StrokeColour.new(ctx,page)
 
 	for i,preset in ipairs(themePresets) do
 		local textColor=readableTextColor(preset.Primary)
-		local rounded=cornerRoleRadius("Control")>0
 		local card=New("TextButton",{
 			BackgroundColor3=preset.Primary,
 			BorderSizePixel=0,
-			ClipsDescendants=rounded,
+			ClipsDescendants=false,
 			Text="",
 			AutoButtonColor=false,
 			SkipThemeRole=true,
@@ -1219,8 +1035,8 @@ function StrokeColour.new(ctx,page)
 		local marker=New("Frame",{
 			BackgroundColor3=preset.Stroke,
 			BorderSizePixel=0,
-			Size=rounded and UDim2.new(1,-16,0,2) or UDim2.new(1,0,0,2),
-			Position=rounded and UDim2.new(0,8,1,-4) or UDim2.new(0,0,1,-2),
+			Size=UDim2.new(1,0,0,2),
+			Position=UDim2.new(0,0,1,-2),
 			Visible=false,
 			SkipThemeRole=true,
 			ZIndex=8,
@@ -1318,14 +1134,13 @@ function StrokeColour.new(ctx,page)
 		Color3.fromRGB(255,210,0),
 		Color3.fromRGB(0,210,210),
 	}) do
-		local rounded=cornerRoleRadius("Control")>0
 		local swatch=New("TextButton",{
 			BackgroundColor3=color,
 			BorderSizePixel=0,
 			Text="",
 			AutoButtonColor=false,
 			SkipThemeRole=true,
-			ClipsDescendants=rounded,
+			ClipsDescendants=false,
 			Size=UDim2.fromOffset(30,24),
 			ZIndex=6,
 			LayoutOrder=i,
@@ -1335,8 +1150,8 @@ function StrokeColour.new(ctx,page)
 		local marker=New("Frame",{
 			BackgroundColor3=readableTextColor(color),
 			BorderSizePixel=0,
-			Size=rounded and UDim2.new(1,-10,0,2) or UDim2.new(1,0,0,3),
-			Position=rounded and UDim2.new(0,5,1,-4) or UDim2.new(0,0,1,-3),
+			Size=UDim2.new(1,0,0,3),
+			Position=UDim2.new(0,0,1,-3),
 			Visible=false,
 			SkipThemeRole=true,
 			ZIndex=7,
