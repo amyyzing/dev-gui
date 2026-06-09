@@ -140,7 +140,7 @@ function GuiLogic.new(ctx)
 
 		local onRole=tostring(c.ToggleOnRole or "SLIDER_FILL")
 		local accent=themeRoleColor(onRole,themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(32,202,106)))
-		local input=themeColor("INPUT",THEME.PANEL or Color3.fromRGB(18,18,24))
+		local input=themeColor("SLIDER_BG",themeColor("INPUT",THEME.PANEL or Color3.fromRGB(18,18,24)))
 		local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 		local strokeColor=themeColor("STROKE",THEME.STROKE or muted)
 		local tickHeight=math.max(6,height-10)
@@ -167,7 +167,7 @@ function GuiLogic.new(ctx)
 			BorderSizePixel=0,
 			ClipsDescendants=true,
 			ZIndex=zIndex,
-			ThemeRole="INPUT",
+			ThemeRole="SLIDER_BG",
 			CornerRole="Control",
 		},parent)
 		addCorner(wrap,"Control")
@@ -257,17 +257,17 @@ function GuiLogic.new(ctx)
 			cancelTweens()
 
 			local currentAccent=themeRoleColor(onRole,themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(32,202,106)))
-			local currentInput=themeColor("INPUT",THEME.PANEL or Color3.fromRGB(18,18,24))
+			local currentBg=themeColor("SLIDER_BG",themeColor("INPUT",THEME.PANEL or Color3.fromRGB(18,18,24)))
 			local currentMuted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 			local currentStroke=themeColor("STROKE",THEME.STROKE or currentMuted)
 			local onTextColor=readableOn(currentAccent)
 			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
 			local fillTransparency=state and 0.18 or 1
-			local bgColor=currentInput
+			local bgColor=currentBg
 			local strokeTarget=state and currentAccent or (hovering and currentMuted or currentStroke)
 			local strokeTransparency=state and activeStrokeTransparency or (hovering and hoverStrokeTransparency or offStrokeTransparency)
 
-			wrap:SetAttribute("ThemeRole","INPUT")
+			wrap:SetAttribute("ThemeRole","SLIDER_BG")
 
 			if not animate then
 				wrap.BackgroundColor3=bgColor
@@ -358,20 +358,20 @@ function GuiLogic.new(ctx)
 		local softInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 		local hoverInfo=TweenInfo.new(0.1,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 
-		local input=themeColor("INPUT",THEME.INPUT or THEME.PANEL or Color3.fromRGB(18,18,24))
-		local dark=input
 		local state=startState and true or false
 		local stateValue=makeFusionValue(state)
 		local function visualState(enabled)
 			local currentAccent=themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(74,208,128))
 			local currentMuted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 			local currentStroke=themeColor("STROKE",THEME.STROKE or currentMuted)
+			local currentBg=themeColor("SLIDER_BG",themeColor("INPUT",THEME.INPUT or THEME.PANEL or Color3.fromRGB(18,18,24)))
 
 			if enabled then
 				return{
 					fillSize=UDim2.new(1,0,1,0),
 					fillTransparency=0.08,
 					fillColor=currentAccent,
+					bgColor=currentBg,
 					strokeColor=currentAccent,
 					tickColor=currentAccent,
 					tickTransparency=0.34,
@@ -382,6 +382,7 @@ function GuiLogic.new(ctx)
 				fillSize=UDim2.new(0,0,1,0),
 				fillTransparency=1,
 				fillColor=currentAccent,
+				bgColor=currentBg,
 				strokeColor=currentStroke,
 				tickColor=currentMuted,
 				tickTransparency=0.86,
@@ -403,12 +404,12 @@ function GuiLogic.new(ctx)
 			AnchorPoint=Vector2.new(0.5,0.5),
 			Position=UDim2.fromScale(0.5,0.5),
 			Size=UDim2.new(1,0,0,railHeight),
-			BackgroundColor3=dark,
+			BackgroundColor3=initialVisuals.bgColor,
 			BackgroundTransparency=0.04,
 			BorderSizePixel=0,
 			ClipsDescendants=true,
 			ZIndex=z+1,
-			ThemeRole="INPUT",
+			ThemeRole="SLIDER_BG",
 		},switch)
 
 		local railStroke=New("UIStroke",{
@@ -525,6 +526,7 @@ function GuiLogic.new(ctx)
 			local strokeTransparency=state and 0.64 or 0.88
 
 			if not animate then
+				applyProps(rail,{BackgroundColor3=visuals.bgColor})
 				applyProps(railFillClip,{Size=visuals.fillSize})
 				applyProps(railFill,{BackgroundColor3=visuals.fillColor,BackgroundTransparency=visuals.fillTransparency})
 				applyProps(railStroke,{Color=visuals.strokeColor,Transparency=strokeTransparency})
@@ -536,6 +538,7 @@ function GuiLogic.new(ctx)
 
 			local shapeInfo=state and expandInfo or collapseInfo
 
+			playTrackedTween(rail,softInfo,{BackgroundColor3=visuals.bgColor})
 			playTrackedTween(railFillClip,shapeInfo,{Size=visuals.fillSize})
 			playTrackedTween(railFill,softInfo,{BackgroundColor3=visuals.fillColor,BackgroundTransparency=visuals.fillTransparency})
 			playTrackedTween(railStroke,softInfo,{Color=visuals.strokeColor,Transparency=strokeTransparency})
