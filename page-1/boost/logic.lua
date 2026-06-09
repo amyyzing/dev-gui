@@ -10,6 +10,7 @@ local DEFAULT_FORCE_Y=32
 local DEFAULT_COOLDOWN=5
 local DEFAULT_CHANCE=100
 local DEFAULT_RADIUS=10
+local FOOTBALL_CACHE_INTERVAL=0.20
 local TOGGLE_JB_KEY=Enum.KeyCode.Unknown
 local TOGGLE_AB_KEY=Enum.KeyCode.Unknown
 
@@ -110,6 +111,8 @@ function Boost.new(ctx,parent)
 	local destroyConn=nil
 	local boostReady=true
 	local section=nil
+	local footballCache=nil
+	local footballCacheExpires=0
 
 	local function changed()
 		if ctx.onChanged then pcall(ctx.onChanged,state) end
@@ -177,6 +180,17 @@ function Boost.new(ctx,parent)
 		return true
 	end
 
+	local function getCachedFootball()
+		local now=os.clock()
+		if footballCache and footballCache.Parent and now<footballCacheExpires then
+			return footballCache
+		end
+
+		footballCache=getFootball()
+		footballCacheExpires=now+FOOTBALL_CACHE_INTERVAL
+		return footballCache
+	end
+
 	local function clearJumpBoostTouchConnection()
 		safeDisconnect(jumpBoostTouchConn)
 		jumpBoostTouchConn=nil
@@ -211,7 +225,7 @@ function Boost.new(ctx,parent)
 				return
 			end
 
-			local football=getFootball()
+			local football=getCachedFootball()
 			if football then
 				local distance=(football.Position-root.Position).Magnitude
 				if distance<=state.ballDetectionRadius then
@@ -337,6 +351,8 @@ function Boost.new(ctx,parent)
 		safeDisconnect(destroyConn)
 		destroyConn=nil
 		clearJumpBoostTouchConnection()
+		footballCache=nil
+		footballCacheExpires=0
 		destroyControl(jumpBoostToggle)
 		destroyControl(jumpBoostModeToggle)
 		destroyControl(forceSlider)

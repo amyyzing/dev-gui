@@ -6,6 +6,7 @@ local RunService=game:GetService("RunService")
 
 local me=Players.LocalPlayer
 local DEFAULT_SPEED=18
+local SPEED_FORCE_INTERVAL=0.05
 local TOGGLE_SPEED_KEY=Enum.KeyCode.Unknown
 
 local function getMyHumanoid()
@@ -41,6 +42,7 @@ function Speed.new(ctx,parent)
 	local toggle=nil
 	local slider=nil
 	local speedConn=nil
+	local speedElapsed=0
 	local inputConn=nil
 	local destroyConn=nil
 	local section=nil
@@ -69,6 +71,7 @@ function Speed.new(ctx,parent)
 	local function stopForcing(resetValue)
 		safeDisconnect(speedConn)
 		speedConn=nil
+		speedElapsed=0
 
 		if resetValue then
 			state.speedValue=DEFAULT_SPEED
@@ -100,16 +103,23 @@ function Speed.new(ctx,parent)
 
 		safeDisconnect(speedConn)
 		speedConn=nil
+		speedElapsed=0
 
 		if state.speedEnabled then
 			applySpeedValue()
 
-			speedConn=RunService.Heartbeat:Connect(function()
+			speedConn=RunService.Heartbeat:Connect(function(dt)
 				if not state.speedEnabled or not isAlive() then
 					safeDisconnect(speedConn)
 					speedConn=nil
 					return
 				end
+
+				speedElapsed+=(dt or 0)
+				if speedElapsed<SPEED_FORCE_INTERVAL then
+					return
+				end
+				speedElapsed=0
 
 				state.speedValue=clampSpeed(state.speedValue)
 				local hum=getMyHumanoid()

@@ -91,6 +91,9 @@ local ARC_PREVIEW_ENABLED=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
 local HELD_BALL_CACHE_INTERVAL=0.12
 local RECEIVER_TRACK_INTERVAL=0.05
+local RECEIVER_PLAYER_CACHE_INTERVAL=0.25
+local MODE_KEY_CACHE_INTERVAL=0.35
+local TARGET_HIGHLIGHT_INTERVAL=0.08
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
 local PREVIEW_MISSING_BALL_GRACE=0.2
@@ -663,6 +666,11 @@ function QBAim.new(ctx,parent)
 	local connections={}
 	local heldBallCache=nil
 	local heldBallCacheExpires=0
+	local playerListCache={}
+	local playerListCacheExpires=0
+	local modeKeyCache=nil
+	local modeKeyCacheExpires=0
+	local targetHighlightLast=0
 	local sectionBody=nil
 	local sectionFrame=nil
 	local enabledToggle=nil
@@ -740,6 +748,16 @@ function QBAim.new(ctx,parent)
 		return heldBallCache
 	end
 
+	local function getCachedPlayers(maxAge)
+		local now=os.clock()
+		if now>=playerListCacheExpires then
+			playerListCache=Players:GetPlayers()
+			playerListCacheExpires=now+(maxAge or RECEIVER_PLAYER_CACHE_INTERVAL)
+		end
+
+		return playerListCache
+	end
+
 	local function changed()
 		if ctx.onChanged then
 			pcall(ctx.onChanged,state)
@@ -751,12 +769,24 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function isAvailable()
-		local modeKey=getModeKey(ctx)
+		local now=os.clock()
+		if now>=modeKeyCacheExpires then
+			modeKeyCache=getModeKey(ctx)
+			modeKeyCacheExpires=now+MODE_KEY_CACHE_INTERVAL
+		end
+
+		local modeKey=modeKeyCache
 		return modeKey=="mode1" or modeKey=="mode3"
 	end
 
 	local function currentModeText()
-		local modeKey=getModeKey(ctx)
+		local now=os.clock()
+		if now>=modeKeyCacheExpires then
+			modeKeyCache=getModeKey(ctx)
+			modeKeyCacheExpires=now+MODE_KEY_CACHE_INTERVAL
+		end
+
+		local modeKey=modeKeyCache
 		if modeKey=="mode1" then
 			return"Gameplay"
 		elseif modeKey=="mode2" then
@@ -2107,7 +2137,7 @@ function QBAim.new(ctx,parent)
 		local best=nil
 		local bestDistance=math.huge
 
-		for _,player in ipairs(Players:GetPlayers()) do
+		for _,player in ipairs(getCachedPlayers()) do
 			local receiverRoot=player~=LP and player.Character and root(player.Character)
 			if receiverRoot and camera and canTargetReceiver(player) then
 				local screenPoint,onScreen=camera:WorldToViewportPoint(receiverRoot.Position)
@@ -2278,13 +2308,17 @@ function QBAim.new(ctx,parent)
 
 	addConnection(RunService.Heartbeat:Connect(function(dt)
 		if not isAlive() then return end
+		if not enabled or not isAvailable() then
+			receiverTrackElapsed=0
+			return
+		end
 
 		receiverTrackElapsed+=(dt or 0)
 		if receiverTrackElapsed<RECEIVER_TRACK_INTERVAL then return end
 		receiverTrackElapsed=0
 
 		local now=os.clock()
-		for _,player in ipairs(Players:GetPlayers()) do
+		for _,player in ipairs(getCachedPlayers()) do
 			if player~=LP and player.Character then
 				local receiverRoot=root(player.Character)
 				if receiverRoot then
@@ -2324,9 +2358,12 @@ function QBAim.new(ctx,parent)
 	addConnection(RunService.RenderStepped:Connect(function()
 		if not(enabled and isAvailable()) then return end
 
-		updateTargetHighlight()
-
 		local now=os.clock()
+		if now-targetHighlightLast>=TARGET_HIGHLIGHT_INTERVAL then
+			targetHighlightLast=now
+			updateTargetHighlight()
+		end
+
 		if not trackedReceiver then return end
 
 		if state.qbAimShowArc==false then

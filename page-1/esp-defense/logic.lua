@@ -15,6 +15,10 @@ local RANGE_BASE_YARDS=7
 local YOUR_SPEED_YPS=7
 local ANTIMATTER_SPEED_YPS=25
 local ESP_REFRESH_INTERVAL=0.12
+local ESP_TEAM_CACHE_INTERVAL=0.50
+local HIGHLIGHT_SCAN_INTERVAL=1.00
+local teamCache=setmetatable({}, {__mode="k"})
+local highlightCache=setmetatable({}, {__mode="k"})
 
 local function getLiveCharacter(player)
 	if not player then return nil end
@@ -45,23 +49,35 @@ local function studsToYards(studs)
 end
 
 local function getPlayerTeamID(player)
+	if not player then return nil end
+
+	local now=os.clock()
+	local cached=teamCache[player]
+	if cached and now-cached.t<ESP_TEAM_CACHE_INTERVAL then
+		return cached.value
+	end
+
 	local replicated=player and player:FindFirstChild("Replicated")
 	local teamValue=replicated and replicated:FindFirstChild("TeamID")
-	if not teamValue then return nil end
+	local value=nil
 
-	if teamValue:IsA("StringValue") or teamValue:IsA("IntValue") or teamValue:IsA("NumberValue") then
-		return tostring(teamValue.Value)
+	if teamValue then
+		if teamValue:IsA("StringValue") or teamValue:IsA("IntValue") or teamValue:IsA("NumberValue") then
+			value=tostring(teamValue.Value)
+		else
+			local ok,result=pcall(function()
+				return teamValue.Value
+			end)
+
+			if ok then
+				value=tostring(result)
+			end
+		end
 	end
 
-	local ok,value=pcall(function()
-		return teamValue.Value
-	end)
+	teamCache[player]={t=now,value=value}
 
-	if ok then
-		return tostring(value)
-	end
-
-	return nil
+	return value
 end
 
 local function isValidGameTeamID(teamID)
@@ -105,8 +121,8 @@ local function getFootballPartFromPlayer(player)
 	return nil
 end
 
-local function findAntimatterData()
-	for _,player in ipairs(Players:GetPlayers()) do
+local function findAntimatterData(players)
+	for _,player in ipairs(players or Players:GetPlayers()) do
 		if shouldHighlightPlayer(player) then
 			local footballPart=getFootballPartFromPlayer(player)
 			if footballPart then
@@ -121,14 +137,14 @@ local function findAntimatterData()
 	return nil
 end
 
-local function getClosestFriendlyReachTime(targetPlayer)
+local function getClosestFriendlyReachTime(targetPlayer,players)
 	local targetRoot=getPlayerRoot(targetPlayer)
 	if not targetRoot then
 		return math.huge
 	end
 
 	local bestTime=math.huge
-	for _,player in ipairs(Players:GetPlayers()) do
+	for _,player in ipairs(players or Players:GetPlayers()) do
 		if isSameTeam(player,me) then
 			local friendlyRoot=getPlayerRoot(player)
 			if friendlyRoot then
@@ -150,7 +166,7 @@ local function getClosestFriendlyReachTime(targetPlayer)
 	return bestTime
 end
 
-local function shouldTurnRedFromAntimatterRule(targetPlayer,antimatterData)
+local function shouldTurnRedFromAntimatterRule(targetPlayer,antimatterData,players)
 	if not targetPlayer or not antimatterData then
 		return false
 	end
@@ -177,9 +193,40 @@ local function shouldTurnRedFromAntimatterRule(targetPlayer,antimatterData)
 	local footballDistanceStuds=(footballPart.Position-targetRoot.Position).Magnitude
 	local footballDistanceYards=studsToYards(footballDistanceStuds)
 	local footballTime=footballDistanceYards/ANTIMATTER_SPEED_YPS
-	local closestFriendlyTime=getClosestFriendlyReachTime(targetPlayer)
+	local closestFriendlyTime=getClosestFriendlyReachTime(targetPlayer,players)
 
 	return closestFriendlyTime<=footballTime
+end
+
+local function getCachedHighlights(character)
+	local now=os.clock()
+	local cached=highlightCache[character]
+	if cached and now-cached.t<HIGHLIGHT_SCAN_INTERVAL then
+		return cached.items
+	end
+
+	local items={}
+	for _,descendant in ipairs(character:GetDescendants()) do
+		if descendant:IsA("Highlight") then
+			table.insert(items,descendant)
+		end
+	end
+
+	highlightCache[character]={t=now,items=items}
+	return items
+end
+
+local function rememberHighlight(character,highlight)
+	local cached=highlightCache[character]
+	if not cached then return end
+
+	for _,item in ipairs(cached.items) do
+		if item==highlight then
+			return
+		end
+	end
+
+	table.insert(cached.items,highlight)
 end
 
 local function getOurHighlight(character)
@@ -205,20 +252,21 @@ local function forceHighlight(character,color)
 	if not character then return end
 
 	local found=false
-	for _,descendant in ipairs(character:GetDescendants()) do
-		if descendant:IsA("Highlight") then
+	for _,highlight in ipairs(getCachedHighlights(character)) do
+		if highlight and highlight.Parent then
 			found=true
-			descendant.Adornee=character
-			descendant.Enabled=true
-			descendant.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-			descendant.FillTransparency=0.5
-			descendant.OutlineTransparency=0
-			descendant.FillColor=color
-			descendant.OutlineColor=color
+			highlight.Adornee=character
+			highlight.Enabled=true
+			highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+			highlight.FillTransparency=0.5
+			highlight.OutlineTransparency=0
+			highlight.FillColor=color
+			highlight.OutlineColor=color
 		end
 	end
 
 	local owned=ensureOwnedHighlight(character)
+	rememberHighlight(character,owned)
 	owned.Adornee=character
 	owned.Enabled=true
 	owned.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
@@ -237,6 +285,7 @@ local function destroyOwnedHighlight(character)
 	if highlight then
 		highlight:Destroy()
 	end
+	highlightCache[character]=nil
 end
 
 local function clearOwnedHighlights()
@@ -262,12 +311,13 @@ function ESPDefense.new(ctx)
 			return
 		end
 
-		local antimatterData=findAntimatterData()
+		local players=Players:GetPlayers()
+		local antimatterData=findAntimatterData(players)
 		local blue=THEME.BLUE or Color3.fromRGB(70,140,255)
 		local red=THEME.RED or Color3.fromRGB(210,70,70)
 		local green=THEME.GREEN or Color3.fromRGB(90,200,90)
 
-		for _,player in ipairs(Players:GetPlayers()) do
+		for _,player in ipairs(players) do
 			if player~=me then
 				local character=getLiveCharacter(player)
 				if character then
@@ -275,7 +325,7 @@ function ESPDefense.new(ctx)
 						if antimatterData and player==antimatterData.player then
 							forceHighlight(character,blue)
 						elseif antimatterData and isSameTeam(player,antimatterData.player) then
-							if shouldTurnRedFromAntimatterRule(player,antimatterData) then
+							if shouldTurnRedFromAntimatterRule(player,antimatterData,players) then
 								forceHighlight(character,red)
 							else
 								forceHighlight(character,green)
