@@ -8,7 +8,6 @@ local ReplicatedStorage=game:GetService("ReplicatedStorage")
 
 local LP=Players.LocalPlayer
 
-local YARDS_TO_STUDS=3
 local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local MODEL_BALL_SPEED=95
@@ -16,57 +15,24 @@ local REMOTE_DISPLAY_POWER=100 -- send to remote; server converts incoming Updat
 local GAMEPLAY_BALL_POWER=MODEL_BALL_SPEED
 local SQUADS_BALL_POWER=MODEL_BALL_SPEED
 local PLAYER_G=196.2
-local JUMP_POWER=55.5
-local WR_STANDING_TOP_Y=6.00
 local DEFAULT_WR_MAX_Y=14.00 -- clean default catch peak; original jump formula is ~=13.85
 local WR_MAX_Y=DEFAULT_WR_MAX_Y
 local C1_Y_MIN=WR_MAX_Y
 local C1_Y_MAX=WR_MAX_Y
 local C1_Y_FIXED=WR_MAX_Y
-local C1_Y_POTENTIAL_EXPONENT=1.00
 local C1_SOLVE_Y_BIAS=0.00
 local MAX_RUN_SPEED=21
-local NORMAL_ROUTE_MIN_SPEED=19
-local ROUTE_LOCK_MIN_SPEED=2.5
-local ROUTE_LOCK_MAX_AGE=1.5
-local CLEAN_MATH_ENABLED=true
 local CLEAN_MOVING_SPEED_MIN=5.0
 local CLEAN_CATCH_Y_TOLERANCE=0.35
 local CLEAN_TARGET_MISS_TOLERANCE=0.35
 local CLEAN_NEAR_TARGET_MISS_TOLERANCE=0.05
-local CLEAN_USE_DIRECT_LEAD=true
 local WR_LEAD_DELAY=0.38
 local LEAD_DELAY_BASELINE=0.38 -- clean math: Lead Adjust is direct intentional ahead-time
-local LEAD_DELAY_ZERO_FLIGHT_TIME=0.70
-local LEAD_DELAY_FULL_FLIGHT_TIME=1.35
-local ADAPTIVE_LEAD_ENABLED=true
-local ROUTE_SPEED_PARTIAL_GAIN=1.08
-local PREDICTOR_HISTORY_MAX_AGE=0.30
-local PREDICTOR_MIN_SAMPLES=3
-local PREDICTOR_LS_BLEND=0.00
-local PREDICTOR_VELOCITY_BLEND=1.00
-local PREDICTOR_ACCEL_BLEND=0.28
 local PREDICTOR_ACCEL_MAX=48
-local PREDICTOR_ACCEL_TIME_MAX=1.05
-local PREDICTOR_ACCEL_LEAD_SCALE=0.22
-local PREDICTOR_ACCEL_LEAD_MAX=9.5
 local PREDICTOR_CONFIDENCE_MIN=0.30
 local PREDICTOR_CONFIDENCE_MAX=1.00
 local PREDICTOR_STALE_AFTER=0.35
-local ADAPTIVE_RADIAL_FLIGHT_SCALE_MIN=0.45
-local ADAPTIVE_RADIAL_FLIGHT_SCALE_MAX=1.12
-local ADAPTIVE_TANGENT_FLIGHT_SCALE_MIN=0.38
-local ADAPTIVE_TANGENT_FLIGHT_SCALE_MAX=0.95
-local ADAPTIVE_CLOSING_TANGENT_DAMPING=0.55
-local ADAPTIVE_UNCERTAINTY_DAMPING=0.45
-local AXIS_INVARIANT_LEAD_ENABLED=true
-local AXIS_EXTRA_LEAD_FRACTION=0.08
-local AXIS_EXTRA_LEAD_TIME_MAX=0.16
-local AXIS_LOS_RATE_GAIN=3.00
-local AXIS_CLOSING_EXTRA_DAMPING=0.75
-local AXIS_BRAKE_FLIGHT_DAMPING=0.38
 local QB_RELEASE_DELAY=0.25
-local QB_XZ_RELEASE_FACTOR=0
 local QB_LAUNCH_Y_BIAS=0
 local QB_GROUND_ROOT_Y=3.648
 local QB_AIRBORNE_Y_EPSILON=0.35
@@ -82,8 +48,6 @@ local MIN_T,MAX_T,DT=0.35,6,0.01
 local INTERCEPT_SCAN_DT=0.025
 local QB_INHERITANCE=0
 local INTERCEPT_BISECTION_STEPS=12
-local SPEED_TOLERANCE=1.25
-local CATCH_TOLERANCE=2.0
 local GLOBAL_MIN_ANGLE=-5
 local GLOBAL_MAX_ANGLE=55
 local AIM_SCALE=1000
@@ -101,45 +65,7 @@ local ARC_MAX_CURVE=400
 local PREVIEW_SMOOTH=1.00
 local C1_MARKER_ENABLED=true
 local C1_MARKER_SIZE=1.65
-local C3_INFO_GUI_ENABLED=false
-local C3_INFO_GUI_SIZE=UDim2.new(0,220,0,78)
-local C3_INFO_GUI_OFFSET=Vector3.new(0,3.2,0)
-local STABLE_WINDOW=0.48
-local STABLE_MIN_DIST=2
-local STABLE_MIN_SPEED=5
-local STABLE_HOLD=0.55
-local STABLE_STOP_SPEED=1.75
-local STABLE_DOT_REPLACE=0.72
-local STABLE_BLEND=0.18
-local CIRCLE_RADIUS_FULL_LEAD=180
-local CIRCLE_DISTANCE_SCALE_MIN=0.35
-local CIRCLE_DISTANCE_SCALE_MAX=1.00
-local CIRCLE_RADIAL_EXTRA_BASE=0.55
-local CIRCLE_RADIAL_EXTRA_GAIN=0.45
-local CIRCLE_RADIAL_EXTRA_MIN=0.25
-local CIRCLE_RADIAL_EXTRA_MAX=1
-local CIRCLE_TANGENT_EXTRA_BASE=0.25
-local CIRCLE_TANGENT_EXTRA_GAIN=0.50
-local CIRCLE_TANGENT_EXTRA_MIN=0.15
-local CIRCLE_TANGENT_EXTRA_MAX=0.70
-local CIRCLE_LOS_RATE_GAIN=6
-local CIRCLE_LOS_RATE_EPSILON=1.00
-local CIRCLE_EXTRA_LEAD_TIME_MAX=0.78
-local CIRCLE_BALANCE_LEAD_SCALE_MIN=0.72
-local CIRCLE_BALANCE_LEAD_SCALE_MAX=1.00
-local CIRCLE_TANGENT_REACTIVE_LEAD=0.58
-local CIRCLE_TANGENT_REACTIVE_LOS_GAIN=1.25
-local CIRCLE_TANGENT_ALIGNMENT_BOOST=0.30
-local CIRCLE_TANGENT_BALANCE_BOOST=0.35
-local CIRCLE_TANGENT_DOMINANCE_SCALE_MIN=0.35
-local CIRCLE_TANGENT_DOMINANCE_SCALE_MAX=1.00
-local CIRCLE_TANGENT_DOMINANCE_LIFT=0.30
 local CIRCLE_TANGENT_DOMINANCE_EPSILON=1e-6
-local CIRCLE_TANGENT_CLOSING_DAMPING=0.95
-local CIRCLE_TANGENT_CLOSING_SCALE_MIN=0.42
-local CIRCLE_RADIAL_BASE_LEAD_TIME=0.20
-local DIAG_STREAK_SIDE_RATIO_MIN=0.30
-local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
@@ -179,26 +105,11 @@ local function clampMagnitude(v,maxMagnitude)
 	return v
 end
 
-local function smoothstep(edge0,edge1,value)
-	if edge1<=edge0 then
-		return value>=edge1 and 1 or 0
-	end
-
-	local alpha=math.clamp((value-edge0)/(edge1-edge0),0,1)
-	return alpha*alpha*(3-2*alpha)
-end
-
 local function leadDelayForFlightTime(time)
 	-- Clean math rebuild: Lead Adjust is not route classification and not radial/tangent damping.
 	-- It is only the intentional ahead-time along the receiver's current velocity vector.
 	-- Set Lead Adjust to 0 for pure catch-time intercept, or 0.35-0.40 for your ahead-of-WR catch window.
 	return math.max(WR_LEAD_DELAY,0)
-end
-
-local function safeVectorLerp(a,b,alpha)
-	if not a then return b or Vector3.zero end
-	if not b then return a or Vector3.zero end
-	return a:Lerp(b,math.clamp(alpha or 0,0,1))
 end
 
 local function root(character)
@@ -348,31 +259,6 @@ local function isSameTeam(playerA,playerB)
 	end
 
 	return teamA==teamB
-end
-
-local function getFootballFromFolder(folder)
-	if not folder then return nil end
-
-	for _,descendant in ipairs(folder:GetDescendants()) do
-		if descendant:IsA("BasePart") and descendant.Name=="Football" then
-			return descendant
-		end
-	end
-
-	return nil
-end
-
-local function getModeFootball(modeKey)
-	local heldBall=getHeldBall()
-	if heldBall then
-		return heldBall
-	end
-
-	if modeKey=="mode3" then
-		return getFootballFromFolder(Workspace:FindFirstChild("MiniGames")) or getFootballFromFolder(ReplicatedStorage:FindFirstChild("MiniGames"))
-	end
-
-	return nil
 end
 
 local function getGameReEvent()
@@ -676,24 +562,12 @@ function QBAim.new(ctx,parent)
 	local enabledToggle=nil
 	local teamFilterToggle=nil
 	local arcToggle=nil
-	local leadDelayFrame=nil
-	local leadDelayBox=nil
-	local leadDelaySlider=nil
-	local leadDelaySliderFill=nil
-	local leadDelaySliderKnob=nil
-	local leadDelaySliderControl=nil
-	local leadDelayDragging=false
-	local peakHeightFrame=nil
-	local peakHeightBox=nil
-	local peakHeightSlider=nil
-	local peakHeightSliderFill=nil
-	local peakHeightSliderKnob=nil
-	local peakHeightSliderControl=nil
-	local peakHeightDragging=false
+	local settingSliders={}
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
 	local PEAK_HEIGHT_MIN=8.00
 	local PEAK_HEIGHT_MAX=20.00
+	local MODE_LABELS={mode1="Gameplay",mode2="Park",mode3="Squads"}
 	local updateTargetHighlight=function() end
 
 	local function destroyControl(control)
@@ -768,34 +642,24 @@ function QBAim.new(ctx,parent)
 		return sectionFrame==nil or sectionFrame.Parent~=nil
 	end
 
-	local function isAvailable()
+	local function currentModeKey()
 		local now=os.clock()
 		if now>=modeKeyCacheExpires then
 			modeKeyCache=getModeKey(ctx)
 			modeKeyCacheExpires=now+MODE_KEY_CACHE_INTERVAL
 		end
 
-		local modeKey=modeKeyCache
+		return modeKeyCache
+	end
+
+	local function isAvailable()
+		local modeKey=currentModeKey()
 		return modeKey=="mode1" or modeKey=="mode3"
 	end
 
 	local function currentModeText()
-		local now=os.clock()
-		if now>=modeKeyCacheExpires then
-			modeKeyCache=getModeKey(ctx)
-			modeKeyCacheExpires=now+MODE_KEY_CACHE_INTERVAL
-		end
-
-		local modeKey=modeKeyCache
-		if modeKey=="mode1" then
-			return"Gameplay"
-		elseif modeKey=="mode2" then
-			return"Park"
-		elseif modeKey=="mode3" then
-			return"Squads"
-		end
-
-		return tostring(modeKey)
+		local modeKey=currentModeKey()
+		return MODE_LABELS[modeKey] or tostring(modeKey)
 	end
 
 	local function setStatus(text)
@@ -807,19 +671,8 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function updateLeadDelayVisuals()
-		if leadDelaySliderControl then
-			leadDelaySliderControl.set(WR_LEAD_DELAY)
-		end
-
-		if leadDelayBox then
-			leadDelayBox.Text=string.format("%.2f",WR_LEAD_DELAY)
-		end
-
-		if leadDelaySliderFill and leadDelaySliderKnob and leadDelaySlider then
-			local alpha=(WR_LEAD_DELAY-LEAD_DELAY_MIN)/math.max(LEAD_DELAY_MAX-LEAD_DELAY_MIN,0.001)
-			alpha=math.clamp(alpha,0,1)
-			leadDelaySliderFill.Size=UDim2.new(alpha,0,1,0)
-			leadDelaySliderKnob.Position=UDim2.new(alpha,-5,0.5,-5)
+		if settingSliders.leadDelay then
+			settingSliders.leadDelay.set(WR_LEAD_DELAY)
 		end
 	end
 
@@ -830,19 +683,8 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function updatePeakHeightVisuals()
-		if peakHeightSliderControl then
-			peakHeightSliderControl.set(WR_MAX_Y)
-		end
-
-		if peakHeightBox then
-			peakHeightBox.Text=string.format("%.2f",WR_MAX_Y)
-		end
-
-		if peakHeightSliderFill and peakHeightSliderKnob and peakHeightSlider then
-			local alpha=(WR_MAX_Y-PEAK_HEIGHT_MIN)/math.max(PEAK_HEIGHT_MAX-PEAK_HEIGHT_MIN,0.001)
-			alpha=math.clamp(alpha,0,1)
-			peakHeightSliderFill.Size=UDim2.new(alpha,0,1,0)
-			peakHeightSliderKnob.Position=UDim2.new(alpha,-5,0.5,-5)
+		if settingSliders.peakHeight then
+			settingSliders.peakHeight.set(WR_MAX_Y)
 		end
 	end
 
@@ -878,22 +720,6 @@ function QBAim.new(ctx,parent)
 			changed()
 		end
 		return true
-	end
-
-	local function setLeadDelayFromScreenX(screenX,showStatus)
-		if not leadDelaySlider then return false end
-		local pos=leadDelaySlider.AbsolutePosition.X
-		local size=math.max(leadDelaySlider.AbsoluteSize.X,1)
-		local alpha=math.clamp((screenX-pos)/size,0,1)
-		return setLeadDelay(LEAD_DELAY_MIN+(LEAD_DELAY_MAX-LEAD_DELAY_MIN)*alpha,showStatus)
-	end
-
-	local function setPeakHeightFromScreenX(screenX,showStatus)
-		if not peakHeightSlider then return false end
-		local pos=peakHeightSlider.AbsolutePosition.X
-		local size=math.max(peakHeightSlider.AbsoluteSize.X,1)
-		local alpha=math.clamp((screenX-pos)/size,0,1)
-		return setPeakHeight(PEAK_HEIGHT_MIN+(PEAK_HEIGHT_MAX-PEAK_HEIGHT_MIN)*alpha,showStatus)
 	end
 
 	local function canTargetReceiver(player)
@@ -1164,50 +990,6 @@ function QBAim.new(ctx,parent)
 		No slant/streak/radial/tangent dominance is used for targeting. Route labels below are diagnostics only.
 	]]
 
-	local function historyVector(data,now)
-		if not(data and data.ph and #data.ph>=2) then
-			return nil,0,0
-		end
-
-		local latest=data.ph[#data.ph]
-		local earliest=data.ph[1]
-		local dt=latest.t-earliest.t
-		if dt<=0 then
-			return nil,0,0
-		end
-
-		local movement=flat(latest.pos-earliest.pos)
-		local distance=movement.Magnitude
-		local speed=distance/dt
-		return movement,speed,distance
-	end
-
-	local function leastSquaresVelocity(data,now)
-		-- Kept for compatibility with older diagnostics, but the clean predictor does not use
-		-- long-window least-squares because it lags hard cuts and slants.
-		if not(data and data.ph and #data.ph>=2) then
-			return nil,0,0
-		end
-
-		local latest=data.ph[#data.ph]
-		local earliest=data.ph[1]
-		for i=#data.ph,1,-1 do
-			if now-data.ph[i].t>=PREDICTOR_HISTORY_MAX_AGE then
-				earliest=data.ph[i]
-				break
-			end
-		end
-
-		local dt=latest.t-earliest.t
-		if dt<=0 then
-			return nil,0,0
-		end
-
-		local velocity=clampMagnitude(flat(latest.pos-earliest.pos)/dt,MAX_RUN_SPEED)
-		local quality=math.clamp(dt/math.max(PREDICTOR_HISTORY_MAX_AGE,0.05),0,1)
-		return velocity,quality,dt
-	end
-
 	local function currentReceiverRawVelocity(data,receiverRoot,fallbackVelocity)
 		local assembly=receiverRoot and receiverRoot.AssemblyLinearVelocity or nil
 		local assemblyXZ=assembly and flat(assembly) or Vector3.zero
@@ -1260,28 +1042,6 @@ function QBAim.new(ctx,parent)
 			sampleAge=sampleAge,
 			source=source,
 		}
-	end
-
-	local function updateStable(data)
-		-- Compatibility shim. Clean math does not hold old route direction.
-		local velocity,source,rawSpeed=currentReceiverRawVelocity(data,nil,data and data.rawVel or Vector3.zero)
-		if velocity.Magnitude<CLEAN_MOVING_SPEED_MIN then
-			if data then
-				data.sdir=nil
-				data.sspeed=0
-				data.src="stopped"
-			end
-			return nil,0,"stopped"
-		end
-
-		local direction=velocity.Unit
-		if data then
-			data.sdir=direction
-			data.sspeed=MAX_RUN_SPEED
-			data.stime=os.clock()
-			data.src=source
-		end
-		return direction,MAX_RUN_SPEED,source
 	end
 
 	local function movementShape(origin,position,velocity)
@@ -1396,10 +1156,6 @@ function QBAim.new(ctx,parent)
 		return Vector3.new(basePosition.X+dx,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+dz)
 	end
 
-	local function velocityNeeded(originPosition,targetPosition,time)
-		return(targetPosition-originPosition-0.5*G*time*time)/time
-	end
-
 	local function ballAt(originPosition,velocity,time)
 		return originPosition+velocity*time+0.5*G*time*time
 	end
@@ -1417,78 +1173,6 @@ function QBAim.new(ctx,parent)
 	local function targetAtTime(receiverStart,wrVel,time,leadDelay)
 		local target=receiverStart+flat(wrVel)*(time+(leadDelay or 0))
 		return Vector3.new(target.X,WR_MAX_Y+C1_SOLVE_Y_BIAS,target.Z)
-	end
-
-	local function c1HeightFromMagnitudePotential(potential,speed)
-		return C1_Y_FIXED
-	end
-
-	local function c1Target(receiverPosition,originPosition,targetVelocity,flightTime,predictorState)
-		local receiverStart=receiverMaxAt(receiverPosition)
-		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
-		local leadDelay=leadDelayForFlightTime(flightTime)
-		local target=targetAtTime(receiverStart,wrVel,flightTime,leadDelay)
-		local speed=wrVel.Magnitude
-		local losVector=flat(receiverStart-originPosition)
-		local losDir=unit(losVector,speed>0 and wrVel.Unit or Vector3.new(1,0,0))
-		local awayShare=speed>1e-6 and math.clamp(wrVel:Dot(losDir)/speed,-1,1) or 0
-		local lateralSpeed=(wrVel-losDir*wrVel:Dot(losDir)).Magnitude
-		local lateralShare=speed>1e-6 and math.clamp(lateralSpeed/speed,0,1) or 0
-
-		return target,{
-			flightLeadXZ=wrVel*flightTime,
-			accelerationLeadXZ=Vector3.zero,
-			extraLeadXZ=wrVel*leadDelay,
-			radialExtraLeadXZ=Vector3.zero,
-			tangentExtraLeadXZ=wrVel*leadDelay,
-			extraLeadTime=leadDelay,
-			radialExtraTime=0,
-			tangentExtraTime=leadDelay,
-			tangentBaseTime=0,
-			tangentReactiveTime=leadDelay,
-			radialBaseTime=0,
-			radialLDTime=0,
-			adaptiveLeadScale=1,
-			leadUserScale=math.clamp(WR_LEAD_DELAY/math.max(LEAD_DELAY_BASELINE,0.01),0,2.25),
-			predictorConfidence=predictorState and predictorState.confidence or 1,
-			radialFlightScale=1,
-			tangentFlightScale=1,
-			accelTime=0,
-			magnitudeChangePotential=0,
-			c1Height=C1_Y_FIXED,
-			c1HeightMin=C1_Y_MIN,
-			c1HeightMax=C1_Y_MAX,
-			c1SolveYBias=C1_SOLVE_Y_BIAS,
-			distance3DNow=(receiverStart-originPosition).Magnitude,
-			distanceXZNow=distXZ(originPosition,receiverStart),
-			distanceScale=1,
-			awayShare=awayShare,
-			positiveAwayShare=math.clamp(awayShare,0,1),
-			radialShareAbs=math.abs(awayShare),
-			lateralShare=lateralShare,
-			routeBalance=1-math.abs(math.abs(awayShare)-lateralShare),
-			balanceLeadScale=1,
-			radialGain=0,
-			tangentGain=0,
-			losRate=0,
-			losDamping=1,
-			reactiveLosDamping=1,
-			tangentAlignment=1,
-			tangentAlignmentBoost=1,
-			tangentBalanceBoost=1,
-			tangentDominance=lateralShare*lateralShare/(awayShare*awayShare+lateralShare*lateralShare+CIRCLE_TANGENT_DOMINANCE_EPSILON),
-			tangentBalancePeak=1,
-			tangentDominanceScale=1,
-			closingShare=math.clamp(-awayShare,0,1),
-			tangentClosingScale=1,
-			tangentSignedScale=1,
-			routeAway=wrVel:Dot(losDir),
-			routeSide=lateralSpeed,
-			routeElevation=0,
-			routeSpeed=speed,
-			axisInvariant=true,
-			cleanMath=true,
-		}
 	end
 
 	local function interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
@@ -1790,86 +1474,6 @@ function QBAim.new(ctx,parent)
 				existing:Destroy()
 			end
 		end
-	end
-
-	local function ensureC3InfoGui()
-		if not C3_INFO_GUI_ENABLED then return nil,nil end
-
-		local _,folder=originalCenter()
-		if not folder then return nil,nil end
-
-		local anchor=preview.c3InfoAnchor
-		if not(anchor and anchor.Parent) then
-			anchor=folder:FindFirstChild("PreviewC3InfoAnchor")
-			if not(anchor and anchor:IsA("BasePart")) then
-				anchor=Instance.new("Part")
-				anchor.Name="PreviewC3InfoAnchor"
-				anchor.Size=Vector3.new(0.25,0.25,0.25)
-				anchor.Transparency=1
-				anchor.Anchored=true
-				anchor.CanCollide=false
-				anchor.CanTouch=false
-				anchor.CanQuery=false
-				anchor.Parent=folder
-			end
-			preview.c3InfoAnchor=anchor
-		end
-
-		local billboard=anchor:FindFirstChild("C3InfoGui")
-		if not billboard then
-			billboard=Instance.new("BillboardGui")
-			billboard.Name="C3InfoGui"
-			billboard.Size=C3_INFO_GUI_SIZE
-			billboard.StudsOffset=C3_INFO_GUI_OFFSET
-			billboard.AlwaysOnTop=true
-			billboard.Adornee=anchor
-			billboard.Parent=anchor
-
-			local frame=Instance.new("Frame")
-			frame.Name="Panel"
-			frame.BackgroundColor3=Color3.fromRGB(10,12,16)
-			frame.BackgroundTransparency=0.18
-			frame.BorderSizePixel=0
-			frame.Size=UDim2.new(1,0,1,0)
-			frame.Parent=billboard
-
-			local corner=Instance.new("UICorner")
-			corner.CornerRadius=UDim.new(0,0)
-			corner.Parent=frame
-
-			local stroke=Instance.new("UIStroke")
-			stroke.Color=Color3.fromRGB(255,170,0)
-			stroke.Thickness=1.5
-			stroke.Transparency=0.1
-			stroke.Parent=frame
-
-			local label=Instance.new("TextLabel")
-			label.Name="Text"
-			label.BackgroundTransparency=1
-			label.Position=UDim2.new(0,8,0,4)
-			label.Size=UDim2.new(1,-16,1,-8)
-			label.Font=Enum.Font.GothamMedium
-			label.TextSize=12
-			label.TextColor3=Color3.fromRGB(255,235,205)
-			label.TextStrokeTransparency=0.85
-			label.TextXAlignment=Enum.TextXAlignment.Center
-			label.TextYAlignment=Enum.TextYAlignment.Center
-			label.Parent=frame
-		else
-			billboard.Enabled=true
-			billboard.Adornee=anchor
-		end
-
-		local label=billboard:FindFirstChild("Panel") and billboard.Panel:FindFirstChild("Text")
-		if billboard then
-			billboard.Size=C3_INFO_GUI_SIZE
-			billboard.StudsOffset=C3_INFO_GUI_OFFSET
-		end
-		if label then
-			label.TextXAlignment=Enum.TextXAlignment.Center
-			label.TextYAlignment=Enum.TextYAlignment.Center
-		end
-		return anchor,label
 	end
 
 	local function updateC1AndC3Info(plan,c1Pos,c3Pos)
@@ -2236,8 +1840,10 @@ function QBAim.new(ctx,parent)
 		destroyControl(enabledToggle)
 		destroyControl(teamFilterToggle)
 		destroyControl(arcToggle)
-		destroyControl(leadDelaySliderControl)
-		destroyControl(peakHeightSliderControl)
+		for key,control in pairs(settingSliders) do
+			destroyControl(control)
+			settingSliders[key]=nil
+		end
 
 		for _,conn in ipairs(connections) do
 			safeDisconnect(conn)
@@ -2282,25 +1888,12 @@ function QBAim.new(ctx,parent)
 	end)
 
 	if buildSlider then
-		leadDelaySliderControl=buildSlider(sectionBody,"Lead Adjust",LEAD_DELAY_MIN,LEAD_DELAY_MAX,WR_LEAD_DELAY,2,function(value)
+		settingSliders.leadDelay=buildSlider(sectionBody,"Lead Adjust",LEAD_DELAY_MIN,LEAD_DELAY_MAX,WR_LEAD_DELAY,2,function(value)
 			api.SetLeadDelay(value,true)
 		end)
-		peakHeightSliderControl=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
+		settingSliders.peakHeight=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
 			api.SetPeakHeight(value,true)
 		end)
-	else
-		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
-		leadDelayBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",WR_LEAD_DELAY),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},leadDelayFrame)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="Lead Adjust",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},leadDelayFrame)
-		addConnection(leadDelayBox.FocusLost:Connect(function()
-			setLeadDelay(leadDelayBox.Text,true)
-		end))
-		peakHeightFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
-		peakHeightBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",WR_MAX_Y),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},peakHeightFrame)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="Peak Height",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},peakHeightFrame)
-		addConnection(peakHeightBox.FocusLost:Connect(function()
-			setPeakHeight(peakHeightBox.Text,true)
-		end))
 	end
 
 	updateLeadDelayVisuals()
