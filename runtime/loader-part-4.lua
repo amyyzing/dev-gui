@@ -136,29 +136,7 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 end
 
 function refreshSettingsPage()
-	if AntiMaterialAPI and AntiMaterialAPI.Refresh then
-		pcall(function()
-			AntiMaterialAPI.Refresh()
-		end)
-	end
-
-	if MapCleanerAPI and MapCleanerAPI.Refresh then
-		pcall(function()
-			MapCleanerAPI.Refresh()
-		end)
-	end
-
-	if RemoveAdsAPI and RemoveAdsAPI.Refresh then
-		pcall(function()
-			RemoveAdsAPI.Refresh()
-		end)
-	end
-
-	if DiscordAPI and DiscordAPI.Refresh then
-		pcall(function()
-			DiscordAPI.Refresh()
-		end)
-	end
+	refreshRuntimeAPIs({"AntiMaterialAPI","MapCleanerAPI","RemoveAdsAPI","DiscordAPI"})
 end
 
 function buildUpdateSection()
@@ -227,89 +205,60 @@ function buildUpdateSection()
 	end))
 end
 
-function buildActualSettingsPage()
-	PlayerDataLogicModule=loadDeferredModule("PlayerDataLogic",MODULE_PATHS.PlayerDataLogic,PlayerDataLogicModule)
-	PlayerDataModule=loadDeferredModule("PlayerData",MODULE_PATHS.PlayerData,PlayerDataModule)
-	DiscordLogicModule=loadDeferredModule("DiscordLogic",MODULE_PATHS.DiscordLogic,DiscordLogicModule)
-	DiscordModule=loadDeferredModule("Discord",MODULE_PATHS.Discord,DiscordModule)
+function makePlayerDataCtx()
+	return{
+		New=New,
+		Fusion=FusionModule,
+		THEME=THEME,
+		SG=SG,
+		BOT_API=BOT_API,
+		playerId=tostring(me.UserId),
+		me=me,
+		PlayerDataLogicModule=PlayerDataLogicModule,
+		makeSection=makeSection,
+		wrapTextButton=wrapTextButton,
+		showConfirmModal=showConfirmModal,
+		OWNED_PRESETS=OWNED_PRESETS,
+		expandedOwned=PAGE2_EXPANDED_OWNED,
+		resetMainPageDefaults=resetMainPageDefaults,
+		resetCustomizePageDefaults=resetCustomizePageDefaults,
+		resetKeybindPresetPageDefaults=function()
+			if resetKeybindPresetPageDefaults then
+				resetKeybindPresetPageDefaults()
+			end
+		end,
+		refreshPage2UI=function()
+			if refreshPage2UI then refreshPage2UI() end
+		end,
+		rebuildOwnedList=function()
+			if refreshPage2UI then refreshPage2UI() end
+		end,
+		refreshSettingsPage=refreshSettingsPage,
+	}
+end
 
+function makeDiscordCtx()
+	return{
+		New=New,
+		Fusion=FusionModule,
+		THEME=THEME,
+		BOT_API=BOT_API,
+		DiscordLogicModule=DiscordLogicModule,
+		makeSection=makeSection,
+		wrapTextButton=wrapTextButton,
+	}
+end
+
+function buildActualSettingsPage()
+	loadDeferredModuleNames(SETTINGS_RELOAD_NAMES)
 	buildUpdateSection()
 
-	if PlayerDataModule and PlayerDataModule.new then
-		local ok,result=pcall(function()
-			return PlayerDataModule.new({
-				New=New,
-				Fusion=FusionModule,
-				THEME=THEME,
-				SG=SG,
-				BOT_API=BOT_API,
-				playerId=tostring(me.UserId),
-				me=me,
-				PlayerDataLogicModule=PlayerDataLogicModule,
-
-				makeSection=makeSection,
-				wrapTextButton=wrapTextButton,
-				showConfirmModal=showConfirmModal,
-
-				OWNED_PRESETS=OWNED_PRESETS,
-				expandedOwned=PAGE2_EXPANDED_OWNED,
-
-				resetMainPageDefaults=resetMainPageDefaults,
-				resetCustomizePageDefaults=resetCustomizePageDefaults,
-				resetKeybindPresetPageDefaults=function()
-					if resetKeybindPresetPageDefaults then
-						resetKeybindPresetPageDefaults()
-					end
-				end,
-				refreshPage2UI=function()
-					if refreshPage2UI then refreshPage2UI() end
-				end,
-				rebuildOwnedList=function()
-					if refreshPage2UI then refreshPage2UI() end
-				end,
-				refreshSettingsPage=refreshSettingsPage,
-			},actualSettingsPage,{
-				Workspace=AntiMaterialAPI,
-				AntiMaterial=AntiMaterialAPI,
-				MapCleaner=MapCleanerAPI,
-			})
-		end)
-
-		if ok then
-			PlayerDataAPI=result
-		else
-			local section=makeSection(actualSettingsPage,1,"Player Data","Remote module failed to load.")
-			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Player Data module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
-		end
-	else
-		local section=makeSection(actualSettingsPage,1,"Player Data","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-6/player-data/gui.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
-	end
-
-	if DiscordModule and DiscordModule.new then
-		local ok,result=pcall(function()
-			return DiscordModule.new({
-				New=New,
-				Fusion=FusionModule,
-				THEME=THEME,
-				BOT_API=BOT_API,
-				DiscordLogicModule=DiscordLogicModule,
-				makeSection=makeSection,
-				wrapTextButton=wrapTextButton,
-			},actualSettingsPage)
-		end)
-
-		if ok then
-			DiscordAPI=result
-		else
-			local section=makeSection(actualSettingsPage,3,"Discord","Remote module failed to load.")
-			New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Discord module failed: "..tostring(result),Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
-		end
-	else
-		local section=makeSection(actualSettingsPage,3,"Discord","Remote module failed to load.")
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text="Missing remote module: page-6/discord/gui.lua",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
-	end
-
+	PlayerDataAPI=buildRuntimeModule({name="PlayerData",api="PlayerDataAPI",order=1,title="Player Data"},makePlayerDataCtx(),actualSettingsPage,{
+		Workspace=AntiMaterialAPI,
+		AntiMaterial=AntiMaterialAPI,
+		MapCleaner=MapCleanerAPI,
+	})
+	DiscordAPI=buildRuntimeModule({name="Discord",api="DiscordAPI",order=3,title="Discord"},makeDiscordCtx(),actualSettingsPage)
 	refreshSettingsPage()
 end
 
@@ -317,28 +266,11 @@ LAZY_PAGE_BUILDERS.settings=buildActualSettingsPage
 
 function clearActualSettingsPage()
 	disconnectSettingsConnections()
-	for _,child in ipairs(actualSettingsPage:GetChildren()) do
-		if not child:IsA("UIListLayout") then
-			child:Destroy()
-		end
-	end
+	clearRuntimePage(actualSettingsPage,false)
 end
 
 rebuildSettingsFromModules=function()
-	if PlayerDataAPI and PlayerDataAPI.Destroy then
-		pcall(function()
-			PlayerDataAPI.Destroy()
-		end)
-	end
-
-	if DiscordAPI and DiscordAPI.Destroy then
-		pcall(function()
-			DiscordAPI.Destroy()
-		end)
-	end
-
-	PlayerDataAPI=nil
-	DiscordAPI=nil
+	destroyRuntimeAPIs({"PlayerDataAPI","DiscordAPI"})
 	clearActualSettingsPage()
 	LAZY_PAGE_BUILT.settings=false
 
@@ -353,25 +285,52 @@ function addPage2Error(parent,text)
 	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},parent)
 end
 
-function buildPage2()
-	destroyPage2APIs()
+PAGE2_BINDING_SPECS={
+	{label="Toggle open / hide GUI",key="TOGGLE_UI_KEY"},
+	{label="Hitbox Toggle",key="TOGGLE_HB_KEY"},
+	{label="Jump Boost Toggle",key="TOGGLE_JB_KEY"},
+	{label="Always Boost Toggle",key="TOGGLE_AB_KEY"},
+	{label="ESP Toggle",key="TOGGLE_ACTION_KEY"},
+	{label="Speed Toggle",key="TOGGLE_SPEED_KEY"},
+	{label="QB Aim Lock Receiver",key="QB_AIM_LOCK_KEY"},
+	{label="QB Aim Throw",key="QB_AIM_THROW_KEY"},
+	{label="QB Aim Toggle",key="QB_AIM_TOGGLE_KEY"},
+}
 
-	HitboxPresetLogicModule=loadDeferredModule("HitboxPresetLogic",MODULE_PATHS.HitboxPresetLogic,HitboxPresetLogicModule)
-	HitboxPresetModule=loadDeferredModule("HitboxPreset",MODULE_PATHS.HitboxPreset,HitboxPresetModule)
-	KeybindSettingsLogicModule=loadDeferredModule("KeybindSettingsLogic",MODULE_PATHS.KeybindSettingsLogic,KeybindSettingsLogicModule)
-	KeybindSettingsModule=loadDeferredModule("KeybindSettings",MODULE_PATHS.KeybindSettings,KeybindSettingsModule)
-	PresetEditorLogicModule=loadDeferredModule("PresetEditorLogic",MODULE_PATHS.PresetEditorLogic,PresetEditorLogicModule)
-	PresetEditorModule=loadDeferredModule("PresetEditor",MODULE_PATHS.PresetEditor,PresetEditorModule)
+PAGE2_SECTION_SPECS={
+	owned={order=1,title="Hitbox Presets",subtitle="Your saved presets"},
+	editor={order=2,title="Preset Editor",subtitle="edit hotkeys and hitbox sizes and save (maybe?)"},
+	bind={order=3,title="Keybind Settings",subtitle="keyboard, controller, and mouse buttons are supported"},
+}
 
-	local page2Wrap=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=4,LayoutOrder=1},futurePage)
+PAGE2_MODULE_SPECS={
+	{api="hitboxPresets",name="HitboxPreset",section="owned",title="Hitbox Presets"},
+	{api="keybindSettings",name="KeybindSettings",section="bind",title="Keybind Settings"},
+	{api="presetEditor",name="PresetEditor",section="editor",title="Preset Editor",requires="keybindSettings",extras=function(apis) return apis.keybindSettings,apis.hitboxPresets end},
+}
 
-	New("UIListLayout",{FillDirection=Enum.FillDirection.Vertical,Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},page2Wrap)
+function makePage2Bindings()
+	local bindings={}
+	for _,spec in ipairs(PAGE2_BINDING_SPECS) do
+		local key=spec.key
+		local label=spec.label
+		table.insert(bindings,{
+			label=label,
+			get=function()
+				return getfenv()[key]
+			end,
+			set=function(value)
+				getfenv()[key]=value
+				requestPlayerAutosave()
+			end,
+		})
+	end
 
-	local ownedSection=makeSection(page2Wrap,1,"Hitbox Presets","Your saved presets")
-	local editorSection=makeSection(page2Wrap,2,"Preset Editor","edit hotkeys and hitbox sizes and save (maybe?)")
-	local bindSection=makeSection(page2Wrap,3,"Keybind Settings","keyboard, controller, and mouse buttons are supported")
+	return bindings
+end
 
-	local page2Ctx={
+function makePage2Ctx()
+	return{
 		New=New,
 		Fusion=FusionModule,
 		THEME=THEME,
@@ -404,96 +363,75 @@ function buildPage2()
 		equipOwnedPreset=equipOwnedPresetFromDataSave,
 		deleteOwnedPreset=deleteOwnedPresetFromDataSave,
 		State={},
-		Bindings={
-			{label="Toggle open / hide GUI",get=function() return TOGGLE_UI_KEY end,set=function(v) TOGGLE_UI_KEY=v; requestPlayerAutosave() end},
-			{label="Hitbox Toggle",get=function() return TOGGLE_HB_KEY end,set=function(v) TOGGLE_HB_KEY=v; requestPlayerAutosave() end},
-			{label="Jump Boost Toggle",get=function() return TOGGLE_JB_KEY end,set=function(v) TOGGLE_JB_KEY=v; requestPlayerAutosave() end},
-			{label="Always Boost Toggle",get=function() return TOGGLE_AB_KEY end,set=function(v) TOGGLE_AB_KEY=v; requestPlayerAutosave() end},
-			{label="ESP Toggle",get=function() return TOGGLE_ACTION_KEY end,set=function(v) TOGGLE_ACTION_KEY=v; requestPlayerAutosave() end},
-			{label="Speed Toggle",get=function() return TOGGLE_SPEED_KEY end,set=function(v) TOGGLE_SPEED_KEY=v; requestPlayerAutosave() end},
-			{label="QB Aim Lock Receiver",get=function() return QB_AIM_LOCK_KEY end,set=function(v) QB_AIM_LOCK_KEY=v; requestPlayerAutosave() end},
-			{label="QB Aim Throw",get=function() return QB_AIM_THROW_KEY end,set=function(v) QB_AIM_THROW_KEY=v; requestPlayerAutosave() end},
-			{label="QB Aim Toggle",get=function() return QB_AIM_TOGGLE_KEY end,set=function(v) QB_AIM_TOGGLE_KEY=v; requestPlayerAutosave() end},
-		},
+		Bindings=makePage2Bindings(),
 	}
+end
 
-	local hitboxPresets=nil
-	local keybindSettings=nil
-	local presetEditor=nil
-
-	if HitboxPresetModule and type(HitboxPresetModule.new)=="function" then
-		local ok,result=pcall(function()
-			return HitboxPresetModule.new(page2Ctx,ownedSection)
-		end)
-		if ok then
-			hitboxPresets=result
-		else
-			addPage2Error(ownedSection,"Hitbox Presets failed: "..tostring(result))
-		end
-	else
-		addPage2Error(ownedSection,"Missing remote module: page-5/hitbox-preset/gui.lua")
+function buildPage2Module(spec,ctx,sections)
+	if spec.requires and not PAGE2_APIS[spec.requires] then
+		addPage2Error(sections[spec.section],spec.title.." needs "..tostring(spec.requires).." to load first.")
+		return nil
 	end
 
-	if KeybindSettingsModule and type(KeybindSettingsModule.new)=="function" then
-		local ok,result=pcall(function()
-			return KeybindSettingsModule.new(page2Ctx,bindSection)
-		end)
-		if ok then
-			keybindSettings=result
-		else
-			addPage2Error(bindSection,"Keybind Settings failed: "..tostring(result))
-		end
-	else
-		addPage2Error(bindSection,"Missing remote module: page-5/keybind-settings/gui.lua")
+	local module=getfenv()[moduleGlobalName(spec.name)]
+	if not(module and type(module.new)=="function") then
+		addPage2Error(sections[spec.section],"Missing remote module: "..tostring(MODULE_PATHS[spec.name] or spec.name))
+		return nil
 	end
 
-	if PresetEditorModule and type(PresetEditorModule.new)=="function" then
-		if not keybindSettings then
-			addPage2Error(editorSection,"Preset Editor needs keybind-settings/gui.lua to load first.")
-		else
-			local ok,result=pcall(function()
-				return PresetEditorModule.new(page2Ctx,editorSection,keybindSettings,hitboxPresets)
-			end)
-			if ok then
-				presetEditor=result
-			else
-				addPage2Error(editorSection,"Preset Editor failed: "..tostring(result))
-			end
-		end
-	else
-		addPage2Error(editorSection,"Missing remote module: page-5/preset-editor/gui.lua")
+	local extra={nil,nil}
+	if spec.extras then
+		extra={spec.extras(PAGE2_APIS)}
+	end
+	local ok,result=pcall(function()
+		return module.new(ctx,sections[spec.section],table.unpack(extra))
+	end)
+	if ok then
+		PAGE2_APIS[spec.api]=result
+		return result
+	end
+
+	addPage2Error(sections[spec.section],spec.title.." failed: "..tostring(result))
+	return nil
+end
+
+function buildPage2()
+	destroyPage2APIs()
+	loadDeferredModuleNames(PAGE2_RELOAD_NAMES)
+
+	local page2Wrap=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=4,LayoutOrder=1},futurePage)
+	New("UIListLayout",{FillDirection=Enum.FillDirection.Vertical,Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},page2Wrap)
+
+	local sections={}
+	for key,spec in pairs(PAGE2_SECTION_SPECS) do
+		sections[key]=makeSection(page2Wrap,spec.order,spec.title,spec.subtitle)
+	end
+
+	local page2Ctx=makePage2Ctx()
+	for _,spec in ipairs(PAGE2_MODULE_SPECS) do
+		buildPage2Module(spec,page2Ctx,sections)
 	end
 
 	refreshPage2UI=function()
-		if hitboxPresets and hitboxPresets.Refresh then pcall(hitboxPresets.Refresh) end
-		if keybindSettings and keybindSettings.Refresh then pcall(keybindSettings.Refresh) end
-		if presetEditor and presetEditor.Refresh then pcall(presetEditor.Refresh) end
+		for _,api in pairs(PAGE2_APIS) do
+			if api and api.Refresh then pcall(api.Refresh) end
+		end
 	end
 
 	local function refreshAll()
 		refreshPage2UI()
 	end
 
-	if hitboxPresets and hitboxPresets.SetRefreshAll then hitboxPresets.SetRefreshAll(refreshAll) end
-	if keybindSettings and keybindSettings.SetRefreshAll then keybindSettings.SetRefreshAll(refreshAll) end
-	if presetEditor and presetEditor.SetRefreshAll then presetEditor.SetRefreshAll(refreshAll) end
-
-	PAGE2_APIS.hitboxPresets=hitboxPresets
-	PAGE2_APIS.keybindSettings=keybindSettings
-	PAGE2_APIS.presetEditor=presetEditor
+	for _,api in pairs(PAGE2_APIS) do
+		if api and api.SetRefreshAll then api.SetRefreshAll(refreshAll) end
+	end
 
 	refreshPage2UI()
 end
 
 function clearPage2()
 	destroyPage2APIs()
-	if not futurePage then return end
-
-	for _,child in ipairs(futurePage:GetChildren()) do
-		if not child:IsA("UIListLayout") and not child:IsA("UIPadding") then
-			child:Destroy()
-		end
-	end
+	clearRuntimePage(futurePage,true)
 end
 
 rebuildPage2FromModules=function()

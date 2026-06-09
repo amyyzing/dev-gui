@@ -50,11 +50,22 @@ function addRuntimeModuleError(parent,order,title,text)
 	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 end
 
-function buildRuntimeModule(spec,ctx,parent)
+function refreshRuntimeAPIs(apiNames)
+	local env=getfenv()
+	for _,apiName in ipairs(apiNames or {}) do
+		local api=env[apiName]
+		if api and api.Refresh then
+			pcall(api.Refresh)
+		end
+	end
+end
+
+function buildRuntimeModule(spec,ctx,parent,...)
+	local extra={...}
 	local module=getfenv()[moduleGlobalName(spec.name)]
 	if module and module.new then
 		local ok,result=pcall(function()
-			return module.new(ctx,parent)
+			return module.new(ctx,parent,table.unpack(extra))
 		end)
 		if ok then
 			getfenv()[spec.api]=result
