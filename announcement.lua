@@ -28,8 +28,25 @@ function Announcement.new(ctx)
 	local api={}
 	local alive=true
 	local activeModal=nil
+	local activeModalConnections={}
 	local pollThread=nil
 	local currentAnnouncementId=nil
+
+	local function trackModalConnection(conn,bucket)
+		if conn then
+			table.insert(bucket or activeModalConnections,conn)
+		end
+
+		return conn
+	end
+
+	local function disconnectModalConnections()
+		for _,conn in ipairs(activeModalConnections) do
+			safeDisconnect(conn)
+		end
+
+		table.clear(activeModalConnections)
+	end
 
 	local function post(path,body)
 		if not BOT_API or not BOT_API.Post then
@@ -63,6 +80,7 @@ function Announcement.new(ctx)
 		end
 
 		currentAnnouncementId=nil
+		disconnectModalConnections()
 
 		if activeModal and activeModal.Parent then
 			activeModal:Destroy()
@@ -71,7 +89,7 @@ function Announcement.new(ctx)
 		activeModal=nil
 	end
 
-	local function makeButton(parent,text,x,width)
+	local function makeButton(parent,text,x,width,bucket)
 		local button=New("TextButton",{
 			Position=UDim2.new(1,-x,1,-46),
 			Size=UDim2.fromOffset(width or 104,30),
@@ -87,17 +105,17 @@ function Announcement.new(ctx)
 
 		local wrap=wrapTextButton and wrapTextButton(button,THEME.BG,2)
 
-		button.MouseEnter:Connect(function()
+		trackModalConnection(button.MouseEnter:Connect(function()
 			if wrap then
 				wrap.BackgroundColor3=THEME.CARD
 			end
-		end)
+		end),bucket)
 
-		button.MouseLeave:Connect(function()
+		trackModalConnection(button.MouseLeave:Connect(function()
 			if wrap then
 				wrap.BackgroundColor3=THEME.BG
 			end
-		end)
+		end),bucket)
 
 		return button
 	end
@@ -114,6 +132,7 @@ function Announcement.new(ctx)
 
 		destroyModal(false)
 		currentAnnouncementId=id
+		local modalConnections={}
 
 		local title=clampText(announcement.title or announcement.Title or "Announcement",90)
 		local description=clampText(announcement.description or announcement.Description or "",6000)
@@ -205,23 +224,20 @@ function Announcement.new(ctx)
 			textBox.MultiLine=true
 		end)
 
-		local okButton=makeButton(box,"OK",104,104)
+		local okButton=makeButton(box,"OK",104,104,modalConnections)
 
 		local closeConn=nil
 		local okConn=nil
-		closeConn=close.MouseButton1Click:Connect(function()
-			safeDisconnect(closeConn)
-			safeDisconnect(okConn)
+		closeConn=trackModalConnection(close.MouseButton1Click:Connect(function()
 			destroyModal(true)
-		end)
+		end),modalConnections)
 
-		okConn=okButton.MouseButton1Click:Connect(function()
-			safeDisconnect(closeConn)
-			safeDisconnect(okConn)
+		okConn=trackModalConnection(okButton.MouseButton1Click:Connect(function()
 			destroyModal(true)
-		end)
+		end),modalConnections)
 
 		activeModal=modal
+		activeModalConnections=modalConnections
 	end
 
 	local function checkLatest()

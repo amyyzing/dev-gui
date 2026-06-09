@@ -20,6 +20,25 @@ function PlayerData.new(ctx,page,deps)
 	local statusPill=nil
 	local statusPillText=nil
 	local busy=false
+	local connections={}
+
+	local function trackConnection(conn,bucket)
+		if conn then
+			table.insert(bucket or connections,conn)
+		end
+
+		return conn
+	end
+
+	local function disconnectConnections(bucket)
+		for _,conn in ipairs(bucket) do
+			pcall(function()
+				conn:Disconnect()
+			end)
+		end
+
+		table.clear(bucket)
+	end
 
 	local function setStatus(text,color)
 		if statusLabel then
@@ -37,7 +56,7 @@ function PlayerData.new(ctx,page,deps)
 		end
 	end
 
-	local function modalButton(parent,text,x,danger)
+	local function modalButton(parent,text,x,danger,bucket)
 		local normalBg=danger and THEME.RED or THEME.BG
 		local hoverBg=danger and Color3.fromRGB(255,124,118) or THEME.CARD
 		local leaveBg=danger and THEME.RED or THEME.PANEL
@@ -61,13 +80,13 @@ function PlayerData.new(ctx,page,deps)
 			wrap:SetAttribute("ThemeRole","RED")
 		end
 
-		btn.MouseEnter:Connect(function()
+		trackConnection(btn.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=hoverBg
-		end)
+		end),bucket)
 
-		btn.MouseLeave:Connect(function()
+		trackConnection(btn.MouseLeave:Connect(function()
 			wrap.BackgroundColor3=leaveBg
-		end)
+		end),bucket)
 
 		return btn
 	end
@@ -85,6 +104,13 @@ function PlayerData.new(ctx,page,deps)
 			Size=UDim2.new(1,0,1,0),
 			ZIndex=100,
 		},SG)
+		local modalConnections={}
+		local function closeModal()
+			disconnectConnections(modalConnections)
+			if modal and modal.Parent then
+				modal:Destroy()
+			end
+		end
 
 		local box=New("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
@@ -124,17 +150,15 @@ function PlayerData.new(ctx,page,deps)
 		},box)
 
 		local danger=options and options.danger==true
-		local no=modalButton(box,"CANCEL",160,false)
-		local yes=modalButton(box,yesText or"YES",274,danger)
+		local no=modalButton(box,"CANCEL",160,false,modalConnections)
+		local yes=modalButton(box,yesText or"YES",274,danger,modalConnections)
 
-		no.MouseButton1Click:Connect(function()
-			modal:Destroy()
-		end)
+		trackConnection(no.MouseButton1Click:Connect(closeModal),modalConnections)
 
-		yes.MouseButton1Click:Connect(function()
-			modal:Destroy()
+		trackConnection(yes.MouseButton1Click:Connect(function()
+			closeModal()
 			if onYes then onYes() end
-		end)
+		end),modalConnections)
 	end
 
 	local function getPlayerId()
@@ -214,6 +238,10 @@ function PlayerData.new(ctx,page,deps)
 			end,
 			{danger=true}
 		)
+	end
+
+	function api.Destroy()
+		disconnectConnections(connections)
 	end
 
 	local dataSection=makeSection(page,2,"Player Data","Saved settings",{

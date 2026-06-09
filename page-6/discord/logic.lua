@@ -12,6 +12,13 @@ function Discord.new(ctx,page)
 	local linkButton=nil
 	local statusLabel=nil
 	local linkWrap=nil
+	local connections={}
+
+	local function connect(signal,fn)
+		local conn=signal:Connect(fn)
+		table.insert(connections,conn)
+		return conn
+	end
 
 	local function getClipboardSetter()
 		if type(setclipboard)=="function" then return setclipboard end
@@ -84,6 +91,12 @@ function Discord.new(ctx,page)
 
 	function api.Destroy()
 		alive=false
+		for _,conn in ipairs(connections) do
+			pcall(function()
+				conn:Disconnect()
+			end)
+		end
+		table.clear(connections)
 	end
 
 	local section=makeSection(page,3,"Discord","Community invite")
@@ -107,21 +120,21 @@ function Discord.new(ctx,page)
 	linkButton.Position=UDim2.fromOffset(10,0)
 	linkButton.Size=UDim2.new(1,-20,1,0)
 
-	linkButton.MouseEnter:Connect(function()
+	connect(linkButton.MouseEnter,function()
 		if linkWrap then linkWrap.BackgroundColor3=THEME.CARD end
 		if inviteLink and inviteLink~="" then
 			setStatus("Click to Copy",THEME.GREEN)
 		end
 	end)
 
-	linkButton.MouseLeave:Connect(function()
+	connect(linkButton.MouseLeave,function()
 		if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
 		if statusLabel and statusLabel.Text=="Click to Copy" then
 			paint()
 		end
 	end)
 
-	linkButton.MouseButton1Click:Connect(copyInvite)
+	connect(linkButton.MouseButton1Click,copyInvite)
 
 	statusLabel=New("TextLabel",{
 		BackgroundTransparency=1,
