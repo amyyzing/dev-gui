@@ -195,6 +195,11 @@ function StrokeColour.new(ctx,page)
 	local connections={}
 	local collapsiblePanels={}
 
+	local function trackConnection(conn)
+		connections[#connections+1]=conn
+		return conn
+	end
+
 	local function getUIStrokeColor()
 		if ctx.getUIStrokeColor then
 			return ctx.getUIStrokeColor()
@@ -472,14 +477,28 @@ function StrokeColour.new(ctx,page)
 			syncPickerControls()
 		end
 
-		mainValue.Changed:Connect(applyStep)
-		gradientValue.Changed:Connect(applyStep)
+		local valueConnections={}
+		local function trackValueConnection(conn)
+			valueConnections[#valueConnections+1]=conn
+			return conn
+		end
+		local function cleanupValueConnections()
+			for _,conn in ipairs(valueConnections) do
+				pcall(function()
+					conn:Disconnect()
+				end)
+			end
+			table.clear(valueConnections)
+		end
+
+		trackValueConnection(mainValue.Changed:Connect(applyStep))
+		trackValueConnection(gradientValue.Changed:Connect(applyStep))
 
 		local info=TweenInfo.new(0.24,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 		local t1=TweenService:Create(mainValue,info,{Value=c1})
 		local t2=TweenService:Create(gradientValue,info,{Value=c2 or c1})
 
-		t2.Completed:Connect(function()
+		trackValueConnection(t2.Completed:Connect(function()
 			if token==colourTweenToken then
 				setMainColour(c1)
 				setGradientColour(c2 or c1)
@@ -489,9 +508,10 @@ function StrokeColour.new(ctx,page)
 				syncPickerControls()
 			end
 
+			cleanupValueConnections()
 			mainValue:Destroy()
 			gradientValue:Destroy()
-		end)
+		end))
 
 		t1:Play()
 		t2:Play()
@@ -624,11 +644,6 @@ function StrokeColour.new(ctx,page)
 	local modeBodies={}
 	local colorPreview,previewHex,hexBox
 	local svBase,svCursor,hueCursor
-
-	local function trackConnection(conn)
-		connections[#connections+1]=conn
-		return conn
-	end
 
 	local function themeColor(role,fallback)
 		return THEME[role] or fallback
@@ -852,21 +867,21 @@ function StrokeColour.new(ctx,page)
 			end
 		end
 
-		titleButton.MouseButton1Click:Connect(function()
+		trackConnection(titleButton.MouseButton1Click:Connect(function()
 			setExpanded(not expanded,true,true)
-		end)
+		end))
 
-		header.InputBegan:Connect(function(input)
+		trackConnection(header.InputBegan:Connect(function(input)
 			if input.UserInputType==Enum.UserInputType.MouseButton1 then
 				setExpanded(not expanded,true,true)
 			end
-		end)
+		end))
 
-		body:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		trackConnection(body:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
 			if expanded then
 				lastHeight=targetHeight()
 			end
-		end)
+		end))
 
 		collapsiblePanels[#collapsiblePanels+1]={
 			stateKey=stateKey,
@@ -909,13 +924,13 @@ function StrokeColour.new(ctx,page)
 		},button)
 		addCorner(marker,"Slider")
 
-		button.MouseEnter:Connect(function()
+		trackConnection(button.MouseEnter:Connect(function()
 			button.BackgroundColor3=themeColor("SECTION",THEME.CARD)
-		end)
+		end))
 
-		button.MouseLeave:Connect(function()
+		trackConnection(button.MouseLeave:Connect(function()
 			paintChoices()
-		end)
+		end))
 
 		return button,marker
 	end
@@ -1201,9 +1216,9 @@ function StrokeColour.new(ctx,page)
 			ZIndex=7,
 		},card)
 
-		card.MouseButton1Click:Connect(function()
+		trackConnection(card.MouseButton1Click:Connect(function()
 			applyThemePreset(preset)
-		end)
+		end))
 
 		themeCards[#themeCards+1]={Preset=preset,Card=card,Marker=marker}
 	end
@@ -1225,9 +1240,9 @@ function StrokeColour.new(ctx,page)
 
 	for i,target in ipairs({"Primary","Stroke","Gradient"}) do
 		local button,marker=makeFlatButton(targetRow,target,i)
-		button.MouseButton1Click:Connect(function()
+		trackConnection(button.MouseButton1Click:Connect(function()
 			setActiveTarget(target)
-		end)
+		end))
 
 		targetButtons[target]={Button=button,Marker=marker}
 	end
@@ -1247,9 +1262,9 @@ function StrokeColour.new(ctx,page)
 
 	for i,mode in ipairs({"Square","RGB","HSV","Hex"}) do
 		local button,marker=makeFlatButton(modeRow,mode,i,0.25)
-		button.MouseButton1Click:Connect(function()
+		trackConnection(button.MouseButton1Click:Connect(function()
 			setActiveMode(mode)
-		end)
+		end))
 
 		modeButtons[mode]={Button=button,Marker=marker}
 	end
@@ -1304,9 +1319,9 @@ function StrokeColour.new(ctx,page)
 		},swatch)
 		addCorner(marker,"Slider")
 
-		swatch.MouseButton1Click:Connect(function()
+		trackConnection(swatch.MouseButton1Click:Connect(function()
 			applyActiveColor(color,false)
-		end)
+		end))
 
 		quickChoices[#quickChoices+1]={Color=color,Marker=marker}
 	end
@@ -1446,19 +1461,19 @@ function StrokeColour.new(ctx,page)
 		end
 	end
 
-	svSquare.InputBegan:Connect(function(input)
+	trackConnection(svSquare.InputBegan:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 then
 			colorDrag="SV"
 			updateColorDrag()
 		end
-	end)
+	end))
 
-	hueStrip.InputBegan:Connect(function(input)
+	trackConnection(hueStrip.InputBegan:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 then
 			colorDrag="Hue"
 			updateColorDrag()
 		end
-	end)
+	end))
 
 	trackConnection(UIS.InputChanged:Connect(function(input)
 		if colorDrag and input.UserInputType==Enum.UserInputType.MouseMovement then
@@ -1549,11 +1564,11 @@ function StrokeColour.new(ctx,page)
 		end
 	end
 
-	hexBox.FocusLost:Connect(function()
+	trackConnection(hexBox.FocusLost:Connect(function()
 		commitHex()
-	end)
+	end))
 
-	applyHex.MouseButton1Click:Connect(commitHex)
+	trackConnection(applyHex.MouseButton1Click:Connect(commitHex))
 
 	paintChoices=function()
 		local primary=getUIPrimaryColor()

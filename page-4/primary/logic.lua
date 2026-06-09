@@ -23,6 +23,12 @@ function Primary.new(ctx,parent)
 	local applyPrimaryColour=ctx.applyPrimaryColour or function() end
 
 	local refs={}
+	local connections={}
+	local function connect(signal,fn)
+		local conn=signal:Connect(fn)
+		table.insert(connections,conn)
+		return conn
+	end
 
 	makeLabel(New,THEME,parent,"Primary Colours",20)
 
@@ -64,7 +70,7 @@ function Primary.new(ctx,parent)
 			Transparency=0,
 		},swatch)
 
-		swatch.MouseButton1Click:Connect(function()
+		connect(swatch.MouseButton1Click,function()
 			applyPrimaryColour(colour)
 		end)
 	end
@@ -86,6 +92,21 @@ function Primary.new(ctx,parent)
 		updateEverything()
 		tintSlider(refs.pb,Color3.fromRGB(0,0,v))
 	end)
+
+	function refs.Destroy()
+		for _,conn in ipairs(connections) do
+			pcall(function()
+				conn:Disconnect()
+			end)
+		end
+		table.clear(connections)
+
+		for _,control in ipairs({refs.pr,refs.pg,refs.pb}) do
+			if control and control.Destroy then
+				pcall(control.Destroy)
+			end
+		end
+	end
 
 	return refs
 end

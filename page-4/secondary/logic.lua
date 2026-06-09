@@ -40,6 +40,12 @@ function Secondary.new(ctx,parent)
 	local applyGradient=ctx.applyGradient or function() end
 
 	local refs={}
+	local connections={}
+	local function connect(signal,fn)
+		local conn=signal:Connect(fn)
+		table.insert(connections,conn)
+		return conn
+	end
 
 	makeLabel(New,THEME,parent,"Secondary Colours",20)
 	makeLabel(New,THEME,parent,"Quick colours")
@@ -71,7 +77,7 @@ function Secondary.new(ctx,parent)
 			Transparency=0,
 		},swatch)
 
-		swatch.MouseButton1Click:Connect(function()
+		connect(swatch.MouseButton1Click,function()
 			applyMainColour(colour)
 		end)
 	end
@@ -112,7 +118,7 @@ function Secondary.new(ctx,parent)
 		})
 		grad.Parent=btn
 
-		btn.MouseButton1Click:Connect(function()
+		connect(btn.MouseButton1Click,function()
 			applyGradient(pair[1],pair[2])
 		end)
 	end
@@ -156,6 +162,21 @@ function Secondary.new(ctx,parent)
 		updateEverything()
 		tintSlider(refs.gb,Color3.fromRGB(0,0,v))
 	end)
+
+	function refs.Destroy()
+		for _,conn in ipairs(connections) do
+			pcall(function()
+				conn:Disconnect()
+			end)
+		end
+		table.clear(connections)
+
+		for _,control in ipairs({refs.r,refs.g,refs.b,refs.gr,refs.gg,refs.gb}) do
+			if control and control.Destroy then
+				pcall(control.Destroy)
+			end
+		end
+	end
 
 	return refs
 end
