@@ -1351,8 +1351,16 @@ function GuiLogic.new(ctx)
 
 		local containerRole=tostring(componentValue("SliderContainerRole","SECTION"))
 		local containerCorner=tostring(componentValue("SliderContainerCornerRole",containerRole=="BUTTON" and "Control" or "Section"))
-		local trackRole=tostring(componentValue("SliderTrackRole","SLIDER_BG"))
+		local trackRole=tostring(componentValue("SliderTrackRole","INPUT"))
 		local valueRole=tostring(componentValue("SliderValueBoxRole","INPUT"))
+		local sliderTweenInfo=TweenInfo.new(componentNumber("SliderTweenTime",0.14),Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		local sliderGlowInfo=TweenInfo.new(componentNumber("SliderGlowTweenTime",0.16),Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		local sliderGlowIdleTransparency=componentNumber("SliderGlowIdleTransparency",0.84)
+		local sliderGlowActiveTransparency=componentNumber("SliderGlowActiveTransparency",0.52)
+		local sliderGlowStrokeIdleTransparency=componentNumber("SliderGlowStrokeIdleTransparency",0.72)
+		local sliderGlowStrokeActiveTransparency=componentNumber("SliderGlowStrokeActiveTransparency",0.24)
+		local sliderFillTransparency=componentNumber("SliderFillTransparency",0)
+		local sliderTrackTransparency=componentNumber("SliderTrackTransparency",0.04)
 		local container=New("Frame",{BackgroundColor3=themeColor(containerRole,themeColor("SECTION",THEME.CARD)),BackgroundTransparency=componentNumber("SliderContainerTransparency",1),BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole=containerRole,CornerRole=containerCorner},parent)
 		addCorner(container,containerCorner)
 		local containerStrokeTransparency=componentNumber("SliderContainerStrokeTransparency",1)
@@ -1360,23 +1368,29 @@ function GuiLogic.new(ctx)
 		containerStroke:SetAttribute("BaseStrokeTransparency",containerStrokeTransparency)
 		New("TextLabel",{BackgroundTransparency=1,Position=labelPosition,Size=labelSize,Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false},container)
 
-		local track=New("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor(trackRole,THEME.PANEL),BorderSizePixel=0,ClipsDescendants=rounded,ZIndex=6,ThemeRole=trackRole,CornerRole="Slider"},container)
+		local track=New("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor(trackRole,THEME.PANEL),BackgroundTransparency=sliderTrackTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=6,ThemeRole=trackRole,CornerRole="Slider"},container)
 		addCorner(track,"Slider")
 		local trackStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=componentNumber("SliderTrackStrokeTransparency",0.55)},track)
 		trackStroke:SetAttribute("BaseStrokeTransparency",componentNumber("SliderTrackStrokeTransparency",0.55))
 
-		local fill=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",THEME.STROKE),BorderSizePixel=0,ClipsDescendants=rounded,ZIndex=7,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
+		local fillGlow=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",THEME.STROKE),BackgroundTransparency=sliderGlowIdleTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=7,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
+		addCorner(fillGlow,"Slider")
+
+		local fill=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",THEME.STROKE),BackgroundTransparency=sliderFillTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=8,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
 		addCorner(fill,"Slider")
+		local fillStroke=New("UIStroke",{Color=themeColor("SLIDER_FILL",THEME.STROKE),Thickness=componentNumber("SliderGlowStrokeThickness",2),Transparency=sliderGlowStrokeIdleTransparency},fill)
+		fillStroke:SetAttribute("StrokeRole","Accent")
+		fillStroke:SetAttribute("BaseStrokeTransparency",sliderGlowStrokeIdleTransparency)
 
 		local knobVisible=componentValue("SliderKnobVisible",false)==true
 		local knobWidth=knobVisible and (s.SliderStyle=="windui" and 10 or (s.SliderStyle=="thin" and 2 or 3)) or 0
-		local knob=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(knobWidth,sliderHeight),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=themeColor("SLIDER_FILL",THEME.STROKE),BackgroundTransparency=knobVisible and 0 or 1,BorderSizePixel=0,Visible=knobVisible,ZIndex=8,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
+		local knob=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(knobWidth,sliderHeight),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=themeColor("SLIDER_FILL",THEME.STROKE),BackgroundTransparency=knobVisible and 0 or 1,BorderSizePixel=0,Visible=knobVisible,ZIndex=9,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
 		if knobVisible then
 			addCorner(knob,"Slider")
 		end
 
-		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=10,AutoButtonColor=false,Selectable=true},track)
-		local valueLabel=New("TextLabel",{BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=9,Selectable=false},track)
+		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=12,AutoButtonColor=false,Selectable=true},track)
+		local valueLabel=New("TextLabel",{BackgroundTransparency=1,BorderSizePixel=0,Size=UDim2.new(1,0,1,0),Position=UDim2.fromOffset(0,0),Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=11,Selectable=false},track)
 		local valueBoxHeight=componentNumber("SliderValueBoxHeight",math.max(componentNumber("TextBoxHeight",24),sliderHeight))
 		local valueBox=New("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor(valueRole,THEME.PANEL),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole=valueRole,CornerRole="Control",Selectable=true},container)
 		valueBox.Visible=valueBoxVisible
@@ -1388,6 +1402,13 @@ function GuiLogic.new(ctx)
 		local valueState=makeFusionValue(value)
 		local dragging=false
 		local dragInputType=nil
+		local sliderDestroyed=false
+		local fillTween=nil
+		local fillGlowTween=nil
+		local fillGlowFadeTween=nil
+		local fillStrokeTween=nil
+		local knobTween=nil
+		local glowSerial=0
 		local connections={}
 
 		local function connect(signal,fn)
@@ -1401,11 +1422,69 @@ function GuiLogic.new(ctx)
 			return math.floor(v*m+0.5)/m
 		end
 
-		local function setVisual(v)
+		local function cancelSliderTweens()
+			if fillTween then
+				fillTween:Cancel()
+				fillTween=nil
+			end
+			if fillGlowTween then
+				fillGlowTween:Cancel()
+				fillGlowTween=nil
+			end
+			if fillGlowFadeTween then
+				fillGlowFadeTween:Cancel()
+				fillGlowFadeTween=nil
+			end
+			if fillStrokeTween then
+				fillStrokeTween:Cancel()
+				fillStrokeTween=nil
+			end
+			if knobTween then
+				knobTween:Cancel()
+				knobTween=nil
+			end
+		end
+
+		local function setVisual(v,animate)
 			local pct=math.clamp((v-minVal)/(maxVal-minVal),0,1)
-			fill.Size=UDim2.new(pct,0,1,0)
+			local fillSize=UDim2.new(pct,0,1,0)
+			local knobPosition=UDim2.new(pct,0,0.5,0)
+
+			if animate then
+				cancelSliderTweens()
+				fillTween=TweenService:Create(fill,sliderTweenInfo,{Size=fillSize})
+				fillGlowTween=TweenService:Create(fillGlow,sliderTweenInfo,{Size=fillSize,BackgroundTransparency=sliderGlowActiveTransparency})
+				fillStrokeTween=TweenService:Create(fillStroke,sliderGlowInfo,{Transparency=sliderGlowStrokeActiveTransparency})
+				fillTween:Play()
+				fillGlowTween:Play()
+				fillStrokeTween:Play()
+
+				if knobVisible then
+					knobTween=TweenService:Create(knob,sliderTweenInfo,{Position=knobPosition})
+					knobTween:Play()
+				end
+
+				glowSerial+=1
+				local thisGlow=glowSerial
+				task.delay(0.18,function()
+					if sliderDestroyed or thisGlow~=glowSerial or not fillGlow.Parent then
+						return
+					end
+					fillGlowFadeTween=TweenService:Create(fillGlow,sliderGlowInfo,{BackgroundTransparency=sliderGlowIdleTransparency})
+					fillGlowFadeTween:Play()
+					fillStrokeTween=TweenService:Create(fillStroke,sliderGlowInfo,{Transparency=sliderGlowStrokeIdleTransparency})
+					fillStrokeTween:Play()
+				end)
+			else
+				cancelSliderTweens()
+				fill.Size=fillSize
+				fillGlow.Size=fillSize
+				fillGlow.BackgroundTransparency=sliderGlowIdleTransparency
+				fillStroke.Transparency=sliderGlowStrokeIdleTransparency
+			end
+
 			if knobVisible then
-				knob.Position=UDim2.new(pct,0,0.5,0)
+				knob.Position=knobPosition
 			end
 			valueLabel.Text=fmtNumber(v,decimals)
 			valueBox.Text=fmtNumber(v,decimals)
@@ -1434,7 +1513,7 @@ function GuiLogic.new(ctx)
 			if valueState then
 				valueState:set(value)
 			end
-			setVisual(v)
+			setVisual(v,fire~=false)
 
 			if fire and onChange then
 				onChange(v)
@@ -1512,8 +1591,10 @@ function GuiLogic.new(ctx)
 		end)
 
 		local function destroySlider()
+			sliderDestroyed=true
 			dragging=false
 			dragInputType=nil
+			cancelSliderTweens()
 			destroyFusionValue(valueState)
 			for _,conn in ipairs(connections) do
 				pcall(function()
@@ -1524,7 +1605,7 @@ function GuiLogic.new(ctx)
 		end
 
 		setValue(startVal,false)
-		return{set=function(v) setValue(v,false) end,get=function() return value end,Destroy=destroySlider,destroy=destroySlider,valueState=valueState,box=valueBox,valueLabel=valueLabel,fill=fill,knob=knob,track=track}
+		return{set=function(v) setValue(v,false) end,get=function() return value end,Destroy=destroySlider,destroy=destroySlider,valueState=valueState,box=valueBox,valueLabel=valueLabel,fill=fill,fillGlow=fillGlow,knob=knob,track=track}
 	end
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)
