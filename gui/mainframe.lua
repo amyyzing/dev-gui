@@ -278,7 +278,7 @@ function MainFrame.new(ctx)
 		end
 	end)
 
-	local main=New("Frame",{Size=UDim2.new(1,0,1,0),AutomaticSize=Enum.AutomaticSize.None,BackgroundTransparency=1,ZIndex=3},root)
+	local main=New("Frame",{Size=UDim2.new(1,0,1,0),AutomaticSize=Enum.AutomaticSize.None,BackgroundTransparency=1,ClipsDescendants=true,ZIndex=3},root)
 	local mainLayout=New("UIListLayout",{Padding=UDim.new(0,mainGap),SortOrder=Enum.SortOrder.LayoutOrder},main)
 
 	attachHover=attachHover or function() end
@@ -335,8 +335,8 @@ function MainFrame.new(ctx)
 		pageBarSize=UDim2.fromOffset(navWidth,384)
 	end
 
-	local pageBar=New("Frame",{Size=pageBarSize,BackgroundTransparency=1,ZIndex=4,LayoutOrder=pageBarLayoutOrder},pageParent)
-	local pageShell=New("Frame",{Size=navIsLeft and UDim2.new(1,0,1,0) or UDim2.fromOffset(pageShellWidth,pageBarHeight),BackgroundColor3=THEME.TOPBAR or THEME.BG,BackgroundTransparency=pageShellTransparency,BorderSizePixel=0,ZIndex=5,ThemeRole="TOPBAR",CornerRole="Section"},pageBar)
+	local pageBar=New("Frame",{Size=pageBarSize,BackgroundTransparency=1,ClipsDescendants=true,ZIndex=4,LayoutOrder=pageBarLayoutOrder},pageParent)
+	local pageShell=New("Frame",{Size=navIsLeft and UDim2.new(1,0,1,0) or UDim2.fromOffset(pageShellWidth,pageBarHeight),BackgroundColor3=THEME.TOPBAR or THEME.BG,BackgroundTransparency=pageShellTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=5,ThemeRole="TOPBAR",CornerRole="Section"},pageBar)
 	local pageShellScale=New("UIScale",{Scale=1},pageShell)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},pageShell)
 	local pageShellStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=pageShellStrokeTransparency},pageShell)
@@ -363,26 +363,26 @@ function MainFrame.new(ctx)
 
 	local pageTabs={settingsTab,mapsPageTab,serverPageTab,uiSettingsTab,futureTab,settingsPageTab}
 
-	local pageHost=New("ScrollingFrame",{Size=navIsLeft and UDim2.new(1,-(navWidth+navGap),1,0) or UDim2.new(1,0,0,384),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=3,LayoutOrder=pageHostLayoutOrder},pageHostParent)
+	local pageHost=New("ScrollingFrame",{Size=navIsLeft and UDim2.new(1,-(navWidth+navGap),1,0) or UDim2.new(1,0,0,384),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=3,LayoutOrder=pageHostLayoutOrder},pageHostParent)
 	New("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},pageHost)
 	New("UIPadding",{PaddingTop=UDim.new(0,2),PaddingLeft=UDim.new(0,3),PaddingRight=UDim.new(0,7),PaddingBottom=UDim.new(0,2)},pageHost)
 
-	local settingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Visible=true,ZIndex=3,LayoutOrder=1},pageHost)
+	local settingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=true,ZIndex=3,LayoutOrder=1},pageHost)
 	New("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},settingsPage)
 
-	local mapPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Visible=false,ZIndex=3,LayoutOrder=2},pageHost)
+	local mapPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=2},pageHost)
 	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},mapPage)
 
-	local serverPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Visible=false,ZIndex=3,LayoutOrder=3},pageHost)
+	local serverPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=3},pageHost)
 	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},serverPage)
 
-	local uiSettingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Visible=false,ZIndex=3,LayoutOrder=4},pageHost)
+	local uiSettingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=4},pageHost)
 	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},uiSettingsPage)
 
-	local futurePage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Visible=false,ZIndex=3,LayoutOrder=5},pageHost)
+	local futurePage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=5},pageHost)
 	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},futurePage)
 
-	local actualSettingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,Visible=false,ZIndex=3,LayoutOrder=6},pageHost)
+	local actualSettingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=6},pageHost)
 	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},actualSettingsPage)
 
 	local activePageName="main"
@@ -523,7 +523,7 @@ function MainFrame.new(ctx)
 	futureTab.MouseButton1Click:Connect(function() setActivePage("page2") end)
 	settingsPageTab.MouseButton1Click:Connect(function() setActivePage("settings") end)
 
-	local contentWrap=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ZIndex=3,LayoutOrder=1},settingsPage)
+	local contentWrap=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,ZIndex=3,LayoutOrder=1},settingsPage)
 	local contentLayout=New("UIListLayout",{Padding=UDim.new(0,columnGap),SortOrder=Enum.SortOrder.LayoutOrder,FillDirection=Enum.FillDirection.Horizontal},contentWrap)
 
 	local columnHalfGap=columnGap/2
@@ -574,7 +574,7 @@ function MainFrame.new(ctx)
 
 	updateResponsiveLayout()
 
-	local footer=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,footerHeight),ZIndex=4,LayoutOrder=4},main)
+	local footer=New("Frame",{BackgroundColor3=THEME.BG,BackgroundTransparency=0,Size=UDim2.new(1,0,0,footerHeight),ZIndex=8,LayoutOrder=4,ThemeRole="BG"},main)
 	New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,footerGap),SortOrder=Enum.SortOrder.LayoutOrder,HorizontalAlignment=Enum.HorizontalAlignment.Right,VerticalAlignment=Enum.VerticalAlignment.Center},footer)
 
 	function api.RefreshESPStatus() end

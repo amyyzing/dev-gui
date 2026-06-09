@@ -940,7 +940,7 @@ function GuiLogic.new(ctx)
 		local sectionMode=tostring(c.SectionMode or "card"):lower()
 		local descriptionOnly=options.compact==true or options.headerOnly==true
 		local hasBody=not descriptionOnly
-		local sec=New("Frame",{BackgroundColor3=themeColor("SECTION",THEME.CARD),BackgroundTransparency=componentNumber("SectionBackgroundTransparency",0),BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=4,LayoutOrder=order,ThemeRole="SECTION",CornerRole="Section"},parent)
+		local sec=New("Frame",{BackgroundColor3=themeColor("SECTION",THEME.CARD),BackgroundTransparency=componentNumber("SectionBackgroundTransparency",0),BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ClipsDescendants=true,ZIndex=4,LayoutOrder=order,ThemeRole="SECTION",CornerRole="Section"},parent)
 
 		addCorner(sec,"Section")
 		local sectionStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=componentNumber("SectionStrokeTransparency",0.62)},sec)
@@ -956,7 +956,7 @@ function GuiLogic.new(ctx)
 			headerHeight=math.max(headerHeight,headerToggleHeight)
 		end
 
-		local header=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,headerHeight),ZIndex=5,LayoutOrder=1},sec)
+		local header=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,headerHeight),ClipsDescendants=true,ZIndex=5,LayoutOrder=1},sec)
 		local controls={section=sec}
 		local headerButtonOptions=options.headerButton or options.headerAction
 		local headerButtonWidth=headerButtonOptions and (headerButtonOptions.width or headerButtonOptions.Width or 104) or 0
