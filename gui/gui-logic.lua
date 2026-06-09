@@ -131,12 +131,11 @@ function GuiLogic.new(ctx)
 		return Color3.fromRGB(22,22,22)
 	end
 
-	local function createSwitch(parent,startState,onChange,width,height,knobSize,pad,zIndex)
+	local function createSwitch(parent,startState,onChange,width,height,_knobSize,_pad,zIndex)
 		local c=components()
 		local checkbox=tostring(c.ToggleStyle or "switch"):lower()=="checkbox"
 		width=width or componentNumber("ToggleWidth",checkbox and 34 or 58)
 		height=height or componentNumber("ToggleHeight",checkbox and 22 or 22)
-		pad=pad or componentNumber("TogglePad",3)
 		zIndex=zIndex or 6
 
 		local onRole=tostring(c.ToggleOnRole or "SLIDER_FILL")
@@ -145,7 +144,6 @@ function GuiLogic.new(ctx)
 		local input=themeColor("INPUT",THEME.PANEL or Color3.fromRGB(18,18,24))
 		local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 		local strokeColor=themeColor("STROKE",THEME.STROKE or muted)
-		local coreSize=knobSize or componentNumber("ToggleKnobSize",math.max(10,math.min(height-8,14)))
 		local tickHeight=math.max(6,height-10)
 		local onTextColor=readableOn(accent)
 		local offStrokeTransparency=componentNumber("ToggleStrokeTransparency",0.50)
@@ -239,8 +237,8 @@ function GuiLogic.new(ctx)
 		local stateText=New("TextLabel",{
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
-			Position=UDim2.new(0,pad+coreSize+4,0,0),
-			Size=UDim2.new(1,-(pad*2+coreSize+6),1,0),
+			Position=UDim2.fromOffset(0,0),
+			Size=UDim2.new(1,0,1,0),
 			Text="OFF",
 			Font=componentFont("ControlFont",Enum.Font.GothamBold),
 			TextSize=componentNumber("ToggleTextSize",9),
@@ -250,39 +248,6 @@ function GuiLogic.new(ctx)
 			ZIndex=zIndex+3,
 			SkipThemeRole=true,
 		},wrap)
-
-		local core=New("Frame",{
-			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=UDim2.new(0,pad+(coreSize/2),0.5,0),
-			Size=UDim2.fromOffset(coreSize,coreSize),
-			BackgroundColor3=muted,
-			BackgroundTransparency=0.08,
-			BorderSizePixel=0,
-			Rotation=45,
-			ZIndex=zIndex+4,
-			SkipThemeRole=true,
-		},wrap)
-		New("UIAspectRatioConstraint",{AspectRatio=1},core)
-
-		local coreStroke=New("UIStroke",{
-			Color=strokeColor,
-			Thickness=1.2,
-			Transparency=0.34,
-		},core)
-		coreStroke:SetAttribute("StrokeRole","Fixed")
-
-		local coreDot=New("Frame",{
-			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=UDim2.fromScale(0.5,0.5),
-			Size=UDim2.fromOffset(math.max(4,coreSize-8),math.max(4,coreSize-8)),
-			BackgroundColor3=input,
-			BackgroundTransparency=0.16,
-			BorderSizePixel=0,
-			Rotation=0,
-			ZIndex=zIndex+5,
-			SkipThemeRole=true,
-		},core)
-		New("UIAspectRatioConstraint",{AspectRatio=1},coreDot)
 
 		local hit=New("TextButton",{
 			BackgroundTransparency=1,
@@ -313,22 +278,12 @@ function GuiLogic.new(ctx)
 		local function applyVisuals(animate)
 			cancelTweens()
 
-			local onX=width-pad-(coreSize/2)
-			local offX=pad+(coreSize/2)
 			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
-			local corePos=state and UDim2.new(0,onX,0.5,0) or UDim2.new(0,offX,0.5,0)
-			local coreColor=state and accent:Lerp(Color3.new(1,1,1),0.08) or muted
 			local bgColor=state and input:Lerp(accent,0.12) or input:Lerp(Color3.new(0,0,0),0.10)
 			local strokeTarget=state and accent or (hovering and muted or strokeColor)
 			local strokeTransparency=state and 0.22 or (hovering and 0.32 or offStrokeTransparency)
-			local dotColor=state and onTextColor or input
-			local dotTransparency=state and 0.02 or 0.18
 			local text=state and "ON" or "OFF"
-			local textPosition=state and UDim2.new(0,pad,0,0) or UDim2.new(0,pad+coreSize+4,0,0)
-			local textSize=state and UDim2.new(1,-(pad*2+coreSize+6),1,0) or UDim2.new(1,-(pad*2+coreSize+6),1,0)
 			local textColorTarget=state and onTextColor or muted
-			local coreRotation=state and 135 or 45
-			local coreScale=state and math.min(coreSize+2,height-6) or coreSize
 
 			stateText.Text=text
 			wrap:SetAttribute("ThemeRole",state and onRole or offRole)
@@ -338,16 +293,6 @@ function GuiLogic.new(ctx)
 				wrapStroke.Color=strokeTarget
 				wrapStroke.Transparency=strokeTransparency
 				fillClip.Size=fillSize
-				core.Position=corePos
-				core.Size=UDim2.fromOffset(coreScale,coreScale)
-				core.BackgroundColor3=coreColor
-				core.Rotation=coreRotation
-				coreStroke.Color=state and accent or strokeColor
-				coreStroke.Transparency=state and 0.12 or 0.34
-				coreDot.BackgroundColor3=dotColor
-				coreDot.BackgroundTransparency=dotTransparency
-				stateText.Position=textPosition
-				stateText.Size=textSize
 				stateText.TextColor3=textColorTarget
 				stateText.TextTransparency=state and 0.02 or 0.22
 				for _,tick in ipairs(ticks) do
@@ -360,10 +305,7 @@ function GuiLogic.new(ctx)
 			tween(wrap,softInfo,{BackgroundColor3=bgColor})
 			tween(wrapStroke,softInfo,{Color=strokeTarget,Transparency=strokeTransparency})
 			tween(fillClip,snapInfo,{Size=fillSize})
-			tween(core,snapInfo,{Position=corePos,Size=UDim2.fromOffset(coreScale,coreScale),BackgroundColor3=coreColor,Rotation=coreRotation})
-			tween(coreStroke,softInfo,{Color=state and accent or strokeColor,Transparency=state and 0.12 or 0.34})
-			tween(coreDot,softInfo,{BackgroundColor3=dotColor,BackgroundTransparency=dotTransparency})
-			tween(stateText,softInfo,{Position=textPosition,Size=textSize,TextColor3=textColorTarget,TextTransparency=state and 0.02 or 0.22})
+			tween(stateText,softInfo,{TextColor3=textColorTarget,TextTransparency=state and 0.02 or 0.22})
 
 			for _,tick in ipairs(ticks) do
 				tween(tick,softInfo,{BackgroundColor3=state and onTextColor or muted,BackgroundTransparency=state and 0.74 or 0.86})
@@ -413,7 +355,7 @@ function GuiLogic.new(ctx)
 		end
 
 		setState(state,false,false)
-		return{set=function(v) setState(v,false,false) end,get=function() return state end,Destroy=destroySwitch,destroy=destroySwitch,stateValue=stateValue,wrap=wrap,knob=core,hit=hit,width=width,height=height}
+		return{set=function(v) setState(v,false,false) end,get=function() return state end,Destroy=destroySwitch,destroy=destroySwitch,stateValue=stateValue,wrap=wrap,knob=fill,hit=hit,width=width,height=height}
 	end
 
 	local function createHeaderSwitch(parent,startState,onChange,zIndex)
@@ -429,16 +371,7 @@ function GuiLogic.new(ctx)
 		local width=headerNumber("HeaderToggleWidth",88)
 		local height=headerNumber("HeaderToggleHeight",30)
 		local railHeight=headerNumber("HeaderToggleRailHeight",22)
-		local indicatorSize=headerNumber("HeaderToggleIndicatorSize",26)
-		local outerCoreSize=headerNumber("HeaderToggleOuterCoreSize",22)
-		local innerOffSize=headerNumber("HeaderToggleInnerOffSize",11)
-		local inactiveOuterCoreSize=headerNumber("HeaderToggleInactiveOuterCoreSize",math.min(outerCoreSize,math.max(innerOffSize+6,railHeight-4)))
-		local indicatorInset=headerNumber("HeaderToggleIndicatorInset",4)
-		local strokeThickness=headerNumber("HeaderToggleStrokeThickness",1.6)
-		local expandedScale=headerNumber("HeaderToggleExpandedScale",1.05)
-		local collapsedScale=headerNumber("HeaderToggleCollapsedScale",0.94)
 		local z=zIndex or 6
-		local scaleInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 		local expandInfo=TweenInfo.new(0.26,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 		local collapseInfo=TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut)
 		local softInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
@@ -452,42 +385,16 @@ function GuiLogic.new(ctx)
 		local light=(THEME.TEXT or Color3.fromRGB(245,245,245))
 		local state=startState and true or false
 		local stateValue=makeFusionValue(state)
-		local onPosition=UDim2.new(1,-(indicatorSize/2+indicatorInset),0.5,0)
-		local offPosition=UDim2.new(0,indicatorSize/2+indicatorInset,0.5,0)
-		local activeInnerSize=headerNumber("HeaderToggleActiveInnerSize",math.max(10,math.floor(outerCoreSize*0.54)))
-		local inactiveInnerSize=headerNumber("HeaderToggleInactiveInnerSize",math.min(innerOffSize,math.max(8,math.floor(inactiveOuterCoreSize*0.52))))
 		local stateVisuals={
 			[true]={
-				indicatorPosition=onPosition,
 				fillSize=UDim2.new(1,0,1,0),
 				fillTransparency=0.08,
-				outerCoreSize=UDim2.fromOffset(outerCoreSize,outerCoreSize),
-				outerStrokeColor=accent,
-				outerStrokeTransparency=0.08,
-				innerSize=UDim2.fromOffset(activeInnerSize,activeInnerSize),
-				innerRotation=45,
-				innerColor=light:Lerp(accent,0.2),
-				innerFillTransparency=0.05,
-				innerStrokeColor=accent,
-				innerStrokeTransparency=0.38,
-				glowTransparency=0.8,
 				tickColor=accent,
 				tickTransparency=0.34,
 			},
 			[false]={
-				indicatorPosition=offPosition,
 				fillSize=UDim2.new(0,0,1,0),
 				fillTransparency=1,
-				outerCoreSize=UDim2.fromOffset(inactiveOuterCoreSize,inactiveOuterCoreSize),
-				outerStrokeColor=strokeColor,
-				outerStrokeTransparency=0.28,
-				innerSize=UDim2.fromOffset(inactiveInnerSize,inactiveInnerSize),
-				innerRotation=0,
-				innerColor=muted,
-				innerFillTransparency=0.14,
-				innerStrokeColor=muted,
-				innerStrokeTransparency=0.58,
-				glowTransparency=1,
 				tickColor=muted,
 				tickTransparency=0.82,
 			},
@@ -567,7 +474,7 @@ function GuiLogic.new(ctx)
 		},rail)
 
 		local ticks={}
-		for i,alpha in ipairs({0.22,0.5,0.78}) do
+		for _,alpha in ipairs({0.22,0.5,0.78}) do
 			local tick=New("Frame",{
 				AnchorPoint=Vector2.new(0.5,0.5),
 				Position=UDim2.fromScale(alpha,0.5),
@@ -579,92 +486,6 @@ function GuiLogic.new(ctx)
 			},tickHolder)
 			table.insert(ticks,tick)
 		end
-
-		local indicator=New("Frame",{
-			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=initialVisuals.indicatorPosition,
-			Size=UDim2.fromOffset(indicatorSize,indicatorSize),
-			BackgroundTransparency=1,
-			BorderSizePixel=0,
-			ClipsDescendants=true,
-			ZIndex=z+5,
-		},switch)
-		New("UIAspectRatioConstraint",{AspectRatio=1},indicator)
-
-		local indicatorScale=New("UIScale",{
-			Scale=1,
-		},indicator)
-
-		local outerCore=New("Frame",{
-			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=UDim2.fromScale(0.5,0.5),
-			Size=initialVisuals.outerCoreSize,
-			BackgroundTransparency=1,
-			BorderSizePixel=0,
-			Rotation=0,
-			ZIndex=z+6,
-		},indicator)
-		New("UIAspectRatioConstraint",{AspectRatio=1},outerCore)
-
-		local outerStroke=New("UIStroke",{
-			Color=initialVisuals.outerStrokeColor,
-			Thickness=strokeThickness,
-			Transparency=initialVisuals.outerStrokeTransparency,
-			LineJoinMode=Enum.LineJoinMode.Miter,
-		},outerCore)
-		outerStroke:SetAttribute("StrokeRole","Fixed")
-
-		local glowOuter=New("Frame",{
-			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=UDim2.fromScale(0.5,0.5),
-			Size=UDim2.fromOffset(outerCoreSize+4,outerCoreSize+4),
-			BackgroundTransparency=1,
-			BorderSizePixel=0,
-			Rotation=initialVisuals.innerRotation,
-			ZIndex=z+4,
-		},indicator)
-		New("UIAspectRatioConstraint",{AspectRatio=1},glowOuter)
-
-		local glowStroke=New("UIStroke",{
-			Color=accent,
-			Thickness=4,
-			Transparency=initialVisuals.glowTransparency,
-			LineJoinMode=Enum.LineJoinMode.Miter,
-		},glowOuter)
-		glowStroke:SetAttribute("StrokeRole","Fixed")
-		New("UIGradient",{
-			Rotation=45,
-			Color=ColorSequence.new({
-				ColorSequenceKeypoint.new(0,accent),
-				ColorSequenceKeypoint.new(0.5,light),
-				ColorSequenceKeypoint.new(1,accent),
-			}),
-			Transparency=NumberSequence.new({
-				NumberSequenceKeypoint.new(0,0.9),
-				NumberSequenceKeypoint.new(0.5,0.18),
-				NumberSequenceKeypoint.new(1,0.9),
-			}),
-		},glowStroke)
-
-		local inner=New("Frame",{
-			AnchorPoint=Vector2.new(0.5,0.5),
-			Position=UDim2.fromScale(0.5,0.5),
-			Size=initialVisuals.innerSize,
-			BackgroundColor3=initialVisuals.innerColor,
-			BackgroundTransparency=initialVisuals.innerFillTransparency,
-			BorderSizePixel=0,
-			Rotation=initialVisuals.innerRotation,
-			ZIndex=z+7,
-		},indicator)
-		New("UIAspectRatioConstraint",{AspectRatio=1},inner)
-
-		local innerStroke=New("UIStroke",{
-			Color=initialVisuals.innerStrokeColor,
-			Thickness=strokeThickness,
-			Transparency=initialVisuals.innerStrokeTransparency,
-			LineJoinMode=Enum.LineJoinMode.Miter,
-		},inner)
-		innerStroke:SetAttribute("StrokeRole","Fixed")
 
 		local hit=New("TextButton",{
 			BackgroundTransparency=1,
@@ -679,7 +500,6 @@ function GuiLogic.new(ctx)
 		local categoryExpanded=true
 		local expandedValue=makeFusionValue(categoryExpanded)
 		local activeTweens={}
-		local scaleTween=nil
 		local hoverTween=nil
 		local visualTweenCount=0
 		local clickConn=nil
@@ -714,51 +534,23 @@ function GuiLogic.new(ctx)
 			return tw
 		end
 
-		local function applyExpandedVisuals(animate)
+		local function applyExpandedVisuals(_animate)
 			if expandedValue then
 				expandedValue:set(categoryExpanded)
 			end
-
-			local targetScale=categoryExpanded and expandedScale or collapsedScale
-
-			if scaleTween then
-				scaleTween:Cancel()
-				scaleTween=nil
-			end
-
-			if not animate then
-				indicatorScale.Scale=targetScale
-				return
-			end
-
-			scaleTween=TweenService:Create(indicatorScale,scaleInfo,{Scale=targetScale})
-			scaleTween:Play()
 		end
 
 		local function applyVisuals(animate)
 			cancelTrackedTweens()
 
 			local visuals=visualState(state)
+			local strokeTarget=state and accent or strokeColor
+			local strokeTransparency=state and 0.28 or 0.48
 
 			if not animate then
-				applyProps(indicator,{Position=visuals.indicatorPosition})
-				applyProps(outerCore,{Size=visuals.outerCoreSize})
 				applyProps(railFillClip,{Size=visuals.fillSize})
 				applyProps(railFill,{BackgroundTransparency=visuals.fillTransparency})
-				applyProps(outerStroke,{Color=visuals.outerStrokeColor,Transparency=visuals.outerStrokeTransparency})
-				applyProps(inner,{
-					Size=visuals.innerSize,
-					Rotation=visuals.innerRotation,
-					BackgroundColor3=visuals.innerColor,
-					BackgroundTransparency=visuals.innerFillTransparency,
-				})
-				applyProps(innerStroke,{
-					Color=visuals.innerStrokeColor,
-					Thickness=strokeThickness,
-					Transparency=visuals.innerStrokeTransparency,
-				})
-				applyProps(glowOuter,{Rotation=visuals.innerRotation})
-				applyProps(glowStroke,{Transparency=visuals.glowTransparency})
+				applyProps(railStroke,{Color=strokeTarget,Transparency=strokeTransparency})
 				for _,tick in ipairs(ticks) do
 					applyProps(tick,{BackgroundColor3=visuals.tickColor,BackgroundTransparency=visuals.tickTransparency})
 				end
@@ -767,24 +559,9 @@ function GuiLogic.new(ctx)
 
 			local shapeInfo=state and expandInfo or collapseInfo
 
-			playTrackedTween(indicator,shapeInfo,{Position=visuals.indicatorPosition})
-			playTrackedTween(outerCore,shapeInfo,{Size=visuals.outerCoreSize})
 			playTrackedTween(railFillClip,shapeInfo,{Size=visuals.fillSize})
 			playTrackedTween(railFill,softInfo,{BackgroundTransparency=visuals.fillTransparency})
-			playTrackedTween(outerStroke,softInfo,{Color=visuals.outerStrokeColor,Transparency=visuals.outerStrokeTransparency})
-			playTrackedTween(inner,shapeInfo,{
-				Size=visuals.innerSize,
-				Rotation=visuals.innerRotation,
-				BackgroundColor3=visuals.innerColor,
-				BackgroundTransparency=visuals.innerFillTransparency,
-			})
-			playTrackedTween(innerStroke,softInfo,{
-				Color=visuals.innerStrokeColor,
-				Thickness=strokeThickness,
-				Transparency=visuals.innerStrokeTransparency,
-			})
-			playTrackedTween(glowOuter,shapeInfo,{Rotation=visuals.innerRotation})
-			playTrackedTween(glowStroke,softInfo,{Transparency=visuals.glowTransparency})
+			playTrackedTween(railStroke,softInfo,{Color=strokeTarget,Transparency=strokeTransparency})
 
 			for _,tick in ipairs(ticks) do
 				playTrackedTween(tick,softInfo,{BackgroundColor3=visuals.tickColor,BackgroundTransparency=visuals.tickTransparency})
@@ -830,7 +607,10 @@ function GuiLogic.new(ctx)
 			if hoverTween then
 				hoverTween:Cancel()
 			end
-			hoverTween=TweenService:Create(railStroke,hoverInfo,{Transparency=0.48})
+			hoverTween=TweenService:Create(railStroke,hoverInfo,{
+				Color=state and accent or strokeColor,
+				Transparency=state and 0.28 or 0.48,
+			})
 			hoverTween:Play()
 		end)
 
@@ -841,10 +621,6 @@ function GuiLogic.new(ctx)
 			if destroyed then return end
 			destroyed=true
 			cancelTrackedTweens()
-			if scaleTween then
-				scaleTween:Cancel()
-				scaleTween=nil
-			end
 			if hoverTween then
 				hoverTween:Cancel()
 				hoverTween=nil
