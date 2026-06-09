@@ -17,6 +17,9 @@ function GuiLogic.new(ctx)
 	local WRAP_INSET=0
 	local EMPTY_TABLE={}
 	local DEFAULT_SHAPE={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original"}
+	local TOGGLE_TICK_ALPHAS={0.25,0.5,0.75}
+	local TOGGLE_SOFT_TWEEN=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+	local TOGGLE_SNAP_TWEEN=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 	local BUILTIN_PROFILES={
 		windui={Shape={WindowRadius=12,SectionRadius=10,ControlRadius=8,SliderRadius=10,SliderHeight=24,SliderStyle="windui"}},
 		rayfield={Shape={WindowRadius=6,SectionRadius=5,ControlRadius=4,SliderRadius=4,SliderHeight=26,SliderStyle="rayfield"}},
@@ -141,8 +144,6 @@ function GuiLogic.new(ctx)
 		local input=themeColor("SLIDER_BG",themeColor("INPUT",THEME.PANEL or Color3.fromRGB(18,18,24)))
 		local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 		local tickHeight=math.max(6,height-10)
-		local softInfo=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
-		local snapInfo=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 		local state=startState and true or false
 		local stateValue=makeFusionValue(state)
 		local activeTweens={}
@@ -197,7 +198,7 @@ function GuiLogic.new(ctx)
 		},wrap)
 
 		local ticks={}
-		for _,alpha in ipairs({0.25,0.50,0.75}) do
+		for _,alpha in ipairs(TOGGLE_TICK_ALPHAS) do
 			local tick=New("Frame",{
 				AnchorPoint=Vector2.new(0.5,0.5),
 				Position=UDim2.fromScale(alpha,0.5),
@@ -263,12 +264,12 @@ function GuiLogic.new(ctx)
 				return
 			end
 
-			tween(wrap,softInfo,{BackgroundColor3=bgColor})
-			tween(fillClip,snapInfo,{Size=fillSize})
-			tween(fill,softInfo,{BackgroundColor3=currentAccent,BackgroundTransparency=fillTransparency})
+			tween(wrap,TOGGLE_SOFT_TWEEN,{BackgroundColor3=bgColor})
+			tween(fillClip,TOGGLE_SNAP_TWEEN,{Size=fillSize})
+			tween(fill,TOGGLE_SOFT_TWEEN,{BackgroundColor3=currentAccent,BackgroundTransparency=fillTransparency})
 
 			for _,tick in ipairs(ticks) do
-				tween(tick,softInfo,{BackgroundColor3=state and onTextColor or currentMuted,BackgroundTransparency=state and 0.74 or 0.86})
+				tween(tick,TOGGLE_SOFT_TWEEN,{BackgroundColor3=state and onTextColor or currentMuted,BackgroundTransparency=state and 0.74 or 0.86})
 			end
 		end
 
