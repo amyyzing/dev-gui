@@ -20,7 +20,6 @@ function MainFrame.new(ctx)
 	local getUIStrokeGradientColor=ctx.getUIStrokeGradientColor or function() return THEME.GREEN or THEME.ACC or THEME.TEXT end
 	local getCurrentUILibProfile=ctx.getCurrentUILibProfile
 	local onPageActivated=ctx.onPageActivated
-	local onRefreshRequested=ctx.onRefreshRequested
 	local uiProfile=type(ctx.UI_PROFILE)=="table" and ctx.UI_PROFILE or {}
 	local mainFrameProfile={}
 	local windowProfile={}
@@ -314,10 +313,9 @@ function MainFrame.new(ctx)
 	end
 
 	local function headerSearchInset()
-		return topButtonOuter+(topButtonSize*3)+(topButtonGap*2)+12
+		return topButtonOuter+(topButtonSize*2)+topButtonGap+12
 	end
 
-	local refreshBtn,refreshWrap=makeTopButton("R",topButtonX(3))
 	local miniBtn,miniWrap=makeTopButton("-",topButtonX(2))
 	local closeBtn,closeWrap=makeTopButton("x",topButtonX(1))
 
@@ -800,30 +798,6 @@ function MainFrame.new(ctx)
 		end
 	end)
 
-	local refreshBusy=false
-	refreshBtn.MouseButton1Click:Connect(function()
-		if refreshBusy then return end
-		refreshBusy=true
-
-		local oldText=refreshBtn.Text
-		refreshBtn.Text="..."
-
-		task.spawn(function()
-			if type(onRefreshRequested)=="function" then
-				local ok,err=pcall(onRefreshRequested)
-				if not ok then
-					warn("Manual refresh failed:",err)
-				end
-			end
-
-			task.wait(0.35)
-			if refreshBtn and refreshBtn.Parent then
-				refreshBtn.Text=oldText
-			end
-			refreshBusy=false
-		end)
-	end)
-
 	fab.MouseButton1Click:Connect(restore)
 
 	local dragConn=nil
@@ -931,10 +905,6 @@ function MainFrame.new(ctx)
 		mainLayout.Padding=UDim.new(0,mainGap)
 		header.Size=UDim2.new(1,0,0,headerHeight)
 		footer.Size=UDim2.new(1,0,0,footerHeight)
-		refreshWrap.Size=UDim2.fromOffset(topButtonSize,topButtonSize)
-		refreshWrap.Position=UDim2.new(1,topButtonX(3),0.5,-topButtonSize/2)
-		refreshBtn.Size=UDim2.new(1,0,1,0)
-		refreshBtn.Position=UDim2.fromOffset(0,0)
 		miniWrap.Size=UDim2.fromOffset(topButtonSize,topButtonSize)
 		miniWrap.Position=UDim2.new(1,topButtonX(2),0.5,-topButtonSize/2)
 		miniBtn.Size=UDim2.new(1,0,1,0)
@@ -982,7 +952,6 @@ function MainFrame.new(ctx)
 	api.main=main
 	api.header=header
 	api.modeSubtitle=modeSubtitle
-	api.refreshBtn=refreshBtn
 	api.closeBtn=closeBtn
 	api.resetBtn=resetBtn
 	api.pageBar=pageBar

@@ -93,9 +93,6 @@ MainFrame=MainFrameModule.new({
 		return CURRENT_MODE_LABEL
 	end,
 	onPageActivated=ensureRuntimePageBuilt,
-	onRefreshRequested=function()
-		return refreshRemoteModulesNow()
-	end,
 })
 
 root=MainFrame.root

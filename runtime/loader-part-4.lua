@@ -84,11 +84,72 @@ function refreshSettingsPage()
 	end
 end
 
+function buildUpdateSection()
+	local section=makeSection(actualSettingsPage,1,"Update","Reload latest GUI build")
+	local normalBg=THEME.BUTTON or THEME.BG
+	local hoverBg=THEME.CARD
+	local button=New("TextButton",{
+		BackgroundColor3=normalBg,
+		BorderSizePixel=0,
+		Size=UDim2.new(1,-20,0,30),
+		Position=UDim2.fromOffset(10,0),
+		Text="UPDATE GUI",
+		Font=Enum.Font.GothamMedium,
+		TextSize=12,
+		TextColor3=THEME.TEXT,
+		AutoButtonColor=false,
+		ZIndex=6,
+	},section)
+
+	local wrap=wrapTextButton(button,normalBg,2)
+	wrap.BackgroundColor3=normalBg
+	wrap:SetAttribute("ThemeRole","BUTTON")
+	wrap:SetAttribute("CornerRole","Control")
+
+	button.Size=UDim2.new(1,0,1,0)
+	button.Position=UDim2.fromOffset(0,0)
+
+	button.MouseEnter:Connect(function()
+		wrap.BackgroundColor3=hoverBg
+	end)
+
+	button.MouseLeave:Connect(function()
+		wrap.BackgroundColor3=normalBg
+	end)
+
+	local busy=false
+	button.MouseButton1Click:Connect(function()
+		if busy then return end
+		busy=true
+		button.Text="UPDATING..."
+
+		task.spawn(function()
+			local ok,result=pcall(refreshRemoteModulesNow)
+			if ok and result~=false then
+				return
+			end
+
+			warn("Manual refresh failed:",ok and "refresh returned false" or result)
+			if button and button.Parent then
+				button.Text="UPDATE FAILED"
+			end
+
+			task.wait(1.2)
+			if button and button.Parent then
+				button.Text="UPDATE GUI"
+			end
+			busy=false
+		end)
+	end)
+end
+
 function buildActualSettingsPage()
 	PlayerDataLogicModule=loadDeferredModule("PlayerDataLogic",MODULE_PATHS.PlayerDataLogic,PlayerDataLogicModule)
 	PlayerDataModule=loadDeferredModule("PlayerData",MODULE_PATHS.PlayerData,PlayerDataModule)
 	DiscordLogicModule=loadDeferredModule("DiscordLogic",MODULE_PATHS.DiscordLogic,DiscordLogicModule)
 	DiscordModule=loadDeferredModule("Discord",MODULE_PATHS.Discord,DiscordModule)
+
+	buildUpdateSection()
 
 	if PlayerDataModule and PlayerDataModule.new then
 		local ok,result=pcall(function()
