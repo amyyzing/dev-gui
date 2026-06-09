@@ -134,6 +134,13 @@ function GuiLogic.new(ctx)
 		local state=startState and true or false
 		local hovering=false
 		local activeTweens={}
+		local connections={}
+
+		local function connect(signal,fn)
+			local conn=signal:Connect(fn)
+			table.insert(connections,conn)
+			return conn
+		end
 
 		local wrap=New("Frame",{
 			Size=UDim2.fromOffset(width,height),
@@ -352,22 +359,35 @@ function GuiLogic.new(ctx)
 			end
 		end
 
-		hit.MouseButton1Click:Connect(function()
+		connect(hit.MouseButton1Click,function()
 			setState(not state,true,true)
 		end)
 
-		hit.MouseEnter:Connect(function()
+		connect(hit.MouseEnter,function()
 			hovering=true
 			applyVisuals(true)
 		end)
 
-		hit.MouseLeave:Connect(function()
+		connect(hit.MouseLeave,function()
 			hovering=false
 			applyVisuals(true)
 		end)
 
+		local function destroySwitch()
+			cancelTweens()
+			for _,conn in ipairs(connections) do
+				pcall(function()
+					conn:Disconnect()
+				end)
+			end
+			table.clear(connections)
+			if wrap then
+				wrap:Destroy()
+			end
+		end
+
 		setState(state,false,false)
-		return{set=function(v) setState(v,false,false) end,get=function() return state end,wrap=wrap,knob=core,hit=hit,width=width,height=height}
+		return{set=function(v) setState(v,false,false) end,get=function() return state end,Destroy=destroySwitch,destroy=destroySwitch,wrap=wrap,knob=core,hit=hit,width=width,height=height}
 	end
 
 	local function createHeaderSwitch(parent,startState,onChange,zIndex)
@@ -780,6 +800,24 @@ function GuiLogic.new(ctx)
 		applyVisuals(false)
 		applyExpandedVisuals(false)
 
+		local function destroyHeaderSwitch()
+			cancelTrackedTweens()
+			if scaleTween then
+				scaleTween:Cancel()
+				scaleTween=nil
+			end
+			if hoverTween then
+				hoverTween:Cancel()
+				hoverTween=nil
+			end
+			if clickConn then clickConn:Disconnect() clickConn=nil end
+			if hoverEnterConn then hoverEnterConn:Disconnect() hoverEnterConn=nil end
+			if hoverLeaveConn then hoverLeaveConn:Disconnect() hoverLeaveConn=nil end
+			if switch then
+				switch:Destroy()
+			end
+		end
+
 		return{
 			set=function(value)
 				setState(value,false,false,true)
@@ -791,23 +829,8 @@ function GuiLogic.new(ctx)
 				categoryExpanded=value and true or false
 				applyExpandedVisuals(animate~=false)
 			end,
-			destroy=function()
-				cancelTrackedTweens()
-				if scaleTween then
-					scaleTween:Cancel()
-					scaleTween=nil
-				end
-				if hoverTween then
-					hoverTween:Cancel()
-					hoverTween=nil
-				end
-				if clickConn then clickConn:Disconnect() clickConn=nil end
-				if hoverEnterConn then hoverEnterConn:Disconnect() hoverEnterConn=nil end
-				if hoverLeaveConn then hoverLeaveConn:Disconnect() hoverLeaveConn=nil end
-				if switch then
-					switch:Destroy()
-				end
-			end,
+			Destroy=destroyHeaderSwitch,
+			destroy=destroyHeaderSwitch,
 			wrap=switch,
 			width=width,
 			height=height,
