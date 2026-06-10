@@ -45,8 +45,6 @@ local QB_AIRBORNE_VY_EPSILON=2
 local QB_Y_RISE_FACTOR=0
 local QB_Y_FALL_FACTOR=0
 local QB_Y_MAX_CORRECTION=4.25
-local C2_GROUND_FALLBACK_MARGIN=2.50
-local C2_MAX_ABOVE_BALL=8.00
 local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
 local QB_RELEASE_EXTRAPOLATE_VERTICAL=false
 local MIN_T,MAX_T,DT=0.35,6,0.01
@@ -59,6 +57,7 @@ local GLOBAL_MAX_ANGLE=55
 local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
+local ARC_PREVIEW_ROLL=math.rad(90)
 local HELD_BALL_CACHE_INTERVAL=0.12
 local RECEIVER_TRACK_INTERVAL=0.05
 local RECEIVER_PLAYER_CACHE_INTERVAL=0.25
@@ -354,6 +353,10 @@ local function xAxisCFrame(position,xVector)
 	local z=unit(xVector:Cross(up),Vector3.new(0,0,1))
 	local y=unit(z:Cross(xVector),Vector3.new(0,1,0))
 	return CFrame.fromMatrix(position,xVector,y,z)
+end
+
+local function previewArcCFrame(position,xVector)
+	return xAxisCFrame(position,xVector)*CFrame.Angles(ARC_PREVIEW_ROLL,0,0)
 end
 
 local function prepPreviewObject(object)
@@ -840,13 +843,10 @@ function QBAim.new(ctx,parent)
 		setTargetText()
 	end
 
-	local function c2Y()
-		-- Use the game's original Center.C2 only as a release-height reference.
-		-- Do not read from the cloned preview C2 here, because that creates stale/self-referential C2 values.
+	local function originalC2Frame()
 		local center=originalCenter()
 		local c2=center and center:FindFirstChild("C2",true)
-		local cf=c2 and attachmentCFrame(c2)
-		return cf and cf.Position.Y
+		return c2 and attachmentCFrame(c2)
 	end
 
 	local function setPreviewCenterVisible(visible)
@@ -1064,14 +1064,9 @@ function QBAim.new(ctx,parent)
 	local function origin(qbRoot,ball,releaseOffset)
 		releaseOffset=releaseOffset or 0
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
-		local basePosition=ball and ball.Position or qbRoot.Position
-
-		local baseY=basePosition.Y
-		local centerY=c2Y()
-		local y=baseY
-		if centerY and centerY>=baseY-C2_GROUND_FALLBACK_MARGIN and centerY<=baseY+C2_MAX_ABOVE_BALL then
-			y=centerY
-		end
+		local c2Frame=originalC2Frame()
+		local basePosition=(c2Frame and c2Frame.Position) or qbRoot.Position
+		local y=basePosition.Y
 
 		local dx,dz=0,0
 		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and releaseOffset>0 then
@@ -1469,9 +1464,9 @@ function QBAim.new(ctx,parent)
 		end
 
 		preview.p1,preview.p2,preview.p3=p1,p2,p3
-		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity))
-		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*plan.time))
-		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity))
+		setAttachmentCFrame(c2,previewArcCFrame(p2,plan.velocity))
+		setAttachmentCFrame(c1,previewArcCFrame(p1,plan.velocity+G*plan.time))
+		setAttachmentCFrame(c3,previewArcCFrame(p3,endVelocity))
 		updateC1AndC3Info(plan,p1,p3)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
