@@ -2,73 +2,51 @@
 
 This page reflects the current live `page-1/qb-aim/logic.lua` route velocity path.
 
-## Route speed
+## Current route velocity model
 
-The live script uses partial route speed:
+The current solver wants a clean route direction and a bounded receiver velocity. It no longer uses the older route-speed ramp helpers.
 
 ```lua
-local function routeSpeed(speed)
-	local clamped=math.clamp(speed or 0,0,MAX_RUN_SPEED)
-	if clamped<ROUTE_LOCK_MIN_SPEED then
-		return 0
-	end
+local function routeVelocity(data, receiverRoot)
+    local currentVelocity = currentReceiverRawVelocity(data, receiverRoot, data and data.vel or Vector3.zero)
+    local currentSpeed = currentVelocity.Magnitude
+    local previousDir = data and data.lastGoodDir
+    local currentDir = currentSpeed >= STOP_SPEED_THRESHOLD and currentVelocity.Unit or previousDir
 
-	if clamped>=NORMAL_ROUTE_MIN_SPEED then
-		return MAX_RUN_SPEED
-	end
+    if not currentDir then
+        return Vector3.zero, Vector3.new(1, 0, 0), false, "standing"
+    end
 
-	return math.clamp(clamped*ROUTE_SPEED_PARTIAL_GAIN,ROUTE_LOCK_MIN_SPEED,MAX_RUN_SPEED)
+    local source = "current"
+    if previousDir and currentVelocity.Magnitude >= CLEAN_MOVING_SPEED_MIN and previousDir:Dot(currentDir) < CUT_DOT_THRESHOLD then
+        source = "cut_snap"
+    end
+
+    return currentDir * MAX_RUN_SPEED, currentDir, true, source
 end
 ```
 
-Current relevant constants:
+Relevant constants:
 
 ```lua
 MAX_RUN_SPEED = 21
-NORMAL_ROUTE_MIN_SPEED = 19
-ROUTE_LOCK_MIN_SPEED = 2.5
-ROUTE_SPEED_PARTIAL_GAIN = 1.08
-```
-
-## Route velocity source
-
-`routeVelocity` uses `predictionState`, `updateStable`, and the measured receiver velocity. The H lock keeps the receiver identity stable, but the velocity can still blend toward current measured movement.
-
-```lua
-local function routeVelocity(receiver,data,origin,receiverRoot,routeLock)
-	local state=predictionState(data,receiverRoot.Position,data and data.vel or Vector3.zero)
-	local measuredVelocity=clampMagnitude(flat(state.velocity or Vector3.zero),MAX_RUN_SPEED)
-	local measuredSpeed=measuredVelocity.Magnitude
-	local adjustedSpeed=routeSpeed(measuredSpeed)
-	local stableDirection,stableSpeed=updateStable(data)
-	local velocity=Vector3.zero
-
-	if stableDirection and stableSpeed>0 then
-		velocity=stableDirection*stableSpeed
-		if measuredSpeed>=ROUTE_LOCK_MIN_SPEED and adjustedSpeed>0 then
-			local reactiveVelocity=measuredVelocity.Unit*adjustedSpeed
-			velocity=safeVectorLerp(velocity,reactiveVelocity,math.clamp((state.confidence or 0)*0.38,0,0.38))
-		end
-	elseif measuredSpeed>=ROUTE_LOCK_MIN_SPEED and adjustedSpeed>0 then
-		velocity=measuredVelocity.Unit*adjustedSpeed
-	else
-		state.routeVelocity=Vector3.zero
-		return Vector3.zero,"standing",state
-	end
-
-	velocity=clampMagnitude(flat(velocity),MAX_RUN_SPEED)
-	state.routeVelocity=velocity
-	return velocity,movementShape(origin,receiverRoot.Position,velocity),state
-end
+CLEAN_MOVING_SPEED_MIN = 5.0
+STOP_SPEED_THRESHOLD = 2.0
+CUT_DOT_THRESHOLD = 0.45
 ```
 
 ## Interaction with intercept solver
 
-The route velocity is no longer used to create route-bucket extra lead as the primary validity rule. It feeds `wrVel` into the fixed-speed intercept solve:
+Route velocity feeds the universal fixed-speed solve:
 
 ```lua
-receiverStart = receiverMaxAt(receiverRoot.Position + wrVel * releaseOffset)
-target = targetAtTime(receiverStart, wrVel, flightTime, leadDelayForFlightTime(flightTime))
+target(t) = receiverStart + flat(wrVel) * t + catchOffset(routeDir, moving)
 ```
 
-Then the solver chooses a time where a `MODEL_BALL_SPEED = 95` projectile can hit that peak-height moving target.
+Where `catchOffset` is a spatial offset:
+
+```lua
+moving and routeDir * CATCH_AHEAD_STUDS or Vector3.zero
+```
+
+This means slants, streaks, posts, and crossings use the same projectile equation. Route direction only determines receiver motion and the optional catch-ahead vector.

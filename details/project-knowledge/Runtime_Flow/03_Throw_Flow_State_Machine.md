@@ -1,144 +1,61 @@
 # Throw flow state machine
 
-This is the main throw state flow.
-
 ```text
-Input T / throw key
-  ↓
-QBAim enabled and mode available?
-  ↓
-Receiver locked and targetable?
-  ↓
-Held football exists?
-  ↓
-Select power by mode:
-  mode1 -> GAMEPLAY_BALL_POWER = 95
-  mode3 -> SQUADS_BALL_POWER = 95
-  ↓
-Build pre-animation release-offset plan
-  using fixed-speed intercept at 95 studs/s
-  receiver start = WR peak position + wrVel * releaseOffset
-  extra lead adjust = wrVel * leadDelayForFlightTime(t)
-  ↓
-Play throw animation
-  ↓
-During 0.2666667s release wait:
-  update throw plan every Heartbeat
-  update arc preview if plan exists
-  ↓
-Build final plan at release
-  using releaseOffset = 0 but still applying tapered lead adjust
-  ↓
-Send remote:
-  mode1 -> Gameplay ReEvent Mechanics/ThrowBall
-  mode3 -> Squads ReEvent Mechanics/ThrowBall
-  ↓
-Freeze preview briefly after throw
+Throw key
+  -> QB Aim enabled and current mode available
+  -> receiver locked and targetable
+  -> held football exists
+  -> choose model speed 95 for current mode
+  -> build pre-animation plan at release offset 0.2666667
+  -> play UF_QuarterbackThrow at speed 1.35
+  -> update plan during release wait
+  -> build final plan at release offset 0
+  -> fire Mechanics/ThrowBall remote with display power 100
+  -> freeze preview briefly
 ```
 
-## Main throw function
+## Source-backed remote timing
 
-```lua
-	local function throwTo(receiver)
-		if not(enabled and isAvailable()) then return end
+`MECH_ControlsQuarterback.FootballThrow` confirms the game client:
 
-		if not canTargetReceiver(receiver) then
-			trackedReceiver=nil
-			selectedRouteLock=nil
-			clearPreviewVisuals()
-			setTargetText()
-			setStatus(state.qbAimTeamFilter~=false and "Target not teammate" or "No receiver locked")
-			return
-		end
-
-		local heldBall=getHeldBall()
-		if not heldBall then
-			clearPreviewForMissingBall("No ball held")
-			return
-		end
-
-		local modeKey=getModeKey(ctx)
-		local power=modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
-		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
-		if not receiverRoot then
-			setStatus("No receiver locked")
-			return
-		end
-
-		local preAnimationPlan=buildPlan(receiver,power,THROW_ANIMATION_RELEASE_WAIT,heldBall)
-		if not preAnimationPlan then
-			setStatus("No release-time throw solution")
-			return
-		end
-
-		playThrowAnimation()
-
-		local plan=buildReleasePlan(receiver,power,heldBall,preAnimationPlan)
-		if not plan then
-			setStatus("No release-time throw solution")
-			return
-		end
-
-		local ok,err
-		if modeKey=="mode1" then
-			ok,err=fireGameplayThrow(plan)
-		elseif modeKey=="mode3" then
-			ok,err=fireSquadsThrow(plan)
-		else
-			ok,err=false,"Park route unknown"
-		end
-
-		if ok then
-			freezePreviewAtCurrentPlan(plan)
-			setStatus(currentModeText().." release-time throw sent")
-		else
-			setStatus(err or "Throw failed")
-		end
-	end
-```
+1. plays `UF_QuarterbackThrow` at `1.35`
+2. waits `0.26666666666666666`
+3. sends `ReEvent:FireServer("Mechanics", "ThrowBall", payload)`
+4. calls `UnequipFootball()`
 
 ## Current solve model
 
-The current `solve` path does not choose a throw by route/distance angle buckets. It scans time and solves the fixed-speed intercept condition:
+The current solver does not use route/distance angle buckets. It solves fixed-speed projectile interception:
 
 ```lua
-F(t) = |targetAtTime(receiverStart, wrVel, t, leadDelayForFlightTime(t)) - origin - qbVel * QB_INHERITANCE * t - 0.5 * G * t * t|^2 - MODEL_BALL_SPEED^2 * t * t
+target(t) = receiverStart + flat(wrVel) * t + catchOffset(routeDir, moving)
+neededDisplacement = target(t) - origin - inheritedVelocity * t - 0.5 * G * t * t
+F(t) = neededDisplacement:Dot(neededDisplacement) - MODEL_BALL_SPEED^2 * t^2
 ```
 
-`leadDelayForFlightTime(t)` currently returns full `WR_LEAD_DELAY`. In this clean-math version, `Lead Adjust` is direct ahead-time on the receiver target; set it to `0` for a pure catch-time intercept.
+Where:
+
+- `origin` comes from original `Center.C2`, moved by release-time horizontal QB motion.
+- `receiverStart` is receiver position moved by release-time receiver motion and forced to `WR_MAX_Y`.
+- `catchOffset` is `routeDir * CATCH_AHEAD_STUDS` only when receiver is moving.
+- `QB_INHERITANCE = 0`, so `inheritedVelocity` is currently zero.
 
 After a valid time is chosen:
 
 ```lua
 requiredVelocity = neededDisplacement / time
 throwVelocity = requiredVelocity.Unit * MODEL_BALL_SPEED
-worldVelocity = throwVelocity + qbVel * QB_INHERITANCE
+worldVelocity = throwVelocity + flat(qbVel) * QB_INHERITANCE
 aimPoint = origin + requiredVelocity.Unit * AIM_SCALE
 ```
 
-`QB_INHERITANCE` is currently `0`, so QB movement changes the release origin but does not add to the modeled football velocity.
+Candidate acceptance requires tight speed and miss tolerances. Invalid throws return no plan instead of falling back to a route-bucket scorer.
 
 ## Plan build path
 
 ```lua
-	local function buildPlan(receiver,ballPower,releaseOffset,releaseBall)
-		if not canTargetReceiver(receiver) then
-			return nil,nil
-		end
-
-		local character=LP.Character
-		local qbRoot=root(character)
-		local ball=releaseBall or getHeldBall()
-		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
-		local data=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
-
-		if not(qbRoot and ball and receiverRoot and data) then
-			return nil
-		end
-
-		releaseOffset=releaseOffset or 0
-		local originPosition=origin(qbRoot,ball,releaseOffset)
-		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
-		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,predictorState),ball
-	end
+local targetVelocity, routeDir, moving, routeSource = routeVelocity(data, receiverRoot)
+return solve(qbRoot, ball, receiverRoot, targetVelocity, routeDir, moving, routeSource, ballPower, releaseOffset), ball
 ```
+
+The route direction affects only receiver velocity and spatial catch-ahead. It should not reintroduce route-specific validity rules.

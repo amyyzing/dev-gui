@@ -1,23 +1,20 @@
 # Function index
 
+Current live `page-1/qb-aim/logic.lua` function map.
+
+## Shared helpers
+
 - `flat`
 - `distXZ`
 - `unit`
 - `clampMagnitude`
-- `smoothstep`
-- `leadDelayForFlightTime`
 - `safeVectorLerp`
 - `root`
-- `routeSpeed`
 - `getModeKey`
 - `getHeldBall`
-- `findBallPart`
-- `looksLikeFootball`
 - `getPlayerTeamID`
 - `isValidGameTeamID`
 - `isSameTeam`
-- `getFootballFromFolder`
-- `getModeFootball`
 - `getGameReEvent`
 - `getFirstChildFolder`
 - `getFirstGame`
@@ -27,79 +24,80 @@
 - `attachmentCFrame`
 - `setAttachmentCFrame`
 - `xAxisCFrame`
+- `previewArcCFrame`
 - `prepPreviewObject`
-- `prep`
 - `getFirstMiniGameFolder`
 - `getSquadsReEvent`
-- `addContainer`
 - `getGlobalMechanics`
-- `valid`
 - `findThrowAnimation`
 - `playLocalThrowAnimation`
 - `playThrowAnimation`
+
+## QB Aim lifecycle and UI
+
 - `QBAim.new`
+- `destroyControl`
 - `addConnection`
+- `clearHeldBallCache`
+- `getCachedHeldBall`
+- `getCachedPlayers`
 - `changed`
 - `isAlive`
+- `currentModeKey`
 - `isAvailable`
-- `currentModeText`
-- `setStatus`
 - `setTargetText`
-- `updateLeadDelayVisuals`
-- `syncPeakHeightConstants`
+- `updateCatchAheadVisuals`
 - `updatePeakHeightVisuals`
-- `setLeadDelay`
+- `setCatchAhead`
 - `setPeakHeight`
-- `setLeadDelayFromScreenX`
-- `setPeakHeightFromScreenX`
 - `canTargetReceiver`
 - `getQBAimHighlight`
 - `ensureQBAimHighlight`
 - `destroyQBAimHighlight`
 - `clearTargetHighlights`
-- `updateTargetHighlight`
 - `ensureReceiverData`
 - `configuredBinding`
 - `bindingMatches`
 - `syncControls`
-- `c2Y`
+
+## Arc and release reference
+
+- `originalC2Frame`
 - `setPreviewCenterVisible`
-- `apply`
 - `destroyPreviewCenter`
 - `bindArcRigParts`
 - `arcRig`
-- `historyVector`
-- `leastSquaresVelocity`
-- `currentReceiverRawVelocity`
-- `predictionState`
-- `updateStable`
-- `movementShape`
-- `lockRoute`
-- `routeVelocity`
-- `receiverMaxAt`
-- `receiverMax`
-- `qbYCorrection`
-- `origin`
-- `velocityNeeded`
-- `ballAt`
-- `landing`
-- `targetAtTime`
-- `c1HeightFromMagnitudePotential`
-- `c1Target`
-- `interceptValue`
-- `interceptLeadInfo`
-- `interceptCandidate`
-- `betterIntercept`
-- `refineInterceptTime`
-- `solve`
 - `ensureC1Marker`
 - `cleanupC3InfoGui`
-- `ensureC3InfoGui`
 - `updateC1AndC3Info`
 - `hideC1AndC3Info`
 - `hideQBTrailPreview`
 - `clearPreviewVisuals`
 - `previewPlan`
+
+## Prediction and projectile math
+
+- `leastSquaresVelocity`
+- `currentReceiverRawVelocity`
+- `routeVelocity`
+- `receiverMaxAt`
+- `qbYCorrection`
+- `origin`
+- `ballAt`
+- `landing`
+- `catchOffset`
+- `targetAtTime`
+- `requiredVelocityAt`
+- `interceptValue`
+- `speedErrorValue`
+- `interceptCandidate`
+- `betterIntercept`
+- `refineInterceptTime`
+- `refineMinimumTime`
+- `solve`
+
+## Throw flow
+
 - `currentBallPower`
 - `hasHeldBallForPreview`
 - `clearPreviewForMissingBall`
@@ -111,12 +109,16 @@
 - `throwTo`
 - `lockReceiverUnderCursor`
 - `setEnabled`
+- `handleQBAimInput`
+
+## Public API methods
+
 - `api.SetQBAimState`
 - `api.SetTeamFilterState`
 - `api.SetShowArcState`
 - `api.SetLeadDelay`
+- `api.SetCatchAhead`
 - `api.SetPeakHeight`
 - `api.Refresh`
 - `api.Reset`
 - `api.Destroy`
-- `handleQBAimInput`

@@ -1,6 +1,26 @@
 # Constants index
 
-This file tracks the current live `page-1/qb-aim/logic.lua` constants that matter for throw math, preview behavior, remotes, and receiver prediction.
+This tracks current live `page-1/qb-aim/logic.lua` constants plus game-source constants confirmed by the new markdown source.
+
+## Game-source football constants
+
+From `details/project-knowledge/FootballMath.md`:
+
+```lua
+Settings.FPS = 60
+Settings.TimeScale = 1
+Settings.Gravity = -28
+Settings.MaxPower = 100
+Settings.MinPower = 30
+Settings.MaximumPowerCoefficient = 0.95
+Settings.MaxTimeInAir = 6
+```
+
+Implications:
+
+- Display power `100` maps to modeled speed `95`.
+- Ball gravity magnitude is `28`.
+- The project should keep display power and model speed separate unless custom-power support is added deliberately.
 
 ## Ball and remote
 
@@ -13,116 +33,98 @@ local SQUADS_BALL_POWER=MODEL_BALL_SPEED
 ```
 
 - The local projectile math solves with speed `95`.
-- The game remote still sends display power `100`.
-- Do not collapse these into one value unless the server contract changes.
+- The game remote sends display power `100`.
 
-## Receiver peak target
+## Receiver target and catch ahead
 
 ```lua
-local PLAYER_G=196.2
-local JUMP_POWER=55.5
-local WR_STANDING_TOP_Y=6.00
 local DEFAULT_WR_MAX_Y=14.00
 local WR_MAX_Y=DEFAULT_WR_MAX_Y
-local C1_Y_MIN=WR_MAX_Y
-local C1_Y_MAX=WR_MAX_Y
-local C1_Y_FIXED=WR_MAX_Y
-local C1_Y_POTENTIAL_EXPONENT=1.00
 local C1_SOLVE_Y_BIAS=0.00
-```
-
-- Default C1 Y is `WR_MAX_Y = 14.00`.
-- `WR_MAX_Y`, `C1_Y_MIN`, `C1_Y_MAX`, and `C1_Y_FIXED` are updated by the `Peak Height` slider.
-- `state.qbAimPeakHeight` persists the custom value, clamped to `8.00 -> 20.00`.
-- The old `13.00 -> 13.85` route-dominance range is not active in the live solver.
-
-## Receiver velocity and lead adjustment
-
-```lua
 local MAX_RUN_SPEED=21
-local NORMAL_ROUTE_MIN_SPEED=19
-local ROUTE_LOCK_MIN_SPEED=2.5
-local ROUTE_LOCK_MAX_AGE=1.5
-local WR_LEAD_DELAY=0.38
-local LEAD_DELAY_BASELINE=0.38
-local LEAD_DELAY_ZERO_FLIGHT_TIME=0.70
-local LEAD_DELAY_FULL_FLIGHT_TIME=1.35
-local ROUTE_SPEED_PARTIAL_GAIN=1.08
+local CATCH_AHEAD_STUDS=8.0
+local CATCH_AHEAD_MIN=0.00
+local CATCH_AHEAD_MAX=16.00
 ```
 
-- `WR_LEAD_DELAY` is extra receiver prediction time.
-- The intercept target starts from `receiverRoot.Position + wrVel * releaseOffset`.
-- The extra lead delay is applied inside the intercept equation as `wrVel * leadDelayForFlightTime(t)`.
-- `leadDelayForFlightTime(t)` currently returns full `WR_LEAD_DELAY`; the clean solver treats the slider as direct intentional ahead-time.
-- `0.38` is the current clean-math baseline.
+- Default C1/catch Y is `14.00`.
+- `Peak Height` persists through `state.qbAimPeakHeight`, clamped from `8.00` to `20.00`.
+- `Catch Ahead` is a spatial offset in studs along route direction.
+- Old `qbAimLeadDelay` state is a compatibility mirror, not current runtime math.
 
-## Axis-invariant predictor support
+## Receiver velocity estimation
 
 ```lua
-local ADAPTIVE_LEAD_ENABLED=true
-local PREDICTOR_HISTORY_MAX_AGE=0.30
+local CLEAN_MOVING_SPEED_MIN=5.0
+local STOP_SPEED_THRESHOLD=2.0
+local CUT_DOT_THRESHOLD=0.45
+local PREDICTOR_HISTORY_MAX_AGE=1.25
 local PREDICTOR_MIN_SAMPLES=3
-local PREDICTOR_LS_BLEND=0.00
-local PREDICTOR_VELOCITY_BLEND=1.00
+local PREDICTOR_LS_BLEND=0.45
+local PREDICTOR_VELOCITY_BLEND=0.42
 local PREDICTOR_ACCEL_BLEND=0.28
 local PREDICTOR_ACCEL_MAX=48
-local PREDICTOR_ACCEL_TIME_MAX=1.05
-local PREDICTOR_ACCEL_LEAD_SCALE=0.22
-local PREDICTOR_ACCEL_LEAD_MAX=9.5
-local PREDICTOR_CONFIDENCE_MIN=0.30
-local PREDICTOR_CONFIDENCE_MAX=1.00
-local PREDICTOR_STALE_AFTER=0.35
+local PREDICTOR_AVERAGE_SAMPLES=5
 ```
 
-- These still affect receiver velocity estimation and diagnostics.
-- They should not reintroduce route-bucket C1 validity rules.
+- `routeVelocity` uses flat measured/averaged receiver velocity.
+- Moving receivers are modeled at `MAX_RUN_SPEED` in their current route direction.
+- Strong direction cuts can snap route direction with `routeSource = "cut_snap"`.
 
-## Release and C2 preview
+## Release and C2
 
 ```lua
 local QB_RELEASE_DELAY=0.25
-local QB_XZ_RELEASE_FACTOR=0
 local QB_LAUNCH_Y_BIAS=0
+local QB_Y_RISE_FACTOR=0
+local QB_Y_FALL_FACTOR=0
+local QB_Y_MAX_CORRECTION=4.25
 local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
 local QB_RELEASE_EXTRAPOLATE_VERTICAL=false
-local C2_GROUND_FALLBACK_MARGIN=2.50
-local C2_MAX_ABOVE_BALL=8.00
 ```
 
-- Horizontal release extrapolation remains enabled.
-- Vertical release extrapolation is disabled so preview C2 follows the current ball/Center C2 reference instead of being pulled down by player gravity while jumping.
+- The solver uses the original game `Center.C2` world frame as release origin when available.
+- Horizontal release extrapolation moves the C2 origin by QB root X/Z velocity during release wait.
+- Vertical release extrapolation is disabled; current Y comes from original `Center.C2` plus zeroed QB jump correction.
+- The cloned preview `ClonedCenter.C2` is visual-only and must not drive math.
 
 ## Fixed-speed intercept solver
 
 ```lua
 local MIN_T,MAX_T,DT=0.35,6,0.01
+local INTERCEPT_SCAN_DT=0.025
 local QB_INHERITANCE=0
 local INTERCEPT_BISECTION_STEPS=12
-local SPEED_TOLERANCE=1.25
-local CATCH_TOLERANCE=2.0
+local INTERCEPT_MIN_SEARCH_STEPS=14
+local SPEED_ERROR_TOLERANCE=0.50
+local MISS_TOLERANCE=1.50
 local GLOBAL_MIN_ANGLE=-5
 local GLOBAL_MAX_ANGLE=55
 ```
 
-- The solver scans `MIN_T -> MAX_T`, refines sign-change roots with bisection, and accepts only tight near-root fallbacks.
-- `QB_INHERITANCE` remains `0`; QB movement shifts the release position but is not added to the football velocity.
+- The solver scans time, refines sign-change roots, and also refines local minima of speed error.
+- Candidate throws must satisfy speed, target miss, and Y miss tolerances.
+- `QB_INHERITANCE` remains `0`; QB movement shifts release position, not football velocity.
 
-## Preview
+## Preview and animation
 
 ```lua
 local ARC_PREVIEW_ENABLED=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
-local RECEIVER_TRACK_INTERVAL=0.05
+local ARC_PREVIEW_ROLL=math.rad(90)
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
 local PREVIEW_MISSING_BALL_GRACE=0.2
 local ARC_MAX_CURVE=400
-local PREVIEW_SMOOTH=0.28
+local PREVIEW_SMOOTH=1.00
 local C1_MARKER_ENABLED=true
 local C1_MARKER_SIZE=1.65
+local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
+local THROW_ANIMATION_SPEED=1.35
+local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 ```
 
-- `C2` is the start/release attachment.
-- `C1` and `C3` are both placed on the intercept catch point in the current preview path.
+- `THROW_ANIMATION_SPEED` and release wait match decompiled `MECH_ControlsQuarterback.FootballThrow`.
+- `ARC_PREVIEW_ROLL` corrects cloned beam attachment orientation.
 - The locked receiver is shown through a QB Aim-owned highlight, separate from ESP highlights.

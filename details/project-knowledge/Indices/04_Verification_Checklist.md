@@ -1,50 +1,59 @@
 # Verification checklist
 
-Use this when comparing the markdown map against actual in-game explorer output or decompiled modules.
+Use this when comparing project assumptions against live Explorer output or decompiled modules.
 
 ## Folders
 
-- Confirm whether current game uses `Workspace.Games` for gameplay.
+- Confirm whether current gameplay uses `Workspace.Games`.
 - Confirm whether squads uses exactly one child under `Workspace.MiniGames`.
 - Confirm whether Park creates more than one child under `Workspace.MiniGames`.
 - Confirm whether `Local.Center` exists under the chosen folder.
-- Confirm whether `Center` contains `C2`, `C3`, and a `Beam`.
+- Confirm whether `Center` contains original `C2`, `C3`, and a `Beam`.
 
 ## Remotes
 
 - Confirm exact `ReEvent` path in gameplay.
 - Confirm exact `ReEvent` path in squads.
-- Confirm whether `ReEvent:FireServer("Mechanics", "ThrowBall", payload)` is still the active contract.
-- Confirm whether `Power = 100` still maps to about `95` modeled studs/s.
-- Confirm whether squads still needs `AutoThrow = false`.
+- Confirm `ReEvent:FireServer("Mechanics", "ThrowBall", payload)` is still active.
+- Confirm whether gameplay accepts omitted `AutoThrow` or should always receive `AutoThrow=false`.
+- Confirm whether squads still needs `AutoThrow=false`.
+- Confirm whether custom power is active in the current mode.
+- Confirm display `Power = 100` still maps to modeled speed `95`.
 
 ## Mechanics
 
-- Confirm whether `Mechanics` is stored in `Variables.Mechanics`.
-- Confirm `PlayAnimation(animationName, speed)` signature.
-- Confirm `UnequipFootball()` still exists and when the game normally calls it.
+- Confirm `Mechanics` is reachable through `Variables.Mechanics` or the existing global fallbacks.
+- Confirm `PlayAnimation("UF_QuarterbackThrow", 1.35)` still succeeds.
+- Confirm the game still waits `0.26666666666666666` seconds before remote release.
+- Confirm `UnequipFootball()` still exists and is called immediately after `ThrowBall`.
 
 ## Football object
 
 - Confirm held football path in character.
 - Confirm whether `GAMEOBJECTS` is still used.
 - Confirm whether actual football part name is exactly `Football` or only contains `football` in ancestry.
+- Confirm visible ball position is not needed for release origin when original `Center.C2` exists.
 
-## Player replication
+## Arc and release
 
-- Confirm team path `Player.Replicated.TeamID`.
-- Confirm active team IDs: `HomeTeam`, `AwayTeam`.
-- Confirm whether spectators/park players have missing or invalid `TeamID`.
+- Confirm original `Center.C2.WorldCFrame` matches the actual release reference.
+- Confirm cloned `ClonedCenter.C2` is never used for math.
+- Confirm cloned arc plane matches the game arc after the 90 degree preview roll.
+- Confirm C2 follows the QB body while jumping and does not fall back to ground/ball Y.
+- Confirm hiding the arc makes the clone invisible without destroying the original `Center`.
 
 ## Football math
 
-- Confirm gravity used by actual ball is `28`.
-- Confirm model ball speed is `95` for display power `100`.
-- Confirm player jump peak is still about `13.85` studs, while default target C1 Y is intentionally `14.00`.
-- Confirm default C1 Y at `WR_MAX_Y = 14.00` is correct in current gameplay.
-- Confirm `Peak Height` changes C1/C3 target Y and persists through refresh/save.
-- Confirm `Lead Adjust = 0.38` is the current clean-math baseline.
-- Confirm `Lead Adjust = 0` produces pure catch-time intercept behavior.
-- Confirm larger lead adjust values advance C1 by receiver velocity before the intercept solve.
-- Confirm C2 follows ball/Center C2 while jumping and does not drop during preview.
-- Confirm locked QB Aim receiver is highlighted and the old status/target text rows are gone.
+- Confirm gravity is still `-28`.
+- Confirm `MaximumPowerCoefficient` is still `0.95`.
+- Confirm default C1/catch target Y at `WR_MAX_Y = 14.00` is correct in current gameplay.
+- Confirm `Peak Height` changes target Y and persists through refresh/save.
+- Confirm `Catch Ahead = 8` is the current baseline spatial offset.
+- Confirm `Catch Ahead = 0` produces pure catch-time intercept behavior.
+- Confirm larger catch-ahead values move C1 forward along route direction before the intercept solve.
+
+## UI feedback
+
+- Confirm locked QB Aim receiver is highlighted.
+- Confirm the old status/target text rows are gone.
+- Confirm `Show Arc` hides all cloned arc descendants but keeps math based on original `Center.C2`.

@@ -1,61 +1,32 @@
-# Receiver prediction state
+# Cut and deceleration state
 
-This page replaces the older cut-reactive notes. The current live script uses a smoother axis-invariant predictor state rather than the hard cut/deceleration constants from the experimental branch.
+The current live script keeps only a small cut/stop reaction layer. Older experimental branches tracked heavier deceleration and acceleration lead fields, but those are not primary runtime throw math now.
 
-## Main constants
-
-```lua
-PREDICTOR_HISTORY_MAX_AGE = 1.25
-PREDICTOR_MIN_SAMPLES = 3
-PREDICTOR_LS_BLEND = 0.45
-PREDICTOR_VELOCITY_BLEND = 0.42
-PREDICTOR_ACCEL_BLEND = 0.28
-PREDICTOR_ACCEL_MAX = 48
-PREDICTOR_ACCEL_TIME_MAX = 1.05
-PREDICTOR_ACCEL_LEAD_SCALE = 0.22
-PREDICTOR_ACCEL_LEAD_MAX = 9.5
-PREDICTOR_CONFIDENCE_MIN = 0.30
-PREDICTOR_CONFIDENCE_MAX = 1.00
-PREDICTOR_STALE_AFTER = 0.35
-```
-
-## Predictor state source
+## Current constants
 
 ```lua
-local function predictionState(data,receiverPosition,fallbackVelocity)
-	local now=os.clock()
-	local rawVelocity=clampMagnitude(flat((data and data.rawVel) or fallbackVelocity or Vector3.zero),MAX_RUN_SPEED)
-	local measuredVelocity=clampMagnitude(flat((data and data.vel) or rawVelocity or Vector3.zero),MAX_RUN_SPEED)
-	local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
-	local blendedVelocity=measuredVelocity
-
-	if lsVelocity and lsVelocity.Magnitude>=ROUTE_LOCK_MIN_SPEED then
-		blendedVelocity=safeVectorLerp(measuredVelocity,lsVelocity,PREDICTOR_LS_BLEND*lsQuality)
-	end
-
-	blendedVelocity=clampMagnitude(blendedVelocity,MAX_RUN_SPEED)
-	local acceleration=clampMagnitude(flat(data and data.accel or Vector3.zero),PREDICTOR_ACCEL_MAX)
-	local sampleAge=data and data.lastSeen and math.max(now-data.lastSeen,0) or PREDICTOR_STALE_AFTER
-	local ageConfidence=1-math.clamp(sampleAge/PREDICTOR_STALE_AFTER,0,1)
-	local speedConfidence=math.clamp(rawVelocity.Magnitude/NORMAL_ROUTE_MIN_SPEED,0,1)
-	local storedConfidence=math.clamp(data and data.confidence or PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
-	local confidence=math.clamp((0.35*storedConfidence+0.35*lsQuality+0.30*speedConfidence)*ageConfidence,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
-
-	return{
-		position=receiverPosition,
-		velocity=blendedVelocity,
-		rawVelocity=rawVelocity,
-		acceleration=acceleration,
-		confidence=confidence,
-		lsQuality=lsQuality,
-		sampleAge=sampleAge,
-		routeVelocity=blendedVelocity,
-	}
-end
+CLEAN_MOVING_SPEED_MIN = 5.0
+STOP_SPEED_THRESHOLD = 2.0
+CUT_DOT_THRESHOLD = 0.45
 ```
 
-## Current role
+## Current behavior
 
-- The predictor estimates receiver X/Z velocity and acceleration.
-- The fixed-speed intercept solver ignores receiver Y velocity because C1 Y is fixed at `WR_MAX_Y`.
-- Acceleration fields are retained for diagnostics and old metadata, but the current intercept root uses `wrVel`, `qbVel`, gravity, and speed `95`.
+- Receiver velocity is flattened to X/Z.
+- If current speed is below `STOP_SPEED_THRESHOLD`, the route can be treated as standing unless a previous direction is still usable.
+- If the current direction sharply disagrees with the previous good direction, `routeSource` becomes `"cut_snap"`.
+- Moving receivers use `currentDir * MAX_RUN_SPEED`.
+
+This keeps direction changes responsive without restoring the older route-bucket scorer.
+
+## Solver role
+
+Cut/deceleration state only affects `wrVel`, `routeDir`, and `moving`.
+
+The fixed-speed intercept still decides validity through projectile physics:
+
+```lua
+F(t) = |neededDisplacement|^2 - MODEL_BALL_SPEED^2 * t^2
+```
+
+Receiver Y velocity remains ignored because target Y is fixed to `WR_MAX_Y`.
