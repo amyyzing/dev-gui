@@ -19,16 +19,15 @@ local DEFAULT_WR_MAX_Y=14.00 -- clean default catch peak; original jump formula 
 local WR_MAX_Y=DEFAULT_WR_MAX_Y
 local C1_SOLVE_Y_BIAS=0.00
 local MAX_RUN_SPEED=21
-local NORMAL_ROUTE_MIN_SPEED=19
-local ROUTE_LOCK_MIN_SPEED=2.5
-local ROUTE_SPEED_PARTIAL_GAIN=1.08
 local CLEAN_MOVING_SPEED_MIN=5.0
-local CLEAN_CATCH_Y_TOLERANCE=0.35
-local CLEAN_TARGET_MISS_TOLERANCE=0.35
-local CLEAN_NEAR_TARGET_MISS_TOLERANCE=0.05
-local WR_LEAD_DELAY=0.38
-local LEAD_DELAY_ZERO_FLIGHT_TIME=0.70
-local LEAD_DELAY_FULL_FLIGHT_TIME=1.35
+local STOP_SPEED_THRESHOLD=2.0
+local CUT_DOT_THRESHOLD=0.45
+local CATCH_AHEAD_STUDS=8.0
+local CATCH_AHEAD_MIN=0.00
+local CATCH_AHEAD_MAX=16.00
+local SERVER_SYNC_DELAY=0.00
+local SPEED_ERROR_TOLERANCE=0.50
+local MISS_TOLERANCE=1.50
 local PREDICTOR_HISTORY_MAX_AGE=1.25
 local PREDICTOR_MIN_SAMPLES=3
 local PREDICTOR_LS_BLEND=0.45
@@ -54,6 +53,7 @@ local MIN_T,MAX_T,DT=0.35,6,0.01
 local INTERCEPT_SCAN_DT=0.025
 local QB_INHERITANCE=0
 local INTERCEPT_BISECTION_STEPS=12
+local INTERCEPT_MIN_SEARCH_STEPS=14
 local GLOBAL_MIN_ANGLE=-5
 local GLOBAL_MAX_ANGLE=55
 local AIM_SCALE=1000
@@ -110,36 +110,10 @@ local function clampMagnitude(v,maxMagnitude)
 	return v
 end
 
-local function smoothstep(edge0,edge1,value)
-	if edge1<=edge0 then
-		return value>=edge1 and 1 or 0
-	end
-
-	local alpha=math.clamp((value-edge0)/(edge1-edge0),0,1)
-	return alpha*alpha*(3-2*alpha)
-end
-
 local function safeVectorLerp(a,b,alpha)
 	if not a then return b or Vector3.zero end
 	if not b then return a or Vector3.zero end
 	return a:Lerp(b,math.clamp(alpha or 0,0,1))
-end
-
-local function leadDelayForFlightTime(time)
-	return math.max(WR_LEAD_DELAY,0)*smoothstep(LEAD_DELAY_ZERO_FLIGHT_TIME,LEAD_DELAY_FULL_FLIGHT_TIME,time or 0)
-end
-
-local function routeSpeed(speed)
-	local clamped=math.clamp(speed or 0,0,MAX_RUN_SPEED)
-	if clamped<ROUTE_LOCK_MIN_SPEED then
-		return 0
-	end
-
-	if clamped>=NORMAL_ROUTE_MIN_SPEED then
-		return MAX_RUN_SPEED
-	end
-
-	return math.clamp(clamped*ROUTE_SPEED_PARTIAL_GAIN,ROUTE_LOCK_MIN_SPEED,MAX_RUN_SPEED)
 end
 
 local function root(character)
@@ -581,8 +555,6 @@ function QBAim.new(ctx,parent)
 	local teamFilterToggle=nil
 	local arcToggle=nil
 	local settingSliders={}
-	local LEAD_DELAY_MIN=0.00
-	local LEAD_DELAY_MAX=1.50
 	local PEAK_HEIGHT_MIN=8.00
 	local PEAK_HEIGHT_MAX=20.00
 	local updateTargetHighlight=function() end
@@ -603,15 +575,18 @@ function QBAim.new(ctx,parent)
 		state.qbAimShowArc=true
 	end
 
-	if state.qbAimLeadDelay==nil then
-		state.qbAimLeadDelay=WR_LEAD_DELAY
+	if state.qbAimCatchAhead==nil then
+		local legacyLead=tonumber(state.qbAimLeadDelay)
+		state.qbAimCatchAhead=legacyLead and (legacyLead<=1.5 and legacyLead*MAX_RUN_SPEED or legacyLead) or CATCH_AHEAD_STUDS
 	end
 
 	if state.qbAimPeakHeight==nil then
 		state.qbAimPeakHeight=WR_MAX_Y
 	end
 
-	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
+	CATCH_AHEAD_STUDS=math.clamp(tonumber(state.qbAimCatchAhead) or CATCH_AHEAD_STUDS,CATCH_AHEAD_MIN,CATCH_AHEAD_MAX)
+	state.qbAimCatchAhead=CATCH_AHEAD_STUDS
+	state.qbAimLeadDelay=CATCH_AHEAD_STUDS
 	WR_MAX_Y=math.clamp(tonumber(state.qbAimPeakHeight) or WR_MAX_Y,PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX)
 	state.qbAimPeakHeight=WR_MAX_Y
 
@@ -675,9 +650,9 @@ function QBAim.new(ctx,parent)
 		updateTargetHighlight()
 	end
 
-	local function updateLeadDelayVisuals()
+	local function updateCatchAheadVisuals()
 		if settingSliders.leadDelay then
-			settingSliders.leadDelay.set(WR_LEAD_DELAY)
+			settingSliders.leadDelay.set(CATCH_AHEAD_STUDS)
 		end
 	end
 
@@ -687,16 +662,17 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
-	local function setLeadDelay(value,showStatus)
+	local function setCatchAhead(value,showStatus)
 		local numberValue=tonumber(value)
 		if not numberValue then
-			updateLeadDelayVisuals()
+			updateCatchAheadVisuals()
 			return false
 		end
 
-		WR_LEAD_DELAY=math.clamp(numberValue,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
-		state.qbAimLeadDelay=WR_LEAD_DELAY
-		updateLeadDelayVisuals()
+		CATCH_AHEAD_STUDS=math.clamp(numberValue,CATCH_AHEAD_MIN,CATCH_AHEAD_MAX)
+		state.qbAimCatchAhead=CATCH_AHEAD_STUDS
+		state.qbAimLeadDelay=CATCH_AHEAD_STUDS
+		updateCatchAheadVisuals()
 		if showStatus then
 			changed()
 		end
@@ -859,7 +835,7 @@ function QBAim.new(ctx,parent)
 			arcToggle.set(state.qbAimShowArc~=false)
 		end
 
-		updateLeadDelayVisuals()
+		updateCatchAheadVisuals()
 		updatePeakHeightVisuals()
 		setTargetText()
 	end
@@ -959,18 +935,18 @@ function QBAim.new(ctx,parent)
 	end
 
 	--[[
-		Clean math rebuild
+		Universal relative-intercept math
 
 		Core equation:
 			ball(t) = origin + throwVelocity*t + 0.5*G*t^2
-			target(t) = receiverPeakAtRelease + wrVelocity*(t + leadDelay)
+			target(t) = receiverPeakAtRelease + wrVelocity*t + routeDir*catchAheadStuds
 
 		Only three football constants matter in the math core:
 			1. ball speed
 			2. receiver route speed
 			3. receiver catch height
 
-		No slant/streak/radial/tangent dominance is used for targeting. Route labels below are diagnostics only.
+		Release/server timing moves both QB origin and WR start. Catch-ahead is a spatial offset, not extra time.
 	]]
 
 	local function leastSquaresVelocity(data,now)
@@ -1024,30 +1000,18 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function currentReceiverRawVelocity(data,receiverRoot,fallbackVelocity)
-		local now=os.clock()
 		local assembly=receiverRoot and receiverRoot.AssemblyLinearVelocity or nil
 		local assemblyXZ=assembly and flat(assembly) or Vector3.zero
 		local rawXZ=flat((data and data.rawVel) or fallbackVelocity or Vector3.zero)
-		local storedXZ=flat((data and data.vel) or Vector3.zero)
-		local lsVelocity,lsQuality=leastSquaresVelocity(data,now)
 
 		local velocity=Vector3.zero
 		local source="none"
-		if storedXZ.Magnitude>=ROUTE_LOCK_MIN_SPEED then
-			velocity=storedXZ
-			source="tracked"
-		elseif assemblyXZ.Magnitude>=ROUTE_LOCK_MIN_SPEED then
+		if assemblyXZ.Magnitude>=STOP_SPEED_THRESHOLD then
 			velocity=assemblyXZ
 			source="assembly"
-		elseif rawXZ.Magnitude>=ROUTE_LOCK_MIN_SPEED then
+		elseif rawXZ.Magnitude>=STOP_SPEED_THRESHOLD then
 			velocity=rawXZ
 			source="raw_delta"
-		end
-
-		if lsVelocity and lsVelocity.Magnitude>=ROUTE_LOCK_MIN_SPEED then
-			local alpha=PREDICTOR_LS_BLEND*lsQuality
-			velocity=velocity.Magnitude>0 and safeVectorLerp(velocity,lsVelocity,alpha) or lsVelocity
-			source=source=="none" and "least_squares" or source.."+ls"
 		end
 
 		if velocity.Magnitude<CLEAN_MOVING_SPEED_MIN then
@@ -1059,13 +1023,27 @@ function QBAim.new(ctx,parent)
 
 	local function routeVelocity(data,receiverRoot)
 		local velocity=currentReceiverRawVelocity(data,receiverRoot,data and data.rawVel or Vector3.zero)
+		local fallbackDir=(data and data.lastGoodDir) or Vector3.new(1,0,0)
 
 		if velocity.Magnitude<CLEAN_MOVING_SPEED_MIN then
-			return Vector3.zero
+			return Vector3.zero,fallbackDir,false,"stopped"
 		end
 
-		local speed=routeSpeed(velocity.Magnitude)
-		return speed>0 and velocity.Unit*speed or Vector3.zero
+		local currentDir=velocity.Unit
+		local source="moving"
+		if data and data.lastGoodDir then
+			local dot=math.clamp(data.lastGoodDir:Dot(currentDir),-1,1)
+			if dot<CUT_DOT_THRESHOLD then
+				source="cut_snap"
+				data.lastGoodDir=currentDir
+			else
+				data.lastGoodDir=currentDir
+			end
+		elseif data then
+			data.lastGoodDir=currentDir
+		end
+
+		return currentDir*MAX_RUN_SPEED,currentDir,true,source
 	end
 
 	local function receiverMaxAt(position)
@@ -1125,27 +1103,45 @@ function QBAim.new(ctx,parent)
 		return ballAt(originPosition,velocity,time),time
 	end
 
-	local function targetAtTime(receiverStart,wrVel,time,leadDelay)
-		local target=receiverStart+flat(wrVel)*(time+(leadDelay or 0))
+	local function catchOffset(routeDir,moving)
+		if not moving then
+			return Vector3.zero
+		end
+
+		local direction=unit(flat(routeDir or Vector3.zero),Vector3.new(1,0,0))
+		return direction*CATCH_AHEAD_STUDS
+	end
+
+	local function targetAtTime(receiverStart,wrVel,routeDir,moving,time)
+		local target=receiverStart+flat(wrVel)*time+catchOffset(routeDir,moving)
 		return Vector3.new(target.X,WR_MAX_Y+C1_SOLVE_Y_BIAS,target.Z)
 	end
 
-	local function interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
+	local function requiredVelocityAt(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,time)
 		local inheritedVelocity=flat(qbVel or Vector3.zero)*QB_INHERITANCE
-		local receiverLeadDelay=leadDelayForFlightTime(time)
-		local target=targetAtTime(receiverStart,wrVel,time,receiverLeadDelay)
+		local target=targetAtTime(receiverStart,wrVel,routeDir,moving,time)
 		local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
+		return neededDisplacement/time,target,inheritedVelocity,neededDisplacement
+	end
+
+	local function interceptValue(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,time)
+		if time<=0 then return math.huge end
+		local _,_,_,neededDisplacement=requiredVelocityAt(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,time)
 		return neededDisplacement:Dot(neededDisplacement)-ballSpeed*ballSpeed*time*time
 	end
 
-	local function interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
+	local function speedErrorValue(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,time)
+		if time<=0 then return math.huge end
+		local requiredVelocity=requiredVelocityAt(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,time)
+		local requiredSpeed=requiredVelocity.Magnitude
+		if requiredSpeed<=1e-6 then return math.huge end
+		return math.abs(requiredSpeed-ballSpeed)
+	end
+
+	local function interceptCandidate(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,time,releasePredict,routeSource)
 		if time<=0 then return nil end
 
-		local inheritedVelocity=flat(qbVel or Vector3.zero)*QB_INHERITANCE
-		local receiverLeadDelay=leadDelayForFlightTime(time)
-		local target=targetAtTime(receiverStart,wrVel,time,receiverLeadDelay)
-		local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
-		local requiredVelocity=neededDisplacement/time
+		local requiredVelocity,target,inheritedVelocity=requiredVelocityAt(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,time)
 		local requiredSpeed=requiredVelocity.Magnitude
 		if requiredSpeed<=1e-6 then return nil end
 
@@ -1159,18 +1155,25 @@ function QBAim.new(ctx,parent)
 		local targetMiss=(catchPosition-target).Magnitude
 		local yError=math.abs(catchPosition.Y-(WR_MAX_Y+C1_SOLVE_Y_BIAS))
 		local speedError=math.abs(requiredSpeed-ballSpeed)
-		local residual=math.abs(interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time))
+		local residual=math.abs(interceptValue(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,time))
 		local verticalVelocityAtCatch=worldVelocity.Y+G.Y*time
 		local landingPosition,landingTime=landing(originPosition,worldVelocity)
-		local leadDistance=flat(wrVel).Magnitude*receiverLeadDelay
+		local catchAhead=moving and CATCH_AHEAD_STUDS or 0
+		local highAnglePenalty=math.max(angle-35,0)*0.4
 
 		return{
-			score=targetMiss*1000+speedError*100+time*0.5+math.max(verticalVelocityAtCatch-10,0)*0.25,
+			score=targetMiss*100+speedError*25+math.abs(verticalVelocityAtCatch)*0.8+highAnglePenalty+time*0.15,
 			time=time,
-			totalLeadTime=time+receiverLeadDelay,
-			receiverPredictionDelay=receiverLeadDelay,
-			receiverPredictionDelayScale=WR_LEAD_DELAY>0 and receiverLeadDelay/WR_LEAD_DELAY or 0,
-			receiverLeadDistance=leadDistance,
+			totalLeadTime=time,
+			receiverPredictionDelay=0,
+			receiverPredictionDelayScale=0,
+			receiverLeadDistance=catchAhead,
+			catchAheadStuds=catchAhead,
+			serverSyncDelay=SERVER_SYNC_DELAY,
+			releasePredict=releasePredict or 0,
+			routeMoving=moving and true or false,
+			routeSource=routeSource,
+			routeDir=routeDir,
 			origin=originPosition,
 			target=target,
 			c1Point=target,
@@ -1208,14 +1211,14 @@ function QBAim.new(ctx,parent)
 		return candidate.time<current.time
 	end
 
-	local function refineInterceptTime(originPosition,receiverStart,wrVel,qbVel,ballSpeed,lo,hi,loValue)
+	local function refineInterceptTime(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,lo,hi,loValue)
 		local low=lo
 		local high=hi
-		local lowValue=loValue or interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,low)
+		local lowValue=loValue or interceptValue(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,low)
 
 		for _=1,INTERCEPT_BISECTION_STEPS do
 			local mid=(low+high)*0.5
-			local midValue=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,mid)
+			local midValue=interceptValue(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,mid)
 
 			if math.abs(midValue)<1e-5 then
 				return mid
@@ -1232,52 +1235,77 @@ function QBAim.new(ctx,parent)
 		return(low+high)*0.5
 	end
 
-	local function solve(qbRoot,ball,receiverRoot,targetVelocity,ballPower,releaseOffset)
+	local function refineMinimumTime(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,lo,hi)
+		local low=math.max(lo,MIN_T)
+		local high=math.min(hi,MAX_T)
+
+		for _=1,INTERCEPT_MIN_SEARCH_STEPS do
+			local span=(high-low)/3
+			local left=low+span
+			local right=high-span
+			local leftErr=speedErrorValue(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,left)
+			local rightErr=speedErrorValue(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,right)
+
+			if leftErr<rightErr then
+				high=right
+			else
+				low=left
+			end
+		end
+
+		return(low+high)*0.5
+	end
+
+	local function solve(qbRoot,ball,receiverRoot,targetVelocity,routeDir,moving,routeSource,ballPower,releaseOffset)
 		local ballSpeed=ballPower or GAMEPLAY_BALL_POWER
 		releaseOffset=releaseOffset or 0
+		local releasePredict=releaseOffset+SERVER_SYNC_DELAY
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
 		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
-		local originPosition=origin(qbRoot,ball,releaseOffset)
-		local receiverReleasePosition=receiverRoot.Position+wrVel*releaseOffset
+		local originPosition=origin(qbRoot,ball,releasePredict)
+		local receiverReleasePosition=receiverRoot.Position+wrVel*releasePredict
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
-		local bestRoot=nil
-		local bestNear=nil
+		local best=nil
 		local previousTime=MIN_T
-		local previousValue=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,previousTime)
+		local previousValue=interceptValue(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,previousTime)
+		local previousError=speedErrorValue(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,previousTime)
+		local olderTime=nil
+		local olderError=nil
 
-		local function considerNear(time)
-			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
-			if candidate and candidate.targetMiss<=CLEAN_NEAR_TARGET_MISS_TOLERANCE and candidate.yError<=CLEAN_CATCH_Y_TOLERANCE and betterIntercept(candidate,bestNear) then
-				bestNear=candidate
+		local function consider(time)
+			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,time,releasePredict,routeSource)
+			if candidate and candidate.speedError<=SPEED_ERROR_TOLERANCE and candidate.targetMiss<=MISS_TOLERANCE and candidate.yError<=MISS_TOLERANCE and betterIntercept(candidate,best) then
+				best=candidate
 			end
 		end
 
-		local function considerRoot(time)
-			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
-			if candidate and candidate.targetMiss<=CLEAN_TARGET_MISS_TOLERANCE and candidate.yError<=CLEAN_CATCH_Y_TOLERANCE and betterIntercept(candidate,bestRoot) then
-				bestRoot=candidate
-			end
-		end
-
-		considerNear(previousTime)
+		consider(previousTime)
 
 		for time=MIN_T+INTERCEPT_SCAN_DT,MAX_T,INTERCEPT_SCAN_DT do
-			local value=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
-			considerNear(time)
+			local value=interceptValue(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,time)
+			local errorValue=speedErrorValue(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,time)
+			consider(time)
 
 			if math.abs(value)<1e-8 then
-				considerRoot(time)
+				consider(time)
 			elseif math.abs(previousValue)<1e-8 then
-				considerRoot(previousTime)
+				consider(previousTime)
 			elseif (previousValue<0 and value>0) or (previousValue>0 and value<0) then
-				considerRoot(refineInterceptTime(originPosition,receiverStart,wrVel,qbVel,ballSpeed,previousTime,time,previousValue))
+				consider(refineInterceptTime(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,previousTime,time,previousValue))
 			end
 
+			if olderTime and previousError<=olderError and previousError<=errorValue then
+				consider(refineMinimumTime(originPosition,receiverStart,wrVel,routeDir,moving,qbVel,ballSpeed,olderTime,time))
+			end
+
+			olderTime=previousTime
+			olderError=previousError
 			previousTime=time
 			previousValue=value
+			previousError=errorValue
 		end
 
-		return bestRoot or bestNear
+		return best
 	end
 
 	local function ensureC1Marker()
@@ -1490,8 +1518,8 @@ function QBAim.new(ctx,parent)
 		end
 
 		releaseOffset=releaseOffset or 0
-		local targetVelocity=routeVelocity(data,receiverRoot)
-		return solve(qbRoot,ball,receiverRoot,targetVelocity,ballPower or currentBallPower(),releaseOffset),ball
+		local targetVelocity,routeDir,moving,routeSource=routeVelocity(data,receiverRoot)
+		return solve(qbRoot,ball,receiverRoot,targetVelocity,routeDir,moving,routeSource,ballPower or currentBallPower(),releaseOffset),ball
 	end
 
 	local function buildReleasePlan(receiver,ballPower,releaseBall,fallbackPlan)
@@ -1675,7 +1703,11 @@ function QBAim.new(ctx,parent)
 	end
 
 	function api.SetLeadDelay(value,fire)
-		setLeadDelay(value,fire~=false)
+		setCatchAhead(value,fire~=false)
+	end
+
+	function api.SetCatchAhead(value,fire)
+		setCatchAhead(value,fire~=false)
 	end
 
 	function api.SetPeakHeight(value,fire)
@@ -1742,7 +1774,7 @@ function QBAim.new(ctx,parent)
 	end)
 
 	if buildSlider then
-		settingSliders.leadDelay=buildSlider(sectionBody,"Lead Adjust",LEAD_DELAY_MIN,LEAD_DELAY_MAX,WR_LEAD_DELAY,2,function(value)
+		settingSliders.leadDelay=buildSlider(sectionBody,"Catch Ahead",CATCH_AHEAD_MIN,CATCH_AHEAD_MAX,CATCH_AHEAD_STUDS,2,function(value)
 			api.SetLeadDelay(value,true)
 		end)
 		settingSliders.peakHeight=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
@@ -1750,7 +1782,7 @@ function QBAim.new(ctx,parent)
 		end)
 	end
 
-	updateLeadDelayVisuals()
+	updateCatchAheadVisuals()
 	updatePeakHeightVisuals()
 
 	addConnection(RunService.Heartbeat:Connect(function(dt)
@@ -1825,7 +1857,7 @@ function QBAim.new(ctx,parent)
 						data.vel=clampMagnitude(data.vel,MAX_RUN_SPEED)
 						data.accel=safeVectorLerp(data.accel,rawAcceleration,PREDICTOR_ACCEL_BLEND)
 						data.accel=clampMagnitude(data.accel,PREDICTOR_ACCEL_MAX)
-						local speedConfidence=math.clamp(data.vel.Magnitude/NORMAL_ROUTE_MIN_SPEED,0,1)
+						local speedConfidence=math.clamp(data.vel.Magnitude/MAX_RUN_SPEED,0,1)
 						data.confidence=math.clamp(0.25+0.45*(lsQuality or 0)+0.30*speedConfidence,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
 					end
 				end

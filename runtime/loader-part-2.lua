@@ -308,7 +308,8 @@ PAGE1_DEFAULTS={
 	qbAimEnabled=false,
 	qbAimTeamFilter=true,
 	qbAimShowArc=true,
-	qbAimLeadDelay=0.38,
+	qbAimCatchAhead=8.0,
+	qbAimLeadDelay=8.0,
 	qbAimPeakHeight=14.00,
 	testingEnabled=false,
 }

@@ -1,6 +1,37 @@
 QB AIM MATH NOTES
 =================
 
+CURRENT IMPLEMENTATION ADDENDUM - 2026-06-10
+--------------------------------------------
+
+The active implementation has moved from the old WR-only time-lead model:
+
+    target(t) = receiverStart + wrVel * (t + leadDelay)
+
+to the universal relative-intercept model:
+
+    releasePredict = releaseOffset + SERVER_SYNC_DELAY
+
+    A = originNow predicted to releasePredict
+    B = receiver position predicted to releasePredict, with Y forced to WR_MAX_Y
+    C = routeDir * CATCH_AHEAD_STUDS
+
+    target(t) = B + wrVel * t + C
+    ball(t) = A + (throwVelocity + flat(qbVel) * QB_INHERITANCE) * t + 0.5 * G * t^2
+
+The key split is:
+
+    release/server timing moves both QB origin and WR start
+    catch-ahead is a spatial offset in studs
+    QB movement after release is represented only through QB_INHERITANCE
+    receiver movement during flight is represented by wrVel * t
+
+The current default catch-ahead is 8.0 studs. Old saved lead-delay values in seconds are migrated by:
+
+    catchAheadStuds = oldLeadDelaySeconds * 21
+
+The older sections below describe the previous model and are useful for comparison, but the active code no longer uses leadDelayForFlightTime() or target(t + leadDelay).
+
 File this describes:
 page-1/qb-aim/logic.lua
 
@@ -668,4 +699,3 @@ Then tune:
     QB_INHERITANCE
 
 against real observed throws.
-
