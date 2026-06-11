@@ -43,11 +43,12 @@ ReEvent:FireServer("Mechanics", "ThrowBall", {
 
 ## Release origin
 
-Source-backed implication from `FootballThrow` and the live arc rig:
+Source-backed implication from `FootballThrow`, incoming `UpdateFootball`, and the live arc rig:
 
 - The ball's visible part position is not the right source of truth for release math.
-- The release should be anchored to the game's original `Local.Center.C2` frame because that is the client arc/release reference.
-- The cloned `ClonedCenter.C2` should remain preview-only to avoid feedback loops.
+- The incoming `UpdateFootball.SpawnPos` value is the strongest available evidence for the true server/model release position.
+- The restored runtime uses original `Local.Center.C2` as a Y-height reference when it is near the ball, while X/Z come from the held ball/root path.
+- The cloned `ClonedCenter.C2` remains preview-only to avoid feedback loops.
 
 ## Current project choices
 
@@ -56,5 +57,5 @@ Source-backed implication from `FootballThrow` and the live arc rig:
 - Keep `THROW_ANIMATION_RELEASE_WAIT = 0.26666666666666666`.
 - Keep `THROW_ANIMATION_SPEED = 1.35`.
 - Keep projectile gravity magnitude `28`.
-- Treat `Catch Ahead` as a spatial receiver offset, not a time delay.
-- Use original `Center.C2` for release origin; do not fall back to ball Y except when C2 is unavailable.
+- Treat `Lead Adjust` as a restored time-based receiver prediction control.
+- Use captured `UpdateFootball.SpawnPos` to decide whether a future release-origin change should use full `Center.C2`, `Center.C3`, ball position, or another offset.

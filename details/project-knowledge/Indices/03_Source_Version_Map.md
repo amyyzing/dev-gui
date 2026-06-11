@@ -2,7 +2,7 @@
 
 | File | Bytes | SHA-256 prefix | Notes |
 |---|---:|---|---|
-| `page-1/qb-aim/logic.lua` | 55832 | `5b8e5f914771e532` | Current live repo source after Catch Ahead spatial offset, original C2 release origin, and 90 degree preview roll. |
+| `page-1/qb-aim/logic.lua` | 55200 | `1045e5311ed6cc8f` | Current live repo source restored to the pre-Catch-Ahead lead-delay solver. |
 | `FootballMath.md` | 12985 | `c7871b86b0349cc6` | Decompiled game-source markdown; confirms gravity, power coefficient, pass velocity, and beam math. |
 | `Mechanics.md` | 5293 | `e9a2b280f8db1ff5` | Decompiled game-source markdown; confirms mechanics state, ball power defaults, and module load shape. |
 | `MECH_ControlsQuarterback.md` | 25658 | `7e6568fec01422bd` | Decompiled game-source markdown; confirms FootballThrow animation wait and ThrowBall payload. |

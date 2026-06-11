@@ -19,6 +19,7 @@ Use this when comparing project assumptions against live Explorer output or deco
 - Confirm whether squads still needs `AutoThrow=false`.
 - Confirm whether custom power is active in the current mode.
 - Confirm display `Power = 100` still maps to modeled speed `95`.
+- Capture incoming `UpdateFootball` after local release and compare `SpawnPos` to C2/C3/ball/root.
 
 ## Mechanics
 
@@ -32,14 +33,13 @@ Use this when comparing project assumptions against live Explorer output or deco
 - Confirm held football path in character.
 - Confirm whether `GAMEOBJECTS` is still used.
 - Confirm whether actual football part name is exactly `Football` or only contains `football` in ancestry.
-- Confirm visible ball position is not needed for release origin when original `Center.C2` exists.
 
 ## Arc and release
 
-- Confirm original `Center.C2.WorldCFrame` matches the actual release reference.
+- Confirm original `Center.C2.WorldCFrame` is available while holding the ball.
 - Confirm cloned `ClonedCenter.C2` is never used for math.
-- Confirm cloned arc plane matches the game arc after the 90 degree preview roll.
-- Confirm C2 follows the QB body while jumping and does not fall back to ground/ball Y.
+- Confirm restored preview plane matches the game arc.
+- Confirm C2 Y follows the QB body while jumping and does not fall back to ground/ball Y.
 - Confirm hiding the arc makes the clone invisible without destroying the original `Center`.
 
 ## Football math
@@ -48,12 +48,12 @@ Use this when comparing project assumptions against live Explorer output or deco
 - Confirm `MaximumPowerCoefficient` is still `0.95`.
 - Confirm default C1/catch target Y at `WR_MAX_Y = 14.00` is correct in current gameplay.
 - Confirm `Peak Height` changes target Y and persists through refresh/save.
-- Confirm `Catch Ahead = 8` is the current baseline spatial offset.
-- Confirm `Catch Ahead = 0` produces pure catch-time intercept behavior.
-- Confirm larger catch-ahead values move C1 forward along route direction before the intercept solve.
+- Confirm `Lead Adjust = 0.38` is the restored baseline.
+- Confirm `Lead Adjust = 0` produces pure catch-time intercept behavior.
+- Confirm larger lead adjust values increase receiver prediction time.
 
 ## UI feedback
 
 - Confirm locked QB Aim receiver is highlighted.
 - Confirm the old status/target text rows are gone.
-- Confirm `Show Arc` hides all cloned arc descendants but keeps math based on original `Center.C2`.
+- Confirm `Show Arc` hides all cloned arc descendants.

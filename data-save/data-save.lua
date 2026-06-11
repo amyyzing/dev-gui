@@ -552,8 +552,7 @@ function DataSave.new(ctx)
 				enabled=getValue(ctx,"qbAimEnabled",false),
 				teamFilter=getValue(ctx,"qbAimTeamFilter",true),
 				showArc=getValue(ctx,"qbAimShowArc",true),
-				catchAhead=getValue(ctx,"qbAimCatchAhead",getValue(ctx,"qbAimLeadDelay",8.0)),
-				leadDelay=getValue(ctx,"qbAimCatchAhead",getValue(ctx,"qbAimLeadDelay",8.0)),
+				leadDelay=getValue(ctx,"qbAimLeadDelay",0.38),
 				peakHeight=getValue(ctx,"qbAimPeakHeight",14.00),
 			},
 
@@ -652,12 +651,7 @@ function DataSave.new(ctx)
 		applyBoolean(ctx,"setQBAimState","qbAimEnabled",qbAim.enabled)
 		applyBoolean(ctx,"setQBAimTeamFilter","qbAimTeamFilter",qbAim.teamFilter)
 		applyBoolean(ctx,"setQBAimShowArc","qbAimShowArc",qbAim.showArc)
-		local catchAhead=qbAim.catchAhead
-		if catchAhead==nil and qbAim.leadDelay~=nil then
-			local legacyLead=tonumber(qbAim.leadDelay)
-			catchAhead=legacyLead and (legacyLead<=1.5 and legacyLead*21 or legacyLead) or nil
-		end
-		applyClamped(ctx,"setQBAimCatchAhead","qbAimCatchAhead",catchAhead,0,16,8.0)
+		applyClamped(ctx,"setQBAimLeadDelay","qbAimLeadDelay",qbAim.leadDelay,0,1.5,0.38)
 		applyClamped(ctx,"setQBAimPeakHeight","qbAimPeakHeight",qbAim.peakHeight,8,20,14.00)
 
 		local testing=settings.testing or {}

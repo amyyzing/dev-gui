@@ -23,22 +23,23 @@ Throw key
 3. sends `ReEvent:FireServer("Mechanics", "ThrowBall", payload)`
 4. calls `UnequipFootball()`
 
-## Current solve model
+## Current restored solve model
 
-The current solver does not use route/distance angle buckets. It solves fixed-speed projectile interception:
+The restored solver solves a fixed-speed projectile intercept against a lead-delay target:
 
 ```lua
-target(t) = receiverStart + flat(wrVel) * t + catchOffset(routeDir, moving)
-neededDisplacement = target(t) - origin - inheritedVelocity * t - 0.5 * G * t * t
+leadDelay = leadDelayForFlightTime(t)
+target(t) = receiverStart + flat(wrVel) * (t + leadDelay)
+neededDisplacement = target(t) - origin - flat(qbVel) * QB_INHERITANCE * t - 0.5 * G * t * t
 F(t) = neededDisplacement:Dot(neededDisplacement) - MODEL_BALL_SPEED^2 * t^2
 ```
 
 Where:
 
-- `origin` comes from original `Center.C2`, moved by release-time horizontal QB motion.
+- `origin` starts from held ball/root position.
+- original `Center.C2.Y` can replace origin Y if it passes the fallback range.
 - `receiverStart` is receiver position moved by release-time receiver motion and forced to `WR_MAX_Y`.
-- `catchOffset` is `routeDir * CATCH_AHEAD_STUDS` only when receiver is moving.
-- `QB_INHERITANCE = 0`, so `inheritedVelocity` is currently zero.
+- `QB_INHERITANCE = 0`, so inherited velocity is currently zero.
 
 After a valid time is chosen:
 
@@ -49,13 +50,11 @@ worldVelocity = throwVelocity + flat(qbVel) * QB_INHERITANCE
 aimPoint = origin + requiredVelocity.Unit * AIM_SCALE
 ```
 
-Candidate acceptance requires tight speed and miss tolerances. Invalid throws return no plan instead of falling back to a route-bucket scorer.
+Candidate acceptance uses target miss and Y miss tolerances. Invalid throws return no plan instead of forcing a route-bucket fallback.
 
 ## Plan build path
 
 ```lua
-local targetVelocity, routeDir, moving, routeSource = routeVelocity(data, receiverRoot)
-return solve(qbRoot, ball, receiverRoot, targetVelocity, routeDir, moving, routeSource, ballPower, releaseOffset), ball
+local targetVelocity = routeVelocity(data, receiverRoot)
+return solve(qbRoot, ball, receiverRoot, targetVelocity, ballPower, releaseOffset), ball
 ```
-
-The route direction affects only receiver velocity and spatial catch-ahead. It should not reintroduce route-specific validity rules.

@@ -31,19 +31,20 @@ Preferred path uses the game's `Mechanics` object:
 mechanics:PlayAnimation("UF_QuarterbackThrow", 1.35)
 ```
 
-Local animation fallback is disabled by default. That is intentional because the game already has the correct animation loader and state.
+Local animation fallback is disabled by default.
 
 ## Release-time planning
 
-The script builds a preliminary release-offset plan, plays the throw animation, updates the plan during the release wait, then builds one final plan at release.
+The restored script builds a preliminary release-offset plan, plays the throw animation, updates the plan during the release wait, then builds one final plan at release.
 
-Important current behavior:
+Current behavior:
 
-- Release origin comes from the original game `Center.C2` frame when available.
-- Horizontal release extrapolation moves that C2 origin by QB root X/Z velocity during the animation wait.
+- Base origin comes from the held football when available, otherwise QB root.
+- Original `Center.C2.Y` can replace origin Y when it is near the ball.
+- Horizontal release extrapolation moves origin X/Z by QB root velocity during the animation wait.
 - Vertical release extrapolation is disabled.
 - Receiver release prediction moves receiver start by `wrVel * releaseOffset`.
-- `Catch Ahead` is a spatial offset in route direction, not extra flight time.
+- `Lead Adjust` is a max extra receiver prediction time, tapered by flight time.
 
 The release loop should remain aligned with the source wait:
 

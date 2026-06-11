@@ -15,26 +15,33 @@ originalCenter()
 
 ## Attachment roles
 
-| Attachment | Current role |
+| Attachment | Current restored role |
 |---|---|
-| `C2` | Original `Center.C2` is the release-origin frame used by math. Cloned `C2` is visual-only. |
+| `C2` | Original `Center.C2.Y` is used as release-height reference if near the ball. Cloned `C2` is visual-only. |
 | `C1` | Catch/intercept marker for preview. Created on the clone if missing. |
 | `C3` | Preview beam endpoint, currently placed at the same catch point as C1. |
 | `Beam` | Preview curve wired as cloned `C2 -> C3`. |
 
-## Release frame rule
+## Release-height rule
 
-Current code reads the original game C2 frame:
+Current restored code reads only original C2 Y:
 
 ```lua
-local function originalC2Frame()
+local function c2Y()
     local center = originalCenter()
     local c2 = center and center:FindFirstChild("C2", true)
-    return c2 and attachmentCFrame(c2)
+    local cf = c2 and attachmentCFrame(c2)
+    return cf and cf.Position.Y
 end
 ```
 
-`origin()` uses that original C2 position when available. It no longer uses ball position as the primary release source, because the game throw is anchored to the arc/release rig rather than the visible ball part.
+`origin()` starts from ball/root position and only replaces Y with `c2Y()` when it is near the ball:
+
+```lua
+if centerY and centerY >= baseY - C2_GROUND_FALLBACK_MARGIN and centerY <= baseY + C2_MAX_ABOVE_BALL then
+    y = centerY
+end
+```
 
 ## Preview clone rule
 
@@ -45,18 +52,12 @@ preview.center = original:Clone()
 preview.center.Name = "ClonedCenter"
 ```
 
-The cloned attachments are updated from the plan:
+The cloned attachments are updated from the plan with normal `xAxisCFrame`:
 
 ```lua
-setAttachmentCFrame(c2, previewArcCFrame(p2, plan.velocity))
-setAttachmentCFrame(c1, previewArcCFrame(p1, plan.velocity + G * plan.time))
-setAttachmentCFrame(c3, previewArcCFrame(p3, endVelocity))
-```
-
-`previewArcCFrame` applies a 90 degree roll to match the live arc plane:
-
-```lua
-xAxisCFrame(position, vector) * CFrame.Angles(math.rad(90), 0, 0)
+setAttachmentCFrame(c2, xAxisCFrame(p2, plan.velocity))
+setAttachmentCFrame(c1, xAxisCFrame(p1, plan.velocity + G * plan.time))
+setAttachmentCFrame(c3, xAxisCFrame(p3, endVelocity))
 ```
 
 Do not read from cloned C2 for math; it can be stale or self-referential.

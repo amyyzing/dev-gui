@@ -1,6 +1,6 @@
 # `FootballMath.lua` map
 
-The root-level `details/project-knowledge/FootballMath.md` file now contains decompiled source markdown for the game module. This file is kept as a compact map of the parts relevant to QBAim.
+The root-level `details/project-knowledge/FootballMath.md` file contains decompiled source markdown for the game module. This file is a compact map of the parts relevant to QBAim.
 
 ## Confirmed settings
 
@@ -50,5 +50,5 @@ display power 100 -> modeled velocity magnitude 95
 - Ball speed used by model: `95`
 - Ball gravity used by model: `28`
 - Receiver target peak Y: `14.00` by default, adjustable by the `Peak Height` slider
-- Receiver lead control: `Catch Ahead` in studs, not time delay
-- Release origin: original game `Center.C2` frame when available
+- Receiver lead control: `Lead Adjust` in seconds, tapered by flight time
+- Release origin: held ball/root XZ with original `Center.C2.Y` as height fallback

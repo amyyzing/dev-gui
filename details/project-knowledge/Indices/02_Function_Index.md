@@ -1,6 +1,6 @@
 # Function index
 
-Current live `page-1/qb-aim/logic.lua` function map.
+Current live `page-1/qb-aim/logic.lua` function map after restoring the pre-Catch-Ahead QB aim version.
 
 ## Shared helpers
 
@@ -8,7 +8,10 @@ Current live `page-1/qb-aim/logic.lua` function map.
 - `distXZ`
 - `unit`
 - `clampMagnitude`
+- `smoothstep`
 - `safeVectorLerp`
+- `leadDelayForFlightTime`
+- `routeSpeed`
 - `root`
 - `getModeKey`
 - `getHeldBall`
@@ -24,7 +27,6 @@ Current live `page-1/qb-aim/logic.lua` function map.
 - `attachmentCFrame`
 - `setAttachmentCFrame`
 - `xAxisCFrame`
-- `previewArcCFrame`
 - `prepPreviewObject`
 - `getFirstMiniGameFolder`
 - `getSquadsReEvent`
@@ -46,9 +48,9 @@ Current live `page-1/qb-aim/logic.lua` function map.
 - `currentModeKey`
 - `isAvailable`
 - `setTargetText`
-- `updateCatchAheadVisuals`
+- `updateLeadDelayVisuals`
 - `updatePeakHeightVisuals`
-- `setCatchAhead`
+- `setLeadDelay`
 - `setPeakHeight`
 - `canTargetReceiver`
 - `getQBAimHighlight`
@@ -62,7 +64,7 @@ Current live `page-1/qb-aim/logic.lua` function map.
 
 ## Arc and release reference
 
-- `originalC2Frame`
+- `c2Y`
 - `setPreviewCenterVisible`
 - `destroyPreviewCenter`
 - `bindArcRigParts`
@@ -85,15 +87,11 @@ Current live `page-1/qb-aim/logic.lua` function map.
 - `origin`
 - `ballAt`
 - `landing`
-- `catchOffset`
 - `targetAtTime`
-- `requiredVelocityAt`
 - `interceptValue`
-- `speedErrorValue`
 - `interceptCandidate`
 - `betterIntercept`
 - `refineInterceptTime`
-- `refineMinimumTime`
 - `solve`
 
 ## Throw flow
@@ -117,7 +115,6 @@ Current live `page-1/qb-aim/logic.lua` function map.
 - `api.SetTeamFilterState`
 - `api.SetShowArcState`
 - `api.SetLeadDelay`
-- `api.SetCatchAhead`
 - `api.SetPeakHeight`
 - `api.Refresh`
 - `api.Reset`
