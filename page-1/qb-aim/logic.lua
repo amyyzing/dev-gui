@@ -79,8 +79,9 @@ local C2_MAX_ABOVE_BALL=8.00
 local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
 local QB_RELEASE_EXTRAPOLATE_VERTICAL=false
 local MIN_T,MAX_T,DT=0.35,6,0.01
-local QB_INHERITANCE=1.00 -- moving-QB XZ inheritance compensation; set lower if server does not carry full QB velocity
+local QB_INHERITANCE=1.00 -- signed QB movement compensation along the release-origin -> C1 line
 local QB_INHERITANCE_MIN_SPEED=1.00
+local QB_INHERITANCE_SIDE_SCALE=0.00 -- keep 0 by default: do not shove the arc sideways from raw QB movement
 local INTERCEPT_BISECTION_STEPS=12
 local SPEED_TOLERANCE=1.25
 local CATCH_TOLERANCE=2.0
@@ -1362,13 +1363,27 @@ function QBAim.new(ctx,parent)
 		return Vector3.new(target.X,WR_MAX_Y+C1_SOLVE_Y_BIAS,target.Z)
 	end
 
-	local function qbInheritedVelocity(qbVel)
+	local function qbInheritedVelocity(qbVel,originPosition,targetPosition)
+		-- Moving-QB compensation must be aimed toward the actual C1/intercept point.
+		-- Raw QB velocity can push the arc sideways and overlead posts/slants.
+		-- We therefore project QB XZ velocity onto the release-origin -> C1 direction,
+		-- and only keep optional side carry if QB_INHERITANCE_SIDE_SCALE is raised above 0.
 		local velocity=clampMagnitude(flat(qbVel or Vector3.zero),MAX_RUN_SPEED)
 		if velocity.Magnitude<QB_INHERITANCE_MIN_SPEED then
 			return Vector3.zero
 		end
 
-		return velocity*QB_INHERITANCE
+		local toC1=flat((targetPosition or originPosition or Vector3.zero)-(originPosition or Vector3.zero))
+		if toC1.Magnitude<1e-6 then
+			return Vector3.zero
+		end
+
+		local c1Dir=toC1.Unit
+		local alongSpeed=velocity:Dot(c1Dir)
+		local along=c1Dir*alongSpeed
+		local side=velocity-along
+
+		return (along*QB_INHERITANCE)+(side*QB_INHERITANCE_SIDE_SCALE)
 	end
 
 	local function c1HeightFromMagnitudePotential(potential,speed)
@@ -1444,9 +1459,9 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
-		local inheritedVelocity=qbInheritedVelocity(qbVel)
 		local receiverLeadDelay=leadDelayForFlightTime(time)
 		local target=targetAtTime(receiverStart,wrVel,time,receiverLeadDelay)
+		local inheritedVelocity=qbInheritedVelocity(qbVel,originPosition,target)
 		local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
 		return neededDisplacement:Dot(neededDisplacement)-ballSpeed*ballSpeed*time*time
 	end
@@ -1523,9 +1538,9 @@ function QBAim.new(ctx,parent)
 	local function interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,includeLeadInfo)
 		if time<=0 then return nil end
 
-		local inheritedVelocity=qbInheritedVelocity(qbVel)
 		local receiverLeadDelay=leadDelayForFlightTime(time)
 		local target=targetAtTime(receiverStart,wrVel,time,receiverLeadDelay)
+		local inheritedVelocity=qbInheritedVelocity(qbVel,originPosition,target)
 		local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
 		local requiredVelocity=neededDisplacement/time
 		local requiredSpeed=requiredVelocity.Magnitude
