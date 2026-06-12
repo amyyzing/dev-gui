@@ -143,6 +143,9 @@ local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
 -- Solve at that release window instead of trusting the keybind-time plan.
 local THROW_REMOTE_LEAD_TIME=0.035
 local RELEASE_FRAME_PLAN_MAX_AGE=0.075
+local THROW_TARGET_LOCK_ON_INPUT=true
+local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
+local THROW_TARGET_LOCK_PREVIEW_LIVE=true
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local VALID_TEAM_IDS={
@@ -1963,43 +1966,34 @@ function QBAim.new(ctx,parent)
 		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,predictorState),ball
 	end
 
-	local function buildReleasePlan(receiver,ballPower,releaseBall)
-		-- Release-frame solver. The animation starts on keybind, but the target remote
-		-- matters shortly before the football leaves. Recompute during the animation,
-		-- then fire using only the small remaining release window.
+	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
+		-- Target-latch solver. Normal throws appear to lock the mouse target at
+		-- keypress/animation start, then send the remote near the release frame.
+		-- Therefore the throw target must be computed at input time using the
+		-- predicted release origin, then held until the remote is fired. Live plans
+		-- during the animation are preview-only and must not replace the locked target.
 		if THROW_ANIMATION_RELEASE_WAIT<=0 then
-			return buildPlan(receiver,ballPower,0,releaseBall)
+			return lockedPlan or buildPlan(receiver,ballPower,0,releaseBall)
 		end
 
 		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
 		local fireAt=endAt-math.clamp(THROW_REMOTE_LEAD_TIME,0,THROW_ANIMATION_RELEASE_WAIT)
-		local latestPlan=nil
-		local latestBall=nil
-		local latestAt=0
 
 		while os.clock()<fireAt do
-			local remaining=math.max(endAt-os.clock(),0)
-			local plan,ball=buildPlan(receiver,ballPower,remaining,releaseBall)
-			if plan then
-				latestPlan=plan
-				latestBall=ball
-				latestAt=os.clock()
-				previewPlan(plan)
+			if THROW_TARGET_LOCK_PREVIEW_LIVE then
+				local remaining=math.max(endAt-os.clock(),0)
+				local livePlan=buildPlan(receiver,ballPower,remaining,releaseBall)
+				if livePlan then
+					previewPlan(livePlan)
+				end
+			elseif lockedPlan then
+				previewPlan(lockedPlan)
 			end
+
 			RunService.Heartbeat:Wait()
 		end
 
-		local remaining=math.max(endAt-os.clock(),0)
-		local finalPlan,finalBall=buildPlan(receiver,ballPower,remaining,releaseBall)
-		if finalPlan then
-			return finalPlan,finalBall or latestBall or releaseBall
-		end
-
-		if latestPlan and os.clock()-latestAt<=RELEASE_FRAME_PLAN_MAX_AGE then
-			return latestPlan,latestBall or releaseBall
-		end
-
-		return nil,releaseBall
+		return lockedPlan,releaseBall
 	end
 
 	local function fireGameplayThrow(plan)
@@ -2060,18 +2054,23 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		-- Keybind-time plan is preview only. Do not throw with it. The game samples/sends
-		-- the real target shortly before release, so a stale keypress plan underleads slants.
-		local previewOnlyPlan=buildPlan(receiver,power,THROW_ANIMATION_RELEASE_WAIT,heldBall)
-		if previewOnlyPlan then
-			previewPlan(previewOnlyPlan)
+		-- Lock the target at keybind/animation start, but solve it from the predicted
+		-- release-frame origin. This mirrors the normal throw timeline: click/target
+		-- is latched first, remote appears near release, then the ball releases from
+		-- the moved QB position toward that latched target.
+		local lockedReleaseOffset=THROW_ANIMATION_RELEASE_WAIT+THROW_TARGET_LOCK_EXTRA_DELAY
+		local lockedPlan=buildPlan(receiver,power,lockedReleaseOffset,heldBall)
+		if not lockedPlan then
+			setStatus("No target-latch throw solution")
+			return
 		end
 
+		previewPlan(lockedPlan)
 		playThrowAnimation()
 
-		local plan=buildReleasePlan(receiver,power,heldBall)
+		local plan=buildReleasePlan(receiver,power,heldBall,lockedPlan)
 		if not plan then
-			setStatus("No release-frame throw solution")
+			setStatus("No target-latch throw solution")
 			return
 		end
 
