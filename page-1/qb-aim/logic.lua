@@ -139,13 +139,13 @@ local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
 local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
--- The game appears to send/sample the remote shortly before the ball actually leaves.
--- Solve at that release window instead of trusting the keybind-time plan.
+-- The game appears to latch the visible target/arc at click, then send the remote shortly before release.
+-- Solve from click origin, while predicting only the WR forward to the release frame.
 local THROW_REMOTE_LEAD_TIME=0.035
 local RELEASE_FRAME_PLAN_MAX_AGE=0.075
 local THROW_TARGET_LOCK_ON_INPUT=true
 local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
-local THROW_TARGET_LOCK_PREVIEW_LIVE=true
+local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze click-origin plan during animation; normal game preview appears to latch here
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local VALID_TEAM_IDS={
@@ -1614,13 +1614,17 @@ function QBAim.new(ctx,parent)
 		return(low+high)*0.5
 	end
 
-	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower,releaseOffset,predictorState)
+	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower,qbReleaseOffset,receiverReleaseOffset,predictorState)
 		local ballSpeed=ballPower or GAMEPLAY_BALL_POWER
-		releaseOffset=releaseOffset or 0
+		qbReleaseOffset=qbReleaseOffset or 0
+		receiverReleaseOffset=receiverReleaseOffset==nil and qbReleaseOffset or receiverReleaseOffset
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
 		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
-		local originPosition=origin(qbRoot,ball,releaseOffset)
-		local receiverReleasePosition=receiverRoot.Position+wrVel*releaseOffset
+		-- Split the two timelines. The game's throw target/ball origin appears to latch at
+		-- click/animation-start, while the WR keeps moving until ball release. Therefore
+		-- QB origin offset and WR release offset must not always be the same value.
+		local originPosition=origin(qbRoot,ball,qbReleaseOffset)
+		local receiverReleasePosition=receiverRoot.Position+wrVel*receiverReleaseOffset
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
 		local bestRoot=nil
 		local bestNear=nil
@@ -1662,6 +1666,11 @@ function QBAim.new(ctx,parent)
 		local best=bestRoot or bestNear
 		if best and not best.leadInfo then
 			best.leadInfo=interceptLeadInfo(originPosition,best.target,wrVel,best.time,predictorState)
+		end
+		if best then
+			best.qbReleaseOffset=qbReleaseOffset
+			best.receiverReleaseOffset=receiverReleaseOffset
+			best.clickOriginLatch=true
 		end
 
 		return best
@@ -1945,7 +1954,7 @@ function QBAim.new(ctx,parent)
 		previewFreezeStarted=os.clock()
 	end
 
-	local function buildPlan(receiver,ballPower,releaseOffset,releaseBall)
+	local function buildPlan(receiver,ballPower,releaseOffset,releaseBall,receiverReleaseOffset)
 		if not canTargetReceiver(receiver) then
 			return nil,nil
 		end
@@ -1961,17 +1970,17 @@ function QBAim.new(ctx,parent)
 		end
 
 		releaseOffset=releaseOffset or 0
+		receiverReleaseOffset=receiverReleaseOffset==nil and releaseOffset or receiverReleaseOffset
 		local originPosition=origin(qbRoot,ball,releaseOffset)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
-		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,predictorState),ball
+		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,receiverReleaseOffset,predictorState),ball
 	end
 
 	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
-		-- Target-latch solver. Normal throws appear to lock the mouse target at
-		-- keypress/animation start, then send the remote near the release frame.
-		-- Therefore the throw target must be computed at input time using the
-		-- predicted release origin, then held until the remote is fired. Live plans
-		-- during the animation are preview-only and must not replace the locked target.
+		-- Click-origin target-latch solver. Your normal throw evidence shows the
+		-- visible arc/target locks at click/animation-start, while the remote appears
+		-- shortly before release. So the final target must be held from click-time,
+		-- not recomputed from the moving QB at release.
 		if THROW_ANIMATION_RELEASE_WAIT<=0 then
 			return lockedPlan or buildPlan(receiver,ballPower,0,releaseBall)
 		end
@@ -1982,7 +1991,7 @@ function QBAim.new(ctx,parent)
 		while os.clock()<fireAt do
 			if THROW_TARGET_LOCK_PREVIEW_LIVE then
 				local remaining=math.max(endAt-os.clock(),0)
-				local livePlan=buildPlan(receiver,ballPower,remaining,releaseBall)
+				local livePlan=buildPlan(receiver,ballPower,0,releaseBall,remaining)
 				if livePlan then
 					previewPlan(livePlan)
 				end
@@ -2054,12 +2063,11 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		-- Lock the target at keybind/animation start, but solve it from the predicted
-		-- release-frame origin. This mirrors the normal throw timeline: click/target
-		-- is latched first, remote appears near release, then the ball releases from
-		-- the moved QB position toward that latched target.
-		local lockedReleaseOffset=THROW_ANIMATION_RELEASE_WAIT+THROW_TARGET_LOCK_EXTRA_DELAY
-		local lockedPlan=buildPlan(receiver,power,lockedReleaseOffset,heldBall)
+		-- Lock from the click/animation-start origin. The WR is still predicted to the
+		-- release frame, but the QB/ball origin is NOT extrapolated forward because
+		-- the game's own preview/target appears to latch from the click origin.
+		local lockedReceiverReleaseOffset=THROW_ANIMATION_RELEASE_WAIT+THROW_TARGET_LOCK_EXTRA_DELAY
+		local lockedPlan=buildPlan(receiver,power,0,heldBall,lockedReceiverReleaseOffset)
 		if not lockedPlan then
 			setStatus("No target-latch throw solution")
 			return
@@ -2344,7 +2352,7 @@ function QBAim.new(ctx,parent)
 		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
 		preview.last=now
 
-		local plan=buildPlan(trackedReceiver,nil,THROW_ANIMATION_RELEASE_WAIT)
+		local plan=buildPlan(trackedReceiver,nil,0,nil,THROW_ANIMATION_RELEASE_WAIT)
 		if plan then
 			previewPlan(plan)
 		end
