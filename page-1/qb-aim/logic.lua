@@ -1,8 +1,9 @@
 local QBAim={}
 
--- QBAim Total Power 100 Universal Intercept - anti-flicker preview/target build
+-- QBAim Total Power 100 Universal Intercept - release-delay fixed
 -- Rebuild focus: Power is always sent as 100; the solver treats 100 as total 3D launch speed.
 -- XZ ball speed is NOT constant: it is derived from the chosen launch angle as totalSpeed*cos(angle).
+-- Release delay is now modeled after the remote is sent, so slants/crossers are not under-led.
 -- No slant/streak damping; receiver speed is modeled as 0 or 21 and direction is reactive.
 
 local Players=game:GetService("Players")
@@ -34,7 +35,7 @@ local MAX_RUN_SPEED=21
 local NORMAL_ROUTE_MIN_SPEED=19
 local ROUTE_LOCK_MIN_SPEED=2.5
 local ROUTE_LOCK_MAX_AGE=1.5
-local SERVER_SYNC_DELAY=0.00 -- moves BOTH QB origin and WR start before release; do not use WR-only time lead
+local SERVER_SYNC_DELAY=0.26666666666666666 -- remote-to-ball-release delay; moves BOTH QB origin and WR start before release, fixing under-lead on slants/crossers
 local CLEAN_MOVING_SPEED_MIN=5.00
 local CLEAN_STOP_SPEED=2.25
 local CLEAN_CUT_DOT_RESET=0.45
@@ -1890,6 +1891,9 @@ function QBAim.new(ctx,parent)
 		releaseOffset=releaseOffset or 0
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
 		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
+		-- releaseOffset is the local animation wait remaining before FireServer.
+		-- SERVER_SYNC_DELAY is the delay from FireServer to the actual ball spawn/release.
+		-- Both delays must move the QB origin and receiver start; otherwise slants/crossers under-lead by about WR_SPEED*delay.
 		local releasePredict=math.max(releaseOffset+SERVER_SYNC_DELAY,0)
 		local originPosition=origin(qbRoot,ball,releasePredict)
 		local receiverReleasePosition=receiverRoot.Position+wrVel*releasePredict
@@ -2310,7 +2314,11 @@ function QBAim.new(ctx,parent)
 		end
 
 		local finalPlan,finalBall=buildPlan(receiver,ballPower,0,releaseBall)
-		return finalPlan or latestPlan or fallbackPlan,finalBall or latestBall or releaseBall
+
+		-- Do not fall back to the keybind-time plan. That stale plan is exactly what causes
+		-- slants/crossers to throw at where the WR was predicted when the key was pressed.
+		-- If the release-time solve fails, use the latest heartbeat plan from this release window only.
+		return finalPlan or latestPlan,finalBall or latestBall or releaseBall
 	end
 
 	local function fireGameplayThrow(plan)
@@ -2396,7 +2404,7 @@ function QBAim.new(ctx,parent)
 
 		if ok then
 			freezePreviewAtCurrentPlan(plan)
-			setStatus(currentModeText().." release-time throw sent")
+			setStatus(currentModeText().." delay-corrected throw sent")
 		else
 			setStatus(err or "Throw failed")
 		end
