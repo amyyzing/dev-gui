@@ -86,16 +86,6 @@ local CATCH_TOLERANCE=2.0
 local GLOBAL_MIN_ANGLE=-5
 local GLOBAL_MAX_ANGLE=55
 local AIM_SCALE=1000
-
--- Arc A/B release-copy model.
--- Arc A is solved from the extrapolated QB release point to C1.
--- Arc B is the same launch direction copied back to the QB's current point.
--- This is for games/remotes that lock the throw direction before the visual football actually leaves the QB.
-local ARC_AB_COPY_ENABLED=true
-local ARC_AB_FIRE_ON_INPUT=true -- send the pre-release copied arc immediately after starting the throw animation
-local ARC_AB_PREVIEW_COPIED_ARC=true -- preview the copied arc from current QB position; C1 marker still shows true C1
-local ARC_AB_MIN_RELEASE_OFFSET=0.015
-
 local ARC_PREVIEW_ENABLED=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
 local RECEIVER_TRACK_INTERVAL=0.05
@@ -149,6 +139,10 @@ local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
 local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
+-- The game appears to send/sample the remote shortly before the ball actually leaves.
+-- Solve at that release window instead of trusting the keybind-time plan.
+local THROW_REMOTE_LEAD_TIME=0.035
+local RELEASE_FRAME_PLAN_MAX_AGE=0.075
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local VALID_TEAM_IDS={
@@ -1520,7 +1514,7 @@ function QBAim.new(ctx,parent)
 		}
 	end
 
-	local function interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,includeLeadInfo,aimOriginPosition)
+	local function interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,includeLeadInfo)
 		if time<=0 then return nil end
 
 		local inheritedVelocity=flat(qbVel or Vector3.zero)*QB_INHERITANCE
@@ -1545,12 +1539,6 @@ function QBAim.new(ctx,parent)
 		local verticalVelocityAtCatch=worldVelocity.Y+G.Y*time
 		local landingPosition,landingTime=landing(originPosition,worldVelocity)
 		local leadDistance=flat(wrVel).Magnitude*receiverLeadDelay
-		local aimOrigin=aimOriginPosition or originPosition
-		local arcCopyOffset=originPosition-aimOrigin
-		local copiedTarget=target-arcCopyOffset
-		local copiedCatchPosition=catchPosition-arcCopyOffset
-		local copiedLandingPosition=landingPosition and (landingPosition-arcCopyOffset) or nil
-		local copiedAimPoint=aimOrigin+direction*AIM_SCALE
 
 		return{
 			score=targetMiss*1000+speedError*100+time*0.5+math.max(verticalVelocityAtCatch-10,0)*0.25,
@@ -1559,13 +1547,8 @@ function QBAim.new(ctx,parent)
 			receiverPredictionDelay=receiverLeadDelay,
 			receiverPredictionDelayScale=WR_LEAD_DELAY>0 and receiverLeadDelay/WR_LEAD_DELAY or 0,
 			receiverLeadDistance=leadDistance,
-			origin=aimOrigin,
-			arcAOrigin=originPosition,
-			arcBOrigin=aimOrigin,
-			arcCopyOffset=arcCopyOffset,
-			target=(ARC_AB_PREVIEW_COPIED_ARC and copiedTarget) or target,
-			previewTarget=copiedTarget,
-			trueC1Point=target,
+			origin=originPosition,
+			target=target,
 			c1Point=target,
 			requiredVelocity=requiredVelocity,
 			requiredSpeed=requiredSpeed,
@@ -1574,7 +1557,7 @@ function QBAim.new(ctx,parent)
 			worldVelocity=worldVelocity,
 			velocity=worldVelocity,
 			speed=ballSpeed,
-			aimPoint=copiedAimPoint,
+			aimPoint=originPosition+direction*AIM_SCALE,
 			angleDeg=angle,
 			preferredAngle=angle,
 			minDesiredAngle=GLOBAL_MIN_ANGLE,
@@ -1586,12 +1569,8 @@ function QBAim.new(ctx,parent)
 			verticalVelocityAtCatch=verticalVelocityAtCatch,
 			interceptResidual=residual,
 			missEstimate=targetMiss,
-			ballAtCatch=(ARC_AB_PREVIEW_COPIED_ARC and copiedCatchPosition) or catchPosition,
-			arcABallAtCatch=catchPosition,
-			arcBBallAtCatch=copiedCatchPosition,
-			landing=(ARC_AB_PREVIEW_COPIED_ARC and copiedLandingPosition) or landingPosition,
-			arcALanding=landingPosition,
-			arcBLanding=copiedLandingPosition,
+			ballAtCatch=catchPosition,
+			landing=landingPosition,
 			landingTime=landingTime,
 			flatDistNow=distXZ(originPosition,receiverStart),
 			movementShape=shape,
@@ -1637,19 +1616,8 @@ function QBAim.new(ctx,parent)
 		releaseOffset=releaseOffset or 0
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
 		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
-
-		-- Arc A/B model:
-		--   Arc A solve origin = where the QB/ball should be at release.
-		--   Arc B aim origin   = where the QB/ball is now.
-		-- The solved direction from Arc A is copied onto Arc B, so if QB motion stays constant,
-		-- the ball visually moves into Arc A by the time it leaves the hand.
-		local aimOriginPosition=origin(qbRoot,ball,0)
-		local solveReleaseOffset=(ARC_AB_COPY_ENABLED and releaseOffset>=ARC_AB_MIN_RELEASE_OFFSET) and releaseOffset or releaseOffset
-		local originPosition=origin(qbRoot,ball,solveReleaseOffset)
-		if not ARC_AB_COPY_ENABLED or releaseOffset<ARC_AB_MIN_RELEASE_OFFSET then
-			aimOriginPosition=originPosition
-		end
-		local receiverReleasePosition=receiverRoot.Position+wrVel*solveReleaseOffset
+		local originPosition=origin(qbRoot,ball,releaseOffset)
+		local receiverReleasePosition=receiverRoot.Position+wrVel*releaseOffset
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
 		local bestRoot=nil
 		local bestNear=nil
@@ -1657,14 +1625,14 @@ function QBAim.new(ctx,parent)
 		local previousValue=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,previousTime)
 
 		local function considerNear(time)
-			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,false,aimOriginPosition)
+			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,false)
 			if candidate and candidate.targetMiss<=CLEAN_NEAR_TARGET_MISS_TOLERANCE and candidate.yError<=CLEAN_CATCH_Y_TOLERANCE and betterIntercept(candidate,bestNear) then
 				bestNear=candidate
 			end
 		end
 
 		local function considerRoot(time)
-			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,false,aimOriginPosition)
+			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,false)
 			if candidate and candidate.targetMiss<=CLEAN_TARGET_MISS_TOLERANCE and candidate.yError<=CLEAN_CATCH_Y_TOLERANCE and betterIntercept(candidate,bestRoot) then
 				bestRoot=candidate
 			end
@@ -1690,14 +1658,7 @@ function QBAim.new(ctx,parent)
 
 		local best=bestRoot or bestNear
 		if best and not best.leadInfo then
-			best.leadInfo=interceptLeadInfo(originPosition,best.trueC1Point or best.c1Point or best.target,wrVel,best.time,predictorState)
-		end
-		if best then
-			best.arcABCopyEnabled=ARC_AB_COPY_ENABLED
-			best.arcABFireOnInput=ARC_AB_FIRE_ON_INPUT
-			best.solveReleaseOffset=solveReleaseOffset
-			best.aimReleaseOffset=0
-			best.previewCopiedArc=ARC_AB_PREVIEW_COPIED_ARC
+			best.leadInfo=interceptLeadInfo(originPosition,best.target,wrVel,best.time,predictorState)
 		end
 
 		return best
@@ -1922,8 +1883,7 @@ function QBAim.new(ctx,parent)
 		if not(c2 and c1 and c3 and beam) then return end
 
 		local startPoint=plan.origin
-		local endPoint=plan.previewTarget or plan.target or plan.c1Point
-		local trueC1Point=plan.trueC1Point or plan.c1Point or endPoint
+		local endPoint=plan.target or plan.c1Point
 		local previewTime=plan.time
 		if not(startPoint and endPoint and previewTime) then return end
 
@@ -1948,7 +1908,7 @@ function QBAim.new(ctx,parent)
 		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity))
 		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*plan.time))
 		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity))
-		updateC1AndC3Info(plan,trueC1Point or p1,p3)
+		updateC1AndC3Info(plan,p1,p3)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
 		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
@@ -2003,26 +1963,43 @@ function QBAim.new(ctx,parent)
 		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,predictorState),ball
 	end
 
-	local function buildReleasePlan(receiver,ballPower,releaseBall,fallbackPlan)
+	local function buildReleasePlan(receiver,ballPower,releaseBall)
+		-- Release-frame solver. The animation starts on keybind, but the target remote
+		-- matters shortly before the football leaves. Recompute during the animation,
+		-- then fire using only the small remaining release window.
 		if THROW_ANIMATION_RELEASE_WAIT<=0 then
 			return buildPlan(receiver,ballPower,0,releaseBall)
 		end
 
 		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
+		local fireAt=endAt-math.clamp(THROW_REMOTE_LEAD_TIME,0,THROW_ANIMATION_RELEASE_WAIT)
 		local latestPlan=nil
 		local latestBall=nil
+		local latestAt=0
 
-		while os.clock()<endAt do
+		while os.clock()<fireAt do
 			local remaining=math.max(endAt-os.clock(),0)
-			latestPlan,latestBall=buildPlan(receiver,ballPower,remaining,releaseBall)
-			if latestPlan then
-				previewPlan(latestPlan)
+			local plan,ball=buildPlan(receiver,ballPower,remaining,releaseBall)
+			if plan then
+				latestPlan=plan
+				latestBall=ball
+				latestAt=os.clock()
+				previewPlan(plan)
 			end
 			RunService.Heartbeat:Wait()
 		end
 
-		local finalPlan,finalBall=buildPlan(receiver,ballPower,0,releaseBall)
-		return finalPlan or latestPlan,finalBall or latestBall or releaseBall
+		local remaining=math.max(endAt-os.clock(),0)
+		local finalPlan,finalBall=buildPlan(receiver,ballPower,remaining,releaseBall)
+		if finalPlan then
+			return finalPlan,finalBall or latestBall or releaseBall
+		end
+
+		if latestPlan and os.clock()-latestAt<=RELEASE_FRAME_PLAN_MAX_AGE then
+			return latestPlan,latestBall or releaseBall
+		end
+
+		return nil,releaseBall
 	end
 
 	local function fireGameplayThrow(plan)
@@ -2083,25 +2060,18 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		local preAnimationPlan=buildPlan(receiver,power,THROW_ANIMATION_RELEASE_WAIT,heldBall)
-		if not preAnimationPlan then
-			setStatus("No release-time throw solution")
-			return
+		-- Keybind-time plan is preview only. Do not throw with it. The game samples/sends
+		-- the real target shortly before release, so a stale keypress plan underleads slants.
+		local previewOnlyPlan=buildPlan(receiver,power,THROW_ANIMATION_RELEASE_WAIT,heldBall)
+		if previewOnlyPlan then
+			previewPlan(previewOnlyPlan)
 		end
 
 		playThrowAnimation()
 
-		local plan=nil
-		if ARC_AB_COPY_ENABLED and ARC_AB_FIRE_ON_INPUT then
-			-- Use the Arc A/B copied plan computed at keypress. The server/game release delay
-			-- should move the QB from Arc B toward Arc A before the football actually leaves.
-			plan=preAnimationPlan
-			previewPlan(plan)
-		else
-			plan=buildReleasePlan(receiver,power,heldBall,preAnimationPlan)
-		end
+		local plan=buildReleasePlan(receiver,power,heldBall)
 		if not plan then
-			setStatus("No release-time throw solution")
+			setStatus("No release-frame throw solution")
 			return
 		end
 
