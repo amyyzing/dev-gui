@@ -374,6 +374,9 @@ function rebuildDataSaveFromModule(loadRemoteData)
 end
 
 rebuildDataSaveFromModule(true)
+if buildAllRuntimePages then
+	pcall(buildAllRuntimePages)
+end
 
 if AnnouncementModule and AnnouncementModule.new then
 	local ok,result=pcall(function()

@@ -347,8 +347,8 @@ function refreshRuntimePageControls(name,forceTheme)
 			pcall(refreshActionStatus)
 		end
 	elseif name=="maps" then
-		if refreshSettingsPage then
-			pcall(refreshSettingsPage)
+		if refreshRuntimeAPIs and MAP_API_NAMES then
+			pcall(refreshRuntimeAPIs,MAP_API_NAMES)
 		end
 	elseif name=="customize" then
 		if StrokeColourAPI and StrokeColourAPI.Refresh then

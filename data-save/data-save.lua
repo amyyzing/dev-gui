@@ -583,7 +583,7 @@ function DataSave.new(ctx)
 			uiStyle=collectUIStylePayload(uiStyle,defaultUIStyle),
 
 			workspace={
-				smoothPlastic=worldSettings.SmoothPlastic and true or false,
+				smoothPlastic=false,
 			},
 
 			window={
@@ -750,9 +750,8 @@ function DataSave.new(ctx)
 			ctx.UI_STYLE.CornerRadius=0
 		end
 
-		local workspaceSettings=settings.workspace or {}
-		if workspaceSettings.smoothPlastic~=nil and ctx.WORLD_SETTINGS then
-			ctx.WORLD_SETTINGS.SmoothPlastic=workspaceSettings.smoothPlastic and true or false
+		if ctx.WORLD_SETTINGS then
+			ctx.WORLD_SETTINGS.SmoothPlastic=false
 		end
 
 		local window=settings.window or {}

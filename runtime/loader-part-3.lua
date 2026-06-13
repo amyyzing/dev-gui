@@ -181,6 +181,31 @@ function ensureWorldSettings()
 	end
 end
 
+function resetMapRuntimeState()
+	if destroyRuntimeAPIs and MAP_API_NAMES then
+		pcall(destroyRuntimeAPIs,MAP_API_NAMES)
+	end
+
+	ensureWorldSettings()
+
+	if WORLD_SETTINGS.Conn then
+		safeDisconnect(WORLD_SETTINGS.Conn)
+		WORLD_SETTINGS.Conn=nil
+	end
+
+	for part,material in pairs(WORLD_SETTINGS.OriginalMaterials or {}) do
+		if part and part.Parent and part:IsA("BasePart") then
+			pcall(function()
+				part.Material=material
+			end)
+		end
+	end
+
+	WORLD_SETTINGS.SmoothPlastic=false
+	WORLD_SETTINGS.OriginalMaterials=setmetatable({}, {__mode="k"})
+	potatoMode=false
+end
+
 function makeMapCtx(name)
 	local ctx={
 		New=New,
@@ -230,15 +255,25 @@ function buildMapPage()
 end
 
 rebuildMapFromModules=function()
+	resetMapRuntimeState()
+
 	if getActivePageName and getActivePageName()=="maps" then
 		LAZY_PAGE_BUILT.maps=false
 		ensureRuntimePageBuilt("maps")
 		return
 	end
 
-	destroyRuntimeAPIs(MAP_API_NAMES)
 	clearMapPage()
 	LAZY_PAGE_BUILT.maps=false
 end
 
 LAZY_PAGE_BUILDERS.maps=buildMapPage
+
+PRELOAD_RUNTIME_PAGE_NAMES={"maps","customize","page2","settings"}
+function buildAllRuntimePages()
+	for _,pageName in ipairs(PRELOAD_RUNTIME_PAGE_NAMES) do
+		if ensureRuntimePageBuilt then
+			pcall(ensureRuntimePageBuilt,pageName)
+		end
+	end
+end
