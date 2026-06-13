@@ -14,6 +14,9 @@ local DEFAULT_SELECTED_PAGE="speed"
 local DIAL_W=96
 local DIAL_H=96
 local DIAL_SIDE_GAP=14
+local DIAL_INNER_RADIUS=0.23
+local DIAL_OUTER_RADIUS=0.49
+local DIAL_GAP_DEG=8
 local PARAMS_PAGE_H=112
 local PAGE_TWEEN=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 local PAINT_TWEEN=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
@@ -34,6 +37,11 @@ local PARAM_STATE_PAGE={
 
 local PAGE_ORDER={"speed","gravity","stamina"}
 local PAGE_INDEX={speed=1,gravity=2,stamina=3}
+local DIAL_SECTORS={
+	{key="gravity",start=30,finish=150},
+	{key="speed",start=150,finish=270},
+	{key="stamina",start=270,finish=390},
+}
 local PAGE_ENABLED_KEY={
 	speed="speedParamsEnabled",
 	gravity="gravityJumpParamsEnabled",
@@ -98,6 +106,22 @@ end
 
 local function themeColor(theme,key,fallback)
 	return (theme and theme[key]) or fallback
+end
+
+local function brightenColor(color,amount)
+	amount=math.clamp(tonumber(amount) or 0,0,1)
+	return color:Lerp(Color3.new(1,1,1),amount)
+end
+
+local function inAngleRange(angle,startAngle,finishAngle)
+	local start=startAngle+DIAL_GAP_DEG
+	local finish=finishAngle-DIAL_GAP_DEG
+
+	if finish>360 then
+		return angle>=start or angle<=(finish-360)
+	end
+
+	return angle>=start and angle<=finish
 end
 
 local function decodeHex(hex)
@@ -165,9 +189,9 @@ function GameParams.new(ctx,parent)
 	local pageClip=nil
 	local pageFrames={}
 	local dialImages={}
-	local dialButtons={}
 	local fallbackSlices={}
 	local currentPage=nil
+	local hoverPage=nil
 	local pageTweens={}
 	local section=nil
 	local sectionControls=nil
@@ -729,14 +753,26 @@ function GameParams.new(ctx,parent)
 	paintDial=function(animate)
 		local selected=normalizePageKey(state.paramsSelectedPage)
 		local active=accentColor()
+		local glow=brightenColor(active,0.24)
+		local hoverGlow=brightenColor(active,0.38)
 		local muted=mutedColor()
 
 		for _,pageKey in ipairs(PAGE_ORDER) do
 			local enabled=isPageEnabled(pageKey)
 			local isSelected=pageKey==selected
-			local targetColor=enabled and active or muted
-			local targetTransparency=isSelected and (enabled and 0.02 or 0.18) or (enabled and 0.48 or 0.68)
-			local textTarget=(enabled or isSelected) and textColor() or muted
+			local isHover=pageKey==hoverPage
+			local targetColor=muted
+			local targetTransparency=isSelected and 0.18 or 0.68
+
+			if enabled then
+				targetColor=isHover and hoverGlow or glow
+				targetTransparency=isSelected and 0.02 or (isHover and 0.12 or 0.30)
+			elseif isSelected then
+				targetColor=active
+				targetTransparency=isHover and 0.08 or 0.18
+			elseif isHover then
+				targetTransparency=0.56
+			end
 
 			if dialImages[pageKey] then
 				if animate then
@@ -754,10 +790,6 @@ function GameParams.new(ctx,parent)
 					fallbackSlices[pageKey].BackgroundColor3=targetColor
 					fallbackSlices[pageKey].BackgroundTransparency=targetTransparency
 				end
-			end
-
-			if dialButtons[pageKey] then
-				dialButtons[pageKey].TextColor3=textTarget
 			end
 		end
 	end
@@ -833,6 +865,52 @@ function GameParams.new(ctx,parent)
 		},dialWrap)
 
 		local assets=getDialSliceAssets()
+		local function pageAtPosition(position)
+			local absolutePosition=canvas.AbsolutePosition
+			local absoluteSize=canvas.AbsoluteSize
+			local x=(position.X or 0)-absolutePosition.X
+			local y=(position.Y or 0)-absolutePosition.Y
+			local size=math.min(absoluteSize.X,absoluteSize.Y)
+
+			if size<=0 then
+				return nil
+			end
+
+			local dx=x-absoluteSize.X*0.5
+			local dy=y-absoluteSize.Y*0.5
+			local radius=math.sqrt(dx*dx+dy*dy)
+			local inner=size*DIAL_INNER_RADIUS
+			local outer=size*DIAL_OUTER_RADIUS
+
+			if radius<inner or radius>outer then
+				return nil
+			end
+
+			local angle=math.deg(math.atan(-dy,dx))
+			if angle<0 then
+				angle+=360
+			end
+
+			for _,sector in ipairs(DIAL_SECTORS) do
+				if inAngleRange(angle,sector.start,sector.finish) then
+					return sector.key
+				end
+			end
+
+			return nil
+		end
+
+		local function setHoverPage(pageKey)
+			pageKey=pageKey and normalizePageKey(pageKey) or nil
+			if hoverPage==pageKey then
+				return
+			end
+
+			hoverPage=pageKey
+			if paintDial then
+				paintDial(true)
+			end
+		end
 
 		for _,pageKey in ipairs(PAGE_ORDER) do
 			local sliceData=DIAL_SLICE_DATA[pageKey]
@@ -867,26 +945,37 @@ function GameParams.new(ctx,parent)
 			end
 		end
 
-		for _,pageKey in ipairs(PAGE_ORDER) do
-			local index=PAGE_INDEX[pageKey]
-			local button=New("TextButton",{
-				Position=UDim2.new((index-1)/3,0,0,0),
-				Size=UDim2.new(1/3,0,1,0),
-				BackgroundTransparency=1,
-				BorderSizePixel=0,
-				Text="",
-				Font=Enum.Font.GothamBold,
-				TextSize=11,
-				TextColor3=textColor(),
-				AutoButtonColor=false,
-				Selectable=true,
-				ZIndex=9,
-			},canvas)
-			dialButtons[pageKey]=button
-			button.Activated:Connect(function()
+		local hitLayer=New("TextButton",{
+			Position=UDim2.fromScale(0,0),
+			Size=UDim2.fromScale(1,1),
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			Text="",
+			AutoButtonColor=false,
+			Selectable=false,
+			ZIndex=10,
+		},canvas)
+
+		hitLayer.InputBegan:Connect(function(input)
+			if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then
+				return
+			end
+
+			local pageKey=pageAtPosition(input.Position)
+			if pageKey then
 				api.ActivateParamsPage(pageKey,true)
-			end)
-		end
+			end
+		end)
+
+		hitLayer.InputChanged:Connect(function(input)
+			if input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch then
+				setHoverPage(pageAtPosition(input.Position))
+			end
+		end)
+
+		hitLayer.MouseLeave:Connect(function()
+			setHoverPage(nil)
+		end)
 	end
 
 	local function createPageEditor(parentFrame)
