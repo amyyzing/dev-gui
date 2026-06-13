@@ -38,9 +38,9 @@ local PARAM_STATE_PAGE={
 local PAGE_ORDER={"speed","gravity","stamina"}
 local PAGE_INDEX={speed=1,gravity=2,stamina=3}
 local DIAL_SECTORS={
-	{key="gravity",start=30,finish=150},
-	{key="speed",start=150,finish=270},
-	{key="stamina",start=270,finish=390},
+	{key="gravity",start=45,finish=135},
+	{key="speed",start=135,finish=270},
+	{key="stamina",start=270,finish=405},
 }
 local PAGE_ENABLED_KEY={
 	speed="speedParamsEnabled",
@@ -111,6 +111,22 @@ end
 local function brightenColor(color,amount)
 	amount=math.clamp(tonumber(amount) or 0,0,1)
 	return color:Lerp(Color3.new(1,1,1),amount)
+end
+
+local function atan2(y,x)
+	if x>0 then
+		return math.atan(y/x)
+	elseif x<0 and y>=0 then
+		return math.atan(y/x)+math.pi
+	elseif x<0 then
+		return math.atan(y/x)-math.pi
+	elseif y>0 then
+		return math.pi*0.5
+	elseif y<0 then
+		return -math.pi*0.5
+	end
+
+	return 0
 end
 
 local function inAngleRange(angle,startAngle,finishAngle)
@@ -886,7 +902,7 @@ function GameParams.new(ctx,parent)
 				return nil
 			end
 
-			local angle=math.deg(math.atan(-dy,dx))
+			local angle=math.deg(atan2(-dy,dx))
 			if angle<0 then
 				angle+=360
 			end
