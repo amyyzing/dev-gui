@@ -77,7 +77,7 @@ local QB_Y_MAX_CORRECTION=4.25
 local C2_GROUND_FALLBACK_MARGIN=2.50
 local C2_MAX_ABOVE_BALL=8.00
 local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
-local QB_RELEASE_EXTRAPOLATE_VERTICAL=false
+local QB_RELEASE_EXTRAPOLATE_VERTICAL=true
 local MIN_T,MAX_T,DT=0.35,6,0.01
 local QB_INHERITANCE=0
 local INTERCEPT_BISECTION_STEPS=12
@@ -149,12 +149,15 @@ local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animatio
 local THROW_TARGET_FIRE_IMMEDIATELY=false
 -- Separate timing terms. Do not use the full animation delay to move C2/origin.
 -- Logs showed the real ball SpawnPos only drifts a small amount from the click-time held ball.
-local QB_RELEASE_ORIGIN_DRIFT_TIME=0.00
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0.04
+local QB_RELEASE_VERTICAL_DRIFT_TIME=0.13
+local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
 --   1. Keypress computes one locked plan.
---   2. C2/QB origin drifts only QB_RELEASE_ORIGIN_DRIFT_TIME.
---   3. WR is predicted through the full animation release window.
+--   2. C2/QB XZ origin drifts only QB_RELEASE_ORIGIN_DRIFT_TIME.
+--   3. C2/QB Y origin uses QB_RELEASE_VERTICAL_DRIFT_TIME so jumping throws can be timed separately.
+--   4. WR is predicted through the full animation release window.
 --   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
@@ -698,12 +701,17 @@ function QBAim.new(ctx,parent)
 	local qbDriftFrame=nil
 	local qbDriftBox=nil
 	local qbDriftSliderControl=nil
+	local qbYDriftFrame=nil
+	local qbYDriftBox=nil
+	local qbYDriftSliderControl=nil
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
 	local PEAK_HEIGHT_MIN=8.00
 	local PEAK_HEIGHT_MAX=20.00
 	local QB_DRIFT_MIN=0.00
 	local QB_DRIFT_MAX=0.25
+	local QB_Y_DRIFT_MIN=0.00
+	local QB_Y_DRIFT_MAX=0.35
 	local updateTargetHighlight=function() end
 
 	if state.qbAimTeamFilter==nil then
@@ -726,11 +734,17 @@ function QBAim.new(ctx,parent)
 		state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
 	end
 
+	if state.qbAimQBYDrift==nil then
+		state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
+	end
+
 	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
 	WR_MAX_Y=math.clamp(tonumber(state.qbAimPeakHeight) or WR_MAX_Y,PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX)
 	QB_RELEASE_ORIGIN_DRIFT_TIME=math.clamp(tonumber(state.qbAimQBDrift) or QB_RELEASE_ORIGIN_DRIFT_TIME,QB_DRIFT_MIN,QB_DRIFT_MAX)
+	QB_RELEASE_VERTICAL_DRIFT_TIME=math.clamp(tonumber(state.qbAimQBYDrift) or QB_RELEASE_VERTICAL_DRIFT_TIME,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
 	state.qbAimPeakHeight=WR_MAX_Y
 	state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
+	state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
 	C1_Y_MIN=WR_MAX_Y
 	C1_Y_MAX=WR_MAX_Y
 	C1_Y_FIXED=WR_MAX_Y
@@ -826,6 +840,16 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
+	local function updateQBYDriftVisuals()
+		if qbYDriftSliderControl then
+			qbYDriftSliderControl.set(QB_RELEASE_VERTICAL_DRIFT_TIME)
+		end
+
+		if qbYDriftBox then
+			qbYDriftBox.Text=string.format("%.2f",QB_RELEASE_VERTICAL_DRIFT_TIME)
+		end
+	end
+
 	local function setLeadDelay(value,showStatus)
 		local numberValue=tonumber(value)
 		if not numberValue then
@@ -853,6 +877,22 @@ function QBAim.new(ctx,parent)
 		QB_RELEASE_ORIGIN_DRIFT_TIME=math.clamp(numberValue,QB_DRIFT_MIN,QB_DRIFT_MAX)
 		state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
 		updateQBDriftVisuals()
+		if showStatus then
+			changed()
+		end
+		return true
+	end
+
+	local function setQBYDrift(value,showStatus)
+		local numberValue=tonumber(value)
+		if not numberValue then
+			updateQBYDriftVisuals()
+			return false
+		end
+
+		QB_RELEASE_VERTICAL_DRIFT_TIME=math.clamp(numberValue,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
+		state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
+		updateQBYDriftVisuals()
 		if showStatus then
 			changed()
 		end
@@ -1040,6 +1080,8 @@ function QBAim.new(ctx,parent)
 
 		updateLeadDelayVisuals()
 		updatePeakHeightVisuals()
+		updateQBDriftVisuals()
+		updateQBYDriftVisuals()
 		setTargetText()
 
 		if not isAvailable() then
@@ -1364,8 +1406,24 @@ function QBAim.new(ctx,parent)
 		return math.clamp(raw,0,QB_Y_MAX_CORRECTION)
 	end
 
-	local function origin(qbRoot,ball,releaseOffset)
-		releaseOffset=releaseOffset or 0
+	local function releaseVerticalVelocity(qbRoot,ball)
+		local rootVelocity=qbRoot and qbRoot.AssemblyLinearVelocity or Vector3.zero
+		local ballVelocity=ball and ball.AssemblyLinearVelocity or Vector3.zero
+
+		if math.abs(ballVelocity.Y)>=QB_AIRBORNE_VY_EPSILON then
+			return ballVelocity.Y,"ball"
+		end
+
+		return rootVelocity.Y,"root"
+	end
+
+	local function origin(qbRoot,ball,xzReleaseOffset,yReleaseOffset)
+		xzReleaseOffset=xzReleaseOffset or 0
+		yReleaseOffset=yReleaseOffset
+		if yReleaseOffset==nil then
+			yReleaseOffset=QB_RELEASE_VERTICAL_DRIFT_TIME or 0
+		end
+
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
 		local basePosition=ball and ball.Position or qbRoot.Position
 
@@ -1377,15 +1435,17 @@ function QBAim.new(ctx,parent)
 		end
 
 		local dx,dz=0,0
-		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and releaseOffset>0 then
-			dx=rootVelocity.X*releaseOffset
-			dz=rootVelocity.Z*releaseOffset
+		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and xzReleaseOffset>0 then
+			dx=rootVelocity.X*xzReleaseOffset
+			dz=rootVelocity.Z*xzReleaseOffset
 		end
 
-		if QB_RELEASE_EXTRAPOLATE_VERTICAL and releaseOffset>0 then
-			local airborne=math.abs(rootVelocity.Y)>=QB_AIRBORNE_VY_EPSILON or qbRoot.Position.Y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON
+		if QB_RELEASE_EXTRAPOLATE_VERTICAL and yReleaseOffset>0 then
+			local verticalVelocity=releaseVerticalVelocity(qbRoot,ball)
+			local airborne=math.abs(verticalVelocity)>=QB_AIRBORNE_VY_EPSILON or qbRoot.Position.Y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON
 			if airborne then
-				y=y+rootVelocity.Y*releaseOffset-0.5*PLAYER_G*releaseOffset*releaseOffset
+				local yOffset=verticalVelocity*yReleaseOffset-0.5*PLAYER_G*yReleaseOffset*yReleaseOffset
+				y=y+math.clamp(yOffset,-QB_RELEASE_VERTICAL_DRIFT_MAX,QB_RELEASE_VERTICAL_DRIFT_MAX)
 			end
 		end
 
@@ -1672,7 +1732,7 @@ function QBAim.new(ctx,parent)
 		-- Predict the actual server SpawnPos/release origin forward by qbReleaseOffset,
 		-- predict the receiver by receiverReleaseOffset, and build the outgoing Target
 		-- ray from that future release point.
-		local originPosition=origin(qbRoot,ball,qbReleaseOffset)
+		local originPosition=origin(qbRoot,ball,qbReleaseOffset,QB_RELEASE_VERTICAL_DRIFT_TIME)
 		local receiverReleasePosition=receiverRoot.Position+wrVel*receiverReleaseOffset
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
 		local bestRoot=nil
@@ -1718,6 +1778,7 @@ function QBAim.new(ctx,parent)
 		end
 		if best then
 			best.qbReleaseOffset=qbReleaseOffset
+			best.qbVerticalReleaseOffset=QB_RELEASE_VERTICAL_DRIFT_TIME
 			best.receiverReleaseOffset=receiverReleaseOffset
 			best.futureReleaseOriginLatch=(qbReleaseOffset or 0)>0
 			best.remoteFireDelayed=not THROW_TARGET_FIRE_IMMEDIATELY
@@ -2256,9 +2317,14 @@ function QBAim.new(ctx,parent)
 		setQBDrift(value,fire~=false)
 	end
 
+	function api.SetQBYDrift(value,fire)
+		setQBYDrift(value,fire~=false)
+	end
+
 	function api.Refresh()
 		syncControls()
 		updateQBDriftVisuals()
+		updateQBYDriftVisuals()
 	end
 
 	function api.Reset()
@@ -2315,8 +2381,11 @@ function QBAim.new(ctx,parent)
 		peakHeightSliderControl=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
 			api.SetPeakHeight(value,true)
 		end)
-		qbDriftSliderControl=buildSlider(sectionBody,"QB Drift",QB_DRIFT_MIN,QB_DRIFT_MAX,QB_RELEASE_ORIGIN_DRIFT_TIME,2,function(value)
+		qbDriftSliderControl=buildSlider(sectionBody,"QB XZ Drift",QB_DRIFT_MIN,QB_DRIFT_MAX,QB_RELEASE_ORIGIN_DRIFT_TIME,2,function(value)
 			api.SetQBDrift(value,true)
+		end)
+		qbYDriftSliderControl=buildSlider(sectionBody,"QB Y Drift",QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX,QB_RELEASE_VERTICAL_DRIFT_TIME,2,function(value)
+			api.SetQBYDrift(value,true)
 		end)
 	else
 		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
@@ -2341,6 +2410,8 @@ function QBAim.new(ctx,parent)
 
 	updateLeadDelayVisuals()
 	updatePeakHeightVisuals()
+	updateQBDriftVisuals()
+	updateQBYDriftVisuals()
 	updateQBDriftVisuals()
 
 	addConnection(RunService.Heartbeat:Connect(function(dt)
