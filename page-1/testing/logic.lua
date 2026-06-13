@@ -386,8 +386,6 @@ function Testing.new(ctx,parent)
 		end)
 	end
 
-	statusLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,28),Text="",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.MUTED,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,ZIndex=6},section)
-
 	local ancestryConn=section.AncestryChanged:Connect(function()
 		if not section.Parent then
 			api.Destroy()

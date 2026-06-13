@@ -637,7 +637,7 @@ function GuiLogic.new(ctx)
 		local function tweenTitle()
 			titleButton.TextTransparency=0.18
 			TweenService:Create(titleButton,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
-			TweenService:Create(sec,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundColor3=collapsed and THEME.PANEL or themeColor("SECTION",THEME.CARD)}):Play()
+			TweenService:Create(sec,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundColor3=themeColor("SECTION",THEME.CARD)}):Play()
 		end
 
 		local function cancelBodyTween()
