@@ -352,10 +352,6 @@ local MainFrameModule=moduleAt("gui/mainframe")
 
 local Page1HitboxLogicModule=moduleAt("page-1/hitbox/logic")
 local Page1HitboxModule=moduleAt("page-1/hitbox/gui")
-local Page1GravityLogicModule=moduleAt("page-1/gravity/logic")
-local Page1GravityModule=moduleAt("page-1/gravity/gui")
-local Page1SpeedLogicModule=moduleAt("page-1/speed/logic")
-local Page1SpeedModule=moduleAt("page-1/speed/gui")
 local Page1GameParamsLogicModule=moduleAt("page-1/game-params/logic")
 local Page1GameParamsModule=moduleAt("page-1/game-params/gui")
 local Page1BoostLogicModule=moduleAt("page-1/boost/logic")
@@ -458,8 +454,6 @@ local function makePage1Ctx()
 		safeDisconnect=safeDisconnect,
 		inputToBinding=inputToBinding,
 		Page1HitboxLogicModule=Page1HitboxLogicModule,
-		Page1GravityLogicModule=Page1GravityLogicModule,
-		Page1SpeedLogicModule=Page1SpeedLogicModule,
 		Page1GameParamsLogicModule=Page1GameParamsLogicModule,
 		Page1BoostLogicModule=Page1BoostLogicModule,
 		Page1ESPLogicModule=Page1ESPLogicModule,
@@ -529,9 +523,7 @@ local function mount(name,module,parent,order,title)
 end
 
 mount("Hitbox",Page1HitboxModule,mainFrame.leftCol,1,"Hitbox")
-mount("Gravity",Page1GravityModule,mainFrame.leftCol,2,"Gravity")
-mount("Speed",Page1SpeedModule,mainFrame.leftCol,3,"Speed")
-mount("GameParams",Page1GameParamsModule,mainFrame.leftCol,4,"Game Params")
+mount("GameParams",Page1GameParamsModule,mainFrame.leftCol,2,"Game Params")
 mount("Boost",Page1BoostModule,mainFrame.rightCol,2,"Boost")
 mount("ESP",Page1ESPModule,mainFrame.rightCol,3,"ESP")
 mount("QBAim",Page1QBAimModule,mainFrame.rightCol,4,"QB Aim")

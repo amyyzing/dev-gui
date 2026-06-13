@@ -30,9 +30,7 @@ Description.Categories={
 	Sections={
 		Main={
 			["Hitbox"]={Title="HITBOX",Description="Tackle Hitbox"},
-			["Gravity"]={Title="GRAVITY",Description="Player Gravity"},
-			["Speed"]={Title="SPEED",Description="Forced Speed"},
-			["Game Params"]={Title="PARAMS",Description="Stamina, jump, and dive tuning"},
+			["Game Params"]={Title="PARAMS",Description="Gravity, speed, stamina, jump, and dive tuning"},
 			["Boost"]={Title="AUTO BOOST",Description="Boost force, chance, and radius"},
 			["ESP"]={Title="ESP",Description="Player highlights and possession filters"},
 			["QB Aim"]={Title="QB AIM",Description="Receiver lock, arc preview, and throw timing"},

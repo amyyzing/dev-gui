@@ -388,8 +388,6 @@ function makePage1Ctx()
 		safeDisconnect=safeDisconnect,
 		inputToBinding=inputToBinding,
 		Page1HitboxLogicModule=Page1HitboxLogicModule,
-		Page1GravityLogicModule=Page1GravityLogicModule,
-		Page1SpeedLogicModule=Page1SpeedLogicModule,
 		Page1GameParamsLogicModule=Page1GameParamsLogicModule,
 		Page1BoostLogicModule=Page1BoostLogicModule,
 		Page1ESPLogicModule=Page1ESPLogicModule,
@@ -448,9 +446,7 @@ end
 
 PAGE1_MODULE_SPECS={
 	{api="Hitbox",name="Page1Hitbox",column="left",order=1,title="Hitbox"},
-	{api="Gravity",name="Page1Gravity",column="left",order=2,title="Gravity"},
-	{api="Speed",name="Page1Speed",column="left",order=3,title="Speed"},
-	{api="GameParams",name="Page1GameParams",column="left",order=4,title="Game Params"},
+	{api="GameParams",name="Page1GameParams",column="left",order=2,title="Game Params"},
 	{api="Boost",name="Page1Boost",column="right",order=2,title="Boost"},
 	{api="ESP",name="Page1ESP",column="right",order=3,title="ESP"},
 	{api="QBAim",name="Page1QBAim",column="right",order=4,title="QB Aim"},

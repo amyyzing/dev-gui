@@ -1,6 +1,14 @@
 local GameParams={}
 
+local Players=game:GetService("Players")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
+local UIS=game:GetService("UserInputService")
+local RunService=game:GetService("RunService")
+
+local me=Players.LocalPlayer
+local DEFAULT_GRAVITY=196.2
+local DEFAULT_SPEED=18
+local SPEED_FORCE_INTERVAL=0.05
 
 local PARAMS={
 	JumpPower="jumpPowerValue",
@@ -23,24 +31,46 @@ local function destroyControl(control)
 	end
 end
 
+local function getMyHumanoid()
+	local character=workspace:FindFirstChild(me.Name) or me.Character
+
+	if character then
+		return character:FindFirstChildOfClass("Humanoid")
+	end
+
+	return nil
+end
+
+local function clampSpeed(value)
+	return math.clamp(tonumber(value) or DEFAULT_SPEED,0,100)
+end
+
 function GameParams.new(ctx,parent)
 	local safeDisconnect=ctx.safeDisconnect
+	local inputToBinding=ctx.inputToBinding
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
 	local buildToggleRow=ctx.buildToggleRow
 	local state=ctx.State
 	local api={}
 	local toggle=nil
+	local gravitySlider=nil
+	local speedSlider=nil
 	local staminaRegenSlider=nil
 	local staminaDepleteSlider=nil
 	local jumpSlider=nil
 	local diveSlider=nil
 	local section=nil
 	local sectionControls=nil
+	local speedConn=nil
+	local speedElapsed=0
+	local inputConn=nil
+	local destroyConn=nil
 	local rootConns={}
 	local folderConns=setmetatable({}, {__mode="k"})
 	local valueConns=setmetatable({}, {__mode="k"})
 	local applying=false
+	local destroyed=false
 
 	local function safeDisconnectAll(t)
 		if not t then return end
@@ -64,6 +94,10 @@ function GameParams.new(ctx,parent)
 
 	local function normalizeState()
 		state.gameParamsEnabled=state.gameParamsEnabled and true or false
+		state.gravityEnabled=state.gravityEnabled and true or false
+		state.gravityValue=clampNumber(state.gravityValue,0,1000,DEFAULT_GRAVITY)
+		state.speedEnabled=state.speedEnabled and true or false
+		state.speedValue=clampSpeed(state.speedValue)
 		state.staminaRegenValue=clampNumber(state.staminaRegenValue,0,50,10)
 		state.staminaDepleteValue=clampStaminaDeplete(state.staminaDepleteValue)
 		state.jumpPowerValue=clampNumber(state.jumpPowerValue,0,300,53.5)
@@ -72,6 +106,8 @@ function GameParams.new(ctx,parent)
 
 	local function syncControls()
 		if toggle then toggle.set(state.gameParamsEnabled) end
+		if gravitySlider then gravitySlider.set(state.gravityValue) end
+		if speedSlider then speedSlider.set(state.speedValue) end
 		if staminaRegenSlider then staminaRegenSlider.set(state.staminaRegenValue) end
 		if staminaDepleteSlider then staminaDepleteSlider.set(state.staminaDepleteValue) end
 		if jumpSlider then jumpSlider.set(state.jumpPowerValue) end
@@ -79,7 +115,74 @@ function GameParams.new(ctx,parent)
 	end
 
 	local function isAlive()
-		return section==nil or section.Parent~=nil
+		return not destroyed and (section==nil or section.Parent~=nil)
+	end
+
+	local function applyGravity(value)
+		local gravity=clampNumber(value,0,1000,DEFAULT_GRAVITY)
+		state.gravityValue=gravity
+		if state.gameParamsEnabled and state.gravityEnabled then
+			workspace.Gravity=gravity
+		end
+		return gravity
+	end
+
+	local function applySpeedValue()
+		local hum=getMyHumanoid()
+
+		if hum then
+			hum.WalkSpeed=state.speedValue
+		end
+	end
+
+	local function stopSpeedForcing(resetValue)
+		safeDisconnect(speedConn)
+		speedConn=nil
+		speedElapsed=0
+
+		if resetValue then
+			state.speedValue=DEFAULT_SPEED
+		end
+
+		local hum=getMyHumanoid()
+		if hum then
+			hum.WalkSpeed=DEFAULT_SPEED
+		end
+	end
+
+	local function ensureSpeedForcing()
+		if not(state.gameParamsEnabled and state.speedEnabled) then
+			stopSpeedForcing(false)
+			return
+		end
+
+		state.speedValue=clampSpeed(state.speedValue)
+		applySpeedValue()
+
+		if speedConn then
+			return
+		end
+
+		speedConn=RunService.Heartbeat:Connect(function(dt)
+			if not state.speedEnabled or not isAlive() then
+				safeDisconnect(speedConn)
+				speedConn=nil
+				return
+			end
+
+			speedElapsed+=(dt or 0)
+			if speedElapsed<SPEED_FORCE_INTERVAL then
+				return
+			end
+			speedElapsed=0
+
+			state.speedValue=clampSpeed(state.speedValue)
+			local hum=getMyHumanoid()
+
+			if hum and hum.WalkSpeed~=state.speedValue then
+				hum.WalkSpeed=state.speedValue
+			end
+		end)
 	end
 
 	local function getCurrentModeKey()
@@ -286,6 +389,67 @@ function GameParams.new(ctx,parent)
 		watchRootFolder(ReplicatedStorage:FindFirstChild("MiniGames"))
 	end
 
+	function api.SetGravityState(value,fire)
+		state.gravityEnabled=value and true or false
+		if state.gameParamsEnabled and state.gravityEnabled then
+			applyGravity(state.gravityValue)
+		else
+			workspace.Gravity=DEFAULT_GRAVITY
+		end
+
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetGravityValue(value,fire)
+		state.gravityValue=clampNumber(value,0,1000,DEFAULT_GRAVITY)
+		if fire~=false then
+			state.gravityEnabled=true
+		end
+		applyGravity(state.gravityValue)
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetSpeedState(value,fire,resetValue)
+		state.speedEnabled=value and true or false
+		state.speedValue=clampSpeed(state.speedValue)
+
+		if state.gameParamsEnabled and state.speedEnabled then
+			ensureSpeedForcing()
+		else
+			stopSpeedForcing(resetValue==true)
+		end
+
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetSpeedValue(value,fire)
+		state.speedValue=clampSpeed(value)
+		if fire~=false then
+			state.speedEnabled=true
+		end
+		if state.speedEnabled then
+			ensureSpeedForcing()
+		end
+
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
+	end
+
 	function api.SetGameParamsState(value,fire)
 		state.gameParamsEnabled=value and true or false
 
@@ -294,6 +458,16 @@ function GameParams.new(ctx,parent)
 			applyGameParams()
 		else
 			disconnectWatchers()
+		end
+		if state.gameParamsEnabled and state.gravityEnabled then
+			applyGravity(state.gravityValue)
+		else
+			workspace.Gravity=DEFAULT_GRAVITY
+		end
+		if state.gameParamsEnabled and state.speedEnabled then
+			ensureSpeedForcing()
+		else
+			stopSpeedForcing(false)
 		end
 
 		syncControls()
@@ -344,7 +518,7 @@ function GameParams.new(ctx,parent)
 	end
 
 	normalizeState()
-	section,sectionControls=makeSection(parent,4,"Game Params","",{
+	section,sectionControls=makeSection(parent,2,"Game Params","",{
 		headerToggle={
 			startState=state.gameParamsEnabled,
 			onChange=function(value)
@@ -359,6 +533,14 @@ function GameParams.new(ctx,parent)
 			api.SetGameParamsState(value,true)
 		end)
 	end
+
+	gravitySlider=buildSlider(section,"Gravity",0,1000,state.gravityValue,1,function(v)
+		api.SetGravityValue(v,true)
+	end)
+
+	speedSlider=buildSlider(section,"Speed",0,100,state.speedValue,0,function(v)
+		api.SetSpeedValue(v,true)
+	end)
 
 	staminaRegenSlider=buildSlider(section,"Stamina Regeneration",0,50,state.staminaRegenValue,1,function(v)
 		api.SetStaminaRegenValue(v,true)
@@ -384,11 +566,25 @@ function GameParams.new(ctx,parent)
 		else
 			disconnectWatchers()
 		end
+		if state.gameParamsEnabled and state.gravityEnabled then
+			applyGravity(state.gravityValue)
+		else
+			workspace.Gravity=DEFAULT_GRAVITY
+		end
+		if state.gameParamsEnabled and state.speedEnabled then
+			ensureSpeedForcing()
+		else
+			stopSpeedForcing(false)
+		end
 		syncControls()
 	end
 
 	function api.Reset()
 		state.gameParamsEnabled=false
+		state.gravityEnabled=false
+		state.gravityValue=DEFAULT_GRAVITY
+		state.speedEnabled=false
+		state.speedValue=DEFAULT_SPEED
 		state.staminaRegenValue=10
 		state.staminaDepleteValue=10
 		state.jumpPowerValue=53.5
@@ -398,13 +594,47 @@ function GameParams.new(ctx,parent)
 	end
 
 	function api.Destroy()
+		if destroyed then return end
+		destroyed=true
 		disconnectWatchers()
+		safeDisconnect(inputConn)
+		inputConn=nil
+		safeDisconnect(destroyConn)
+		destroyConn=nil
 		destroyControl(toggle)
+		destroyControl(gravitySlider)
+		destroyControl(speedSlider)
 		destroyControl(staminaRegenSlider)
 		destroyControl(staminaDepleteSlider)
 		destroyControl(jumpSlider)
 		destroyControl(diveSlider)
+		stopSpeedForcing(false)
 	end
+
+	local function handleSpeedInput(input)
+		local speedKey=ctx.getSpeedToggleKey and ctx.getSpeedToggleKey() or Enum.KeyCode.Unknown
+		if speedKey==nil or speedKey==Enum.KeyCode.Unknown then return false end
+
+		local binding=inputToBinding and inputToBinding(input) or nil
+		if binding==speedKey then
+			api.SetSpeedState(not state.speedEnabled,true,true)
+			return true
+		end
+
+		return false
+	end
+
+	inputConn=UIS.InputBegan:Connect(function(input,processed)
+		if processed then return end
+		handleSpeedInput(input)
+	end)
+
+	destroyConn=section.AncestryChanged:Connect(function()
+		if not isAlive() then
+			api.Destroy()
+		end
+	end)
+
 	api.Refresh()
 
 	return api

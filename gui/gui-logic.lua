@@ -345,7 +345,7 @@ function GuiLogic.new(ctx)
 				headerTween=nil
 			end
 
-			local targetSize=expanded and UDim2.fromOffset(width,railHeight) or UDim2.fromOffset(math.floor(width*0.74),math.max(14,railHeight-6))
+			local targetSize=UDim2.fromOffset(width,railHeight)
 			if animate~=false then
 				headerTween=TweenService:Create(control.wrap,tweenInfo,{Size=targetSize})
 				headerTween:Play()
