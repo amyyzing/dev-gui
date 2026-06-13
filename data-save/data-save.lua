@@ -529,6 +529,10 @@ function DataSave.new(ctx)
 
 			gameParams={
 				enabled=getValue(ctx,"gameParamsEnabled",false),
+				selectedPage=getValue(ctx,"paramsSelectedPage","speed"),
+				speedEnabled=getValue(ctx,"speedParamsEnabled",true),
+				gravityJumpEnabled=getValue(ctx,"gravityJumpParamsEnabled",true),
+				staminaEnabled=getValue(ctx,"staminaParamsEnabled",true),
 				staminaRegen=getValue(ctx,"staminaRegenValue",10),
 				staminaDeplete=getValue(ctx,"staminaDepleteValue",10),
 				jumpPower=getValue(ctx,"jumpPowerValue",53.5),
@@ -632,6 +636,12 @@ function DataSave.new(ctx)
 		applyBoolean(ctx,"setSpeedState","speedEnabled",speed.enabled)
 
 		local gameParams=settings.gameParams or {}
+		if gameParams.selectedPage~=nil then
+			applyValue(ctx,"setParamsSelectedPage","paramsSelectedPage",gameParams.selectedPage)
+		end
+		applyBoolean(ctx,"setSpeedParamsState","speedParamsEnabled",gameParams.speedEnabled)
+		applyBoolean(ctx,"setGravityJumpParamsState","gravityJumpParamsEnabled",gameParams.gravityJumpEnabled)
+		applyBoolean(ctx,"setStaminaParamsState","staminaParamsEnabled",gameParams.staminaEnabled)
 		applyBoolean(ctx,"setGameParamsState","gameParamsEnabled",gameParams.enabled)
 		applyClamped(ctx,"setStaminaRegenValue","staminaRegenValue",gameParams.staminaRegen,0,50,10)
 		applyClamped(ctx,"setStaminaDepleteValue","staminaDepleteValue",gameParams.staminaDeplete,0,50,10,clampStaminaDeplete)

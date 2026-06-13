@@ -260,6 +260,44 @@ local function attachDataSaveSetters(ctx)
 		end
 	end
 
+	ctx.setSpeedState=function(value)
+		local stateValue=setPage1Field("speedEnabled",value,true)
+		PAGE1_STATE.speedParamsEnabled=stateValue
+		syncPage1State()
+		callPage1Api("GameParams","SetSpeedState",stateValue,false)
+	end
+
+	ctx.setGravityState=function(value)
+		local stateValue=setPage1Field("gravityEnabled",value,true)
+		PAGE1_STATE.gravityJumpParamsEnabled=stateValue
+		syncPage1State()
+		callPage1Api("GameParams","SetGravityState",stateValue,false)
+	end
+
+	ctx.setParamsSelectedPage=function(value)
+		local stateValue=setPage1Field("paramsSelectedPage",tostring(value or "speed"),false)
+		callPage1Api("GameParams","SetParamsSelectedPage",stateValue,false)
+	end
+
+	ctx.setSpeedParamsState=function(value)
+		local stateValue=setPage1Field("speedParamsEnabled",value,true)
+		PAGE1_STATE.speedEnabled=stateValue
+		syncPage1State()
+		callPage1Api("GameParams","SetParamsPageEnabled","speed",stateValue,false)
+	end
+
+	ctx.setGravityJumpParamsState=function(value)
+		local stateValue=setPage1Field("gravityJumpParamsEnabled",value,true)
+		PAGE1_STATE.gravityEnabled=stateValue
+		syncPage1State()
+		callPage1Api("GameParams","SetParamsPageEnabled","gravity",stateValue,false)
+	end
+
+	ctx.setStaminaParamsState=function(value)
+		local stateValue=setPage1Field("staminaParamsEnabled",value,true)
+		callPage1Api("GameParams","SetParamsPageEnabled","stamina",stateValue,false)
+	end
+
 	return ctx
 end
 
