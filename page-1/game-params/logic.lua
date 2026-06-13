@@ -38,9 +38,9 @@ local PARAM_STATE_PAGE={
 local PAGE_ORDER={"speed","gravity","stamina"}
 local PAGE_INDEX={speed=1,gravity=2,stamina=3}
 local DIAL_SECTORS={
-	{key="gravity",start=45,finish=135},
-	{key="speed",start=135,finish=270},
-	{key="stamina",start=270,finish=405},
+	{key="gravity",start=30,finish=150},
+	{key="speed",start=150,finish=270},
+	{key="stamina",start=270,finish=390},
 }
 local PAGE_ENABLED_KEY={
 	speed="speedParamsEnabled",
@@ -205,6 +205,7 @@ function GameParams.new(ctx,parent)
 	local pageClip=nil
 	local pageFrames={}
 	local dialImages={}
+	local dialGlowImages={}
 	local fallbackSlices={}
 	local currentPage=nil
 	local hoverPage=nil
@@ -779,10 +780,14 @@ function GameParams.new(ctx,parent)
 			local isHover=pageKey==hoverPage
 			local targetColor=muted
 			local targetTransparency=isSelected and 0.18 or 0.68
+			local nearGlowTransparency=1
+			local farGlowTransparency=1
 
 			if enabled then
 				targetColor=isHover and hoverGlow or glow
 				targetTransparency=isSelected and 0.02 or (isHover and 0.12 or 0.30)
+				nearGlowTransparency=isHover and 0.48 or (isSelected and 0.58 or 0.70)
+				farGlowTransparency=isHover and 0.74 or (isSelected and 0.82 or 0.90)
 			elseif isSelected then
 				targetColor=active
 				targetTransparency=isHover and 0.08 or 0.18
@@ -796,6 +801,18 @@ function GameParams.new(ctx,parent)
 				else
 					dialImages[pageKey].ImageColor3=targetColor
 					dialImages[pageKey].ImageTransparency=targetTransparency
+				end
+			end
+
+			if dialGlowImages[pageKey] then
+				for index,glow in ipairs(dialGlowImages[pageKey]) do
+					local glowTransparency=index==1 and nearGlowTransparency or farGlowTransparency
+					if animate then
+						tweenObject(glow,{ImageColor3=targetColor,ImageTransparency=glowTransparency})
+					else
+						glow.ImageColor3=targetColor
+						glow.ImageTransparency=glowTransparency
+					end
 				end
 			end
 
@@ -931,6 +948,22 @@ function GameParams.new(ctx,parent)
 		for _,pageKey in ipairs(PAGE_ORDER) do
 			local sliceData=DIAL_SLICE_DATA[pageKey]
 			if assets and assets[pageKey] and sliceData then
+				dialGlowImages[pageKey]={}
+				for _,pad in ipairs({5,11}) do
+					local glow=New("ImageLabel",{
+						BackgroundTransparency=1,
+						Position=UDim2.new(sliceData.x,-pad,sliceData.y,-pad),
+						Size=UDim2.new(sliceData.w,pad*2,sliceData.h,pad*2),
+						Image=assets[pageKey],
+						ImageColor3=inputColor(),
+						ImageTransparency=1,
+						ResampleMode=Enum.ResamplerMode.Default,
+						ScaleType=Enum.ScaleType.Stretch,
+						ZIndex=5,
+					},canvas)
+					table.insert(dialGlowImages[pageKey],glow)
+				end
+
 				dialImages[pageKey]=New("ImageLabel",{
 					BackgroundTransparency=1,
 					Position=UDim2.fromScale(sliceData.x,sliceData.y),
