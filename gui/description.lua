@@ -165,6 +165,7 @@ Description.Categories={
 			["Show Arc"]="Aimbot Arc",
 			["Lead Adjust"]="Lead Adjust",
 			["Peak Height"]="Peak Height",
+			["QB Drift"]="QB Drift",
 			["QB Aim Lock Receiver"]="Select Receiver",
 			["QB Aim Throw"]="Throw Selected Receiver",
 			["QB Aim Toggle"]="Aimbot",

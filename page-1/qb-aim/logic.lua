@@ -149,7 +149,7 @@ local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animatio
 local THROW_TARGET_FIRE_IMMEDIATELY=false
 -- Separate timing terms. Do not use the full animation delay to move C2/origin.
 -- Logs showed the real ball SpawnPos only drifts a small amount from the click-time held ball.
-local QB_RELEASE_ORIGIN_DRIFT_TIME=0.04
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
 --   1. Keypress computes one locked plan.
@@ -695,10 +695,15 @@ function QBAim.new(ctx,parent)
 	local peakHeightSliderKnob=nil
 	local peakHeightSliderControl=nil
 	local peakHeightDragging=false
+	local qbDriftFrame=nil
+	local qbDriftBox=nil
+	local qbDriftSliderControl=nil
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
 	local PEAK_HEIGHT_MIN=8.00
 	local PEAK_HEIGHT_MAX=20.00
+	local QB_DRIFT_MIN=0.00
+	local QB_DRIFT_MAX=0.25
 	local updateTargetHighlight=function() end
 
 	if state.qbAimTeamFilter==nil then
@@ -717,9 +722,15 @@ function QBAim.new(ctx,parent)
 		state.qbAimPeakHeight=WR_MAX_Y
 	end
 
+	if state.qbAimQBDrift==nil then
+		state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
+	end
+
 	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
 	WR_MAX_Y=math.clamp(tonumber(state.qbAimPeakHeight) or WR_MAX_Y,PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX)
+	QB_RELEASE_ORIGIN_DRIFT_TIME=math.clamp(tonumber(state.qbAimQBDrift) or QB_RELEASE_ORIGIN_DRIFT_TIME,QB_DRIFT_MIN,QB_DRIFT_MAX)
 	state.qbAimPeakHeight=WR_MAX_Y
+	state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
 	C1_Y_MIN=WR_MAX_Y
 	C1_Y_MAX=WR_MAX_Y
 	C1_Y_FIXED=WR_MAX_Y
@@ -805,6 +816,16 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
+	local function updateQBDriftVisuals()
+		if qbDriftSliderControl then
+			qbDriftSliderControl.set(QB_RELEASE_ORIGIN_DRIFT_TIME)
+		end
+
+		if qbDriftBox then
+			qbDriftBox.Text=string.format("%.2f",QB_RELEASE_ORIGIN_DRIFT_TIME)
+		end
+	end
+
 	local function setLeadDelay(value,showStatus)
 		local numberValue=tonumber(value)
 		if not numberValue then
@@ -817,6 +838,22 @@ function QBAim.new(ctx,parent)
 		updateLeadDelayVisuals()
 		if showStatus then
 			setStatus(string.format("LD set to %.2fs",WR_LEAD_DELAY))
+			changed()
+		end
+		return true
+	end
+
+	local function setQBDrift(value,showStatus)
+		local numberValue=tonumber(value)
+		if not numberValue then
+			updateQBDriftVisuals()
+			return false
+		end
+
+		QB_RELEASE_ORIGIN_DRIFT_TIME=math.clamp(numberValue,QB_DRIFT_MIN,QB_DRIFT_MAX)
+		state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
+		updateQBDriftVisuals()
+		if showStatus then
 			changed()
 		end
 		return true
@@ -2215,8 +2252,13 @@ function QBAim.new(ctx,parent)
 		setPeakHeight(value,fire~=false)
 	end
 
+	function api.SetQBDrift(value,fire)
+		setQBDrift(value,fire~=false)
+	end
+
 	function api.Refresh()
 		syncControls()
+		updateQBDriftVisuals()
 	end
 
 	function api.Reset()
@@ -2273,6 +2315,9 @@ function QBAim.new(ctx,parent)
 		peakHeightSliderControl=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
 			api.SetPeakHeight(value,true)
 		end)
+		qbDriftSliderControl=buildSlider(sectionBody,"QB Drift",QB_DRIFT_MIN,QB_DRIFT_MAX,QB_RELEASE_ORIGIN_DRIFT_TIME,2,function(value)
+			api.SetQBDrift(value,true)
+		end)
 	else
 		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
 		leadDelayBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",WR_LEAD_DELAY),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},leadDelayFrame)
@@ -2286,10 +2331,17 @@ function QBAim.new(ctx,parent)
 		addConnection(peakHeightBox.FocusLost:Connect(function()
 			setPeakHeight(peakHeightBox.Text,true)
 		end))
+		qbDriftFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
+		qbDriftBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",QB_RELEASE_ORIGIN_DRIFT_TIME),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},qbDriftFrame)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="QB Drift",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbDriftFrame)
+		addConnection(qbDriftBox.FocusLost:Connect(function()
+			setQBDrift(qbDriftBox.Text,true)
+		end))
 	end
 
 	updateLeadDelayVisuals()
 	updatePeakHeightVisuals()
+	updateQBDriftVisuals()
 
 	addConnection(RunService.Heartbeat:Connect(function(dt)
 		if not isAlive() then return end

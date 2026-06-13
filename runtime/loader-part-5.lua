@@ -216,6 +216,7 @@ local DATA_SAVE_STATE_SETTERS={
 	setQBAimShowArc={"qbAimShowArc",true,"QBAim","SetShowArcState",true},
 	setQBAimLeadDelay={"qbAimLeadDelay",false,"QBAim","SetLeadDelay",true},
 	setQBAimPeakHeight={"qbAimPeakHeight",false,"QBAim","SetPeakHeight",true},
+	setQBAimQBDrift={"qbAimQBDrift",false,"QBAim","SetQBDrift",true},
 	setTestingState={"testingEnabled",true,"Testing","SetTestingState",true},
 }
 

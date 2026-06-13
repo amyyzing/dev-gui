@@ -554,6 +554,7 @@ function DataSave.new(ctx)
 				showArc=getValue(ctx,"qbAimShowArc",true),
 				leadDelay=getValue(ctx,"qbAimLeadDelay",0.38),
 				peakHeight=getValue(ctx,"qbAimPeakHeight",14.00),
+				qbDrift=getValue(ctx,"qbAimQBDrift",0.00),
 			},
 
 			testing={
@@ -653,6 +654,7 @@ function DataSave.new(ctx)
 		applyBoolean(ctx,"setQBAimShowArc","qbAimShowArc",qbAim.showArc)
 		applyClamped(ctx,"setQBAimLeadDelay","qbAimLeadDelay",qbAim.leadDelay,0,1.5,0.38)
 		applyClamped(ctx,"setQBAimPeakHeight","qbAimPeakHeight",qbAim.peakHeight,8,20,14.00)
+		applyClamped(ctx,"setQBAimQBDrift","qbAimQBDrift",qbAim.qbDrift,0,0.25,0.00)
 
 		local testing=settings.testing or {}
 		applyBoolean(ctx,"setTestingState","testingEnabled",testing.enabled)

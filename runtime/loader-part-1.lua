@@ -5,6 +5,7 @@ UIS=game:GetService("UserInputService")
 TweenService=game:GetService("TweenService")
 RunService=game:GetService("RunService")
 HttpService=game:GetService("HttpService")
+Workspace=game:GetService("Workspace")
 
 me=Players.LocalPlayer
 guiParent=me:WaitForChild("PlayerGui")
@@ -58,6 +59,7 @@ qbAimTeamFilter=true
 qbAimShowArc=true
 qbAimLeadDelay=0.38
 qbAimPeakHeight=14.00
+qbAimQBDrift=0.00
 
 DEFAULT_PRESETS={{key=Enum.KeyCode.Unknown, size=Vector3.new(0.1, 0.1, 0.1)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.7, 5.8, 1.65)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(3.1, 5.8, 1.70)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.52, 5.4, 1.41)},}
 
@@ -1321,6 +1323,109 @@ liquidStrokeConn=nil
 MainFrame=nil
 applyUIStrokeTheme=nil
 
+function destroyKnownGuiResidue()
+	local guiNames={"HitboxUI_DarkInfluenced_GUIOnly","1",SG_NAME or "HitboxUI"}
+	local parents={guiParent}
+
+	local okCore,coreGui=pcall(function()
+		return game:GetService("CoreGui")
+	end)
+	if okCore and coreGui then
+		table.insert(parents,coreGui)
+	end
+
+	for _,parent in ipairs(parents) do
+		if parent then
+			for _,name in ipairs(guiNames) do
+				local existing=parent:FindFirstChild(name)
+				if existing then
+					pcall(function()
+						existing:Destroy()
+					end)
+				end
+			end
+		end
+	end
+
+	local residueNames={
+		ClonedCenter=true,
+		PreviewC1Marker=true,
+		PreviewC3InfoAnchor=true,
+		TestingC1Marker=true,
+		QBAimTargetHighlight=true,
+		MyESPHighlight=true,
+	}
+
+	for _,container in ipairs({Workspace,guiParent}) do
+		if container then
+			for _,descendant in ipairs(container:GetDescendants()) do
+				if residueNames[descendant.Name] then
+					pcall(function()
+						descendant:Destroy()
+					end)
+				end
+			end
+		end
+	end
+end
+
+function cleanupForManualReload()
+	toolAlive=false
+
+	if PAGE1_APIS then
+		for key,api in pairs(PAGE1_APIS) do
+			if api and api.Destroy then
+				pcall(function()
+					api.Destroy()
+				end)
+			end
+			PAGE1_APIS[key]=nil
+		end
+	end
+
+	if destroyPage2APIs then
+		pcall(destroyPage2APIs)
+	end
+
+	if destroyRuntimeAPIs then
+		pcall(destroyRuntimeAPIs,{
+			"StrokeColourAPI",
+			"MapEditorAPI",
+			"AntiMaterialAPI",
+			"MapCleanerAPI",
+			"RemoveAdsAPI",
+			"PlayerDataAPI",
+			"DiscordAPI",
+		})
+	end
+
+	if AnnouncementAPI and AnnouncementAPI.Destroy then
+		pcall(function()
+			AnnouncementAPI.Destroy()
+		end)
+	end
+
+	if MainFrame and MainFrame.Destroy then
+		pcall(function()
+			MainFrame.Destroy()
+		end)
+	end
+
+	if disconnectSettingsConnections then
+		pcall(disconnectSettingsConnections)
+	end
+
+	if stopLiquidStrokeAnimation then
+		pcall(stopLiquidStrokeAnimation)
+	end
+
+	if disconnectRuntimeConnections then
+		pcall(disconnectRuntimeConnections)
+	end
+
+	destroyKnownGuiResidue()
+end
+
 function refreshRemoteModulesNow()
 	local result=BOT_API.Post("/module/get",{path=MANUAL_REFRESH_RELOAD_PATH})
 	if not result or not result.ok or type(result.source)~="string" then
@@ -1341,13 +1446,7 @@ function refreshRemoteModulesNow()
 	end
 
 	warn("Reloading GUI from fresh loader source.")
-	toolAlive=false
-	if stopLiquidStrokeAnimation then
-		pcall(stopLiquidStrokeAnimation)
-	end
-	if disconnectRuntimeConnections then
-		disconnectRuntimeConnections()
-	end
+	cleanupForManualReload()
 	task.defer(function()
 		local ok,reloadErr=pcall(chunk)
 		if not ok then
