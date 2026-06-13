@@ -13,6 +13,8 @@ local SPEED_FORCE_INTERVAL=0.05
 local DEFAULT_SELECTED_PAGE="speed"
 local DIAL_W=96
 local DIAL_H=96
+local DIAL_SIDE_GAP=14
+local PARAMS_PAGE_H=112
 local PAGE_TWEEN=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 local PAINT_TWEEN=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 
@@ -813,15 +815,17 @@ function GameParams.new(ctx,parent)
 
 	local function createDial(parentFrame)
 		dialWrap=New("Frame",{
+			AnchorPoint=Vector2.new(1,0),
 			BackgroundTransparency=1,
-			Size=UDim2.fromScale(1,1),
+			Position=UDim2.new(1,0,0,0),
+			Size=UDim2.fromOffset(DIAL_W,DIAL_H),
 			ZIndex=6,
 			ClipsDescendants=false,
 		},parentFrame)
 
 		local canvas=New("Frame",{
-			AnchorPoint=Vector2.new(1,0),
-			Position=UDim2.new(1,0,0,0),
+			AnchorPoint=Vector2.new(0,0),
+			Position=UDim2.fromOffset(0,0),
 			Size=UDim2.fromOffset(DIAL_W,DIAL_H),
 			BackgroundTransparency=1,
 			ClipsDescendants=false,
@@ -886,22 +890,21 @@ function GameParams.new(ctx,parent)
 	end
 
 	local function createPageEditor(parentFrame)
-		local dialRow=New("Frame",{
+		local paramsRow=New("Frame",{
 			BackgroundTransparency=1,
-			Size=UDim2.new(1,0,0,DIAL_H+4),
+			Size=UDim2.new(1,0,0,PARAMS_PAGE_H),
 			LayoutOrder=1,
 			ClipsDescendants=false,
 			ZIndex=6,
 		},parentFrame)
-		createDial(dialRow)
 
 		pageClip=New("Frame",{
 			BackgroundTransparency=1,
-			Size=UDim2.new(1,0,0,112),
-			LayoutOrder=2,
+			Size=UDim2.new(1,-(DIAL_W+DIAL_SIDE_GAP),0,PARAMS_PAGE_H),
 			ClipsDescendants=true,
 			ZIndex=6,
-		},parentFrame)
+		},paramsRow)
+		createDial(paramsRow)
 
 		for _,pageKey in ipairs(PAGE_ORDER) do
 			local page=New("Frame",{
