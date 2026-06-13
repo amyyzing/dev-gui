@@ -145,7 +145,8 @@ local THROW_REMOTE_LEAD_TIME=0.035
 local RELEASE_FRAME_PLAN_MAX_AGE=0.075
 local THROW_TARGET_LOCK_ON_INPUT=true
 local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
-local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze click-origin plan during animation; normal game preview appears to latch here
+local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
+local THROW_TARGET_FIRE_IMMEDIATELY=true -- outgoing ThrowBall fires at click/input time; server launches later from predicted SpawnPos
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local VALID_TEAM_IDS={
@@ -1620,9 +1621,11 @@ function QBAim.new(ctx,parent)
 		receiverReleaseOffset=receiverReleaseOffset==nil and qbReleaseOffset or receiverReleaseOffset
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
 		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
-		-- Split the two timelines. The game's throw target/ball origin appears to latch at
-		-- click/animation-start, while the WR keeps moving until ball release. Therefore
-		-- QB origin offset and WR release offset must not always be the same value.
+		-- Future-Spawn target-ray model:
+		-- The outgoing ThrowBall target is sent at input time, but the server later launches
+		-- from SpawnPos. Therefore the far remote Target must be built from the predicted
+		-- release SpawnPos, not from the current click origin. If the QB keeps moving
+		-- consistently, server SpawnPos should line up with this origin.
 		local originPosition=origin(qbRoot,ball,qbReleaseOffset)
 		local receiverReleasePosition=receiverRoot.Position+wrVel*receiverReleaseOffset
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
@@ -1977,10 +1980,17 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
-		-- Click-origin target-latch solver. Your normal throw evidence shows the
-		-- visible arc/target locks at click/animation-start, while the remote appears
-		-- shortly before release. So the final target must be held from click-time,
-		-- not recomputed from the moving QB at release.
+		-- Future-Spawn target-latch solver.
+		-- Your remote logs show the outgoing ThrowBall happens first, then UpdateFootball
+		-- arrives later with SpawnPos/Target/LaunchTime. So the target must be computed
+		-- immediately at input time, from the predicted future SpawnPos, and then sent.
+		if THROW_TARGET_FIRE_IMMEDIATELY then
+			if lockedPlan then
+				previewPlan(lockedPlan)
+			end
+			return lockedPlan,releaseBall
+		end
+
 		if THROW_ANIMATION_RELEASE_WAIT<=0 then
 			return lockedPlan or buildPlan(receiver,ballPower,0,releaseBall)
 		end
@@ -1991,7 +2001,7 @@ function QBAim.new(ctx,parent)
 		while os.clock()<fireAt do
 			if THROW_TARGET_LOCK_PREVIEW_LIVE then
 				local remaining=math.max(endAt-os.clock(),0)
-				local livePlan=buildPlan(receiver,ballPower,0,releaseBall,remaining)
+				local livePlan=buildPlan(receiver,ballPower,remaining,releaseBall,remaining)
 				if livePlan then
 					previewPlan(livePlan)
 				end
@@ -2011,14 +2021,14 @@ function QBAim.new(ctx,parent)
 			return false,"Gameplay ReEvent missing"
 		end
 
-		reEvent:FireServer("Mechanics","ThrowBall",{Target=plan.aimPoint,Power=REMOTE_DISPLAY_POWER}) -- old behavior: fire after release frame
-		pcall(function()
-			local mechanics=getGlobalMechanics()
-			if mechanics and type(mechanics.UnequipFootball)=="function" then
-				mechanics:UnequipFootball() -- old behavior: unequip immediately after remote
-			end
-		end)
+		reEvent:FireServer("Mechanics","ThrowBall",{
+			Target=plan.aimPoint,
+			AutoThrow=false,
+			Power=REMOTE_DISPLAY_POWER,
+		})
 
+		-- Do not call local UnequipFootball here. Normal flow lets the server send the
+		-- incoming Mechanics/UnequipFootball and UpdateFootball events after ThrowBall.
 		return true,nil
 	end
 
@@ -2063,11 +2073,14 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		-- Lock from the click/animation-start origin. The WR is still predicted to the
-		-- release frame, but the QB/ball origin is NOT extrapolated forward because
-		-- the game's own preview/target appears to latch from the click origin.
-		local lockedReceiverReleaseOffset=THROW_ANIMATION_RELEASE_WAIT+THROW_TARGET_LOCK_EXTRA_DELAY
-		local lockedPlan=buildPlan(receiver,power,0,heldBall,lockedReceiverReleaseOffset)
+		-- Lock at input time, but solve from the predicted server SpawnPos.
+		-- Outgoing ThrowBall sends a far Target ray immediately; the server later launches
+		-- the ball from SpawnPos. Therefore the ray endpoint must be:
+		--     futureSpawnPos + solvedDirection * AIM_SCALE
+		-- not:
+		--     currentQBOrigin + solvedDirection * AIM_SCALE
+		local lockedReleaseOffset=THROW_ANIMATION_RELEASE_WAIT+THROW_TARGET_LOCK_EXTRA_DELAY
+		local lockedPlan=buildPlan(receiver,power,lockedReleaseOffset,heldBall,lockedReleaseOffset)
 		if not lockedPlan then
 			setStatus("No target-latch throw solution")
 			return
@@ -2093,7 +2106,7 @@ function QBAim.new(ctx,parent)
 
 		if ok then
 			freezePreviewAtCurrentPlan(plan)
-			setStatus(currentModeText().." release-time throw sent")
+			setStatus(currentModeText().." future-spawn throw sent")
 		else
 			setStatus(err or "Throw failed")
 		end
