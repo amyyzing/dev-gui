@@ -78,6 +78,10 @@ local C2_GROUND_FALLBACK_MARGIN=2.50
 local C2_MAX_ABOVE_BALL=8.00
 local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
 local QB_RELEASE_EXTRAPOLATE_VERTICAL=false
+local QB_VELOCITY_SMOOTH=0.55
+local QB_VELOCITY_MIN_USE=0.75
+local QB_VELOCITY_MAX=21
+local QB_RELEASE_XZ_SCALE=1.00
 local MIN_T,MAX_T,DT=0.35,6,0.01
 local QB_INHERITANCE=0
 local INTERCEPT_BISECTION_STEPS=12
@@ -138,7 +142,7 @@ local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
-local THROW_ANIMATION_RELEASE_WAIT=0.13
+local THROW_ANIMATION_RELEASE_WAIT=0.13 -- tune this, but now QB movement uses measured position-delta fallback
 -- The game appears to latch the target at input, then create/release the football shortly after.
 -- The practical release offset looked closer to ~0.13s than the full animation length,
 -- so the release prediction is exposed as a tunable delay.
@@ -673,6 +677,7 @@ function QBAim.new(ctx,parent)
 	local previewFrozen=false
 	local previewFreezeStarted=0
 	local highlightedCharacter=nil
+	local qbMotionData={pos=nil,t=0,vel=Vector3.zero,rawVel=Vector3.zero,source="none"}
 	local connections={}
 	local sectionBody=nil
 	local sectionFrame=nil
@@ -1352,6 +1357,48 @@ function QBAim.new(ctx,parent)
 		return receiverMaxAt(receiverRoot.Position)
 	end
 
+
+	local function getQBReleaseVelocity(qbRoot)
+		if not qbRoot then
+			return Vector3.zero,"none"
+		end
+
+		local now=os.clock()
+		local position=qbRoot.Position
+		local assembly=flat(qbRoot.AssemblyLinearVelocity or Vector3.zero)
+		local raw=Vector3.zero
+		local source="assembly"
+
+		if qbMotionData.pos and qbMotionData.t and now>qbMotionData.t then
+			local dt=math.clamp(now-qbMotionData.t,1/240,0.15)
+			raw=flat((position-qbMotionData.pos)/dt)
+		end
+
+		qbMotionData.pos=position
+		qbMotionData.t=now
+		qbMotionData.rawVel=clampMagnitude(raw,QB_VELOCITY_MAX)
+
+		local chosen=assembly
+		if assembly.Magnitude<QB_VELOCITY_MIN_USE and raw.Magnitude>=QB_VELOCITY_MIN_USE then
+			chosen=raw
+			source="position_delta"
+		elseif assembly.Magnitude>=QB_VELOCITY_MIN_USE and raw.Magnitude>=QB_VELOCITY_MIN_USE then
+			-- Local characters sometimes report delayed/noisy AssemblyLinearVelocity.
+			-- Blend toward position-delta motion so release prediction actually changes while moving.
+			chosen=safeVectorLerp(assembly,raw,0.45)
+			source="assembly+delta"
+		elseif assembly.Magnitude<QB_VELOCITY_MIN_USE then
+			chosen=Vector3.zero
+			source="stopped"
+		end
+
+		chosen=clampMagnitude(flat(chosen),QB_VELOCITY_MAX)
+		qbMotionData.vel=safeVectorLerp(qbMotionData.vel or Vector3.zero,chosen,QB_VELOCITY_SMOOTH)
+		qbMotionData.vel=clampMagnitude(flat(qbMotionData.vel),QB_VELOCITY_MAX)
+		qbMotionData.source=source
+		return qbMotionData.vel,source
+	end
+
 	local function qbYCorrection(qbRoot)
 		local y=qbRoot.Position.Y
 		local vy=qbRoot.AssemblyLinearVelocity.Y
@@ -1365,7 +1412,7 @@ function QBAim.new(ctx,parent)
 
 	local function origin(qbRoot,ball,releaseOffset)
 		releaseOffset=releaseOffset or 0
-		local rootVelocity=qbRoot.AssemblyLinearVelocity
+		local rootVelocity=getQBReleaseVelocity(qbRoot)
 		local basePosition=ball and ball.Position or qbRoot.Position
 
 		local baseY=basePosition.Y
@@ -1377,8 +1424,8 @@ function QBAim.new(ctx,parent)
 
 		local dx,dz=0,0
 		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and releaseOffset>0 then
-			dx=rootVelocity.X*releaseOffset
-			dz=rootVelocity.Z*releaseOffset
+			dx=rootVelocity.X*releaseOffset*QB_RELEASE_XZ_SCALE
+			dz=rootVelocity.Z*releaseOffset*QB_RELEASE_XZ_SCALE
 		end
 
 		if QB_RELEASE_EXTRAPOLATE_VERTICAL and releaseOffset>0 then
@@ -1665,7 +1712,7 @@ function QBAim.new(ctx,parent)
 		qbReleaseOffset=qbReleaseOffset or 0
 		receiverReleaseOffset=receiverReleaseOffset==nil and qbReleaseOffset or receiverReleaseOffset
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
-		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
+		local qbVel=clampMagnitude(flat(getQBReleaseVelocity(qbRoot)),MAX_RUN_SPEED)
 		-- Delayed future-release model:
 		-- The throw request is sent near release, but the plan is locked on keypress.
 		-- Predict the actual server SpawnPos/release origin forward by qbReleaseOffset,
@@ -1717,6 +1764,9 @@ function QBAim.new(ctx,parent)
 		end
 		if best then
 			best.qbReleaseOffset=qbReleaseOffset
+			best.qbReleaseVelocity=qbVel
+			best.qbVelocitySource=qbMotionData.source
+			best.qbPredictedReleaseDrift=qbVel*(qbReleaseOffset or 0)*QB_RELEASE_XZ_SCALE
 			best.receiverReleaseOffset=receiverReleaseOffset
 			best.futureReleaseOriginLatch=(qbReleaseOffset or 0)>0
 			best.remoteFireDelayed=not THROW_TARGET_FIRE_IMMEDIATELY
