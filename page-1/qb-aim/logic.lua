@@ -138,10 +138,10 @@ local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
-local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
--- The game appears to latch the target at input, but the visible ball SpawnPos is produced
--- about the animation-release delay later. Solve the throw from that predicted future
--- release point, then delay the outgoing remote until just before release.
+local THROW_ANIMATION_RELEASE_WAIT=0.13
+-- The game appears to latch the target at input, then create/release the football shortly after.
+-- The practical release offset looked closer to ~0.13s than the full animation length,
+-- so the release prediction is exposed as a tunable delay.
 local THROW_REMOTE_LEAD_TIME=0.035
 local RELEASE_FRAME_PLAN_MAX_AGE=0.075
 local THROW_TARGET_LOCK_ON_INPUT=true
@@ -693,10 +693,15 @@ function QBAim.new(ctx,parent)
 	local peakHeightSliderKnob=nil
 	local peakHeightSliderControl=nil
 	local peakHeightDragging=false
+	local releaseDelayFrame=nil
+	local releaseDelayBox=nil
+	local releaseDelaySliderControl=nil
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
 	local PEAK_HEIGHT_MIN=8.00
 	local PEAK_HEIGHT_MAX=20.00
+	local RELEASE_DELAY_MIN=0.00
+	local RELEASE_DELAY_MAX=0.35
 	local updateTargetHighlight=function() end
 
 	if state.qbAimTeamFilter==nil then
@@ -715,9 +720,15 @@ function QBAim.new(ctx,parent)
 		state.qbAimPeakHeight=WR_MAX_Y
 	end
 
+	if state.qbAimReleaseDelay==nil then
+		state.qbAimReleaseDelay=THROW_ANIMATION_RELEASE_WAIT
+	end
+
 	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
 	WR_MAX_Y=math.clamp(tonumber(state.qbAimPeakHeight) or WR_MAX_Y,PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX)
+	THROW_ANIMATION_RELEASE_WAIT=math.clamp(tonumber(state.qbAimReleaseDelay) or THROW_ANIMATION_RELEASE_WAIT,RELEASE_DELAY_MIN,RELEASE_DELAY_MAX)
 	state.qbAimPeakHeight=WR_MAX_Y
+	state.qbAimReleaseDelay=THROW_ANIMATION_RELEASE_WAIT
 	C1_Y_MIN=WR_MAX_Y
 	C1_Y_MAX=WR_MAX_Y
 	C1_Y_FIXED=WR_MAX_Y
@@ -803,6 +814,16 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
+	local function updateReleaseDelayVisuals()
+		if releaseDelaySliderControl then
+			releaseDelaySliderControl.set(THROW_ANIMATION_RELEASE_WAIT)
+		end
+
+		if releaseDelayBox then
+			releaseDelayBox.Text=string.format("%.3f",THROW_ANIMATION_RELEASE_WAIT)
+		end
+	end
+
 	local function setLeadDelay(value,showStatus)
 		local numberValue=tonumber(value)
 		if not numberValue then
@@ -831,6 +852,22 @@ function QBAim.new(ctx,parent)
 		state.qbAimPeakHeight=WR_MAX_Y
 		syncPeakHeightConstants()
 		updatePeakHeightVisuals()
+		if showStatus then
+			changed()
+		end
+		return true
+	end
+
+	local function setReleaseDelay(value,showStatus)
+		local numberValue=tonumber(value)
+		if not numberValue then
+			updateReleaseDelayVisuals()
+			return false
+		end
+
+		THROW_ANIMATION_RELEASE_WAIT=math.clamp(numberValue,RELEASE_DELAY_MIN,RELEASE_DELAY_MAX)
+		state.qbAimReleaseDelay=THROW_ANIMATION_RELEASE_WAIT
+		updateReleaseDelayVisuals()
 		if showStatus then
 			changed()
 		end
@@ -1001,6 +1038,7 @@ function QBAim.new(ctx,parent)
 
 		updateLeadDelayVisuals()
 		updatePeakHeightVisuals()
+		updateReleaseDelayVisuals()
 		setTargetText()
 
 		if not isAvailable() then
@@ -2082,9 +2120,9 @@ function QBAim.new(ctx,parent)
 		end
 
 		-- Lock one plan at keypress, but solve it from the predicted release point.
-		-- The normal game appears to show the release/SpawnPos about 0.2-0.266s after input.
-		-- Apply that delay to BOTH the QB/ball origin and the receiver position, then
-		-- delay the remote fire until shortly before release.
+		-- Use the tunable release delay for BOTH the QB/ball origin and receiver position.
+		-- The previous 0.266s default over-predicted the moving release point; 0.13s
+		-- is the current calibration target, adjustable with the Release Delay slider.
 		local lockedReleaseOffset=THROW_ANIMATION_RELEASE_WAIT+THROW_TARGET_LOCK_EXTRA_DELAY
 		local lockedPlan=buildPlan(receiver,power,lockedReleaseOffset,heldBall,lockedReleaseOffset)
 		if not lockedPlan then
@@ -2212,6 +2250,10 @@ function QBAim.new(ctx,parent)
 		setPeakHeight(value,fire~=false)
 	end
 
+	function api.SetReleaseDelay(value,fire)
+		setReleaseDelay(value,fire~=false)
+	end
+
 	function api.Refresh()
 		syncControls()
 	end
@@ -2270,6 +2312,9 @@ function QBAim.new(ctx,parent)
 		peakHeightSliderControl=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
 			api.SetPeakHeight(value,true)
 		end)
+		releaseDelaySliderControl=buildSlider(sectionBody,"Release Delay",RELEASE_DELAY_MIN,RELEASE_DELAY_MAX,THROW_ANIMATION_RELEASE_WAIT,3,function(value)
+			api.SetReleaseDelay(value,true)
+		end)
 	else
 		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
 		leadDelayBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",WR_LEAD_DELAY),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},leadDelayFrame)
@@ -2283,10 +2328,17 @@ function QBAim.new(ctx,parent)
 		addConnection(peakHeightBox.FocusLost:Connect(function()
 			setPeakHeight(peakHeightBox.Text,true)
 		end))
+		releaseDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
+		releaseDelayBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.3f",THROW_ANIMATION_RELEASE_WAIT),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},releaseDelayFrame)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="Release Delay",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},releaseDelayFrame)
+		addConnection(releaseDelayBox.FocusLost:Connect(function()
+			setReleaseDelay(releaseDelayBox.Text,true)
+		end))
 	end
 
 	updateLeadDelayVisuals()
 	updatePeakHeightVisuals()
+	updateReleaseDelayVisuals()
 
 	addConnection(RunService.Heartbeat:Connect(function(dt)
 		if not isAlive() then return end
