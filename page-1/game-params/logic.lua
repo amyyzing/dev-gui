@@ -11,8 +11,8 @@ local DEFAULT_GRAVITY=196.2
 local DEFAULT_SPEED=18
 local SPEED_FORCE_INTERVAL=0.05
 local DEFAULT_SELECTED_PAGE="speed"
-local DIAL_W=252
-local DIAL_H=54
+local DIAL_W=30
+local DIAL_H=30
 local PAGE_TWEEN=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 local PAINT_TWEEN=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 
@@ -37,11 +37,6 @@ local PAGE_ENABLED_KEY={
 	gravity="gravityJumpParamsEnabled",
 	stamina="staminaParamsEnabled",
 }
-local PAGE_TITLE={
-	speed="Speed",
-	gravity="Gravity / Jump",
-	stamina="Stamina",
-}
 local PAGE_SLICE_LABEL={
 	speed="1",
 	gravity="2",
@@ -49,9 +44,9 @@ local PAGE_SLICE_LABEL={
 }
 
 local DIAL_SLICE_HEX={
-	left=[[89504e470d0a1a0a0000000d49484452000000fc000000360806000000e3d8f4b5000001cf4944415478daedddb14a1c411cc7711f2ca01184c8a550d0c2e06be401d4c252411b0b1b2bb1b149932204d3580822762258e4054c482a9bf53f78c571588982bbbfcfc0e7058efdceeddcedcecc745d370364f02180e001c103bd0ffec314e3e5c34545efbee10dc1237843f008de103c82173cf423f81bdd0a9eacbfe50cc1237843f00c31f879ed0a9eac27ed0cc11314bca7ee044fd8b3f4471a163c592fcf3ce858f064bd2d67089ea0e0ade7054fd8fbf0233d0b9eac0d3096352d78b276bc59d0b5e0c9dae2ca9a5ef084ed69d7a2bfd2b8e0c9dac4725fe782276bd7da25ad0b9eac6daadb2dfea9e0216b5ffad5f25ff0907510c58ee021ebe499769bff4df09075d4d45c39173c649d2df7b95c081eb20e93fc54ce040f59a7c7b635fe89e021ebb8e816fe76f92b78c83a1ffe4bf92978c8087ef25b7fabfc163c0c3ff849b3e5a007b7fc2e2a04ffca16cb61b9173c0c3ff8491fcb6eb9133c0c3ff8e935ffd7f243f030fce0a7e31f8d5fe0b9163c0c3bf8e7268095b2d7bdedb65c2e2a04ff4e2780f678ef46f95efe081ec1e74d02ebe31f017f957f8247f07993405b0a6c764fdb77dd0a1ec1e74d02cdda7849705c2ec777043e1f040f081e103c207840f080e001c14376f08f82748fa6104125940000000049454e44ae426082]],
-	center=[[89504e470d0a1a0a0000000d49484452000000fc000000360806000000e3d8f4b5000001964944415478daedd53b6a020114865117669315082e21a5a51b3060ef062c52da27b558066c6c6dc42e8d55402130e8e40f5cbb90264d74ce85af101f33739933f6dab6ed49ea469620012f097849c0ebc7ccdfc77d043cf0c00b78e08117f0c0032fe081071e78010f3cf0021e78e0053cf0c00b78e08107de000f3cf00678e08137c0030f3cf0021e78e0053cf0c00b78e081075ec0030fbc80071e78010f3cf0021e78e08137c0030fbc011e78e00df0c0030fbc80071e78010f3cf0021e78e081b704e081075ec0030fbc80071e78010f3cf0c01be08107de000f3cf00678e081075ec0030fbc80071e78010f3cf0021e78e08117f0c0032fe081075ec0030fbc0cf0c077a8497a4eabb44b0dbfbf4e537b5ad5de26ee21e06fbd7e3548a3344df3f49ad6699f8e7706f958d7b5aeeb9cd7758f6a0fd79db83f80effc83e1bb87344c8f699c9ed2ace02cd24b5aa6b7b449db02f69e0ee9239dd267fd8b9ed3a5305eea7553ef9feaf387fafebe7e6f53bfbface32deaf8b33a9f719ddfb0ceb70f32f0fa7f0f157b005e12f0928097743be0bf00e9711f123d16c0690000000049454e44ae426082]],
-	right=[[89504e470d0a1a0a0000000d49484452000000fc000000360806000000e3d8f4b5000001da4944415478daedddb14a1c511480e17d304123088a2914b4507c0d1fc0a44819411b0b1b2bb1b1b1b110d1c6421049170229f20251b4b2391e712dd204595d77f6dcefc0f70297f999b9cbec9d5e44f480365804103c207840f0f001cce033f1c28584e0eb8f3b3c82173c085ef02078c183e0bb3f3f058fe01bbcbb0b1ec10b1e045f64a6058fe01bbdbb0b1ec147e9b7eb048fe01b98bdf02e3d826f621ec29f67107cbbfb76c123f886f6ed8247f0f5663efc1f1ec137318be1000c04dfc4cc84136f10bc3dbbe0117c8db91e2476c123f8f19bed708825826f6216c2a9b508befc1c0efa082f78043f3e739f96c3b9f408befc7c0f1fa240f0e5e7e8bd1edf058fe0bb3b17692a7c6a0a4a077f993e876fcb41e9e0cfd26cf89824940efe60987b74c123f8d1cf6dfa36cad0058fe0873fa769357c1f1eca06ff277dedc2dd5cf0087e788fec3b69b2ebebe84242f083cddfb49be6c6691d5d4808fef5f33b6da64fe3ba8e2e2404ffff3949eb5ddd930b1ec1bf6d7ec4f31f57e6ab442e78041fff1c17b595962a062e785a0efe261da78dfe6bad13adada30b89aac1dfa5f3fe8f6c6b2dc62d78aa06ff2b9e8f81fad2caa3b9e0a9eee98e7d95f6fb8fe42bfdb0c52d7840f020788b008207040f081e103cd0a5e01f0124bc8f6a6cfc761d0000000049454e44ae426082]],
+	left=[[89504e470d0a1a0a0000000d494844520000001e0000001e08060000003b30aea2000000894944415478daedd6dd0980300c04e08e9341b24376e80eeee034eee054e74bc507515b4872083de8a37cb4f6e70a80c21865c2139e7014bc3360c3955478c33de1b0e03d61b0a22fee70457f5ce105e3a1c1c85e6a575859b0b0e0a70b240536167c3e12145859f0e899762f022b0bee9d7958f5d18f0d17deb9ccbb288c7e206d156afb15ff6b990770b73ff49a33d8440000000049454e44ae426082]],
+	center=[[89504e470d0a1a0a0000000d494844520000001e0000001e08060000003b30aea20000008b4944415478daedd5410dc0200c0550e420040ff380877a981a3ca0eaaf4b38ed022dedb8f427ff42461e840c128074a2d209995bb8954ba3758c650ff8e236ccd3c6b7dbf0bb930e79fa98ab8209fb21297cc32ef72a4cb00fcde002bf94d98ebdb274c6aee8caef640e4a2f1033507b656e835a3859a05af8bb805f5ea763cf62c001071c70c001fbc30f07ad41da3e9c1f5c0000000049454e44ae426082]],
+	right=[[89504e470d0a1a0a0000000d494844520000001e0000001e08060000003b30aea2000000844944415478daedd6c109c0200c40d18ce320d9c11ddc213b741a7770aaf452a178280924a6423e787e886d1498192216249c70c227c223029ed55df05af786bf2a1eb024b486a5352b581b59c07c12dca2608c824b046c3640b4d508d8f492507f54bb61b2be8f255d1e0f01f54ebde1b19ea937dcdfbf8c274ccfecc539917effcabc010d853ff401f0988c0000000049454e44ae426082]],
 }
 
 local function clampStaminaDeplete(value)
@@ -136,7 +131,7 @@ local function getDialSliceAssets()
 	local assets={}
 
 	for key,hex in pairs(DIAL_SLICE_HEX) do
-		local path="params_halfdial_"..key..".png"
+		local path="params_circledial_"..key..".png"
 		local writeOk=pcall(writefile,path,decodeHex(hex))
 		if not writeOk then
 			return nil
@@ -161,10 +156,8 @@ function GameParams.new(ctx,parent)
 	local inputToBinding=ctx.inputToBinding
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
-	local buildToggleRow=ctx.buildToggleRow
 	local state=ctx.State
 	local api={}
-	local toggle=nil
 	local gravitySlider=nil
 	local speedSlider=nil
 	local staminaRegenSlider=nil
@@ -172,10 +165,6 @@ function GameParams.new(ctx,parent)
 	local jumpSlider=nil
 	local diveSlider=nil
 	local dialWrap=nil
-	local pageHeader=nil
-	local pageTitle=nil
-	local pageToggle=nil
-	local pageToggleHolder=nil
 	local pageClip=nil
 	local pageFrames={}
 	local dialImages={}
@@ -222,15 +211,15 @@ function GameParams.new(ctx,parent)
 
 	local function isStateKeyActive(stateKey)
 		local pageKey=PARAM_STATE_PAGE[stateKey]
-		return state.gameParamsEnabled and (not pageKey or isPageEnabled(pageKey))
+		return not pageKey or isPageEnabled(pageKey)
 	end
 
 	local function isSpeedActive()
-		return state.gameParamsEnabled and isPageEnabled("speed")
+		return isPageEnabled("speed")
 	end
 
 	local function isGravityActive()
-		return state.gameParamsEnabled and isPageEnabled("gravity")
+		return isPageEnabled("gravity")
 	end
 
 	local function accentColor()
@@ -250,11 +239,11 @@ function GameParams.new(ctx,parent)
 	end
 
 	local function normalizeState()
-		state.gameParamsEnabled=state.gameParamsEnabled and true or false
+		state.gameParamsEnabled=true
 		state.paramsSelectedPage=normalizePageKey(state.paramsSelectedPage)
-		state.speedParamsEnabled=boolDefault(state.speedParamsEnabled,true)
-		state.gravityJumpParamsEnabled=boolDefault(state.gravityJumpParamsEnabled,true)
-		state.staminaParamsEnabled=boolDefault(state.staminaParamsEnabled,true)
+		state.speedParamsEnabled=boolDefault(state.speedParamsEnabled,false)
+		state.gravityJumpParamsEnabled=boolDefault(state.gravityJumpParamsEnabled,false)
+		state.staminaParamsEnabled=boolDefault(state.staminaParamsEnabled,false)
 		state.speedEnabled=state.speedParamsEnabled
 		state.gravityEnabled=state.gravityJumpParamsEnabled
 		state.gravityValue=clampNumber(state.gravityValue,0,1000,DEFAULT_GRAVITY)
@@ -267,18 +256,14 @@ function GameParams.new(ctx,parent)
 
 	local paintDial=nil
 	local showPage=nil
-	local syncPageHeader=nil
 
 	local function syncControls()
-		if toggle then toggle.set(state.gameParamsEnabled) end
 		if gravitySlider then gravitySlider.set(state.gravityValue) end
 		if speedSlider then speedSlider.set(state.speedValue) end
 		if staminaRegenSlider then staminaRegenSlider.set(state.staminaRegenValue) end
 		if staminaDepleteSlider then staminaDepleteSlider.set(state.staminaDepleteValue) end
 		if jumpSlider then jumpSlider.set(state.jumpPowerValue) end
 		if diveSlider then diveSlider.set(state.divePowerValue) end
-		if pageToggle then pageToggle.set(isPageEnabled(state.paramsSelectedPage)) end
-		if syncPageHeader then syncPageHeader(false) end
 		if paintDial then paintDial(false) end
 		if showPage then showPage(state.paramsSelectedPage,false) end
 	end
@@ -463,10 +448,6 @@ function GameParams.new(ctx,parent)
 	end
 
 	local function watchGameParamsFolder(gameParams)
-		if not state.gameParamsEnabled then
-			return
-		end
-
 		if folderConns[gameParams] then
 			return
 		end
@@ -474,7 +455,7 @@ function GameParams.new(ctx,parent)
 		folderConns[gameParams]={}
 
 		table.insert(folderConns[gameParams],gameParams.ChildAdded:Connect(function(child)
-			if not isAlive() or not state.gameParamsEnabled then return end
+			if not isAlive() then return end
 
 			local stateKey=PARAMS[child.Name]
 			if stateKey and child:IsA("NumberValue") and isStateKeyActive(stateKey) then
@@ -495,7 +476,7 @@ function GameParams.new(ctx,parent)
 	end
 
 	local function applyGameParams()
-		if not isAlive() or not state.gameParamsEnabled then return end
+		if not isAlive() then return end
 
 		for _,gameFolder in ipairs(getTargetGameFolders()) do
 			local gameParams=gameFolder:FindFirstChild("GameParams")
@@ -514,14 +495,12 @@ function GameParams.new(ctx,parent)
 		if not root then return end
 
 		table.insert(rootConns,root.ChildAdded:Connect(function()
-			if state.gameParamsEnabled then
-				task.defer(applyGameParams)
-			end
+			task.defer(applyGameParams)
 		end))
 
 		table.insert(rootConns,root.DescendantAdded:Connect(function(descendant)
 			local stateKey=PARAMS[descendant.Name]
-			if state.gameParamsEnabled and (descendant.Name=="GameParams" or (stateKey and isStateKeyActive(stateKey))) then
+			if descendant.Name=="GameParams" or (stateKey and isStateKeyActive(stateKey)) then
 				task.defer(applyGameParams)
 			end
 		end))
@@ -547,8 +526,6 @@ function GameParams.new(ctx,parent)
 		end
 
 		table.insert(rootConns,ReplicatedStorage.ChildAdded:Connect(function(child)
-			if not state.gameParamsEnabled then return end
-
 			if child.Name=="Games" or child.Name=="MiniGames" then
 				watchRootFolder(child)
 				task.defer(applyGameParams)
@@ -623,12 +600,20 @@ function GameParams.new(ctx,parent)
 	function api.SetParamsSelectedPage(pageKey,fire)
 		state.paramsSelectedPage=normalizePageKey(pageKey)
 		if showPage then showPage(state.paramsSelectedPage,true) end
-		if syncPageHeader then syncPageHeader(true) end
 		if paintDial then paintDial(true) end
-		if pageToggle then pageToggle.set(isPageEnabled(state.paramsSelectedPage)) end
 
 		if fire~=false then
 			changed()
+		end
+	end
+
+	function api.ActivateParamsPage(pageKey,fire)
+		pageKey=normalizePageKey(pageKey)
+
+		if normalizePageKey(state.paramsSelectedPage)==pageKey then
+			api.SetParamsPageEnabled(pageKey,not isPageEnabled(pageKey),fire)
+		else
+			api.SetParamsSelectedPage(pageKey,fire)
 		end
 	end
 
@@ -657,10 +642,6 @@ function GameParams.new(ctx,parent)
 			applyGameParams()
 		end
 
-		if pageToggle and (not pageToggle.get or pageToggle.get()~=isPageEnabled(state.paramsSelectedPage)) then
-			pageToggle.set(isPageEnabled(state.paramsSelectedPage))
-		end
-		if syncPageHeader then syncPageHeader(true) end
 		if paintDial then paintDial(true) end
 
 		if fire~=false then
@@ -668,15 +649,10 @@ function GameParams.new(ctx,parent)
 		end
 	end
 
-	function api.SetGameParamsState(value,fire)
-		state.gameParamsEnabled=value and true or false
-
-		if state.gameParamsEnabled then
-			startWatching()
-			applyGameParams()
-		else
-			disconnectWatchers()
-		end
+	function api.SetGameParamsState(_value,fire)
+		state.gameParamsEnabled=true
+		startWatching()
+		applyGameParams()
 		if isGravityActive() then
 			applyGravity(state.gravityValue)
 		else
@@ -753,36 +729,17 @@ function GameParams.new(ctx,parent)
 		return tween
 	end
 
-	syncPageHeader=function(animate)
-		if not pageTitle then return end
-
-		local pageKey=normalizePageKey(state.paramsSelectedPage)
-		local enabled=isPageEnabled(pageKey)
-		pageTitle.Text=PAGE_TITLE[pageKey] or PAGE_TITLE.speed
-		pageTitle.TextColor3=enabled and textColor() or mutedColor()
-
-		if pageHeader then
-			local target=enabled and themeColor(THEME,"SECTION",themeColor(THEME,"CARD",Color3.fromRGB(38,38,38))) or inputColor()
-			if animate then
-				tweenObject(pageHeader,{BackgroundColor3=target})
-			else
-				pageHeader.BackgroundColor3=target
-			end
-		end
-	end
-
 	paintDial=function(animate)
 		local selected=normalizePageKey(state.paramsSelectedPage)
 		local active=accentColor()
-		local base=inputColor()
 		local muted=mutedColor()
 
 		for _,pageKey in ipairs(PAGE_ORDER) do
 			local enabled=isPageEnabled(pageKey)
 			local isSelected=pageKey==selected
-			local targetColor=isSelected and (enabled and active or muted) or (enabled and base or muted)
-			local targetTransparency=isSelected and (enabled and 0.02 or 0.22) or (enabled and 0.34 or 0.68)
-			local textTarget=enabled and textColor() or muted
+			local targetColor=enabled and active or muted
+			local targetTransparency=isSelected and (enabled and 0.02 or 0.18) or (enabled and 0.48 or 0.68)
+			local textTarget=(enabled or isSelected) and textColor() or muted
 
 			if dialImages[pageKey] then
 				if animate then
@@ -862,20 +819,30 @@ function GameParams.new(ctx,parent)
 	local function createDial(parentFrame)
 		dialWrap=New("Frame",{
 			BackgroundTransparency=1,
-			Size=UDim2.new(1,0,0,DIAL_H+2),
-			LayoutOrder=1,
+			Size=UDim2.fromScale(1,1),
 			ZIndex=6,
 			ClipsDescendants=false,
 		},parentFrame)
 
 		local canvas=New("Frame",{
-			AnchorPoint=Vector2.new(0.5,0),
-			Position=UDim2.new(0.5,0,0,0),
+			AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.fromScale(0.5,0.5),
 			Size=UDim2.fromOffset(DIAL_W,DIAL_H),
 			BackgroundTransparency=1,
-			ClipsDescendants=true,
+			ClipsDescendants=false,
 			ZIndex=6,
 		},dialWrap)
+
+		local baseCircle=New("Frame",{
+			Size=UDim2.fromScale(1,1),
+			BackgroundColor3=inputColor(),
+			BackgroundTransparency=0.18,
+			BorderSizePixel=0,
+			ZIndex=5,
+			ThemeRole="INPUT",
+			CornerRole="Circle",
+		},canvas)
+		New("UICorner",{CornerRadius=UDim.new(1,0)},baseCircle)
 
 		local assets=getDialSliceAssets()
 		local imageKeys={speed="left",gravity="center",stamina="right"}
@@ -894,8 +861,8 @@ function GameParams.new(ctx,parent)
 			else
 				local index=PAGE_INDEX[pageKey]
 				local fallback=New("TextButton",{
-					Position=UDim2.new((index-1)/3,2,0,4),
-					Size=UDim2.new(1/3,-4,1,-10),
+					Position=UDim2.new((index-1)/3,1,0,1),
+					Size=UDim2.new(1/3,-2,1,-2),
 					BackgroundColor3=inputColor(),
 					BackgroundTransparency=0.34,
 					BorderSizePixel=0,
@@ -905,7 +872,7 @@ function GameParams.new(ctx,parent)
 					ZIndex=6,
 					ThemeRole="INPUT",
 				},canvas)
-				New("UICorner",{CornerRadius=UDim.new(0,index==2 and 2 or 18)},fallback)
+				New("UICorner",{CornerRadius=UDim.new(0,10)},fallback)
 				fallbackSlices[pageKey]=fallback
 			end
 		end
@@ -919,7 +886,7 @@ function GameParams.new(ctx,parent)
 				BorderSizePixel=0,
 				Text=PAGE_SLICE_LABEL[pageKey],
 				Font=Enum.Font.GothamBold,
-				TextSize=17,
+				TextSize=11,
 				TextColor3=textColor(),
 				AutoButtonColor=false,
 				Selectable=true,
@@ -927,52 +894,16 @@ function GameParams.new(ctx,parent)
 			},canvas)
 			dialButtons[pageKey]=button
 			button.Activated:Connect(function()
-				api.SetParamsSelectedPage(pageKey,true)
+				api.ActivateParamsPage(pageKey,true)
 			end)
 		end
 	end
 
 	local function createPageEditor(parentFrame)
-		pageHeader=New("Frame",{
-			BackgroundColor3=themeColor(THEME,"SECTION",themeColor(THEME,"CARD",Color3.fromRGB(38,38,38))),
-			BackgroundTransparency=0.22,
-			BorderSizePixel=0,
-			Size=UDim2.new(1,0,0,30),
-			LayoutOrder=2,
-			ZIndex=6,
-			ThemeRole="SECTION",
-			CornerRole="Control",
-		},parentFrame)
-		New("UICorner",{CornerRadius=UDim.new(0,0)},pageHeader)
-
-		pageTitle=New("TextLabel",{
-			BackgroundTransparency=1,
-			Position=UDim2.fromOffset(10,0),
-			Size=UDim2.new(1,-88,1,0),
-			Text=PAGE_TITLE.speed,
-			Font=Enum.Font.GothamBold,
-			TextSize=12,
-			TextColor3=textColor(),
-			TextXAlignment=Enum.TextXAlignment.Left,
-			ZIndex=7,
-		},pageHeader)
-
-		pageToggleHolder=New("Frame",{
-			AnchorPoint=Vector2.new(1,0.5),
-			Position=UDim2.new(1,-8,0.5,0),
-			Size=UDim2.fromOffset(70,24),
-			BackgroundTransparency=1,
-			ZIndex=7,
-		},pageHeader)
-
-		pageToggle=buildToggleRow(pageToggleHolder,"",isPageEnabled(state.paramsSelectedPage),function(value)
-			api.SetParamsPageEnabled(state.paramsSelectedPage,value,true)
-		end)
-
 		pageClip=New("Frame",{
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,0,0,112),
-			LayoutOrder=3,
+			LayoutOrder=1,
 			ClipsDescendants=true,
 			ZIndex=6,
 		},parentFrame)
@@ -1016,32 +947,21 @@ function GameParams.new(ctx,parent)
 
 	normalizeState()
 	section,sectionControls=makeSection(parent,2,"Game Params","",{
-		headerToggle={
-			startState=state.gameParamsEnabled,
-			onChange=function(value)
-				api.SetGameParamsState(value,true)
+		headerCustom={
+			width=40,
+			height=30,
+			build=function(holder)
+				createDial(holder)
 			end,
 		},
 	})
 
-	toggle=sectionControls and sectionControls.toggle
-	if not toggle and buildToggleRow then
-		toggle=buildToggleRow(section,"Game Params",state.gameParamsEnabled,function(value)
-			api.SetGameParamsState(value,true)
-		end)
-	end
-
-	createDial(section)
 	createPageEditor(section)
 
 	function api.Refresh()
 		normalizeState()
-		if state.gameParamsEnabled then
-			startWatching()
-			applyGameParams()
-		else
-			disconnectWatchers()
-		end
+		startWatching()
+		applyGameParams()
 		if isGravityActive() then
 			applyGravity(state.gravityValue)
 		else
@@ -1056,14 +976,14 @@ function GameParams.new(ctx,parent)
 	end
 
 	function api.Reset()
-		state.gameParamsEnabled=false
+		state.gameParamsEnabled=true
 		state.paramsSelectedPage=DEFAULT_SELECTED_PAGE
-		state.speedParamsEnabled=true
-		state.gravityJumpParamsEnabled=true
-		state.staminaParamsEnabled=true
-		state.gravityEnabled=true
+		state.speedParamsEnabled=false
+		state.gravityJumpParamsEnabled=false
+		state.staminaParamsEnabled=false
+		state.gravityEnabled=false
 		state.gravityValue=DEFAULT_GRAVITY
-		state.speedEnabled=true
+		state.speedEnabled=false
 		state.speedValue=DEFAULT_SPEED
 		state.staminaRegenValue=10
 		state.staminaDepleteValue=10
@@ -1081,8 +1001,6 @@ function GameParams.new(ctx,parent)
 		inputConn=nil
 		safeDisconnect(destroyConn)
 		destroyConn=nil
-		destroyControl(toggle)
-		destroyControl(pageToggle)
 		destroyControl(gravitySlider)
 		destroyControl(speedSlider)
 		destroyControl(staminaRegenSlider)

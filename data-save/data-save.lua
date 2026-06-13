@@ -528,11 +528,11 @@ function DataSave.new(ctx)
 			},
 
 			gameParams={
-				enabled=getValue(ctx,"gameParamsEnabled",false),
+				enabled=getValue(ctx,"gameParamsEnabled",true),
 				selectedPage=getValue(ctx,"paramsSelectedPage","speed"),
-				speedEnabled=getValue(ctx,"speedParamsEnabled",true),
-				gravityJumpEnabled=getValue(ctx,"gravityJumpParamsEnabled",true),
-				staminaEnabled=getValue(ctx,"staminaParamsEnabled",true),
+				speedEnabled=getValue(ctx,"speedParamsEnabled",false),
+				gravityJumpEnabled=getValue(ctx,"gravityJumpParamsEnabled",false),
+				staminaEnabled=getValue(ctx,"staminaParamsEnabled",false),
 				staminaRegen=getValue(ctx,"staminaRegenValue",10),
 				staminaDeplete=getValue(ctx,"staminaDepleteValue",10),
 				jumpPower=getValue(ctx,"jumpPowerValue",53.5),
@@ -639,10 +639,19 @@ function DataSave.new(ctx)
 		if gameParams.selectedPage~=nil then
 			applyValue(ctx,"setParamsSelectedPage","paramsSelectedPage",gameParams.selectedPage)
 		end
-		applyBoolean(ctx,"setSpeedParamsState","speedParamsEnabled",gameParams.speedEnabled)
-		applyBoolean(ctx,"setGravityJumpParamsState","gravityJumpParamsEnabled",gameParams.gravityJumpEnabled)
-		applyBoolean(ctx,"setStaminaParamsState","staminaParamsEnabled",gameParams.staminaEnabled)
-		applyBoolean(ctx,"setGameParamsState","gameParamsEnabled",gameParams.enabled)
+		local legacyGameParamsEnabled=gameParams.enabled
+		local speedParamsEnabled=gameParams.speedEnabled
+		local gravityJumpParamsEnabled=gameParams.gravityJumpEnabled
+		local staminaParamsEnabled=gameParams.staminaEnabled
+		if speedParamsEnabled==nil then speedParamsEnabled=legacyGameParamsEnabled end
+		if gravityJumpParamsEnabled==nil then gravityJumpParamsEnabled=legacyGameParamsEnabled end
+		if staminaParamsEnabled==nil then staminaParamsEnabled=legacyGameParamsEnabled end
+		applyBoolean(ctx,"setSpeedParamsState","speedParamsEnabled",speedParamsEnabled)
+		applyBoolean(ctx,"setGravityJumpParamsState","gravityJumpParamsEnabled",gravityJumpParamsEnabled)
+		applyBoolean(ctx,"setStaminaParamsState","staminaParamsEnabled",staminaParamsEnabled)
+		if legacyGameParamsEnabled~=nil or speedParamsEnabled~=nil or gravityJumpParamsEnabled~=nil or staminaParamsEnabled~=nil then
+			applyBoolean(ctx,"setGameParamsState","gameParamsEnabled",true)
+		end
 		applyClamped(ctx,"setStaminaRegenValue","staminaRegenValue",gameParams.staminaRegen,0,50,10)
 		applyClamped(ctx,"setStaminaDepleteValue","staminaDepleteValue",gameParams.staminaDeplete,0,50,10,clampStaminaDeplete)
 		applyClamped(ctx,"setJumpPowerValue","jumpPowerValue",gameParams.jumpPower,0,300,53.5)

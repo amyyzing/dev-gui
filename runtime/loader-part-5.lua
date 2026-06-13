@@ -274,6 +274,11 @@ local function attachDataSaveSetters(ctx)
 		callPage1Api("GameParams","SetGravityState",stateValue,false)
 	end
 
+	ctx.setGameParamsState=function()
+		local stateValue=setPage1Field("gameParamsEnabled",true,true)
+		callPage1Api("GameParams","SetGameParamsState",stateValue,false)
+	end
+
 	ctx.setParamsSelectedPage=function(value)
 		local stateValue=setPage1Field("paramsSelectedPage",tostring(value or "speed"),false)
 		callPage1Api("GameParams","SetParamsSelectedPage",stateValue,false)

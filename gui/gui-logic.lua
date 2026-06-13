@@ -526,9 +526,15 @@ function GuiLogic.new(ctx)
 		local collapsed=false
 		local headerToggleWidth=componentNumber("HeaderToggleWidth",88)
 		local headerToggleHeight=componentNumber("HeaderToggleHeight",30)
+		local headerCustomOptions=options.headerCustom or options.headerControl
+		local headerCustomWidth=headerCustomOptions and (headerCustomOptions.width or headerCustomOptions.Width or 40) or 0
+		local headerCustomHeight=headerCustomOptions and (headerCustomOptions.height or headerCustomOptions.Height or headerToggleHeight) or 0
 		local headerHeight=componentNumber("SectionHeaderHeight",22)
 		if options.headerToggle then
 			headerHeight=math.max(headerHeight,headerToggleHeight)
+		end
+		if headerCustomOptions then
+			headerHeight=math.max(headerHeight,headerCustomHeight)
 		end
 
 		local header=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,headerHeight),ClipsDescendants=true,ZIndex=5,LayoutOrder=1},sec)
@@ -551,7 +557,8 @@ function GuiLogic.new(ctx)
 		local headerButtonOptions=options.headerButton or options.headerAction
 		local headerButtonWidth=headerButtonOptions and (headerButtonOptions.width or headerButtonOptions.Width or 104) or 0
 		local toggleReserve=options.headerToggle and (headerToggleWidth+8) or 0
-		local titleReserve=toggleReserve+(headerButtonOptions and (headerButtonWidth+8) or 0)
+		local customReserve=headerCustomOptions and (headerCustomWidth+8) or 0
+		local titleReserve=toggleReserve+customReserve+(headerButtonOptions and (headerButtonWidth+8) or 0)
 		local usesPrefix=componentValue("SectionPrefix",true)~=false
 		local titleButton=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-titleReserve,1,0),Text=(usesPrefix and "[-] " or "")..titleText,Font=componentFont("TitleFont",Enum.Font.GothamBold),TextSize=componentNumber("SectionTitleSize",14),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,Selectable=true,ZIndex=5},header)
 		local headerRightOffset=0
@@ -575,6 +582,24 @@ function GuiLogic.new(ctx)
 			controls.toggle=createHeaderSwitch(header,toggleOptions.startState,toggleOptions.onChange,6)
 			controls.toggle.wrap.Position=UDim2.new(1,0,0.5,0)
 			headerRightOffset=controls.toggle.width+8
+		end
+
+		if headerCustomOptions then
+			local holder=New("Frame",{
+				Size=UDim2.fromOffset(headerCustomWidth,headerCustomHeight),
+				Position=UDim2.new(1,-headerRightOffset-headerCustomWidth,0.5,-headerCustomHeight/2),
+				BackgroundTransparency=1,
+				BorderSizePixel=0,
+				ClipsDescendants=false,
+				ZIndex=6,
+			},header)
+			controls.headerCustom=holder
+			headerRightOffset=headerRightOffset+headerCustomWidth+8
+
+			local build=headerCustomOptions.build or headerCustomOptions.Build
+			if type(build)=="function" then
+				build(holder,controls)
+			end
 		end
 
 		if headerButtonOptions then
