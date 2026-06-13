@@ -247,7 +247,7 @@ function GuiLogic.new(ctx)
 			local currentMuted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 			local onTextColor=readableOn(currentAccent)
 			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
-			local fillTransparency=state and 0 or 1
+			local fillTransparency=0
 			local bgColor=currentBg
 
 			wrap:SetAttribute("ThemeRole","SLIDER_BG")
@@ -306,7 +306,7 @@ function GuiLogic.new(ctx)
 		end
 
 		setState(state,false,false)
-		return{set=function(v) setState(v,false,false) end,get=function() return state end,Destroy=destroySwitch,destroy=destroySwitch,stateValue=stateValue,wrap=wrap,knob=fill,hit=hit,width=width,height=height}
+		return{set=function(v,animate) setState(v,false,animate~=false) end,get=function() return state end,Destroy=destroySwitch,destroy=destroySwitch,stateValue=stateValue,wrap=wrap,knob=fill,hit=hit,width=width,height=height}
 	end
 
 	local function createHeaderSwitch(parent,startState,onChange,zIndex)

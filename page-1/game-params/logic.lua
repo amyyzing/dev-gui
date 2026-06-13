@@ -11,8 +11,10 @@ local DEFAULT_GRAVITY=196.2
 local DEFAULT_SPEED=18
 local SPEED_FORCE_INTERVAL=0.05
 local DEFAULT_SELECTED_PAGE="speed"
-local DIAL_W=64
-local DIAL_H=64
+local DIAL_W=76
+local DIAL_H=76
+local DIAL_SEPARATOR_W=5
+local DIAL_CENTER_CUTOUT=34
 local PAGE_TWEEN=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 local PAINT_TWEEN=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 
@@ -164,6 +166,8 @@ function GameParams.new(ctx,parent)
 	local dialImages={}
 	local dialButtons={}
 	local fallbackSlices={}
+	local dialSeparators={}
+	local dialCenterCutout=nil
 	local currentPage=nil
 	local pageTweens={}
 	local section=nil
@@ -230,6 +234,10 @@ function GameParams.new(ctx,parent)
 
 	local function textColor()
 		return themeColor(THEME,"TEXT",Color3.fromRGB(225,225,225))
+	end
+
+	local function dialBackColor()
+		return themeColor(THEME,"SECTION",themeColor(THEME,"CARD",inputColor()))
 	end
 
 	local function normalizeState()
@@ -727,6 +735,15 @@ function GameParams.new(ctx,parent)
 		local selected=normalizePageKey(state.paramsSelectedPage)
 		local active=accentColor()
 		local muted=mutedColor()
+		local separatorColor=dialBackColor()
+
+		for _,separator in ipairs(dialSeparators) do
+			separator.BackgroundColor3=separatorColor
+		end
+
+		if dialCenterCutout then
+			dialCenterCutout.BackgroundColor3=separatorColor
+		end
 
 		for _,pageKey in ipairs(PAGE_ORDER) do
 			local enabled=isPageEnabled(pageKey)
@@ -861,6 +878,37 @@ function GameParams.new(ctx,parent)
 			end
 		end
 
+		local separatorColor=dialBackColor()
+		local radius=math.floor(math.min(DIAL_W,DIAL_H)*0.5)
+		for _,angle in ipairs({90,210,330}) do
+			local radians=math.rad(angle)
+			local separator=New("Frame",{
+				AnchorPoint=Vector2.new(0.5,0.5),
+				Position=UDim2.fromOffset(
+					(DIAL_W*0.5)+math.cos(radians)*(radius*0.5),
+					(DIAL_H*0.5)+math.sin(radians)*(radius*0.5)
+				),
+				Size=UDim2.fromOffset(DIAL_SEPARATOR_W,radius+2),
+				Rotation=angle-90,
+				BackgroundColor3=separatorColor,
+				BorderSizePixel=0,
+				ZIndex=7,
+				SkipThemeRole=true,
+			},canvas)
+			table.insert(dialSeparators,separator)
+		end
+
+		dialCenterCutout=New("Frame",{
+			AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.fromScale(0.5,0.5),
+			Size=UDim2.fromOffset(DIAL_CENTER_CUTOUT,DIAL_CENTER_CUTOUT),
+			BackgroundColor3=separatorColor,
+			BorderSizePixel=0,
+			ZIndex=8,
+			SkipThemeRole=true,
+		},canvas)
+		New("UICorner",{CornerRadius=UDim.new(1,0)},dialCenterCutout)
+
 		for _,pageKey in ipairs(PAGE_ORDER) do
 			local index=PAGE_INDEX[pageKey]
 			local button=New("TextButton",{
@@ -932,8 +980,8 @@ function GameParams.new(ctx,parent)
 	normalizeState()
 	section,sectionControls=makeSection(parent,2,"Game Params","",{
 		headerCustom={
-			width=84,
-			height=64,
+			width=100,
+			height=76,
 			build=function(holder)
 				createDial(holder)
 			end,
