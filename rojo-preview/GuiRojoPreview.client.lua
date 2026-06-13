@@ -81,8 +81,8 @@ local PAGE1_STATE={
 	qbAimEnabled=false,
 	qbAimTeamFilter=true,
 	qbAimShowArc=true,
-	qbAimLeadDelay=0.4,
-	qbAimPeakHeight=13.85,
+	qbAimLeadDelay=0.38,
+	qbAimPeakHeight=14.00,
 	testingEnabled=false,
 }
 
