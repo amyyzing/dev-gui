@@ -78,10 +78,6 @@ local C2_GROUND_FALLBACK_MARGIN=2.50
 local C2_MAX_ABOVE_BALL=8.00
 local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
 local QB_RELEASE_EXTRAPOLATE_VERTICAL=false
-local QB_VELOCITY_SMOOTH=0.55
-local QB_VELOCITY_MIN_USE=0.75
-local QB_VELOCITY_MAX=21
-local QB_RELEASE_XZ_SCALE=1.00
 local MIN_T,MAX_T,DT=0.35,6,0.01
 local QB_INHERITANCE=0
 local INTERCEPT_BISECTION_STEPS=12
@@ -142,22 +138,24 @@ local DIAG_STREAK_SIDE_SPEED_MIN=4
 local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
-local THROW_ANIMATION_RELEASE_WAIT=0.13 -- tune this, but now QB movement uses measured position-delta fallback
--- The game appears to latch the target at input, then create/release the football shortly after.
--- The practical release offset looked closer to ~0.13s than the full animation length,
--- so the release prediction is exposed as a tunable delay.
-local THROW_REMOTE_LEAD_TIME=0.035
+-- Animation-to-remote timing stays fixed. User testing showed the outgoing ThrowBall
+-- should wait for the normal animation release window, not fire immediately.
+local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
+local THROW_REMOTE_LEAD_TIME=0.00 -- fire after the full animation release wait
 local RELEASE_FRAME_PLAN_MAX_AGE=0.075
 local THROW_TARGET_LOCK_ON_INPUT=true
 local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
 local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
-local THROW_TARGET_FIRE_IMMEDIATELY=false -- normal flow: latch target at keypress, fire remote shortly before release
+local THROW_TARGET_FIRE_IMMEDIATELY=false
+-- Separate timing terms. Do not use the full animation delay to move C2/origin.
+-- Logs showed the real ball SpawnPos only drifts a small amount from the click-time held ball.
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0.04
+local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
 --   1. Keypress computes one locked plan.
---   2. QB/ball origin is predicted forward by the animation release delay.
---   3. WR is predicted forward by the same release delay.
---   4. Remote is delayed until just before release, then sends the locked future-release Target.
--- This combines the normal delayed remote timing with release-point compensation.
+--   2. C2/QB origin drifts only QB_RELEASE_ORIGIN_DRIFT_TIME.
+--   3. WR is predicted through the full animation release window.
+--   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local VALID_TEAM_IDS={
@@ -677,7 +675,6 @@ function QBAim.new(ctx,parent)
 	local previewFrozen=false
 	local previewFreezeStarted=0
 	local highlightedCharacter=nil
-	local qbMotionData={pos=nil,t=0,vel=Vector3.zero,rawVel=Vector3.zero,source="none"}
 	local connections={}
 	local sectionBody=nil
 	local sectionFrame=nil
@@ -698,15 +695,10 @@ function QBAim.new(ctx,parent)
 	local peakHeightSliderKnob=nil
 	local peakHeightSliderControl=nil
 	local peakHeightDragging=false
-	local releaseDelayFrame=nil
-	local releaseDelayBox=nil
-	local releaseDelaySliderControl=nil
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
 	local PEAK_HEIGHT_MIN=8.00
 	local PEAK_HEIGHT_MAX=20.00
-	local RELEASE_DELAY_MIN=0.00
-	local RELEASE_DELAY_MAX=0.35
 	local updateTargetHighlight=function() end
 
 	if state.qbAimTeamFilter==nil then
@@ -725,15 +717,9 @@ function QBAim.new(ctx,parent)
 		state.qbAimPeakHeight=WR_MAX_Y
 	end
 
-	if state.qbAimReleaseDelay==nil then
-		state.qbAimReleaseDelay=THROW_ANIMATION_RELEASE_WAIT
-	end
-
 	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
 	WR_MAX_Y=math.clamp(tonumber(state.qbAimPeakHeight) or WR_MAX_Y,PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX)
-	THROW_ANIMATION_RELEASE_WAIT=math.clamp(tonumber(state.qbAimReleaseDelay) or THROW_ANIMATION_RELEASE_WAIT,RELEASE_DELAY_MIN,RELEASE_DELAY_MAX)
 	state.qbAimPeakHeight=WR_MAX_Y
-	state.qbAimReleaseDelay=THROW_ANIMATION_RELEASE_WAIT
 	C1_Y_MIN=WR_MAX_Y
 	C1_Y_MAX=WR_MAX_Y
 	C1_Y_FIXED=WR_MAX_Y
@@ -819,16 +805,6 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
-	local function updateReleaseDelayVisuals()
-		if releaseDelaySliderControl then
-			releaseDelaySliderControl.set(THROW_ANIMATION_RELEASE_WAIT)
-		end
-
-		if releaseDelayBox then
-			releaseDelayBox.Text=string.format("%.3f",THROW_ANIMATION_RELEASE_WAIT)
-		end
-	end
-
 	local function setLeadDelay(value,showStatus)
 		local numberValue=tonumber(value)
 		if not numberValue then
@@ -857,22 +833,6 @@ function QBAim.new(ctx,parent)
 		state.qbAimPeakHeight=WR_MAX_Y
 		syncPeakHeightConstants()
 		updatePeakHeightVisuals()
-		if showStatus then
-			changed()
-		end
-		return true
-	end
-
-	local function setReleaseDelay(value,showStatus)
-		local numberValue=tonumber(value)
-		if not numberValue then
-			updateReleaseDelayVisuals()
-			return false
-		end
-
-		THROW_ANIMATION_RELEASE_WAIT=math.clamp(numberValue,RELEASE_DELAY_MIN,RELEASE_DELAY_MAX)
-		state.qbAimReleaseDelay=THROW_ANIMATION_RELEASE_WAIT
-		updateReleaseDelayVisuals()
 		if showStatus then
 			changed()
 		end
@@ -1043,7 +1003,6 @@ function QBAim.new(ctx,parent)
 
 		updateLeadDelayVisuals()
 		updatePeakHeightVisuals()
-		updateReleaseDelayVisuals()
 		setTargetText()
 
 		if not isAvailable() then
@@ -1357,48 +1316,6 @@ function QBAim.new(ctx,parent)
 		return receiverMaxAt(receiverRoot.Position)
 	end
 
-
-	local function getQBReleaseVelocity(qbRoot)
-		if not qbRoot then
-			return Vector3.zero,"none"
-		end
-
-		local now=os.clock()
-		local position=qbRoot.Position
-		local assembly=flat(qbRoot.AssemblyLinearVelocity or Vector3.zero)
-		local raw=Vector3.zero
-		local source="assembly"
-
-		if qbMotionData.pos and qbMotionData.t and now>qbMotionData.t then
-			local dt=math.clamp(now-qbMotionData.t,1/240,0.15)
-			raw=flat((position-qbMotionData.pos)/dt)
-		end
-
-		qbMotionData.pos=position
-		qbMotionData.t=now
-		qbMotionData.rawVel=clampMagnitude(raw,QB_VELOCITY_MAX)
-
-		local chosen=assembly
-		if assembly.Magnitude<QB_VELOCITY_MIN_USE and raw.Magnitude>=QB_VELOCITY_MIN_USE then
-			chosen=raw
-			source="position_delta"
-		elseif assembly.Magnitude>=QB_VELOCITY_MIN_USE and raw.Magnitude>=QB_VELOCITY_MIN_USE then
-			-- Local characters sometimes report delayed/noisy AssemblyLinearVelocity.
-			-- Blend toward position-delta motion so release prediction actually changes while moving.
-			chosen=safeVectorLerp(assembly,raw,0.45)
-			source="assembly+delta"
-		elseif assembly.Magnitude<QB_VELOCITY_MIN_USE then
-			chosen=Vector3.zero
-			source="stopped"
-		end
-
-		chosen=clampMagnitude(flat(chosen),QB_VELOCITY_MAX)
-		qbMotionData.vel=safeVectorLerp(qbMotionData.vel or Vector3.zero,chosen,QB_VELOCITY_SMOOTH)
-		qbMotionData.vel=clampMagnitude(flat(qbMotionData.vel),QB_VELOCITY_MAX)
-		qbMotionData.source=source
-		return qbMotionData.vel,source
-	end
-
 	local function qbYCorrection(qbRoot)
 		local y=qbRoot.Position.Y
 		local vy=qbRoot.AssemblyLinearVelocity.Y
@@ -1412,7 +1329,7 @@ function QBAim.new(ctx,parent)
 
 	local function origin(qbRoot,ball,releaseOffset)
 		releaseOffset=releaseOffset or 0
-		local rootVelocity=getQBReleaseVelocity(qbRoot)
+		local rootVelocity=qbRoot.AssemblyLinearVelocity
 		local basePosition=ball and ball.Position or qbRoot.Position
 
 		local baseY=basePosition.Y
@@ -1424,8 +1341,8 @@ function QBAim.new(ctx,parent)
 
 		local dx,dz=0,0
 		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and releaseOffset>0 then
-			dx=rootVelocity.X*releaseOffset*QB_RELEASE_XZ_SCALE
-			dz=rootVelocity.Z*releaseOffset*QB_RELEASE_XZ_SCALE
+			dx=rootVelocity.X*releaseOffset
+			dz=rootVelocity.Z*releaseOffset
 		end
 
 		if QB_RELEASE_EXTRAPOLATE_VERTICAL and releaseOffset>0 then
@@ -1712,7 +1629,7 @@ function QBAim.new(ctx,parent)
 		qbReleaseOffset=qbReleaseOffset or 0
 		receiverReleaseOffset=receiverReleaseOffset==nil and qbReleaseOffset or receiverReleaseOffset
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
-		local qbVel=clampMagnitude(flat(getQBReleaseVelocity(qbRoot)),MAX_RUN_SPEED)
+		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
 		-- Delayed future-release model:
 		-- The throw request is sent near release, but the plan is locked on keypress.
 		-- Predict the actual server SpawnPos/release origin forward by qbReleaseOffset,
@@ -1764,9 +1681,6 @@ function QBAim.new(ctx,parent)
 		end
 		if best then
 			best.qbReleaseOffset=qbReleaseOffset
-			best.qbReleaseVelocity=qbVel
-			best.qbVelocitySource=qbMotionData.source
-			best.qbPredictedReleaseDrift=qbVel*(qbReleaseOffset or 0)*QB_RELEASE_XZ_SCALE
 			best.receiverReleaseOffset=receiverReleaseOffset
 			best.futureReleaseOriginLatch=(qbReleaseOffset or 0)>0
 			best.remoteFireDelayed=not THROW_TARGET_FIRE_IMMEDIATELY
@@ -2169,12 +2083,13 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		-- Lock one plan at keypress, but solve it from the predicted release point.
-		-- Use the tunable release delay for BOTH the QB/ball origin and receiver position.
-		-- The previous 0.266s default over-predicted the moving release point; 0.13s
-		-- is the current calibration target, adjustable with the Release Delay slider.
-		local lockedReleaseOffset=THROW_ANIMATION_RELEASE_WAIT+THROW_TARGET_LOCK_EXTRA_DELAY
-		local lockedPlan=buildPlan(receiver,power,lockedReleaseOffset,heldBall,lockedReleaseOffset)
+		-- Lock one plan at keypress. Keep animation-to-fire timing at 0.2666s,
+		-- but do not use that whole value to move C2/origin. The QB/ball release
+		-- origin gets a small measured drift; the WR prediction uses the full
+		-- animation window.
+		local lockedQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		local lockedPlan=buildPlan(receiver,power,lockedQBOffset,heldBall,lockedWROffset)
 		if not lockedPlan then
 			setStatus("No target-latch throw solution")
 			return
@@ -2300,10 +2215,6 @@ function QBAim.new(ctx,parent)
 		setPeakHeight(value,fire~=false)
 	end
 
-	function api.SetReleaseDelay(value,fire)
-		setReleaseDelay(value,fire~=false)
-	end
-
 	function api.Refresh()
 		syncControls()
 	end
@@ -2362,9 +2273,6 @@ function QBAim.new(ctx,parent)
 		peakHeightSliderControl=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
 			api.SetPeakHeight(value,true)
 		end)
-		releaseDelaySliderControl=buildSlider(sectionBody,"Release Delay",RELEASE_DELAY_MIN,RELEASE_DELAY_MAX,THROW_ANIMATION_RELEASE_WAIT,3,function(value)
-			api.SetReleaseDelay(value,true)
-		end)
 	else
 		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
 		leadDelayBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",WR_LEAD_DELAY),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},leadDelayFrame)
@@ -2378,17 +2286,10 @@ function QBAim.new(ctx,parent)
 		addConnection(peakHeightBox.FocusLost:Connect(function()
 			setPeakHeight(peakHeightBox.Text,true)
 		end))
-		releaseDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
-		releaseDelayBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.3f",THROW_ANIMATION_RELEASE_WAIT),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},releaseDelayFrame)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="Release Delay",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},releaseDelayFrame)
-		addConnection(releaseDelayBox.FocusLost:Connect(function()
-			setReleaseDelay(releaseDelayBox.Text,true)
-		end))
 	end
 
 	updateLeadDelayVisuals()
 	updatePeakHeightVisuals()
-	updateReleaseDelayVisuals()
 
 	addConnection(RunService.Heartbeat:Connect(function(dt)
 		if not isAlive() then return end
@@ -2473,8 +2374,9 @@ function QBAim.new(ctx,parent)
 		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
 		preview.last=now
 
-		local previewReleaseOffset=THROW_ANIMATION_RELEASE_WAIT+THROW_TARGET_LOCK_EXTRA_DELAY
-		local plan=buildPlan(trackedReceiver,nil,previewReleaseOffset,nil,previewReleaseOffset)
+		local previewQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		local previewWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		local plan=buildPlan(trackedReceiver,nil,previewQBOffset,nil,previewWROffset)
 		if plan then
 			previewPlan(plan)
 		end
