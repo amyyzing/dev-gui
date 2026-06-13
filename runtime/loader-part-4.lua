@@ -4,6 +4,7 @@ refreshPage2UI=function() end
 PAGE2_EXPANDED_OWNED={}
 PAGE2_APIS={}
 PlayerDataAPI=nil
+ResetPositionAPI=nil
 DiscordAPI=nil
 SETTINGS_CONNECTIONS={}
 
@@ -136,7 +137,7 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 end
 
 function refreshSettingsPage()
-	refreshRuntimeAPIs({"AntiMaterialAPI","MapCleanerAPI","RemoveAdsAPI","DiscordAPI"})
+	refreshRuntimeAPIs({"AntiMaterialAPI","MapCleanerAPI","RemoveAdsAPI","ResetPositionAPI","DiscordAPI"})
 end
 
 function buildUpdateSection()
@@ -249,16 +250,35 @@ function makeDiscordCtx()
 	}
 end
 
+function makeResetPositionCtx()
+	return{
+		New=New,
+		Fusion=FusionModule,
+		THEME=THEME,
+		MainFrame=MainFrame,
+		root=root,
+		ResetPositionLogicModule=ResetPositionLogicModule,
+		makeSection=makeSection,
+		wrapTextButton=wrapTextButton,
+		scheduleSave=function()
+			if DataSaveAPI and DataSaveAPI.Schedule then
+				DataSaveAPI.Schedule()
+			end
+		end,
+	}
+end
+
 function buildActualSettingsPage()
 	loadDeferredModuleNames(SETTINGS_RELOAD_NAMES)
 	buildUpdateSection()
 
-	PlayerDataAPI=buildRuntimeModule({name="PlayerData",api="PlayerDataAPI",order=1,title="Player Data"},makePlayerDataCtx(),actualSettingsPage,{
+	ResetPositionAPI=buildRuntimeModule({name="ResetPosition",api="ResetPositionAPI",order=2,title="GUI Position"},makeResetPositionCtx(),actualSettingsPage)
+	PlayerDataAPI=buildRuntimeModule({name="PlayerData",api="PlayerDataAPI",order=3,title="Player Data"},makePlayerDataCtx(),actualSettingsPage,{
 		Workspace=AntiMaterialAPI,
 		AntiMaterial=AntiMaterialAPI,
 		MapCleaner=MapCleanerAPI,
 	})
-	DiscordAPI=buildRuntimeModule({name="Discord",api="DiscordAPI",order=3,title="Discord"},makeDiscordCtx(),actualSettingsPage)
+	DiscordAPI=buildRuntimeModule({name="Discord",api="DiscordAPI",order=4,title="Discord"},makeDiscordCtx(),actualSettingsPage)
 	refreshSettingsPage()
 end
 
@@ -270,7 +290,7 @@ function clearActualSettingsPage()
 end
 
 rebuildSettingsFromModules=function()
-	destroyRuntimeAPIs({"PlayerDataAPI","DiscordAPI"})
+	destroyRuntimeAPIs({"PlayerDataAPI","ResetPositionAPI","DiscordAPI"})
 	clearActualSettingsPage()
 	LAZY_PAGE_BUILT.settings=false
 

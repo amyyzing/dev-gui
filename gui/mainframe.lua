@@ -1137,6 +1137,20 @@ function MainFrame.new(ctx)
 		updateResponsiveLayout()
 	end
 
+	function api.ResetPosition(animate)
+		local defaultPosition=UDim2.new(0.5,0,0,rootStartY)
+		if animate==false then
+			if rootPositionTween then
+				rootPositionTween:Cancel()
+				rootPositionTween=nil
+			end
+			root.Position=defaultPosition
+		else
+			tweenRootPosition(defaultPosition,0.18)
+		end
+		return defaultPosition
+	end
+
 	function api.RefreshTheme()
 		pageShell.BackgroundTransparency=pageShellTransparency
 		pageSlider.BackgroundTransparency=pageSliderTransparency

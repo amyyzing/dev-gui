@@ -517,6 +517,8 @@ MODULE_PATHS={
 	RemoveAdsLogic="page-2/remove-ads/logic.lua",
 	PlayerData="page-6/player-data/gui.lua",
 	PlayerDataLogic="page-6/player-data/logic.lua",
+	ResetPosition="page-6/reset-position/gui.lua",
+	ResetPositionLogic="page-6/reset-position/logic.lua",
 	Discord="page-6/discord/gui.lua",
 	DiscordLogic="page-6/discord/logic.lua",
 	DataSave="data-save/data-save.lua",
@@ -527,7 +529,7 @@ OPTIONAL_MODULE_NAMES={"PrimaryColour","SecondaryColour"}
 MAP_RELOAD_NAMES={"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds"}
 CUSTOMIZE_RELOAD_NAMES={"StrokeColourLogic","StrokeColour"}
 PAGE2_RELOAD_NAMES={"HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor"}
-SETTINGS_RELOAD_NAMES={"PlayerDataLogic","PlayerData","DiscordLogic","Discord"}
+SETTINGS_RELOAD_NAMES={"PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord"}
 
 function moduleGlobalName(name)
 	return MODULE_GLOBAL_NAMES[name] or (tostring(name).."Module")
@@ -1400,6 +1402,7 @@ function cleanupForManualReload()
 			"MapCleanerAPI",
 			"RemoveAdsAPI",
 			"PlayerDataAPI",
+			"ResetPositionAPI",
 			"DiscordAPI",
 		})
 	end
