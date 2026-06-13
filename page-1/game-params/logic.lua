@@ -11,8 +11,8 @@ local DEFAULT_GRAVITY=196.2
 local DEFAULT_SPEED=18
 local SPEED_FORCE_INTERVAL=0.05
 local DEFAULT_SELECTED_PAGE="speed"
-local DIAL_W=30
-local DIAL_H=30
+local DIAL_W=42
+local DIAL_H=42
 local PAGE_TWEEN=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 local PAINT_TWEEN=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 
@@ -37,16 +37,10 @@ local PAGE_ENABLED_KEY={
 	gravity="gravityJumpParamsEnabled",
 	stamina="staminaParamsEnabled",
 }
-local PAGE_SLICE_LABEL={
-	speed="1",
-	gravity="2",
-	stamina="3",
-}
-
 local DIAL_SLICE_HEX={
-	left=[[89504e470d0a1a0a0000000d494844520000001e0000001e08060000003b30aea2000000894944415478daedd6dd0980300c04e08e9341b24376e80eeee034eee054e74bc507515b4872083de8a37cb4f6e70a80c21865c2139e7014bc3360c3955478c33de1b0e03d61b0a22fee70457f5ce105e3a1c1c85e6a575859b0b0e0a70b240536167c3e12145859f0e899762f022b0bee9d7958f5d18f0d17deb9ccbb288c7e206d156afb15ff6b990770b73ff49a33d8440000000049454e44ae426082]],
-	center=[[89504e470d0a1a0a0000000d494844520000001e0000001e08060000003b30aea20000008b4944415478daedd5410dc0200c0550e420040ff380877a981a3ca0eaaf4b38ed022dedb8f427ff42461e840c128074a2d209995bb8954ba3758c650ff8e236ccd3c6b7dbf0bb930e79fa98ab8209fb21297cc32ef72a4cb00fcde002bf94d98ebdb274c6aee8caef640e4a2f1033507b656e835a3859a05af8bb805f5ea763cf62c001071c70c001fbc30f07ad41da3e9c1f5c0000000049454e44ae426082]],
-	right=[[89504e470d0a1a0a0000000d494844520000001e0000001e08060000003b30aea2000000844944415478daedd6c109c0200c40d18ce320d9c11ddc213b741a7770aaf452a178280924a6423e787e886d1498192216249c70c227c223029ed55df05af786bf2a1eb024b486a5352b581b59c07c12dca2608c824b046c3640b4d508d8f492507f54bb61b2be8f255d1e0f01f54ebde1b19ea937dcdfbf8c274ccfecc539917effcabc010d853ff401f0988c0000000049454e44ae426082]],
+	left=[[89504e470d0a1a0a0000000d494844520000002a0000002a0806000000c5c3c95b000000cd4944415478daedd8c10dc2300c05d0ec9205324d17e8025980053a4ec6e9022c90fb07a458200e50a8e5faabfe52aed55312b98e1380c4b05240031ad0800634a0aea1f9be3a0374c1336ea1b29bef71079df1396ea00ddfe302dab13d87410bfe8b3974c2be98412bf6c7047a815e68a0f07ef426d089055a58a0bf16fc43a18d053ab340b3e2f19b36ceaea15abb6af2b8ab2c508d0a60067d5c8195012a7fab2b0354b02b0354ae416380be5683ce0095dd5d3680dd0cc9f2e80d9ad57445eb436534df753c6bce3b76bc01a374254a1d2852fe0000000049454e44ae426082]],
+	center=[[89504e470d0a1a0a0000000d494844520000002a0000002a0806000000c5c3c95b000000d74944415478daedd7cd0d83300c0560766101a6e9022ce005ba00e3649c2cc002dcdd54caa92a8903760ce83de95d103f9f80403230f370876a9d684a7da552ea3b97f2b6c9133aa6cea92175e37ab6bcef9c8f35877e2fb2087125f4d20a6e41d249e03f306942c7fcd8ac12247757324822db27d6065d0db972bfac256ce97147ee9fb8f71aec4103fb2548a1c4fe21e91df54ed360ba0c52fa1d75051ef933b9008ffeeb5d9067664fdd805af35173a0f6c4d90ca80d1d2c91dad05ff025d74cb759dc010a28a080020a28a080020a28a0803e11fa01e4772699b8e9bf4f0000000049454e44ae426082]],
+	right=[[89504e470d0a1a0a0000000d494844520000002a0000002a0806000000c5c3c95b000000c84944415478daedd8cb0d84300c04d0f49206a8260dd0401aa001ca493934b00de46e380409102c6871cc78f148be3fc5727e8e889c86720635a8410d6a50831af442e5a93c3a744e8f0add66b5aa88c0655a14e859d2d3d0abc94f417f492309bd932005bd9b581bca95ae2694de088d5aa0410bb4d100adbee173256981b61aa022d73c8e885c9c595713191aa51e772c938e0c1db62d47847ee65308193a7c43a240d351bb51a0796fba91a0b96ce69e00fe9ef670a99cdd9e803ec9bad2d67036247ff7ed3802e3c4254a2c40e5b50000000049454e44ae426082]],
 }
 
 local function clampStaminaDeplete(value)
@@ -833,17 +827,6 @@ function GameParams.new(ctx,parent)
 			ZIndex=6,
 		},dialWrap)
 
-		local baseCircle=New("Frame",{
-			Size=UDim2.fromScale(1,1),
-			BackgroundColor3=inputColor(),
-			BackgroundTransparency=0.18,
-			BorderSizePixel=0,
-			ZIndex=5,
-			ThemeRole="INPUT",
-			CornerRole="Circle",
-		},canvas)
-		New("UICorner",{CornerRadius=UDim.new(1,0)},baseCircle)
-
 		local assets=getDialSliceAssets()
 		local imageKeys={speed="left",gravity="center",stamina="right"}
 
@@ -884,7 +867,7 @@ function GameParams.new(ctx,parent)
 				Size=UDim2.new(1/3,0,1,0),
 				BackgroundTransparency=1,
 				BorderSizePixel=0,
-				Text=PAGE_SLICE_LABEL[pageKey],
+				Text="",
 				Font=Enum.Font.GothamBold,
 				TextSize=11,
 				TextColor3=textColor(),
@@ -948,8 +931,8 @@ function GameParams.new(ctx,parent)
 	normalizeState()
 	section,sectionControls=makeSection(parent,2,"Game Params","",{
 		headerCustom={
-			width=40,
-			height=30,
+			width=54,
+			height=42,
 			build=function(holder)
 				createDial(holder)
 			end,
