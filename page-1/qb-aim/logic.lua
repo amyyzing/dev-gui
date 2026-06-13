@@ -139,8 +139,9 @@ local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
 local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
--- The game appears to latch the visible target/arc at click, then send the remote shortly before release.
--- Solve from click origin, while predicting only the WR forward to the release frame.
+-- The game appears to latch the target at input, but the visible ball SpawnPos is produced
+-- about the animation-release delay later. Solve the throw from that predicted future
+-- release point, then delay the outgoing remote until just before release.
 local THROW_REMOTE_LEAD_TIME=0.035
 local RELEASE_FRAME_PLAN_MAX_AGE=0.075
 local THROW_TARGET_LOCK_ON_INPUT=true
@@ -148,10 +149,11 @@ local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
 local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
 local THROW_TARGET_FIRE_IMMEDIATELY=false -- normal flow: latch target at keypress, fire remote shortly before release
 -- Key model:
---   1. Keypress computes the locked preview/world Target from the current QB/ball origin.
---   2. WR is predicted forward to the animation release window.
---   3. Remote is delayed until just before release, but sends the locked world Target.
--- This avoids the previous future-spawn translation that pushed moving-QB throws wide.
+--   1. Keypress computes one locked plan.
+--   2. QB/ball origin is predicted forward by the animation release delay.
+--   3. WR is predicted forward by the same release delay.
+--   4. Remote is delayed until just before release, then sends the locked future-release Target.
+-- This combines the normal delayed remote timing with release-point compensation.
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local VALID_TEAM_IDS={
@@ -1626,11 +1628,11 @@ function QBAim.new(ctx,parent)
 		receiverReleaseOffset=receiverReleaseOffset==nil and qbReleaseOffset or receiverReleaseOffset
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
 		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
-		-- Target-latch model:
-		-- The preview/target is locked when the key is pressed. The actual ThrowBall
-		-- remote is fired shortly before release with that locked world Target.
-		-- For the locked plan, qbReleaseOffset should be 0 so the aim ray matches
-		-- the original preview arc instead of translating to the future QB point.
+		-- Delayed future-release model:
+		-- The throw request is sent near release, but the plan is locked on keypress.
+		-- Predict the actual server SpawnPos/release origin forward by qbReleaseOffset,
+		-- predict the receiver by receiverReleaseOffset, and build the outgoing Target
+		-- ray from that future release point.
 		local originPosition=origin(qbRoot,ball,qbReleaseOffset)
 		local receiverReleasePosition=receiverRoot.Position+wrVel*receiverReleaseOffset
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
@@ -1678,7 +1680,7 @@ function QBAim.new(ctx,parent)
 		if best then
 			best.qbReleaseOffset=qbReleaseOffset
 			best.receiverReleaseOffset=receiverReleaseOffset
-			best.clickOriginLatch=(qbReleaseOffset or 0)==0
+			best.futureReleaseOriginLatch=(qbReleaseOffset or 0)>0
 			best.remoteFireDelayed=not THROW_TARGET_FIRE_IMMEDIATELY
 		end
 
@@ -2079,13 +2081,12 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		-- Lock the throw target at keypress using the same origin as the visible preview.
-		-- The receiver is still predicted through the animation delay, but the QB origin
-		-- for the outgoing Target ray is NOT translated to the future QB point.
-		-- This matches the normal behavior you observed: preview stops on keypress,
-		-- then the remote appears shortly before release using the locked target.
-		local lockedReceiverReleaseOffset=THROW_ANIMATION_RELEASE_WAIT+THROW_TARGET_LOCK_EXTRA_DELAY
-		local lockedPlan=buildPlan(receiver,power,0,heldBall,lockedReceiverReleaseOffset)
+		-- Lock one plan at keypress, but solve it from the predicted release point.
+		-- The normal game appears to show the release/SpawnPos about 0.2-0.266s after input.
+		-- Apply that delay to BOTH the QB/ball origin and the receiver position, then
+		-- delay the remote fire until shortly before release.
+		local lockedReleaseOffset=THROW_ANIMATION_RELEASE_WAIT+THROW_TARGET_LOCK_EXTRA_DELAY
+		local lockedPlan=buildPlan(receiver,power,lockedReleaseOffset,heldBall,lockedReleaseOffset)
 		if not lockedPlan then
 			setStatus("No target-latch throw solution")
 			return
@@ -2111,7 +2112,7 @@ function QBAim.new(ctx,parent)
 
 		if ok then
 			freezePreviewAtCurrentPlan(plan)
-			setStatus(currentModeText().." delayed locked-target throw sent")
+			setStatus(currentModeText().." delayed future-release throw sent")
 		else
 			setStatus(err or "Throw failed")
 		end
@@ -2370,7 +2371,8 @@ function QBAim.new(ctx,parent)
 		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
 		preview.last=now
 
-		local plan=buildPlan(trackedReceiver,nil,0,nil,THROW_ANIMATION_RELEASE_WAIT)
+		local previewReleaseOffset=THROW_ANIMATION_RELEASE_WAIT+THROW_TARGET_LOCK_EXTRA_DELAY
+		local plan=buildPlan(trackedReceiver,nil,previewReleaseOffset,nil,previewReleaseOffset)
 		if plan then
 			previewPlan(plan)
 		end
