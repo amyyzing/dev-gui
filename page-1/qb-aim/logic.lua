@@ -148,16 +148,15 @@ local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
 local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
 local THROW_TARGET_FIRE_IMMEDIATELY=false
 -- Separate timing terms. Do not use the full animation delay to move C2/origin.
--- Logs showed the real ball SpawnPos only drifts a small amount from the click-time held ball.
+-- The release-origin drift is unified across X/Y/Z: one time value moves the whole origin vector.
 local QB_RELEASE_ORIGIN_DRIFT_TIME=0.04
-local QB_RELEASE_VERTICAL_DRIFT_TIME=0.13
+local QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME -- kept as alias for internal compatibility
 local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
 --   1. Keypress computes one locked plan.
---   2. C2/QB XZ origin drifts only QB_RELEASE_ORIGIN_DRIFT_TIME.
---   3. C2/QB Y origin uses QB_RELEASE_VERTICAL_DRIFT_TIME so jumping throws can be timed separately.
---   4. WR is predicted through the full animation release window.
+--   2. C2/QB origin drifts by the same time on X, Y, and Z.
+--   3. WR is predicted through the full animation release window.
 --   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
@@ -734,14 +733,11 @@ function QBAim.new(ctx,parent)
 		state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
 	end
 
-	if state.qbAimQBYDrift==nil then
-		state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
-	end
 
 	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
 	WR_MAX_Y=math.clamp(tonumber(state.qbAimPeakHeight) or WR_MAX_Y,PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX)
 	QB_RELEASE_ORIGIN_DRIFT_TIME=math.clamp(tonumber(state.qbAimQBDrift) or QB_RELEASE_ORIGIN_DRIFT_TIME,QB_DRIFT_MIN,QB_DRIFT_MAX)
-	QB_RELEASE_VERTICAL_DRIFT_TIME=math.clamp(tonumber(state.qbAimQBYDrift) or QB_RELEASE_VERTICAL_DRIFT_TIME,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
+	QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME
 	state.qbAimPeakHeight=WR_MAX_Y
 	state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
 	state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
@@ -875,8 +871,11 @@ function QBAim.new(ctx,parent)
 		end
 
 		QB_RELEASE_ORIGIN_DRIFT_TIME=math.clamp(numberValue,QB_DRIFT_MIN,QB_DRIFT_MAX)
+		QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME
 		state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
+		state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
 		updateQBDriftVisuals()
+		updateQBYDriftVisuals()
 		if showStatus then
 			changed()
 		end
@@ -884,19 +883,8 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function setQBYDrift(value,showStatus)
-		local numberValue=tonumber(value)
-		if not numberValue then
-			updateQBYDriftVisuals()
-			return false
-		end
-
-		QB_RELEASE_VERTICAL_DRIFT_TIME=math.clamp(numberValue,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
-		state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
-		updateQBYDriftVisuals()
-		if showStatus then
-			changed()
-		end
-		return true
+		-- Compatibility shim: X/Y/Z release-origin drift is one shared value.
+		return setQBDrift(value,showStatus)
 	end
 
 	local function setPeakHeight(value,showStatus)
@@ -1419,9 +1407,10 @@ function QBAim.new(ctx,parent)
 
 	local function origin(qbRoot,ball,xzReleaseOffset,yReleaseOffset)
 		xzReleaseOffset=xzReleaseOffset or 0
+		-- X/Y/Z share the same release-origin drift time unless explicitly overridden.
 		yReleaseOffset=yReleaseOffset
 		if yReleaseOffset==nil then
-			yReleaseOffset=QB_RELEASE_VERTICAL_DRIFT_TIME or 0
+			yReleaseOffset=xzReleaseOffset
 		end
 
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
@@ -1732,7 +1721,7 @@ function QBAim.new(ctx,parent)
 		-- Predict the actual server SpawnPos/release origin forward by qbReleaseOffset,
 		-- predict the receiver by receiverReleaseOffset, and build the outgoing Target
 		-- ray from that future release point.
-		local originPosition=origin(qbRoot,ball,qbReleaseOffset,QB_RELEASE_VERTICAL_DRIFT_TIME)
+		local originPosition=origin(qbRoot,ball,qbReleaseOffset,qbReleaseOffset)
 		local receiverReleasePosition=receiverRoot.Position+wrVel*receiverReleaseOffset
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
 		local bestRoot=nil
@@ -1778,7 +1767,7 @@ function QBAim.new(ctx,parent)
 		end
 		if best then
 			best.qbReleaseOffset=qbReleaseOffset
-			best.qbVerticalReleaseOffset=QB_RELEASE_VERTICAL_DRIFT_TIME
+			best.qbSharedReleaseOffset=qbReleaseOffset
 			best.receiverReleaseOffset=receiverReleaseOffset
 			best.futureReleaseOriginLatch=(qbReleaseOffset or 0)>0
 			best.remoteFireDelayed=not THROW_TARGET_FIRE_IMMEDIATELY
@@ -2381,11 +2370,8 @@ function QBAim.new(ctx,parent)
 		peakHeightSliderControl=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
 			api.SetPeakHeight(value,true)
 		end)
-		qbDriftSliderControl=buildSlider(sectionBody,"QB XZ Drift",QB_DRIFT_MIN,QB_DRIFT_MAX,QB_RELEASE_ORIGIN_DRIFT_TIME,2,function(value)
+		qbDriftSliderControl=buildSlider(sectionBody,"QB XYZ Drift",QB_DRIFT_MIN,QB_DRIFT_MAX,QB_RELEASE_ORIGIN_DRIFT_TIME,2,function(value)
 			api.SetQBDrift(value,true)
-		end)
-		qbYDriftSliderControl=buildSlider(sectionBody,"QB Y Drift",QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX,QB_RELEASE_VERTICAL_DRIFT_TIME,2,function(value)
-			api.SetQBYDrift(value,true)
 		end)
 	else
 		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
