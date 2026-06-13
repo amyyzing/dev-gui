@@ -137,7 +137,7 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 end
 
 function refreshSettingsPage()
-	refreshRuntimeAPIs({"AntiMaterialAPI","MapCleanerAPI","RemoveAdsAPI","ResetPositionAPI","DiscordAPI"})
+	refreshRuntimeAPIs({"PlayerDataAPI","ResetPositionAPI","DiscordAPI"})
 end
 
 function buildUpdateSection()
@@ -393,7 +393,8 @@ function buildPage2Module(spec,ctx,sections)
 		return nil
 	end
 
-	local module=getfenv()[moduleGlobalName(spec.name)]
+	local env=getfenv()
+	local module=rawget(env,moduleGlobalName(spec.name))
 	if not module then
 		module=loadDeferredModuleByName(spec.name)
 	end

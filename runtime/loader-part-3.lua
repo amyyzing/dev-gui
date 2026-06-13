@@ -36,7 +36,8 @@ function destroyRuntimeAPIs(apiNames)
 end
 
 function loadDeferredModuleByName(name)
-	return setLoadedModule(name,loadDeferredModule(name,MODULE_PATHS[name],getfenv()[moduleGlobalName(name)]))
+	local env=getfenv()
+	return setLoadedModule(name,loadDeferredModule(name,MODULE_PATHS[name],rawget(env,moduleGlobalName(name))))
 end
 
 function loadDeferredModuleNames(names)
@@ -62,7 +63,8 @@ end
 
 function buildRuntimeModule(spec,ctx,parent,...)
 	local extra={...}
-	local module=getfenv()[moduleGlobalName(spec.name)]
+	local env=getfenv()
+	local module=rawget(env,moduleGlobalName(spec.name))
 	if not module then
 		module=loadDeferredModuleByName(spec.name)
 	end

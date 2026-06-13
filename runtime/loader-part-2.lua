@@ -463,7 +463,8 @@ end
 
 function buildPage1Module(spec,ctx)
 	local parent=getPage1Column(spec.column)
-	local module=getfenv()[moduleGlobalName(spec.name)]
+	local env=getfenv()
+	local module=rawget(env,moduleGlobalName(spec.name))
 	if module and module.new then
 		local ok,result=pcall(function()
 			return module.new(ctx,parent)
