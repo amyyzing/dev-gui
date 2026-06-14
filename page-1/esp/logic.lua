@@ -113,7 +113,7 @@ function ESP.new(ctx,parent)
 
 	if OffenseModule and OffenseModule.new then
 		local ok,result=pcall(function()
-			return OffenseModule.new({THEME=THEME})
+			return OffenseModule.new({THEME=THEME,State=state,safeDisconnect=safeDisconnect})
 		end)
 		offenseApi=ok and result or makeNoop()
 	else
@@ -163,31 +163,30 @@ function ESP.new(ctx,parent)
 			pcall(ctx.onChanged,state)
 		end
 
-		refreshFooter(isGameplay() and isDefensePossession())
+		refreshFooter(isGameplay())
 	end
 
 	local function syncControls()
 		local gameplay=isGameplay()
 		local defense=gameplay and isDefensePossession()
-		local available=gameplay and defense
+		local available=gameplay
 
 		if not gameplay then
 			state.actionStatusOn=false
 			stopBoth()
 			setStatus("Gameplay only",THEME.MUTED)
-		elseif not defense then
-			state.actionStatusOn=false
-			stopBoth()
-			setStatus("Offense possession",THEME.MUTED)
 		elseif state.actionStatusOn then
-			if activeMode~="defense" then
+			local nextMode=defense and "defense" or "offense"
+			local nextApi=defense and defenseApi or offenseApi
+
+			if activeMode~=nextMode then
 				stopBoth()
-				activeMode="defense"
-				if defenseApi and defenseApi.Start then pcall(defenseApi.Start) end
-			elseif defenseApi and defenseApi.Refresh then
-				pcall(defenseApi.Refresh)
+				activeMode=nextMode
+				if nextApi and nextApi.Start then pcall(nextApi.Start) end
+			elseif nextApi and nextApi.Refresh then
+				pcall(nextApi.Refresh)
 			end
-			setStatus("Defense active",THEME.GREEN or THEME.TEXT)
+			setStatus(defense and "Defense active" or "Offense active",THEME.GREEN or THEME.TEXT)
 		else
 			stopBoth()
 			setStatus("",THEME.MUTED)
@@ -207,7 +206,7 @@ function ESP.new(ctx,parent)
 	end
 
 	function api.SetESPState(value,fire)
-		state.actionStatusOn=(value and isGameplay() and isDefensePossession()) and true or false
+		state.actionStatusOn=(value and isGameplay()) and true or false
 		syncControls()
 
 		if fire~=false then
@@ -266,7 +265,7 @@ function ESP.new(ctx,parent)
 	end
 
 	local function handleESPInput(input)
-		if not isGameplay() or not isDefensePossession() then return false end
+		if not isGameplay() then return false end
 
 		local getKey=ctx.getESPToggleKey or ctx.getActionToggleKey
 		local key=getKey and getKey() or Enum.KeyCode.Unknown
