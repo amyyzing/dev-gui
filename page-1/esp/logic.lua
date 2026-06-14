@@ -104,7 +104,7 @@ function ESP.new(ctx,parent)
 
 	if DefenseModule and DefenseModule.new then
 		local ok,result=pcall(function()
-			return DefenseModule.new({THEME=THEME,safeDisconnect=safeDisconnect})
+			return DefenseModule.new({THEME=THEME,State=state,safeDisconnect=safeDisconnect})
 		end)
 		defenseApi=ok and result or makeNoop()
 	else

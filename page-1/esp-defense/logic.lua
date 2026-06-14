@@ -11,9 +11,19 @@ local VALID_TEAM_IDS={
 }
 
 local ESP_HIGHLIGHT_NAME="MyESPHighlight"
-local RANGE_BASE_YARDS=7
-local YOUR_SPEED_YPS=7
-local ANTIMATTER_SPEED_YPS=25
+local YARDS_TO_STUDS=3
+local BALL_G=28
+local G=Vector3.new(0,-BALL_G,0)
+local MODEL_BALL_SPEED=95
+local DEFAULT_THROW_Y=14
+local MIN_THROW_ANGLE=-5
+local MAX_THROW_ANGLE=55
+local DEFENDER_REACH_YARDS=7
+local DEFENDER_SPEED_YPS=7
+local DEFENDER_HEIGHT_MARGIN=2
+local DEFENDER_REACTION_BUFFER=0.05
+local PASS_SAMPLE_DT=0.08
+local PASS_SAMPLE_MAX=28
 local ESP_REFRESH_INTERVAL=0.12
 local ESP_TEAM_CACHE_INTERVAL=0.50
 local HIGHLIGHT_SCAN_INTERVAL=1.00
@@ -44,8 +54,8 @@ local function getPlayerRoot(player)
 	return getCharacterRoot(getLiveCharacter(player))
 end
 
-local function studsToYards(studs)
-	return studs/3
+local function flat(v)
+	return Vector3.new(v.X,0,v.Z)
 end
 
 local function getPlayerTeamID(player)
@@ -121,7 +131,7 @@ local function getFootballPartFromPlayer(player)
 	return nil
 end
 
-local function findAntimatterData(players)
+local function findBallCarrierData(players)
 	for _,player in ipairs(players or Players:GetPlayers()) do
 		if shouldHighlightPlayer(player) then
 			local footballPart=getFootballPartFromPlayer(player)
@@ -137,65 +147,164 @@ local function findAntimatterData(players)
 	return nil
 end
 
-local function getClosestFriendlyReachTime(targetPlayer,players)
-	local targetRoot=getPlayerRoot(targetPlayer)
-	if not targetRoot then
-		return math.huge
+local function getConfiguredThrowY(ctx)
+	local state=ctx and ctx.State
+	local value=state and tonumber(state.qbAimPeakHeight)
+	if value then
+		return math.clamp(value,8,24)
 	end
 
-	local bestTime=math.huge
-	for _,player in ipairs(players or Players:GetPlayers()) do
-		if isSameTeam(player,me) then
-			local friendlyRoot=getPlayerRoot(player)
-			if friendlyRoot then
-				local distStuds=(friendlyRoot.Position-targetRoot.Position).Magnitude
-				local distYards=studsToYards(distStuds)
-				local timeToReach=0
+	return DEFAULT_THROW_Y
+end
 
-				if distYards>RANGE_BASE_YARDS then
-					timeToReach=(distYards-RANGE_BASE_YARDS)/YOUR_SPEED_YPS
-				end
+local function getThrowOrigin(carrierRoot,footballPart,throwY)
+	local basePosition=(carrierRoot and carrierRoot.Position) or (footballPart and footballPart.Position)
+	if not basePosition then return nil end
 
-				if timeToReach<bestTime then
-					bestTime=timeToReach
+	return Vector3.new(basePosition.X,throwY,basePosition.Z)
+end
+
+local function getReceiverTarget(receiverRoot,catchY)
+	local position=receiverRoot and receiverRoot.Position
+	if not position then return nil end
+
+	return Vector3.new(position.X,catchY,position.Z)
+end
+
+local function ballAt(origin,velocity,time)
+	return origin+velocity*time+0.5*G*time*time
+end
+
+local function solveStationaryThrow(origin,target)
+	local delta=target-origin
+	local xz2=delta.X*delta.X+delta.Z*delta.Z
+	local y=delta.Y
+	local a=0.25*BALL_G*BALL_G
+	local b=y*BALL_G-MODEL_BALL_SPEED*MODEL_BALL_SPEED
+	local c=xz2+y*y
+	local discriminant=b*b-4*a*c
+	if discriminant<0 then
+		return nil
+	end
+
+	local sqrtDiscriminant=math.sqrt(discriminant)
+	local denominator=2*a
+	local best=nil
+
+	for _,timeSquared in ipairs({
+		(-b-sqrtDiscriminant)/denominator,
+		(-b+sqrtDiscriminant)/denominator,
+	}) do
+		if timeSquared and timeSquared>1e-6 then
+			local time=math.sqrt(timeSquared)
+			local velocity=(target-origin-0.5*G*time*time)/time
+			local speed=velocity.Magnitude
+			if speed>1e-6 then
+				local direction=velocity.Unit
+				local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
+				if angle>=MIN_THROW_ANGLE and angle<=MAX_THROW_ANGLE then
+					local candidate={
+						time=time,
+						origin=origin,
+						target=target,
+						velocity=direction*MODEL_BALL_SPEED,
+						angle=angle,
+					}
+
+					if not best or candidate.time<best.time then
+						best=candidate
+					end
 				end
 			end
 		end
 	end
 
-	return bestTime
+	return best
 end
 
-local function shouldTurnRedFromAntimatterRule(targetPlayer,antimatterData,players)
-	if not targetPlayer or not antimatterData then
+local function collectDefenderRoots(players)
+	local roots={}
+	for _,player in ipairs(players or Players:GetPlayers()) do
+		if isSameTeam(player,me) then
+			local friendlyRoot=getPlayerRoot(player)
+			if friendlyRoot then
+				table.insert(roots,friendlyRoot)
+			end
+		end
+	end
+
+	return roots
+end
+
+local function defenderCanReachBall(defenderRoot,ballPosition,elapsed,catchY)
+	if not defenderRoot or not ballPosition or elapsed<=0 then
 		return false
 	end
 
-	local antimatterPlayer=antimatterData.player
-	local footballPart=antimatterData.footballPart
-	if not antimatterPlayer or not footballPart or not footballPart.Parent then
+	if ballPosition.Y>catchY+DEFENDER_HEIGHT_MARGIN then
 		return false
 	end
 
-	if targetPlayer==antimatterPlayer then
+	local reachStuds=DEFENDER_REACH_YARDS*YARDS_TO_STUDS
+	local speedStuds=DEFENDER_SPEED_YPS*YARDS_TO_STUDS
+	local distanceXZ=(flat(defenderRoot.Position)-flat(ballPosition)).Magnitude
+	local runDistance=math.max(distanceXZ-reachStuds,0)
+	local reachTime=runDistance/speedStuds
+
+	return reachTime<=elapsed+DEFENDER_REACTION_BUFFER
+end
+
+local function passCanBeIntercepted(plan,defenderRoots,catchY)
+	if not plan then
+		return true
+	end
+
+	local sampleCount=math.clamp(math.ceil(plan.time/PASS_SAMPLE_DT),4,PASS_SAMPLE_MAX)
+	for sampleIndex=1,sampleCount do
+		local time=plan.time*sampleIndex/sampleCount
+		local ballPosition=ballAt(plan.origin,plan.velocity,time)
+
+		for _,defenderRoot in ipairs(defenderRoots) do
+			if defenderCanReachBall(defenderRoot,ballPosition,time,catchY) then
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+local function isReceiverClosed(receiverPlayer,carrierData,defenderRoots,ctx)
+	if not receiverPlayer or not carrierData then
+		return true
+	end
+
+	local carrierPlayer=carrierData.player
+	local footballPart=carrierData.footballPart
+	if not carrierPlayer or not footballPart or not footballPart.Parent then
+		return true
+	end
+
+	if receiverPlayer==carrierPlayer then
 		return false
 	end
 
-	if not isSameTeam(targetPlayer,antimatterPlayer) then
+	if not isSameTeam(receiverPlayer,carrierPlayer) then
 		return false
 	end
 
-	local targetRoot=getPlayerRoot(targetPlayer)
-	if not targetRoot then
-		return false
+	local carrierRoot=getPlayerRoot(carrierPlayer)
+	local receiverRoot=getPlayerRoot(receiverPlayer)
+	if not carrierRoot or not receiverRoot then
+		return true
 	end
 
-	local footballDistanceStuds=(footballPart.Position-targetRoot.Position).Magnitude
-	local footballDistanceYards=studsToYards(footballDistanceStuds)
-	local footballTime=footballDistanceYards/ANTIMATTER_SPEED_YPS
-	local closestFriendlyTime=getClosestFriendlyReachTime(targetPlayer,players)
+	local catchY=getConfiguredThrowY(ctx)
+	local origin=getThrowOrigin(carrierRoot,footballPart,catchY)
+	local target=getReceiverTarget(receiverRoot,catchY)
+	local plan=origin and target and solveStationaryThrow(origin,target) or nil
 
-	return closestFriendlyTime<=footballTime
+	return passCanBeIntercepted(plan,defenderRoots,catchY)
 end
 
 local function getCachedHighlights(character)
@@ -312,7 +421,8 @@ function ESPDefense.new(ctx)
 		end
 
 		local players=Players:GetPlayers()
-		local antimatterData=findAntimatterData(players)
+		local carrierData=findBallCarrierData(players)
+		local defenderRoots=collectDefenderRoots(players)
 		local blue=THEME.BLUE or Color3.fromRGB(70,140,255)
 		local red=THEME.RED or Color3.fromRGB(210,70,70)
 		local green=THEME.GREEN or Color3.fromRGB(90,200,90)
@@ -322,10 +432,10 @@ function ESPDefense.new(ctx)
 				local character=getLiveCharacter(player)
 				if character then
 					if shouldHighlightPlayer(player) then
-						if antimatterData and player==antimatterData.player then
+						if carrierData and player==carrierData.player then
 							forceHighlight(character,blue)
-						elseif antimatterData and isSameTeam(player,antimatterData.player) then
-							if shouldTurnRedFromAntimatterRule(player,antimatterData,players) then
+						elseif carrierData and isSameTeam(player,carrierData.player) then
+							if isReceiverClosed(player,carrierData,defenderRoots,ctx) then
 								forceHighlight(character,red)
 							else
 								forceHighlight(character,green)
