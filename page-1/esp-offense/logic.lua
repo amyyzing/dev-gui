@@ -54,6 +54,44 @@ local function flat(v)
 	return Vector3.new(v.X,0,v.Z)
 end
 
+local function findFootballPart(container,rootPart,maxDistance)
+	if not(container and rootPart) then return nil end
+
+	local function looksLikeFootball(inst)
+		while inst and inst~=container do
+			if tostring(inst.Name):lower():find("football",1,true) then
+				return true
+			end
+			inst=inst.Parent
+		end
+
+		return false
+	end
+
+	local direct=container:FindFirstChild("Football")
+	if direct then
+		if direct:IsA("BasePart") and (direct.Position-rootPart.Position).Magnitude<=maxDistance then
+			return direct
+		end
+
+		if direct:IsA("Model") or direct:IsA("Folder") or direct:IsA("Tool") then
+			for _,descendant in ipairs(direct:GetDescendants()) do
+				if descendant:IsA("BasePart") and (descendant.Position-rootPart.Position).Magnitude<=maxDistance then
+					return descendant
+				end
+			end
+		end
+	end
+
+	for _,descendant in ipairs(container:GetDescendants()) do
+		if descendant:IsA("BasePart") and looksLikeFootball(descendant) and (descendant.Position-rootPart.Position).Magnitude<=maxDistance then
+			return descendant
+		end
+	end
+
+	return nil
+end
+
 local function getPlayerTeamID(player)
 	if not player then return nil end
 
@@ -103,14 +141,17 @@ end
 
 local function getFootballPartFromPlayer(player)
 	local character=getLiveCharacter(player)
-	if not character then return nil end
+	local rootPart=getCharacterRoot(character)
+	if not(character and rootPart) then return nil end
 
-	local football=character:FindFirstChild("Football")
-	if football and football:IsA("BasePart") and football.Parent==character then
-		return football
-	end
+	local football=findFootballPart(character,rootPart,35)
+	if football then return football end
 
-	return nil
+	return findFootballPart(character:FindFirstChild("GAMEOBJECTS"),rootPart,35)
+end
+
+local function hasFootball(player)
+	return getFootballPartFromPlayer(player)~=nil
 end
 
 local function shouldHighlightReceiver(player)
@@ -336,15 +377,14 @@ function ESPOffense.new(ctx)
 		end
 
 		local qbRoot=getPlayerRoot(me)
-		local footballPart=getFootballPartFromPlayer(me)
-		if not(qbRoot and footballPart) then
+		if not(qbRoot and hasFootball(me)) then
 			clearOwnedHighlights()
 			return
 		end
 
 		local players=Players:GetPlayers()
 		local catchY=getConfiguredThrowY(ctx)
-		local origin=getThrowOrigin(qbRoot,footballPart,catchY)
+		local origin=getThrowOrigin(qbRoot,nil,catchY)
 		local defenderRoots=collectDefenderRoots(players)
 		local red=THEME.RED or Color3.fromRGB(210,70,70)
 		local green=THEME.GREEN or Color3.fromRGB(90,200,90)
