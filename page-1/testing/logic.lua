@@ -10,6 +10,8 @@ local BALL_G=28
 local PLAYER_G=196.2
 local JUMP_POWER=55.5
 local WR_MAX_Y=6+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
+local C1_MARKER_HEIGHT=80
+local C1_MARKER_THICKNESS=0.12
 
 local function firstFolder(container)
 	if not container then return nil end
@@ -200,33 +202,49 @@ function Testing.new(ctx,parent)
 		marker=nil
 	end
 
+	local function styleMarker(part)
+		part.Shape=Enum.PartType.Block
+		part.Size=Vector3.new(C1_MARKER_THICKNESS,C1_MARKER_HEIGHT,C1_MARKER_THICKNESS)
+		part.Anchored=true
+		part.CanCollide=false
+		part.CanTouch=false
+		part.CanQuery=false
+		part.Material=Enum.Material.Neon
+		part.Color=THEME.GREEN or Color3.fromRGB(80,220,140)
+		part.Transparency=0.15
+	end
+
 	local function ensureMarker(parentFolder)
 		if marker and marker.Parent then
+			styleMarker(marker)
 			return marker
 		end
 
-		marker=Instance.new("Part")
+		local parent=parentFolder or Workspace
+		local existing=parent:FindFirstChild("TestingC1Marker")
+		marker=(existing and existing:IsA("BasePart")) and existing or Instance.new("Part")
 		marker.Name="TestingC1Marker"
-		marker.Shape=Enum.PartType.Ball
-		marker.Size=Vector3.new(1.2,1.2,1.2)
-		marker.Anchored=true
-		marker.CanCollide=false
-		marker.CanTouch=false
-		marker.CanQuery=false
-		marker.Material=Enum.Material.Neon
-		marker.Color=THEME.GREEN or Color3.fromRGB(80,220,140)
-		marker.Transparency=0.15
-		marker.Parent=parentFolder or Workspace
+		styleMarker(marker)
+		marker.Parent=parent
 
-		local billboard=Instance.new("BillboardGui")
+		local billboard=marker:FindFirstChild("TestingC1Label")
+		if not(billboard and billboard:IsA("BillboardGui")) then
+			billboard=Instance.new("BillboardGui")
+			billboard.Name="TestingC1Label"
+			billboard.Parent=marker
+		end
 		billboard.Name="TestingC1Label"
 		billboard.Size=UDim2.new(0,64,0,20)
 		billboard.StudsOffset=Vector3.new(0,1.6,0)
 		billboard.AlwaysOnTop=true
 		billboard.Adornee=marker
-		billboard.Parent=marker
 
-		local label=Instance.new("TextLabel")
+		local label=billboard:FindFirstChild("Text")
+		if not(label and label:IsA("TextLabel")) then
+			label=Instance.new("TextLabel")
+			label.Name="Text"
+			label.Parent=billboard
+		end
 		label.BackgroundTransparency=1
 		label.Size=UDim2.fromScale(1,1)
 		label.Text="C1"
@@ -234,7 +252,6 @@ function Testing.new(ctx,parent)
 		label.TextSize=12
 		label.TextColor3=THEME.TEXT or Color3.new(1,1,1)
 		label.TextStrokeTransparency=0.35
-		label.Parent=billboard
 
 		return marker
 	end
