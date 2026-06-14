@@ -25,6 +25,75 @@ local function destroyControl(control)
 	end
 end
 
+local function getLiveCharacter(player)
+	if not player then return nil end
+
+	local workspaceCharacter=workspace:FindFirstChild(player.Name)
+	if workspaceCharacter and workspaceCharacter:IsA("Model") then
+		return workspaceCharacter
+	end
+
+	if player.Character and player.Character:IsA("Model") then
+		return player.Character
+	end
+
+	return nil
+end
+
+local function getCharacterRoot(character)
+	if not character then return nil end
+	return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+end
+
+local function findFootballPart(container,rootPart,maxDistance)
+	if not(container and rootPart) then return nil end
+
+	local function looksLikeFootball(inst)
+		while inst and inst~=container do
+			if tostring(inst.Name):lower():find("football",1,true) then
+				return true
+			end
+			inst=inst.Parent
+		end
+
+		return false
+	end
+
+	local direct=container:FindFirstChild("Football")
+	if direct then
+		if direct:IsA("BasePart") and (direct.Position-rootPart.Position).Magnitude<=maxDistance then
+			return direct
+		end
+
+		if direct:IsA("Model") or direct:IsA("Folder") or direct:IsA("Tool") then
+			for _,descendant in ipairs(direct:GetDescendants()) do
+				if descendant:IsA("BasePart") and (descendant.Position-rootPart.Position).Magnitude<=maxDistance then
+					return descendant
+				end
+			end
+		end
+	end
+
+	for _,descendant in ipairs(container:GetDescendants()) do
+		if descendant:IsA("BasePart") and looksLikeFootball(descendant) and (descendant.Position-rootPart.Position).Magnitude<=maxDistance then
+			return descendant
+		end
+	end
+
+	return nil
+end
+
+local function getFootballPartFromPlayer(player)
+	local character=getLiveCharacter(player)
+	local rootPart=getCharacterRoot(character)
+	if not(character and rootPart) then return nil end
+
+	local football=findFootballPart(character,rootPart,35)
+	if football then return football end
+
+	return findFootballPart(character:FindFirstChild("GAMEOBJECTS"),rootPart,35)
+end
+
 local function getPlayerTeamID(player)
 	local replicated=player and player:FindFirstChild("Replicated")
 	local teamValue=replicated and replicated:FindFirstChild("TeamID")
@@ -139,6 +208,26 @@ function ESP.new(ctx,parent)
 		return offenseTeam~=myTeam
 	end
 
+	local function getPossessionMode()
+		if getFootballPartFromPlayer(me) then
+			return"offense"
+		end
+
+		local myTeam=getPlayerTeamID(me)
+		for _,player in ipairs(Players:GetPlayers()) do
+			if player~=me and getFootballPartFromPlayer(player) then
+				local theirTeam=getPlayerTeamID(player)
+				if isValidGameTeamID(myTeam) and isValidGameTeamID(theirTeam) then
+					return theirTeam==myTeam and"offense"or"defense"
+				end
+
+				return"defense"
+			end
+		end
+
+		return isDefensePossession() and"defense"or"offense"
+	end
+
 	local function setStatus(text,color)
 		if statusLabel then
 			statusLabel.Text=text
@@ -168,7 +257,7 @@ function ESP.new(ctx,parent)
 
 	local function syncControls()
 		local gameplay=isGameplay()
-		local defense=gameplay and isDefensePossession()
+		local mode=gameplay and getPossessionMode() or nil
 		local available=gameplay
 
 		if not gameplay then
@@ -176,8 +265,8 @@ function ESP.new(ctx,parent)
 			stopBoth()
 			setStatus("Gameplay only",THEME.MUTED)
 		elseif state.actionStatusOn then
-			local nextMode=defense and "defense" or "offense"
-			local nextApi=defense and defenseApi or offenseApi
+			local nextMode=mode or"defense"
+			local nextApi=nextMode=="defense" and defenseApi or offenseApi
 
 			if activeMode~=nextMode then
 				stopBoth()
@@ -186,7 +275,7 @@ function ESP.new(ctx,parent)
 			elseif nextApi and nextApi.Refresh then
 				pcall(nextApi.Refresh)
 			end
-			setStatus(defense and "Defense active" or "Offense active",THEME.GREEN or THEME.TEXT)
+			setStatus(nextMode=="defense" and "Defense active" or "Offense active",THEME.GREEN or THEME.TEXT)
 		else
 			stopBoth()
 			setStatus("",THEME.MUTED)
