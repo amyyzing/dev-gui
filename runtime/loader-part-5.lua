@@ -214,6 +214,7 @@ local DATA_SAVE_STATE_SETTERS={
 	setQBAimState={"qbAimEnabled",true,"QBAim","SetQBAimState"},
 	setQBAimTeamFilter={"qbAimTeamFilter",true,"QBAim","SetTeamFilterState",true},
 	setQBAimShowArc={"qbAimShowArc",true,"QBAim","SetShowArcState",true},
+	setQBAimTargetHighlight={"qbAimTargetHighlight",true,"QBAim","SetTargetHighlightState",true},
 	setQBAimLeadDelay={"qbAimLeadDelay",false,"QBAim","SetLeadDelay",true},
 	setQBAimPeakHeight={"qbAimPeakHeight",false,"QBAim","SetPeakHeight",true},
 	setQBAimQBDrift={"qbAimQBDrift",false,"QBAim","SetQBDrift",true},

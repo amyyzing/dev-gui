@@ -161,6 +161,7 @@ Description.Categories={
 			["Enabled"]="QB Aim",
 			["Team Filter"]="Filter Team",
 			["Show Arc"]="Aimbot Arc",
+			["Target Highlight"]="Target Highlight",
 			["Lead Adjust"]="Lead Adjust",
 			["Peak Height"]="Peak Height",
 			["QB Drift"]="QB XYZ Drift",

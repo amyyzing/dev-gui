@@ -686,6 +686,7 @@ function QBAim.new(ctx,parent)
 	local enabledToggle=nil
 	local teamFilterToggle=nil
 	local arcToggle=nil
+	local highlightToggle=nil
 	local leadDelayFrame=nil
 	local leadDelayBox=nil
 	local leadDelaySlider=nil
@@ -722,6 +723,10 @@ function QBAim.new(ctx,parent)
 
 	if state.qbAimShowArc==nil then
 		state.qbAimShowArc=true
+	end
+
+	if state.qbAimTargetHighlight==nil then
+		state.qbAimTargetHighlight=true
 	end
 
 	if state.qbAimLeadDelay==nil then
@@ -973,7 +978,7 @@ function QBAim.new(ctx,parent)
 	end
 
 	updateTargetHighlight=function()
-		local character=enabled and trackedReceiver and trackedReceiver.Character or nil
+		local character=enabled and state.qbAimTargetHighlight~=false and trackedReceiver and trackedReceiver.Character or nil
 		if not(character and canTargetReceiver(trackedReceiver)) then
 			if highlightedCharacter then
 				destroyQBAimHighlight(highlightedCharacter)
@@ -1049,6 +1054,9 @@ function QBAim.new(ctx,parent)
 			enabled=false
 			trackedReceiver=nil
 			selectedRouteLock=nil
+			if highlightedCharacter then
+				clearTargetHighlights()
+			end
 		elseif trackedReceiver and not canTargetReceiver(trackedReceiver) then
 			trackedReceiver=nil
 			selectedRouteLock=nil
@@ -1067,6 +1075,10 @@ function QBAim.new(ctx,parent)
 
 		if arcToggle then
 			arcToggle.set(state.qbAimShowArc~=false)
+		end
+
+		if highlightToggle then
+			highlightToggle.set(state.qbAimTargetHighlight~=false)
 		end
 
 		updateLeadDelayVisuals()
@@ -2042,6 +2054,9 @@ function QBAim.new(ctx,parent)
 
 	local function clearPreviewForMissingBall(statusText)
 		clearPreviewVisuals()
+		if highlightedCharacter then
+			clearTargetHighlights()
+		end
 
 		if statusText then
 			setStatus(statusText)
@@ -2274,6 +2289,7 @@ function QBAim.new(ctx,parent)
 			preview.ballMissingSince=nil
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			hideQBTrailPreview()
+			clearTargetHighlights()
 		end
 
 		syncControls()
@@ -2307,6 +2323,17 @@ function QBAim.new(ctx,parent)
 		if not state.qbAimShowArc then
 			clearPreviewVisuals()
 			setStatus("Arc hidden")
+		end
+		syncControls()
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetTargetHighlightState(value,fire)
+		state.qbAimTargetHighlight=value and true or false
+		if not state.qbAimTargetHighlight then
+			clearTargetHighlights()
 		end
 		syncControls()
 		if fire~=false then
@@ -2381,6 +2408,10 @@ function QBAim.new(ctx,parent)
 
 	arcToggle=buildToggleRow(sectionBody,"Show Arc",state.qbAimShowArc~=false,function(value)
 		api.SetShowArcState(value,true)
+	end)
+
+	highlightToggle=buildToggleRow(sectionBody,"Target Highlight",state.qbAimTargetHighlight~=false,function(value)
+		api.SetTargetHighlightState(value,true)
 	end)
 
 	if buildSlider then
@@ -2466,9 +2497,12 @@ function QBAim.new(ctx,parent)
 	end))
 
 	addConnection(RunService.RenderStepped:Connect(function()
-		if not(enabled and isAvailable()) then return end
-
-		updateTargetHighlight()
+		if not(enabled and isAvailable()) then
+			if highlightedCharacter then
+				clearTargetHighlights()
+			end
+			return
+		end
 
 		local now=os.clock()
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
@@ -2492,6 +2526,8 @@ function QBAim.new(ctx,parent)
 
 			preview.ballMissingSince=nil
 		end
+
+		updateTargetHighlight()
 
 		if not trackedReceiver then return end
 
@@ -2554,6 +2590,7 @@ function QBAim.new(ctx,parent)
 	end))
 
 	cleanupC3InfoGui()
+	clearTargetHighlights()
 	syncControls()
 	return api
 end
