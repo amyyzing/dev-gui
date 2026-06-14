@@ -24,9 +24,7 @@ local PASS_SAMPLE_DT=0.08
 local PASS_SAMPLE_MAX=28
 local ESP_REFRESH_INTERVAL=0.12
 local ESP_TEAM_CACHE_INTERVAL=0.50
-local HIGHLIGHT_SCAN_INTERVAL=1.00
 local teamCache=setmetatable({}, {__mode="k"})
-local highlightCache=setmetatable({}, {__mode="k"})
 
 local function getLiveCharacter(player)
 	if not player then return nil end
@@ -308,37 +306,6 @@ local function isReceiverClosed(receiverPlayer,carrierData,defenderRoots,ctx)
 	return passCanBeIntercepted(plan,defenderRoots,catchY)
 end
 
-local function getCachedHighlights(character)
-	local now=os.clock()
-	local cached=highlightCache[character]
-	if cached and now-cached.t<HIGHLIGHT_SCAN_INTERVAL then
-		return cached.items
-	end
-
-	local items={}
-	for _,descendant in ipairs(character:GetDescendants()) do
-		if descendant:IsA("Highlight") then
-			table.insert(items,descendant)
-		end
-	end
-
-	highlightCache[character]={t=now,items=items}
-	return items
-end
-
-local function rememberHighlight(character,highlight)
-	local cached=highlightCache[character]
-	if not cached then return end
-
-	for _,item in ipairs(cached.items) do
-		if item==highlight then
-			return
-		end
-	end
-
-	table.insert(cached.items,highlight)
-end
-
 local function getOurHighlight(character)
 	local highlight=character and character:FindFirstChild(ESP_HIGHLIGHT_NAME)
 	if highlight and highlight:IsA("Highlight") then
@@ -361,22 +328,7 @@ end
 local function forceHighlight(character,color)
 	if not character then return end
 
-	local found=false
-	for _,highlight in ipairs(getCachedHighlights(character)) do
-		if highlight and highlight.Parent then
-			found=true
-			highlight.Adornee=character
-			highlight.Enabled=true
-			highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-			highlight.FillTransparency=0.5
-			highlight.OutlineTransparency=0
-			highlight.FillColor=color
-			highlight.OutlineColor=color
-		end
-	end
-
 	local owned=ensureOwnedHighlight(character)
-	rememberHighlight(character,owned)
 	owned.Adornee=character
 	owned.Enabled=true
 	owned.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
@@ -384,10 +336,6 @@ local function forceHighlight(character,color)
 	owned.OutlineTransparency=0
 	owned.FillColor=color
 	owned.OutlineColor=color
-
-	if not found then
-		owned.Parent=character
-	end
 end
 
 local function destroyOwnedHighlight(character)
@@ -395,7 +343,6 @@ local function destroyOwnedHighlight(character)
 	if highlight then
 		highlight:Destroy()
 	end
-	highlightCache[character]=nil
 end
 
 local function clearOwnedHighlights()
