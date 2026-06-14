@@ -19,6 +19,7 @@ local MIN_THROW_ANGLE=-5
 local MAX_THROW_ANGLE=55
 local DEFENDER_SPEED_STUDS=21
 local DEFENDER_REACTION_BUFFER=0.05
+local CATCH_HEIGHT_TOLERANCE=0.25
 local PASS_SAMPLE_DT=0.08
 local PASS_SAMPLE_MAX=28
 local ESP_REFRESH_INTERVAL=0.12
@@ -238,7 +239,7 @@ local function defenderCanReachBall(defenderRoot,ballPosition,elapsed,catchY)
 		return false
 	end
 
-	if ballPosition.Y>catchY then
+	if ballPosition.Y>catchY+CATCH_HEIGHT_TOLERANCE then
 		return false
 	end
 
@@ -251,6 +252,12 @@ end
 local function passCanBeIntercepted(plan,defenderRoots,catchY)
 	if not plan then
 		return true
+	end
+
+	for _,defenderRoot in ipairs(defenderRoots) do
+		if defenderCanReachBall(defenderRoot,plan.target,plan.time,catchY) then
+			return true
+		end
 	end
 
 	local sampleCount=math.clamp(math.ceil(plan.time/PASS_SAMPLE_DT),4,PASS_SAMPLE_MAX)
