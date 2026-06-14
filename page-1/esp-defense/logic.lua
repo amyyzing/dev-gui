@@ -11,16 +11,13 @@ local VALID_TEAM_IDS={
 }
 
 local ESP_HIGHLIGHT_NAME="MyESPHighlight"
-local YARDS_TO_STUDS=3
 local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local MODEL_BALL_SPEED=95
 local DEFAULT_THROW_Y=14
 local MIN_THROW_ANGLE=-5
 local MAX_THROW_ANGLE=55
-local DEFENDER_REACH_YARDS=7
-local DEFENDER_SPEED_YPS=7
-local DEFENDER_HEIGHT_MARGIN=2
+local DEFENDER_SPEED_STUDS=21
 local DEFENDER_REACTION_BUFFER=0.05
 local PASS_SAMPLE_DT=0.08
 local PASS_SAMPLE_MAX=28
@@ -241,15 +238,12 @@ local function defenderCanReachBall(defenderRoot,ballPosition,elapsed,catchY)
 		return false
 	end
 
-	if ballPosition.Y>catchY+DEFENDER_HEIGHT_MARGIN then
+	if ballPosition.Y>catchY then
 		return false
 	end
 
-	local reachStuds=DEFENDER_REACH_YARDS*YARDS_TO_STUDS
-	local speedStuds=DEFENDER_SPEED_YPS*YARDS_TO_STUDS
 	local distanceXZ=(flat(defenderRoot.Position)-flat(ballPosition)).Magnitude
-	local runDistance=math.max(distanceXZ-reachStuds,0)
-	local reachTime=runDistance/speedStuds
+	local reachTime=distanceXZ/DEFENDER_SPEED_STUDS
 
 	return reachTime<=elapsed+DEFENDER_REACTION_BUFFER
 end
