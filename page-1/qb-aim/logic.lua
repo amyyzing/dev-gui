@@ -147,6 +147,7 @@ local THROW_TARGET_LOCK_ON_INPUT=true
 local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
 local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
 local THROW_TARGET_FIRE_IMMEDIATELY=false
+local THROW_INPUT_COOLDOWN=0.85
 -- Separate timing terms. Do not use the full animation delay to move C2/origin.
 -- The release-origin drift is unified across X/Y/Z: one time value moves the whole origin vector.
 local QB_RELEASE_ORIGIN_DRIFT_TIME=0.04
@@ -676,6 +677,8 @@ function QBAim.new(ctx,parent)
 	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil,ballMissingSince=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
+	local throwInProgress=false
+	local lastThrowAt=-math.huge
 	local highlightedCharacter=nil
 	local connections={}
 	local sectionBody=nil
@@ -2147,6 +2150,12 @@ function QBAim.new(ctx,parent)
 	local function throwTo(receiver)
 		if not(enabled and isAvailable()) then return end
 
+		local now=os.clock()
+		if throwInProgress or now-lastThrowAt<THROW_INPUT_COOLDOWN then
+			setStatus("Throw already in progress")
+			return
+		end
+
 		if not canTargetReceiver(receiver) then
 			trackedReceiver=nil
 			selectedRouteLock=nil
@@ -2176,8 +2185,16 @@ function QBAim.new(ctx,parent)
 		-- animation window.
 		local lockedQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		throwInProgress=true
+
+		local function releaseThrowLock()
+			throwInProgress=false
+			lastThrowAt=os.clock()
+		end
+
 		local lockedPlan=buildPlan(receiver,power,lockedQBOffset,heldBall,lockedWROffset)
 		if not lockedPlan then
+			releaseThrowLock()
 			setStatus("No target-latch throw solution")
 			return
 		end
@@ -2187,6 +2204,7 @@ function QBAim.new(ctx,parent)
 
 		local plan=buildReleasePlan(receiver,power,heldBall,lockedPlan)
 		if not plan then
+			releaseThrowLock()
 			setStatus("No target-latch throw solution")
 			return
 		end
@@ -2206,6 +2224,8 @@ function QBAim.new(ctx,parent)
 		else
 			setStatus(err or "Throw failed")
 		end
+
+		releaseThrowLock()
 	end
 
 	local function lockReceiverUnderCursor()
@@ -2504,6 +2524,11 @@ function QBAim.new(ctx,parent)
 		local wantsLock=bindingMatches("getQBAimLockKey",input,Enum.KeyCode.H)
 		local wantsThrow=bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T)
 		if not(wantsLock or wantsThrow) then return false end
+
+		if wantsThrow and (throwInProgress or os.clock()-lastThrowAt<THROW_INPUT_COOLDOWN) then
+			setStatus("Throw already in progress")
+			return true
+		end
 
 		if not getHeldBall() then
 			clearPreviewForMissingBall("No ball held")
