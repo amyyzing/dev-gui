@@ -110,20 +110,37 @@ local function addEvent(list,event)
 	end
 end
 
+local function localPlayerListed(gameFolder)
+	local replicated=gameFolder and gameFolder:FindFirstChild("Replicated")
+	local playersFolder=replicated and replicated:FindFirstChild("Players")
+	return playersFolder and playersFolder:FindFirstChild(LP.Name)~=nil
+end
+
+local function addGameFolderEvents(list,gameFolder,requireLocalPlayer)
+	if not gameFolder then return end
+	if requireLocalPlayer and not localPlayerListed(gameFolder) then return end
+
+	addEvent(list,gameFolder:FindFirstChild("ReEvent"))
+
+	local replicated=gameFolder:FindFirstChild("Replicated")
+	addEvent(list,replicated and replicated:FindFirstChild("ReEvent"))
+end
+
 local function collectGameReEvents()
 	local events={}
 
 	addEvent(events,ReplicatedStorage:FindFirstChild("ReEvent"))
 
-	for _,container in ipairs({
-		ReplicatedStorage:FindFirstChild("Games"),
-		ReplicatedStorage:FindFirstChild("MiniGames"),
-		Workspace:FindFirstChild("Games"),
-		Workspace:FindFirstChild("MiniGames"),
+	for _,entry in ipairs({
+		{container=ReplicatedStorage:FindFirstChild("Games"),requireLocalPlayer=false},
+		{container=ReplicatedStorage:FindFirstChild("MiniGames"),requireLocalPlayer=false},
+		{container=Workspace:FindFirstChild("Games"),requireLocalPlayer=true},
+		{container=Workspace:FindFirstChild("MiniGames"),requireLocalPlayer=false},
 	}) do
+		local container=entry.container
 		if container then
-			for _,child in ipairs(container:GetChildren()) do
-				addEvent(events,child:FindFirstChild("ReEvent"))
+			for _,gameFolder in ipairs(container:GetChildren()) do
+				addGameFolderEvents(events,gameFolder,entry.requireLocalPlayer)
 			end
 		end
 	end
@@ -159,8 +176,10 @@ function Testing.new(ctx,parent)
 	local statusLabel=nil
 	local marker=nil
 	local remoteConnections={}
+	local topologyConnections={}
 	local lifetimeConnections={}
 	local listeningEvents={}
+	local reconnectQueued=false
 	local lastThrower=nil
 	local lastThrowAt=0
 
@@ -185,13 +204,27 @@ function Testing.new(ctx,parent)
 		end
 	end
 
-	local function disconnectAll()
+	local function disconnectRemoteConnections()
 		for _,conn in ipairs(remoteConnections) do
 			safeDisconnect(conn)
 		end
 
 		table.clear(remoteConnections)
 		table.clear(listeningEvents)
+	end
+
+	local function disconnectTopologyConnections()
+		for _,conn in ipairs(topologyConnections) do
+			safeDisconnect(conn)
+		end
+
+		table.clear(topologyConnections)
+		reconnectQueued=false
+	end
+
+	local function disconnectAll()
+		disconnectRemoteConnections()
+		disconnectTopologyConnections()
 	end
 
 	local function destroyMarker()
@@ -331,8 +364,88 @@ function Testing.new(ctx,parent)
 		end
 	end
 
-	local function connectIncoming()
-		disconnectAll()
+	local connectIncoming
+
+	local function scheduleReconnect()
+		if reconnectQueued or not state.testingEnabled then return end
+		reconnectQueued=true
+
+		task.defer(function()
+			reconnectQueued=false
+			if state.testingEnabled and connectIncoming then
+				connectIncoming()
+			end
+		end)
+	end
+
+	local function watchConnection(conn)
+		table.insert(topologyConnections,conn)
+	end
+
+	local function shouldReconnectForInstance(instance)
+		if not instance then return false end
+		local name=instance.Name
+		return name=="Games"
+			or name=="MiniGames"
+			or name=="ReEvent"
+			or name=="Replicated"
+			or name=="Players"
+			or name==LP.Name
+	end
+
+	local function watchRoot(root)
+		if not root then return end
+
+		watchConnection(root.ChildAdded:Connect(function(child)
+			if shouldReconnectForInstance(child) then
+				scheduleReconnect()
+			end
+		end))
+
+		watchConnection(root.ChildRemoved:Connect(function(child)
+			if shouldReconnectForInstance(child) then
+				scheduleReconnect()
+			end
+		end))
+	end
+
+	local function watchContainer(container)
+		if not container then return end
+
+		watchConnection(container.ChildAdded:Connect(function()
+			scheduleReconnect()
+		end))
+
+		watchConnection(container.ChildRemoved:Connect(function()
+			scheduleReconnect()
+		end))
+
+		watchConnection(container.DescendantAdded:Connect(function(descendant)
+			if shouldReconnectForInstance(descendant) then
+				scheduleReconnect()
+			end
+		end))
+
+		watchConnection(container.DescendantRemoving:Connect(function(descendant)
+			if shouldReconnectForInstance(descendant) then
+				scheduleReconnect()
+			end
+		end))
+	end
+
+	local function watchRemoteTopology()
+		disconnectTopologyConnections()
+		watchRoot(ReplicatedStorage)
+		watchRoot(Workspace)
+		watchContainer(ReplicatedStorage:FindFirstChild("Games"))
+		watchContainer(ReplicatedStorage:FindFirstChild("MiniGames"))
+		watchContainer(Workspace:FindFirstChild("Games"))
+		watchContainer(Workspace:FindFirstChild("MiniGames"))
+	end
+
+	connectIncoming=function()
+		disconnectRemoteConnections()
+		watchRemoteTopology()
 
 		for _,event in ipairs(collectGameReEvents()) do
 			if not listeningEvents[event] then
