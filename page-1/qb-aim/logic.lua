@@ -1063,6 +1063,7 @@ function QBAim.new(ctx,parent)
 			previewFrozen=false
 			preview.ballMissingSince=nil
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
+			preview.c2cf,preview.c3cf=nil,nil
 		end
 
 		if enabledToggle then
@@ -1477,6 +1478,103 @@ function QBAim.new(ctx,parent)
 		if time<=0 then return nil,nil end
 
 		return ballAt(originPosition,velocity,time),time
+	end
+
+	local function quadraticTime(a,b,c)
+		local discriminant=b*b-4*a*c
+		if discriminant<0 then return nil end
+
+		if math.abs(a)<1e-6 then
+			if math.abs(b)<1e-6 then return nil end
+			local linear=-c/b
+			return linear>0 and linear or nil
+		end
+
+		local root=math.sqrt(discriminant)
+		local denom=2*a
+		local t1=(-b+root)/denom
+		local t2=(-b-root)/denom
+		local best=math.max(t1,t2)
+		if best<=0 then
+			best=math.min(t1,t2)
+		end
+
+		return best>0 and best or nil
+	end
+
+	local function gameLandingY()
+		local center=originalCenter()
+		if center then
+			local ok,y=pcall(function()
+				return center.CFrame.Y
+			end)
+			if ok and type(y)=="number" then
+				return y+0.5
+			end
+		end
+
+		return 0.5
+	end
+
+	local function gameTimeToDestination(initialVelocity,originPosition,y)
+		return quadraticTime(G.Y/2,initialVelocity.Y,originPosition.Y-y)
+	end
+
+	local function gameSpotAtTime(time,remoteTarget,originPosition,power)
+		local direction=unit(remoteTarget-originPosition)
+		return G*time*time/2+direction*power*time+originPosition
+	end
+
+	local function gameVelocityForPass(originPosition,targetPosition,time)
+		return(targetPosition-G*time*time/2-originPosition)/time
+	end
+
+	local function gameBeamDirection(initialVelocity,originPosition,time)
+		local endPosition=G*time*time/2+initialVelocity*time+originPosition
+		local controlEnd=endPosition-(G*time*time+initialVelocity*time)/3
+		local controlStart=(G*time*time*0.125+initialVelocity*time*0.5+originPosition-(originPosition+endPosition)*0.125)/0.375-controlEnd
+		local lineDirection=unit(originPosition-endPosition,Vector3.new(0,0,-1))
+		local startTangent=unit(controlStart-originPosition,unit(initialVelocity,Vector3.new(1,0,0)))
+		local startNormal=unit(startTangent:Cross(lineDirection),Vector3.new(0,1,0))
+		local startBinormal=unit(startNormal:Cross(startTangent),Vector3.new(0,0,1))
+		local endTangent=unit(controlEnd-endPosition,unit(initialVelocity+G*time,Vector3.new(1,0,0)))
+		local endNormal=unit(endTangent:Cross(lineDirection),startNormal)
+		local curve0=(controlStart-originPosition).Magnitude
+		local curve1=-(controlEnd-endPosition).Magnitude
+
+		return curve0,curve1,CFrame.fromMatrix(originPosition,startTangent,startNormal,startBinormal),CFrame.fromMatrix(endPosition,endTangent,endNormal,startBinormal)
+	end
+
+	local function gameThrowModel(plan)
+		if not(plan and plan.origin and plan.aimPoint and plan.speed) then
+			return nil
+		end
+
+		local originPosition=plan.origin
+		local power=plan.speed
+		local direction=unit(plan.aimPoint-originPosition,plan.direction or Vector3.new(1,0,0))
+		local launchVelocity=direction*power
+		local landingY=gameLandingY()
+		local landingTime=gameTimeToDestination(launchVelocity,originPosition,landingY)
+		if not landingTime then
+			return nil
+		end
+
+		local landingPosition=gameSpotAtTime(landingTime,plan.aimPoint,originPosition,power)
+		local beamVelocity=gameVelocityForPass(originPosition,landingPosition,landingTime)
+		local curve0,curve1,c2CFrame,c3CFrame=gameBeamDirection(beamVelocity,originPosition,landingTime)
+
+		return{
+			origin=originPosition,
+			target=plan.aimPoint,
+			landing=landingPosition,
+			landingTime=landingTime,
+			velocity=beamVelocity,
+			curve0=curve0,
+			curve1=curve1,
+			c2CFrame=c2CFrame,
+			c3CFrame=c3CFrame,
+		}
 	end
 
 	local function targetAtTime(receiverStart,wrVel,time,leadDelay)
@@ -2035,6 +2133,7 @@ function QBAim.new(ctx,parent)
 		previewFrozen=false
 		preview.ballMissingSince=nil
 		preview.p1,preview.p2,preview.p3=nil,nil,nil
+		preview.c2cf,preview.c3cf=nil,nil
 		hideQBTrailPreview()
 
 		if destroyCenter then
@@ -2060,32 +2159,58 @@ function QBAim.new(ctx,parent)
 		local previewTime=plan.time
 		if not(startPoint and endPoint and previewTime) then return end
 
-		local endVelocity=plan.velocity+G*previewTime
-		local p2=startPoint
 		local p1=endPoint
-		local p3=endPoint
-
-		if preview.p2 then
-			p2=preview.p2:Lerp(p2,PREVIEW_SMOOTH)
-		end
+		local model=plan.gameThrowModel or gameThrowModel(plan)
+		plan.gameThrowModel=model
 
 		if preview.p1 and (p1-preview.p1).Magnitude<=28 then
 			p1=preview.p1:Lerp(p1,PREVIEW_SMOOTH)
 		end
 
-		if preview.p3 and (p3-preview.p3).Magnitude<=45 then
-			p3=preview.p3:Lerp(p3,PREVIEW_SMOOTH)
+		preview.p1=p1
+		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*plan.time))
+
+		if model then
+			local c2CFrame=model.c2CFrame
+			local c3CFrame=model.c3CFrame
+			if preview.c2cf then
+				c2CFrame=preview.c2cf:Lerp(c2CFrame,PREVIEW_SMOOTH)
+			end
+			if preview.c3cf then
+				c3CFrame=preview.c3cf:Lerp(c3CFrame,PREVIEW_SMOOTH)
+			end
+
+			preview.c2cf,preview.c3cf=c2CFrame,c3CFrame
+			preview.p2=c2CFrame.Position
+			preview.p3=c3CFrame.Position
+			setAttachmentCFrame(c2,c2CFrame)
+			setAttachmentCFrame(c3,c3CFrame)
+			updateC1AndC3Info(plan,p1,c3CFrame.Position)
+			beam.CurveSize0=math.clamp(model.curve0,-ARC_MAX_CURVE,ARC_MAX_CURVE)
+			beam.CurveSize1=math.clamp(model.curve1,-ARC_MAX_CURVE,ARC_MAX_CURVE)
+			plan.landing=model.landing
+			plan.landingTime=model.landingTime
+		else
+			local endVelocity=plan.velocity+G*previewTime
+			local p2=startPoint
+			local p3=endPoint
+			if preview.p2 then
+				p2=preview.p2:Lerp(p2,PREVIEW_SMOOTH)
+			end
+			if preview.p3 and (p3-preview.p3).Magnitude<=45 then
+				p3=preview.p3:Lerp(p3,PREVIEW_SMOOTH)
+			end
+
+			preview.p2,preview.p3=p2,p3
+			setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity))
+			setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity))
+			updateC1AndC3Info(plan,p1,p3)
+			beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
+			beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
 		end
 
-		preview.p1,preview.p2,preview.p3=p1,p2,p3
-		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity))
-		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*plan.time))
-		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity))
-		updateC1AndC3Info(plan,p1,p3)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
-		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
-		beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
 		setPreviewCenterVisible(true)
 		beam.Enabled=true
 	end
@@ -2318,6 +2443,7 @@ function QBAim.new(ctx,parent)
 			previewFrozen=false
 			preview.ballMissingSince=nil
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
+			preview.c2cf,preview.c3cf=nil,nil
 			setTargetText()
 			setStatus("Locked "..best.Name)
 		else
@@ -2334,6 +2460,7 @@ function QBAim.new(ctx,parent)
 			previewFrozen=false
 			preview.ballMissingSince=nil
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
+			preview.c2cf,preview.c3cf=nil,nil
 			hideQBTrailPreview()
 			clearTargetHighlights()
 		end
