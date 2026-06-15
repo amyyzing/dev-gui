@@ -147,18 +147,18 @@ local THROW_TARGET_LOCK_ON_INPUT=true
 local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
 local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
 local THROW_TARGET_FIRE_IMMEDIATELY=false
-local THROW_INPUT_COOLDOWN=0.85
 -- Separate timing terms. Do not use the full animation delay to move C2/origin.
 -- The release-origin drift is unified across X/Y/Z: one time value moves the whole origin vector.
-local QB_RELEASE_ORIGIN_DRIFT_TIME=0.04
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0.00
 local QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME -- kept as alias for internal compatibility
 local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
--- Key model:
---   1. Keypress computes one locked plan.
---   2. C2/QB origin drifts by the same time on X, Y, and Z.
---   3. WR is predicted through the full animation release window.
---   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
+-- Game-mechanics replica model:
+--   1. Play UF_QuarterbackThrow at 1.35.
+--   2. Wait THROW_ANIMATION_RELEASE_WAIT.
+--   3. Build the final aim ray from the current release-frame state.
+--   4. Use the game preview origin formula: HumanoidRootPart + CFrame.new(1,1.5,0) facing the far Target ray.
+--   5. Send Mechanics/ThrowBall with Target and Power=100, then call UnequipFootball like the source.
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local VALID_TEAM_IDS={
@@ -677,8 +677,6 @@ function QBAim.new(ctx,parent)
 	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil,ballMissingSince=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
-	local throwInProgress=false
-	local lastThrowAt=-math.huge
 	local highlightedCharacter=nil
 	local connections={}
 	local sectionBody=nil
@@ -686,7 +684,6 @@ function QBAim.new(ctx,parent)
 	local enabledToggle=nil
 	local teamFilterToggle=nil
 	local arcToggle=nil
-	local highlightToggle=nil
 	local leadDelayFrame=nil
 	local leadDelayBox=nil
 	local leadDelaySlider=nil
@@ -723,10 +720,6 @@ function QBAim.new(ctx,parent)
 
 	if state.qbAimShowArc==nil then
 		state.qbAimShowArc=true
-	end
-
-	if state.qbAimTargetHighlight==nil then
-		state.qbAimTargetHighlight=true
 	end
 
 	if state.qbAimLeadDelay==nil then
@@ -978,7 +971,7 @@ function QBAim.new(ctx,parent)
 	end
 
 	updateTargetHighlight=function()
-		local character=enabled and state.qbAimTargetHighlight~=false and trackedReceiver and trackedReceiver.Character or nil
+		local character=enabled and trackedReceiver and trackedReceiver.Character or nil
 		if not(character and canTargetReceiver(trackedReceiver)) then
 			if highlightedCharacter then
 				destroyQBAimHighlight(highlightedCharacter)
@@ -1054,9 +1047,6 @@ function QBAim.new(ctx,parent)
 			enabled=false
 			trackedReceiver=nil
 			selectedRouteLock=nil
-			if highlightedCharacter then
-				clearTargetHighlights()
-			end
 		elseif trackedReceiver and not canTargetReceiver(trackedReceiver) then
 			trackedReceiver=nil
 			selectedRouteLock=nil
@@ -1075,10 +1065,6 @@ function QBAim.new(ctx,parent)
 
 		if arcToggle then
 			arcToggle.set(state.qbAimShowArc~=false)
-		end
-
-		if highlightToggle then
-			highlightToggle.set(state.qbAimTargetHighlight~=false)
 		end
 
 		updateLeadDelayVisuals()
@@ -1421,29 +1407,21 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function origin(qbRoot,ball,xzReleaseOffset,yReleaseOffset)
+		-- Compatibility fallback only. The game-mechanics replica solver below does not
+		-- use the held football part or original Center.C2 as the primary throw origin.
 		xzReleaseOffset=xzReleaseOffset or 0
-		-- X/Y/Z share the same release-origin drift time unless explicitly overridden.
-		yReleaseOffset=yReleaseOffset
-		if yReleaseOffset==nil then
-			yReleaseOffset=xzReleaseOffset
-		end
+		yReleaseOffset=yReleaseOffset==nil and xzReleaseOffset or yReleaseOffset
 
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
-		local basePosition=ball and ball.Position or qbRoot.Position
-
-		local baseY=basePosition.Y
-		local centerY=c2Y()
-		local y=baseY
-		if centerY and centerY>=baseY-C2_GROUND_FALLBACK_MARGIN and centerY<=baseY+C2_MAX_ABOVE_BALL then
-			y=centerY
-		end
-
+		local basePosition=qbRoot.Position
 		local dx,dz=0,0
+
 		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and xzReleaseOffset>0 then
 			dx=rootVelocity.X*xzReleaseOffset
 			dz=rootVelocity.Z*xzReleaseOffset
 		end
 
+		local y=basePosition.Y
 		if QB_RELEASE_EXTRAPOLATE_VERTICAL and yReleaseOffset>0 then
 			local verticalVelocity=releaseVerticalVelocity(qbRoot,ball)
 			local airborne=math.abs(verticalVelocity)>=QB_AIRBORNE_VY_EPSILON or qbRoot.Position.Y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON
@@ -1454,6 +1432,47 @@ function QBAim.new(ctx,parent)
 		end
 
 		return Vector3.new(basePosition.X+dx,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+dz)
+	end
+
+	local GAME_MECHANICS_HAND_OFFSET=CFrame.new(1,1.5,0)
+	local GAME_MECHANICS_ORIGIN_ITERATIONS=4
+
+	local function gameMechanicsRootPosition(qbRoot,releaseOffset)
+		releaseOffset=releaseOffset or 0
+		local position=qbRoot.Position
+		if releaseOffset>0 then
+			position=position+qbRoot.AssemblyLinearVelocity*releaseOffset
+		end
+		return position
+	end
+
+	local function gameMechanicsOriginFromRemoteTarget(qbRoot,remoteTarget,releaseOffset)
+		-- Mirrors MECH_Binds.UpdateLandingSpot:
+		-- local Position = HumanoidRootPart.Position
+		-- local Position2 = (CFrame.lookAt(Position, Position + target.unit) * CFrame.new(1,1.5,0)).Position
+		local rootPosition=gameMechanicsRootPosition(qbRoot,releaseOffset)
+		local lookDirection=unit(remoteTarget, qbRoot.CFrame.LookVector)
+		return (CFrame.lookAt(rootPosition,rootPosition+lookDirection)*GAME_MECHANICS_HAND_OFFSET).Position
+	end
+
+	local function footballBeamDirection(velocity,originPosition,time)
+		-- Exact local version of FootballMath:BeamDirection for the cloned preview beam.
+		local scaledTime=time
+		local gravity=G
+		local endPoint=0.5*gravity*scaledTime*scaledTime+velocity*scaledTime+originPosition
+		local control1=endPoint-(gravity*scaledTime*scaledTime+velocity*scaledTime)/3
+		local control0=(0.125*gravity*scaledTime*scaledTime+0.5*velocity*scaledTime+originPosition-0.125*(originPosition+endPoint))/0.375-control1
+		local unitEnd=unit(originPosition-endPoint,Vector3.new(1,0,0))
+		local unitStart=unit(control0-originPosition,Vector3.new(1,0,0))
+		local sideStart=unit(unitStart:Cross(unitEnd),Vector3.new(0,1,0))
+		local unitFinish=unit(control1-endPoint,Vector3.new(1,0,0))
+		local sideFinish=unit(unitFinish:Cross(unitEnd),Vector3.new(0,1,0))
+		local up=unit(sideStart:Cross(unitStart),Vector3.new(0,1,0))
+
+		return (control0-originPosition).Magnitude,
+			-(control1-endPoint).Magnitude,
+			CFrame.new(originPosition.X,originPosition.Y,originPosition.Z,unitStart.X,sideStart.X,up.X,unitStart.Y,sideStart.Y,up.Y,unitStart.Z,sideStart.Z,up.Z),
+			CFrame.new(endPoint.X,endPoint.Y,endPoint.Z,unitFinish.X,sideFinish.X,up.X,unitFinish.Y,sideFinish.Y,up.Y,unitFinish.Z,sideFinish.Z,up.Z)
 	end
 
 	local function velocityNeeded(originPosition,targetPosition,time)
@@ -1725,20 +1744,7 @@ function QBAim.new(ctx,parent)
 		return(low+high)*0.5
 	end
 
-	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower,qbReleaseOffset,receiverReleaseOffset,predictorState)
-		local ballSpeed=ballPower or GAMEPLAY_BALL_POWER
-		qbReleaseOffset=qbReleaseOffset or 0
-		receiverReleaseOffset=receiverReleaseOffset==nil and qbReleaseOffset or receiverReleaseOffset
-		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
-		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
-		-- Delayed future-release model:
-		-- The throw request is sent near release, but the plan is locked on keypress.
-		-- Predict the actual server SpawnPos/release origin forward by qbReleaseOffset,
-		-- predict the receiver by receiverReleaseOffset, and build the outgoing Target
-		-- ray from that future release point.
-		local originPosition=origin(qbRoot,ball,qbReleaseOffset,qbReleaseOffset)
-		local receiverReleasePosition=receiverRoot.Position+wrVel*receiverReleaseOffset
-		local receiverStart=receiverMaxAt(receiverReleasePosition)
+	local function solveFromFixedOrigin(originPosition,receiverStart,wrVel,qbVel,ballSpeed,shape,predictorState)
 		local bestRoot=nil
 		local bestNear=nil
 		local previousTime=MIN_T
@@ -1776,9 +1782,39 @@ function QBAim.new(ctx,parent)
 			previousValue=value
 		end
 
-		local best=bestRoot or bestNear
+		return bestRoot or bestNear
+	end
+
+	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower,qbReleaseOffset,receiverReleaseOffset,predictorState)
+		local ballSpeed=ballPower or GAMEPLAY_BALL_POWER
+		qbReleaseOffset=qbReleaseOffset or 0
+		receiverReleaseOffset=receiverReleaseOffset==nil and qbReleaseOffset or receiverReleaseOffset
+		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
+		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
+
+		local receiverReleasePosition=receiverRoot.Position+wrVel*receiverReleaseOffset
+		local receiverStart=receiverMaxAt(receiverReleasePosition)
+		local rootPosition=gameMechanicsRootPosition(qbRoot,qbReleaseOffset)
+		local initialDirection=unit(receiverStart-rootPosition,qbRoot.CFrame.LookVector)
+		local remoteTarget=rootPosition+initialDirection*AIM_SCALE
+		local best=nil
+
+		for _=1,GAME_MECHANICS_ORIGIN_ITERATIONS do
+			local originPosition=gameMechanicsOriginFromRemoteTarget(qbRoot,remoteTarget,qbReleaseOffset)
+			local candidate=solveFromFixedOrigin(originPosition,receiverStart,wrVel,qbVel,ballSpeed,shape,predictorState)
+			if not candidate then
+				break
+			end
+
+			candidate.aimPoint=originPosition+candidate.direction*AIM_SCALE
+			candidate.origin=originPosition
+			candidate.gameMechanicsReplica=true
+			best=candidate
+			remoteTarget=candidate.aimPoint
+		end
+
 		if best and not best.leadInfo then
-			best.leadInfo=interceptLeadInfo(originPosition,best.target,wrVel,best.time,predictorState)
+			best.leadInfo=interceptLeadInfo(best.origin,best.target,wrVel,best.time,predictorState)
 		end
 		if best then
 			best.qbReleaseOffset=qbReleaseOffset
@@ -1786,6 +1822,7 @@ function QBAim.new(ctx,parent)
 			best.receiverReleaseOffset=receiverReleaseOffset
 			best.futureReleaseOriginLatch=(qbReleaseOffset or 0)>0
 			best.remoteFireDelayed=not THROW_TARGET_FIRE_IMMEDIATELY
+			best.originModel="game_mechanics_root_hand_offset"
 		end
 
 		return best
@@ -2014,32 +2051,23 @@ function QBAim.new(ctx,parent)
 		local previewTime=plan.time
 		if not(startPoint and endPoint and previewTime) then return end
 
-		local endVelocity=plan.velocity+G*previewTime
-		local p2=startPoint
 		local p1=endPoint
-		local p3=endPoint
-
-		if preview.p2 then
-			p2=preview.p2:Lerp(p2,PREVIEW_SMOOTH)
-		end
-
 		if preview.p1 and (p1-preview.p1).Magnitude<=28 then
 			p1=preview.p1:Lerp(p1,PREVIEW_SMOOTH)
 		end
+		preview.p1=p1
+		preview.p2=startPoint
+		preview.p3=endPoint
 
-		if preview.p3 and (p3-preview.p3).Magnitude<=45 then
-			p3=preview.p3:Lerp(p3,PREVIEW_SMOOTH)
-		end
-
-		preview.p1,preview.p2,preview.p3=p1,p2,p3
-		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity))
+		local curve0,curve1,c2CF,c3CF=footballBeamDirection(plan.velocity,startPoint,previewTime)
+		setAttachmentCFrame(c2,c2CF)
 		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*plan.time))
-		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity))
-		updateC1AndC3Info(plan,p1,p3)
+		setAttachmentCFrame(c3,c3CF)
+		updateC1AndC3Info(plan,p1,endPoint)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
-		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
-		beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
+		beam.CurveSize0=math.clamp(curve0,-ARC_MAX_CURVE,ARC_MAX_CURVE)
+		beam.CurveSize1=math.clamp(curve1,-ARC_MAX_CURVE,ARC_MAX_CURVE)
 		setPreviewCenterVisible(true)
 		beam.Enabled=true
 	end
@@ -2054,9 +2082,6 @@ function QBAim.new(ctx,parent)
 
 	local function clearPreviewForMissingBall(statusText)
 		clearPreviewVisuals()
-		if highlightedCharacter then
-			clearTargetHighlights()
-		end
 
 		if statusText then
 			setStatus(statusText)
@@ -2089,25 +2114,20 @@ function QBAim.new(ctx,parent)
 
 		releaseOffset=releaseOffset or 0
 		receiverReleaseOffset=receiverReleaseOffset==nil and releaseOffset or receiverReleaseOffset
-		local originPosition=origin(qbRoot,ball,releaseOffset)
+		local roughTarget=Vector3.new(receiverRoot.Position.X,WR_MAX_Y,receiverRoot.Position.Z)
+		local roughRemote=qbRoot.Position+unit(roughTarget-qbRoot.Position,qbRoot.CFrame.LookVector)*AIM_SCALE
+		local originPosition=gameMechanicsOriginFromRemoteTarget(qbRoot,roughRemote,releaseOffset)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
 		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,receiverReleaseOffset,predictorState),ball
 	end
 
 	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
-		-- Target-latch / delayed-remote solver.
-		-- The preview arc locks at keypress, but the remote appears shortly before release.
-		-- Keep the keypress plan frozen during animation, then send that same world Target.
-		-- Do not recompute from the future QB point and do not fire immediately.
-		if THROW_TARGET_FIRE_IMMEDIATELY then
-			if lockedPlan then
-				previewPlan(lockedPlan)
-			end
-			return lockedPlan,releaseBall
-		end
-
+		-- Game-mechanics replica:
+		-- FootballThrow plays UF_QuarterbackThrow, waits 0.266666..., then samples the
+		-- current aim ray and fires ThrowBall. So QBAim previews before the wait, but
+		-- recomputes the final plan at the release frame from the current QB/root state.
 		if THROW_ANIMATION_RELEASE_WAIT<=0 then
-			return lockedPlan or buildPlan(receiver,ballPower,0,releaseBall)
+			return buildPlan(receiver,ballPower,0,releaseBall,0)
 		end
 
 		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
@@ -2115,8 +2135,7 @@ function QBAim.new(ctx,parent)
 
 		while os.clock()<fireAt do
 			if THROW_TARGET_LOCK_PREVIEW_LIVE then
-				local remaining=math.max(endAt-os.clock(),0)
-				local livePlan=buildPlan(receiver,ballPower,remaining,releaseBall,remaining)
+				local livePlan=buildPlan(receiver,ballPower,0,releaseBall,0)
 				if livePlan then
 					previewPlan(livePlan)
 				end
@@ -2127,7 +2146,8 @@ function QBAim.new(ctx,parent)
 			RunService.Heartbeat:Wait()
 		end
 
-		return lockedPlan,releaseBall
+		local finalPlan,finalBall=buildPlan(receiver,ballPower,0,releaseBall,0)
+		return finalPlan or lockedPlan,finalBall or releaseBall
 	end
 
 	local function fireGameplayThrow(plan)
@@ -2142,8 +2162,13 @@ function QBAim.new(ctx,parent)
 			Power=REMOTE_DISPLAY_POWER,
 		})
 
-		-- Do not call local UnequipFootball here. Normal flow lets the server send the
-		-- incoming Mechanics/UnequipFootball and UpdateFootball events after ThrowBall.
+		pcall(function()
+			local mechanics=getGlobalMechanics()
+			if mechanics and type(mechanics.UnequipFootball)=="function" then
+				mechanics:UnequipFootball()
+			end
+		end)
+
 		return true,nil
 	end
 
@@ -2164,12 +2189,6 @@ function QBAim.new(ctx,parent)
 
 	local function throwTo(receiver)
 		if not(enabled and isAvailable()) then return end
-
-		local now=os.clock()
-		if throwInProgress or now-lastThrowAt<THROW_INPUT_COOLDOWN then
-			setStatus("Throw already in progress")
-			return
-		end
 
 		if not canTargetReceiver(receiver) then
 			trackedReceiver=nil
@@ -2194,22 +2213,11 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		-- Lock one plan at keypress. Keep animation-to-fire timing at 0.2666s,
-		-- but do not use that whole value to move C2/origin. The QB/ball release
-		-- origin gets a small measured drift; the WR prediction uses the full
-		-- animation window.
-		local lockedQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
-		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
-		throwInProgress=true
-
-		local function releaseThrowLock()
-			throwInProgress=false
-			lastThrowAt=os.clock()
-		end
-
-		local lockedPlan=buildPlan(receiver,power,lockedQBOffset,heldBall,lockedWROffset)
+		-- Preview one plan at keypress, then recompute at the actual release frame.
+		-- This mirrors MECH_ControlsQuarterback.FootballThrow: animation first,
+		-- wait 0.266666..., then build/send the Target ray.
+		local lockedPlan=buildPlan(receiver,power,0,heldBall,0)
 		if not lockedPlan then
-			releaseThrowLock()
 			setStatus("No target-latch throw solution")
 			return
 		end
@@ -2219,7 +2227,6 @@ function QBAim.new(ctx,parent)
 
 		local plan=buildReleasePlan(receiver,power,heldBall,lockedPlan)
 		if not plan then
-			releaseThrowLock()
 			setStatus("No target-latch throw solution")
 			return
 		end
@@ -2235,12 +2242,10 @@ function QBAim.new(ctx,parent)
 
 		if ok then
 			freezePreviewAtCurrentPlan(plan)
-			setStatus(currentModeText().." delayed future-release throw sent")
+			setStatus(currentModeText().." game-mechanics replica throw sent")
 		else
 			setStatus(err or "Throw failed")
 		end
-
-		releaseThrowLock()
 	end
 
 	local function lockReceiverUnderCursor()
@@ -2289,7 +2294,6 @@ function QBAim.new(ctx,parent)
 			preview.ballMissingSince=nil
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			hideQBTrailPreview()
-			clearTargetHighlights()
 		end
 
 		syncControls()
@@ -2323,17 +2327,6 @@ function QBAim.new(ctx,parent)
 		if not state.qbAimShowArc then
 			clearPreviewVisuals()
 			setStatus("Arc hidden")
-		end
-		syncControls()
-		if fire~=false then
-			changed()
-		end
-	end
-
-	function api.SetTargetHighlightState(value,fire)
-		state.qbAimTargetHighlight=value and true or false
-		if not state.qbAimTargetHighlight then
-			clearTargetHighlights()
 		end
 		syncControls()
 		if fire~=false then
@@ -2410,10 +2403,6 @@ function QBAim.new(ctx,parent)
 		api.SetShowArcState(value,true)
 	end)
 
-	highlightToggle=buildToggleRow(sectionBody,"Target Highlight",state.qbAimTargetHighlight~=false,function(value)
-		api.SetTargetHighlightState(value,true)
-	end)
-
 	if buildSlider then
 		leadDelaySliderControl=buildSlider(sectionBody,"Lead Adjust",LEAD_DELAY_MIN,LEAD_DELAY_MAX,WR_LEAD_DELAY,2,function(value)
 			api.SetLeadDelay(value,true)
@@ -2439,7 +2428,7 @@ function QBAim.new(ctx,parent)
 		end))
 		qbDriftFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
 		qbDriftBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",QB_RELEASE_ORIGIN_DRIFT_TIME),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},qbDriftFrame)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="QB XYZ Drift",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbDriftFrame)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="QB Drift",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbDriftFrame)
 		addConnection(qbDriftBox.FocusLost:Connect(function()
 			setQBDrift(qbDriftBox.Text,true)
 		end))
@@ -2497,12 +2486,9 @@ function QBAim.new(ctx,parent)
 	end))
 
 	addConnection(RunService.RenderStepped:Connect(function()
-		if not(enabled and isAvailable()) then
-			if highlightedCharacter then
-				clearTargetHighlights()
-			end
-			return
-		end
+		if not(enabled and isAvailable()) then return end
+
+		updateTargetHighlight()
 
 		local now=os.clock()
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
@@ -2527,8 +2513,6 @@ function QBAim.new(ctx,parent)
 			preview.ballMissingSince=nil
 		end
 
-		updateTargetHighlight()
-
 		if not trackedReceiver then return end
 
 		if state.qbAimShowArc==false then
@@ -2539,9 +2523,7 @@ function QBAim.new(ctx,parent)
 		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
 		preview.last=now
 
-		local previewQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
-		local previewWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
-		local plan=buildPlan(trackedReceiver,nil,previewQBOffset,nil,previewWROffset)
+		local plan=buildPlan(trackedReceiver,nil,0,nil,0)
 		if plan then
 			previewPlan(plan)
 		end
@@ -2560,11 +2542,6 @@ function QBAim.new(ctx,parent)
 		local wantsLock=bindingMatches("getQBAimLockKey",input,Enum.KeyCode.H)
 		local wantsThrow=bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T)
 		if not(wantsLock or wantsThrow) then return false end
-
-		if wantsThrow and (throwInProgress or os.clock()-lastThrowAt<THROW_INPUT_COOLDOWN) then
-			setStatus("Throw already in progress")
-			return true
-		end
 
 		if not getHeldBall() then
 			clearPreviewForMissingBall("No ball held")
@@ -2590,7 +2567,6 @@ function QBAim.new(ctx,parent)
 	end))
 
 	cleanupC3InfoGui()
-	clearTargetHighlights()
 	syncControls()
 	return api
 end
