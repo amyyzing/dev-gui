@@ -245,6 +245,7 @@ function StrokeColour.new(ctx,page)
 	local THEME=ctx.THEME
 	local UI_STYLE=ctx.UI_STYLE
 	local UIS=ctx.UIS or game:GetService("UserInputService")
+	local buildSlider=ctx.buildSlider
 
 	applyDefaultOverrides(ctx.DEFAULT_UI_STYLE)
 	ensureStyleDefaults(UI_STYLE)
@@ -265,6 +266,7 @@ function StrokeColour.new(ctx,page)
 	local getActiveColor=function() return colorFromStyle(UI_STYLE,"Primary") end
 	local connections={}
 	local collapsiblePanels={}
+	local sharedSliderControls={}
 
 	local function pointerPosition(input)
 		local raw
@@ -485,6 +487,15 @@ function StrokeColour.new(ctx,page)
 
 	function api.Destroy()
 		colourTweenToken=colourTweenToken+1
+
+		for _,control in ipairs(sharedSliderControls) do
+			if control and type(control.destroy)=="function" then
+				pcall(control.destroy)
+			elseif control and type(control.Destroy)=="function" then
+				pcall(control.Destroy)
+			end
+		end
+		table.clear(sharedSliderControls)
 
 		for _,conn in ipairs(connections) do
 			pcall(function()
@@ -966,6 +977,17 @@ function StrokeColour.new(ctx,page)
 		setValue(startVal,false)
 
 		return{set=function(v,fire) setValue(v,fire) end,get=function() return value end,fill=fill,box=valueBox}
+	end
+
+	local function makeHighlightSlider(parent,labelText,minVal,maxVal,startVal,decimals,fillColor,onChange)
+		if buildSlider then
+			local control=buildSlider(parent,labelText,minVal,maxVal,startVal,decimals,onChange)
+			sharedSliderControls[#sharedSliderControls+1]=control
+			tintSlider(control,fillColor)
+			return control
+		end
+
+		return makeMiniSlider(parent,labelText,minVal,maxVal,startVal,decimals,fillColor,onChange)
 	end
 
 	local function normalizeHighlightMode(value)
@@ -1746,10 +1768,18 @@ function StrokeColour.new(ctx,page)
 			return nil
 		end
 
-		local relative=position-highlightDialCanvas.AbsolutePosition
-		local size=math.min(highlightDialCanvas.AbsoluteSize.X,highlightDialCanvas.AbsoluteSize.Y)
-		local dx=relative.X-highlightDialCanvas.AbsoluteSize.X*0.5
-		local dy=relative.Y-highlightDialCanvas.AbsoluteSize.Y*0.5
+		local absolutePosition=highlightDialCanvas.AbsolutePosition
+		local absoluteSize=highlightDialCanvas.AbsoluteSize
+		local x=(position.X or 0)-absolutePosition.X
+		local y=(position.Y or 0)-absolutePosition.Y
+		local size=math.min(absoluteSize.X,absoluteSize.Y)
+
+		if size<=0 then
+			return nil
+		end
+
+		local dx=x-absoluteSize.X*0.5
+		local dy=y-absoluteSize.Y*0.5
 		local radius=math.sqrt(dx*dx+dy*dy)
 		local inner=size*HIGHLIGHT_DIAL_INNER_RADIUS
 		local outer=size*HIGHLIGHT_DIAL_OUTER_RADIUS
@@ -1884,7 +1914,7 @@ function StrokeColour.new(ctx,page)
 			return
 		end
 
-		local modeKey=highlightModeAtPosition(pointerPosition(input))
+		local modeKey=highlightModeAtPosition(input.Position)
 		if modeKey then
 			setHighlightMode(modeKey)
 		end
@@ -1892,7 +1922,7 @@ function StrokeColour.new(ctx,page)
 
 	trackConnection(highlightDialHit.InputChanged:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch then
-			setHighlightHoverMode(highlightModeAtPosition(pointerPosition(input)))
+			setHighlightHoverMode(highlightModeAtPosition(input.Position))
 		end
 	end))
 
@@ -1947,7 +1977,7 @@ function StrokeColour.new(ctx,page)
 
 	local highlightRgbBody=New("Frame",{
 		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,94),
+		Size=UDim2.new(1,0,0,154),
 		ZIndex=5,
 		LayoutOrder=3,
 	},highlightPanel)
@@ -1959,25 +1989,25 @@ function StrokeColour.new(ctx,page)
 		updateEverything()
 	end
 
-	highlightRgbSliders.R=makeMiniSlider(highlightRgbBody,"R",0,255,0,0,Color3.fromRGB(255,0,0),applyHighlightRGB)
-	highlightRgbSliders.G=makeMiniSlider(highlightRgbBody,"G",0,255,0,0,Color3.fromRGB(0,210,80),applyHighlightRGB)
-	highlightRgbSliders.B=makeMiniSlider(highlightRgbBody,"B",0,255,0,0,Color3.fromRGB(0,120,255),applyHighlightRGB)
+	highlightRgbSliders.R=makeHighlightSlider(highlightRgbBody,"R",0,255,0,0,Color3.fromRGB(255,0,0),applyHighlightRGB)
+	highlightRgbSliders.G=makeHighlightSlider(highlightRgbBody,"G",0,255,0,0,Color3.fromRGB(0,210,80),applyHighlightRGB)
+	highlightRgbSliders.B=makeHighlightSlider(highlightRgbBody,"B",0,255,0,0,Color3.fromRGB(0,120,255),applyHighlightRGB)
 
 	local highlightTransparencyBody=New("Frame",{
 		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,61),
+		Size=UDim2.new(1,0,0,101),
 		ZIndex=5,
 		LayoutOrder=4,
 	},highlightPanel)
 	New("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},highlightTransparencyBody)
 
-	highlightFillTransparencySlider=makeMiniSlider(highlightTransparencyBody,"F",0,1,highlightTransparency("Fill"),2,highlightColor("Fill"),function(value)
+	highlightFillTransparencySlider=makeHighlightSlider(highlightTransparencyBody,"Fill Alpha",0,1,highlightTransparency("Fill"),2,highlightColor("Fill"),function(value)
 		writeHighlightTransparency("Fill",value)
 		syncHighlightControls()
 		updateEverything()
 	end)
 
-	highlightOutlineTransparencySlider=makeMiniSlider(highlightTransparencyBody,"O",0,1,highlightTransparency("Outline"),2,highlightColor("Outline"),function(value)
+	highlightOutlineTransparencySlider=makeHighlightSlider(highlightTransparencyBody,"Outline Alpha",0,1,highlightTransparency("Outline"),2,highlightColor("Outline"),function(value)
 		writeHighlightTransparency("Outline",value)
 		syncHighlightControls()
 		updateEverything()
