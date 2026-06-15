@@ -147,10 +147,10 @@ local THROW_TARGET_LOCK_ON_INPUT=true
 local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
 local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
 local THROW_TARGET_FIRE_IMMEDIATELY=false
+local THROW_INPUT_COOLDOWN=0.85
 -- Separate timing terms. Do not use the full animation delay to move C2/origin.
 -- The release-origin drift is unified across X/Y/Z: one time value moves the whole origin vector.
--- Reverted from game-style root/hand origin because live testing showed the drift model matched the server arc better.
-local QB_RELEASE_ORIGIN_DRIFT_TIME=0.13
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0.04
 local QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME -- kept as alias for internal compatibility
 local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
@@ -677,6 +677,8 @@ function QBAim.new(ctx,parent)
 	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil,ballMissingSince=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
+	local throwInProgress=false
+	local lastThrowAt=-math.huge
 	local highlightedCharacter=nil
 	local connections={}
 	local sectionBody=nil
@@ -684,6 +686,7 @@ function QBAim.new(ctx,parent)
 	local enabledToggle=nil
 	local teamFilterToggle=nil
 	local arcToggle=nil
+	local highlightToggle=nil
 	local leadDelayFrame=nil
 	local leadDelayBox=nil
 	local leadDelaySlider=nil
@@ -720,6 +723,10 @@ function QBAim.new(ctx,parent)
 
 	if state.qbAimShowArc==nil then
 		state.qbAimShowArc=true
+	end
+
+	if state.qbAimTargetHighlight==nil then
+		state.qbAimTargetHighlight=true
 	end
 
 	if state.qbAimLeadDelay==nil then
@@ -971,7 +978,7 @@ function QBAim.new(ctx,parent)
 	end
 
 	updateTargetHighlight=function()
-		local character=enabled and trackedReceiver and trackedReceiver.Character or nil
+		local character=enabled and state.qbAimTargetHighlight~=false and trackedReceiver and trackedReceiver.Character or nil
 		if not(character and canTargetReceiver(trackedReceiver)) then
 			if highlightedCharacter then
 				destroyQBAimHighlight(highlightedCharacter)
@@ -1047,6 +1054,9 @@ function QBAim.new(ctx,parent)
 			enabled=false
 			trackedReceiver=nil
 			selectedRouteLock=nil
+			if highlightedCharacter then
+				clearTargetHighlights()
+			end
 		elseif trackedReceiver and not canTargetReceiver(trackedReceiver) then
 			trackedReceiver=nil
 			selectedRouteLock=nil
@@ -1065,6 +1075,10 @@ function QBAim.new(ctx,parent)
 
 		if arcToggle then
 			arcToggle.set(state.qbAimShowArc~=false)
+		end
+
+		if highlightToggle then
+			highlightToggle.set(state.qbAimTargetHighlight~=false)
 		end
 
 		updateLeadDelayVisuals()
@@ -2040,6 +2054,9 @@ function QBAim.new(ctx,parent)
 
 	local function clearPreviewForMissingBall(statusText)
 		clearPreviewVisuals()
+		if highlightedCharacter then
+			clearTargetHighlights()
+		end
 
 		if statusText then
 			setStatus(statusText)
@@ -2148,6 +2165,12 @@ function QBAim.new(ctx,parent)
 	local function throwTo(receiver)
 		if not(enabled and isAvailable()) then return end
 
+		local now=os.clock()
+		if throwInProgress or now-lastThrowAt<THROW_INPUT_COOLDOWN then
+			setStatus("Throw already in progress")
+			return
+		end
+
 		if not canTargetReceiver(receiver) then
 			trackedReceiver=nil
 			selectedRouteLock=nil
@@ -2177,8 +2200,16 @@ function QBAim.new(ctx,parent)
 		-- animation window.
 		local lockedQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		throwInProgress=true
+
+		local function releaseThrowLock()
+			throwInProgress=false
+			lastThrowAt=os.clock()
+		end
+
 		local lockedPlan=buildPlan(receiver,power,lockedQBOffset,heldBall,lockedWROffset)
 		if not lockedPlan then
+			releaseThrowLock()
 			setStatus("No target-latch throw solution")
 			return
 		end
@@ -2188,6 +2219,7 @@ function QBAim.new(ctx,parent)
 
 		local plan=buildReleasePlan(receiver,power,heldBall,lockedPlan)
 		if not plan then
+			releaseThrowLock()
 			setStatus("No target-latch throw solution")
 			return
 		end
@@ -2207,6 +2239,8 @@ function QBAim.new(ctx,parent)
 		else
 			setStatus(err or "Throw failed")
 		end
+
+		releaseThrowLock()
 	end
 
 	local function lockReceiverUnderCursor()
@@ -2255,6 +2289,7 @@ function QBAim.new(ctx,parent)
 			preview.ballMissingSince=nil
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			hideQBTrailPreview()
+			clearTargetHighlights()
 		end
 
 		syncControls()
@@ -2288,6 +2323,17 @@ function QBAim.new(ctx,parent)
 		if not state.qbAimShowArc then
 			clearPreviewVisuals()
 			setStatus("Arc hidden")
+		end
+		syncControls()
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetTargetHighlightState(value,fire)
+		state.qbAimTargetHighlight=value and true or false
+		if not state.qbAimTargetHighlight then
+			clearTargetHighlights()
 		end
 		syncControls()
 		if fire~=false then
@@ -2364,6 +2410,10 @@ function QBAim.new(ctx,parent)
 		api.SetShowArcState(value,true)
 	end)
 
+	highlightToggle=buildToggleRow(sectionBody,"Target Highlight",state.qbAimTargetHighlight~=false,function(value)
+		api.SetTargetHighlightState(value,true)
+	end)
+
 	if buildSlider then
 		leadDelaySliderControl=buildSlider(sectionBody,"Lead Adjust",LEAD_DELAY_MIN,LEAD_DELAY_MAX,WR_LEAD_DELAY,2,function(value)
 			api.SetLeadDelay(value,true)
@@ -2389,7 +2439,7 @@ function QBAim.new(ctx,parent)
 		end))
 		qbDriftFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
 		qbDriftBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",QB_RELEASE_ORIGIN_DRIFT_TIME),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},qbDriftFrame)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="QB Drift",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbDriftFrame)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="QB XYZ Drift",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbDriftFrame)
 		addConnection(qbDriftBox.FocusLost:Connect(function()
 			setQBDrift(qbDriftBox.Text,true)
 		end))
@@ -2447,9 +2497,12 @@ function QBAim.new(ctx,parent)
 	end))
 
 	addConnection(RunService.RenderStepped:Connect(function()
-		if not(enabled and isAvailable()) then return end
-
-		updateTargetHighlight()
+		if not(enabled and isAvailable()) then
+			if highlightedCharacter then
+				clearTargetHighlights()
+			end
+			return
+		end
 
 		local now=os.clock()
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
@@ -2473,6 +2526,8 @@ function QBAim.new(ctx,parent)
 
 			preview.ballMissingSince=nil
 		end
+
+		updateTargetHighlight()
 
 		if not trackedReceiver then return end
 
@@ -2506,6 +2561,11 @@ function QBAim.new(ctx,parent)
 		local wantsThrow=bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T)
 		if not(wantsLock or wantsThrow) then return false end
 
+		if wantsThrow and (throwInProgress or os.clock()-lastThrowAt<THROW_INPUT_COOLDOWN) then
+			setStatus("Throw already in progress")
+			return true
+		end
+
 		if not getHeldBall() then
 			clearPreviewForMissingBall("No ball held")
 			return true
@@ -2530,6 +2590,7 @@ function QBAim.new(ctx,parent)
 	end))
 
 	cleanupC3InfoGui()
+	clearTargetHighlights()
 	syncControls()
 	return api
 end
