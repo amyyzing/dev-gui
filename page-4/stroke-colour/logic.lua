@@ -1989,9 +1989,9 @@ function StrokeColour.new(ctx,page)
 		updateEverything()
 	end
 
-	highlightRgbSliders.R=makeHighlightSlider(highlightRgbBody,"R",0,255,0,0,Color3.fromRGB(255,0,0),applyHighlightRGB)
-	highlightRgbSliders.G=makeHighlightSlider(highlightRgbBody,"G",0,255,0,0,Color3.fromRGB(0,210,80),applyHighlightRGB)
-	highlightRgbSliders.B=makeHighlightSlider(highlightRgbBody,"B",0,255,0,0,Color3.fromRGB(0,120,255),applyHighlightRGB)
+	highlightRgbSliders.R=makeHighlightSlider(highlightRgbBody,"Red",0,255,0,0,Color3.fromRGB(255,0,0),applyHighlightRGB)
+	highlightRgbSliders.G=makeHighlightSlider(highlightRgbBody,"Green",0,255,0,0,Color3.fromRGB(0,210,80),applyHighlightRGB)
+	highlightRgbSliders.B=makeHighlightSlider(highlightRgbBody,"Blue",0,255,0,0,Color3.fromRGB(0,120,255),applyHighlightRGB)
 
 	local highlightTransparencyBody=New("Frame",{
 		BackgroundTransparency=1,
