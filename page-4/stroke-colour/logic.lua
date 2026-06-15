@@ -28,6 +28,35 @@ local DEFAULTS={
 	UILib="original",
 	ThemePanelExpanded=false,
 	ColoursPanelExpanded=false,
+	HighlightPanelExpanded=false,
+	HighlightSelectedMode="espOffense",
+	ESPOffenseCustomColor=false,
+	ESPDefenseCustomColor=false,
+	QBAimHighlightCustomColor=false,
+	ESPOffenseFillR=32,
+	ESPOffenseFillG=202,
+	ESPOffenseFillB=106,
+	ESPOffenseOutlineR=32,
+	ESPOffenseOutlineG=202,
+	ESPOffenseOutlineB=106,
+	ESPOffenseFillTransparency=0.5,
+	ESPOffenseOutlineTransparency=0,
+	ESPDefenseFillR=32,
+	ESPDefenseFillG=202,
+	ESPDefenseFillB=106,
+	ESPDefenseOutlineR=32,
+	ESPDefenseOutlineG=202,
+	ESPDefenseOutlineB=106,
+	ESPDefenseFillTransparency=0.5,
+	ESPDefenseOutlineTransparency=0,
+	QBAimHighlightFillR=21,
+	QBAimHighlightFillG=103,
+	QBAimHighlightFillB=251,
+	QBAimHighlightOutlineR=32,
+	QBAimHighlightOutlineG=202,
+	QBAimHighlightOutlineB=106,
+	QBAimHighlightFillTransparency=0.65,
+	QBAimHighlightOutlineTransparency=0,
 }
 
 local function clampByte(v)
@@ -55,8 +84,85 @@ local COLOR_FIELDS={
 	Gradient={"GradientR","GradientG","GradientB"},
 }
 
-local BOOL_FIELDS={StrokeGradient=true,LiquidStroke=true,ThemePanelExpanded=true,ColoursPanelExpanded=true}
-local NUMBER_LIMITS={LiquidStrokeSpeed={0,2},StrokeThickness={0,8},StrokeTransparency={0,1}}
+local BOOL_FIELDS={
+	StrokeGradient=true,
+	LiquidStroke=true,
+	ThemePanelExpanded=true,
+	ColoursPanelExpanded=true,
+	HighlightPanelExpanded=true,
+	ESPOffenseCustomColor=true,
+	ESPDefenseCustomColor=true,
+	QBAimHighlightCustomColor=true,
+}
+local NUMBER_LIMITS={
+	LiquidStrokeSpeed={0,2},
+	StrokeThickness={0,8},
+	StrokeTransparency={0,1},
+	ESPOffenseFillTransparency={0,1},
+	ESPOffenseOutlineTransparency={0,1},
+	ESPDefenseFillTransparency={0,1},
+	ESPDefenseOutlineTransparency={0,1},
+	QBAimHighlightFillTransparency={0,1},
+	QBAimHighlightOutlineTransparency={0,1},
+}
+
+local HIGHLIGHT_MODES={
+	{Key="espOffense",Prefix="ESPOffense",Label="ESP Offense",Short="O"},
+	{Key="espDefense",Prefix="ESPDefense",Label="ESP Defense",Short="D"},
+	{Key="qbHighlight",Prefix="QBAimHighlight",Label="QB Highlight",Short="Q"},
+}
+local HIGHLIGHT_MODE_BY_KEY={}
+for _,mode in ipairs(HIGHLIGHT_MODES) do
+	HIGHLIGHT_MODE_BY_KEY[mode.Key]=mode
+end
+local HIGHLIGHT_DIAL_W=96
+local HIGHLIGHT_DIAL_H=96
+local HIGHLIGHT_DIAL_INNER_RADIUS=0.22
+local HIGHLIGHT_DIAL_OUTER_RADIUS=0.43
+local HIGHLIGHT_DIAL_GAP_DEG=8
+local HIGHLIGHT_DIAL_GLOW_LAYERS={
+	{pad=1,z=5},
+	{pad=4,z=4},
+	{pad=8,z=3},
+}
+local HIGHLIGHT_DIAL_ASSET_KEY={espOffense="speed",espDefense="gravity",qbHighlight="stamina"}
+local HIGHLIGHT_DIAL_SECTORS={
+	{key="espDefense",start=30,finish=150},
+	{key="espOffense",start=150,finish=270},
+	{key="qbHighlight",start=270,finish=390},
+}
+
+local function brightenColor(color,amount)
+	amount=math.clamp(tonumber(amount) or 0,0,1)
+	return color:Lerp(Color3.new(1,1,1),amount)
+end
+
+local function atan2(y,x)
+	if x>0 then
+		return math.atan(y/x)
+	elseif x<0 and y>=0 then
+		return math.atan(y/x)+math.pi
+	elseif x<0 then
+		return math.atan(y/x)-math.pi
+	elseif y>0 then
+		return math.pi*0.5
+	elseif y<0 then
+		return -math.pi*0.5
+	end
+
+	return 0
+end
+
+local function inAngleRange(angle,startAngle,finishAngle)
+	local start=startAngle+HIGHLIGHT_DIAL_GAP_DEG
+	local finish=finishAngle-HIGHLIGHT_DIAL_GAP_DEG
+
+	if finish>360 then
+		return angle>=start or angle<=(finish-360)
+	end
+
+	return angle>=start and angle<=finish
+end
 
 local function normalizedStyleValue(key,value,default)
 	if BOOL_FIELDS[key] then
@@ -457,18 +563,31 @@ function StrokeColour.new(ctx,page)
 
 	local activeTarget="Primary"
 	local activeMode="Square"
+	local activeHighlightTarget="Fill"
+	local highlightHoverMode=nil
 	local pickerHue,pickerSat,pickerVal=0,0,1
 	local colorDrag=nil
 
 	local targetButtons={}
 	local modeButtons={}
+	local highlightTargetButtons={}
 	local themeCards={}
 	local quickChoices={}
 	local rgbSliders={}
 	local hsvSliders={}
+	local highlightRgbSliders={}
+	local highlightDialImages={}
+	local highlightDialGlowImages={}
+	local highlightDialHighlightImages={}
+	local highlightFallbackSlices={}
+	local highlightDialPaintTweens={}
+	local highlightDialCanvas=nil
+	local highlightDialCenterCap=nil
 	local modeBodies={}
 	local colorPreview,previewHex,hexBox
 	local svBase,svCursor,hueCursor
+	local highlightModeLabel,highlightPreview,highlightPreviewStroke,highlightFillTransparencySlider,highlightOutlineTransparencySlider
+	local paintHighlightDial=function() end
 
 	local function themeColor(role,fallback)
 		return THEME[role] or fallback
@@ -849,7 +968,74 @@ function StrokeColour.new(ctx,page)
 		return{set=function(v,fire) setValue(v,fire) end,get=function() return value end,fill=fill,box=valueBox}
 	end
 
+	local function normalizeHighlightMode(value)
+		local key=tostring(value or DEFAULTS.HighlightSelectedMode)
+		if HIGHLIGHT_MODE_BY_KEY[key] then
+			return key
+		end
+
+		key=key:lower():gsub("%s+","")
+		if key=="offense" or key=="espoffense" or key=="1" then
+			return"espOffense"
+		elseif key=="defense" or key=="espdefense" or key=="2" then
+			return"espDefense"
+		elseif key=="qb" or key=="qbaim" or key=="qbhighlight" or key=="3" then
+			return"qbHighlight"
+		end
+
+		return DEFAULTS.HighlightSelectedMode
+	end
+
+	local function activeHighlightMode()
+		UI_STYLE.HighlightSelectedMode=normalizeHighlightMode(UI_STYLE.HighlightSelectedMode)
+		return HIGHLIGHT_MODE_BY_KEY[UI_STYLE.HighlightSelectedMode] or HIGHLIGHT_MODE_BY_KEY[DEFAULTS.HighlightSelectedMode]
+	end
+
+	local function highlightField(channel,suffix)
+		return activeHighlightMode().Prefix..channel..suffix
+	end
+
+	local function highlightCustomField()
+		return activeHighlightMode().Prefix.."CustomColor"
+	end
+
+	local function highlightColor(channel)
+		return Color3.fromRGB(
+			clampByte(UI_STYLE[highlightField(channel,"R")]),
+			clampByte(UI_STYLE[highlightField(channel,"G")]),
+			clampByte(UI_STYLE[highlightField(channel,"B")])
+		)
+	end
+
+	local function writeHighlightColor(channel,color)
+		UI_STYLE[highlightField(channel,"R")]=math.floor(color.R*255+0.5)
+		UI_STYLE[highlightField(channel,"G")]=math.floor(color.G*255+0.5)
+		UI_STYLE[highlightField(channel,"B")]=math.floor(color.B*255+0.5)
+		UI_STYLE[highlightCustomField()]=true
+	end
+
+	local function highlightTransparency(channel)
+		return math.clamp(tonumber(UI_STYLE[highlightField(channel,"Transparency")]) or DEFAULTS[highlightField(channel,"Transparency")] or 0,0,1)
+	end
+
+	local function writeHighlightTransparency(channel,value)
+		UI_STYLE[highlightField(channel,"Transparency")]=math.clamp(tonumber(value) or highlightTransparency(channel),0,1)
+	end
+
+	local function getActiveHighlightColor()
+		return highlightColor(activeHighlightTarget)
+	end
+
+	local function writeActiveHighlightColor(color)
+		writeHighlightColor(activeHighlightTarget,color)
+	end
+
 	getActiveColor=function()
+		if activeTarget=="HighlightFill" or activeTarget=="HighlightOutline" then
+			activeHighlightTarget=activeTarget=="HighlightFill" and "Fill" or "Outline"
+			return getActiveHighlightColor()
+		end
+
 		if activeTarget=="Primary" then
 			return getUIPrimaryColor()
 		end
@@ -866,6 +1052,12 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function writeActiveColor(color)
+		if activeTarget=="HighlightFill" or activeTarget=="HighlightOutline" then
+			activeHighlightTarget=activeTarget=="HighlightFill" and "Fill" or "Outline"
+			writeActiveHighlightColor(color)
+			return
+		end
+
 		if activeTarget=="Primary" then
 			setPrimaryColour(color)
 		elseif activeTarget=="Gradient" then
@@ -896,6 +1088,19 @@ function StrokeColour.new(ctx,page)
 
 	local function setActiveMode(mode)
 		activeMode=mode
+		syncPickerControls()
+	end
+
+	local function setHighlightMode(modeKey)
+		UI_STYLE.HighlightSelectedMode=normalizeHighlightMode(modeKey)
+		setPickerFromColor(getActiveColor())
+		syncPickerControls()
+	end
+
+	local function setHighlightTarget(target)
+		activeHighlightTarget=target=="Outline" and "Outline" or "Fill"
+		activeTarget=activeHighlightTarget=="Fill" and "HighlightFill" or "HighlightOutline"
+		setPickerFromColor(getActiveColor())
 		syncPickerControls()
 	end
 
@@ -1358,6 +1563,426 @@ function StrokeColour.new(ctx,page)
 
 	trackConnection(applyHex.Activated:Connect(commitHex))
 
+	local function syncHighlightControls()
+		local mode=activeHighlightMode()
+		local fillColor=highlightColor("Fill")
+		local outlineColor=highlightColor("Outline")
+		local selectedColor=getActiveHighlightColor()
+		local activeAccent=getUIStrokeColor()
+		local inactive=themeColor("BUTTON",THEME.PANEL)
+		local enabled=UI_STYLE[mode.Prefix.."CustomColor"]==true
+
+		if highlightModeLabel then
+			highlightModeLabel.Text=mode.Label..(enabled and " custom" or " default colours")
+		end
+
+		if highlightPreview then
+			highlightPreview.BackgroundColor3=fillColor
+			highlightPreview.BackgroundTransparency=highlightTransparency("Fill")
+		end
+
+		if highlightPreviewStroke then
+			highlightPreviewStroke.Color=outlineColor
+			highlightPreviewStroke.Transparency=highlightTransparency("Outline")
+		end
+
+		paintHighlightDial(false)
+
+		for key,entry in pairs(highlightTargetButtons) do
+			local selected=key==activeHighlightTarget
+			entry.Button.BackgroundColor3=selected and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
+			entry.Marker.Visible=selected
+			entry.Marker.BackgroundColor3=activeAccent
+		end
+
+		if highlightRgbSliders.R then
+			highlightRgbSliders.R.set(clampByte(selectedColor.R*255),false)
+			highlightRgbSliders.G.set(clampByte(selectedColor.G*255),false)
+			highlightRgbSliders.B.set(clampByte(selectedColor.B*255),false)
+			tintSlider(highlightRgbSliders.R,Color3.fromRGB(255,0,0))
+			tintSlider(highlightRgbSliders.G,Color3.fromRGB(0,210,80))
+			tintSlider(highlightRgbSliders.B,Color3.fromRGB(0,120,255))
+		end
+
+		if highlightFillTransparencySlider then
+			highlightFillTransparencySlider.set(highlightTransparency("Fill"),false)
+			tintSlider(highlightFillTransparencySlider,fillColor)
+		end
+
+		if highlightOutlineTransparencySlider then
+			highlightOutlineTransparencySlider.set(highlightTransparency("Outline"),false)
+			tintSlider(highlightOutlineTransparencySlider,outlineColor)
+		end
+	end
+
+	local highlightPanel=makePanel(4,"Highlights","HighlightPanelExpanded")
+
+	local highlightModeRow=New("Frame",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,98),
+		ZIndex=5,
+		LayoutOrder=1,
+	},highlightPanel)
+
+	highlightDialCanvas=New("Frame",{
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		ClipsDescendants=false,
+		Position=UDim2.fromOffset(0,1),
+		Size=UDim2.fromOffset(HIGHLIGHT_DIAL_W,HIGHLIGHT_DIAL_H),
+		ZIndex=6,
+	},highlightModeRow)
+
+	local function tweenHighlightDialObject(object,goal)
+		if not object then return end
+		local previous=highlightDialPaintTweens[object]
+		if previous then
+			previous:Cancel()
+		end
+
+		local tween=TweenService:Create(object,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),goal)
+		highlightDialPaintTweens[object]=tween
+		tween.Completed:Connect(function()
+			if highlightDialPaintTweens[object]==tween then
+				highlightDialPaintTweens[object]=nil
+			end
+		end)
+		tween:Play()
+	end
+
+	paintHighlightDial=function(animate)
+		local selected=activeHighlightMode().Key
+		local accent=getUIStrokeColor()
+		local core=brightenColor(accent,0.10)
+		local hover=brightenColor(accent,0.24)
+		local glow=brightenColor(accent,0.38)
+		local muted=themeColor("MUTED",Color3.fromRGB(118,122,132))
+
+		for _,mode in ipairs(HIGHLIGHT_MODES) do
+			local key=mode.Key
+			local isSelected=key==selected
+			local isHover=key==highlightHoverMode
+			local isCustom=UI_STYLE[mode.Prefix.."CustomColor"]==true
+			local color=muted
+			local transparency=0.74
+			local highlightTransparency=1
+			local nearGlowTransparency=1
+			local midGlowTransparency=1
+			local farGlowTransparency=1
+
+			if isSelected then
+				color=isHover and hover or core
+				transparency=isHover and 0.04 or 0.08
+				highlightTransparency=isHover and 0.64 or 0.76
+				nearGlowTransparency=isHover and 0.42 or 0.54
+				midGlowTransparency=isHover and 0.62 or 0.72
+				farGlowTransparency=isHover and 0.82 or 0.90
+			elseif isCustom then
+				color=core
+				transparency=isHover and 0.24 or 0.40
+				nearGlowTransparency=isHover and 0.72 or 0.92
+				midGlowTransparency=isHover and 0.86 or 0.98
+			elseif isHover then
+				color=brightenColor(muted,0.13)
+				transparency=0.60
+			end
+
+			local image=highlightDialImages[key]
+			if image then
+				if animate then
+					tweenHighlightDialObject(image,{ImageColor3=color,ImageTransparency=transparency})
+				else
+					image.ImageColor3=color
+					image.ImageTransparency=transparency
+				end
+			end
+
+			local highlight=highlightDialHighlightImages[key]
+			if highlight then
+				if animate then
+					tweenHighlightDialObject(highlight,{ImageColor3=Color3.new(1,1,1),ImageTransparency=highlightTransparency})
+				else
+					highlight.ImageColor3=Color3.new(1,1,1)
+					highlight.ImageTransparency=highlightTransparency
+				end
+			end
+
+			local glows=highlightDialGlowImages[key]
+			if glows then
+				for index,glowImage in ipairs(glows) do
+					local glowTransparency=index==1 and nearGlowTransparency or (index==2 and midGlowTransparency or farGlowTransparency)
+					if animate then
+						tweenHighlightDialObject(glowImage,{ImageColor3=glow,ImageTransparency=glowTransparency})
+					else
+						glowImage.ImageColor3=glow
+						glowImage.ImageTransparency=glowTransparency
+					end
+				end
+			end
+
+			local fallback=highlightFallbackSlices[key]
+			if fallback then
+				if animate then
+					tweenHighlightDialObject(fallback,{BackgroundColor3=color,BackgroundTransparency=transparency})
+				else
+					fallback.BackgroundColor3=color
+					fallback.BackgroundTransparency=transparency
+				end
+			end
+		end
+
+		if highlightDialCenterCap then
+			local centerColor=themeColor("INPUT",THEME.PANEL)
+			if animate then
+				tweenHighlightDialObject(highlightDialCenterCap,{ImageColor3=centerColor})
+			else
+				highlightDialCenterCap.ImageColor3=centerColor
+			end
+		end
+	end
+
+	local function highlightModeAtPosition(position)
+		if not highlightDialCanvas then
+			return nil
+		end
+
+		local relative=position-highlightDialCanvas.AbsolutePosition
+		local size=math.min(highlightDialCanvas.AbsoluteSize.X,highlightDialCanvas.AbsoluteSize.Y)
+		local dx=relative.X-highlightDialCanvas.AbsoluteSize.X*0.5
+		local dy=relative.Y-highlightDialCanvas.AbsoluteSize.Y*0.5
+		local radius=math.sqrt(dx*dx+dy*dy)
+		local inner=size*HIGHLIGHT_DIAL_INNER_RADIUS
+		local outer=size*HIGHLIGHT_DIAL_OUTER_RADIUS
+
+		if radius<inner or radius>outer then
+			return nil
+		end
+
+		local angle=math.deg(atan2(-dy,dx))
+		if angle<0 then
+			angle+=360
+		end
+
+		for _,sector in ipairs(HIGHLIGHT_DIAL_SECTORS) do
+			if inAngleRange(angle,sector.start,sector.finish) then
+				return sector.key
+			end
+		end
+
+		return nil
+	end
+
+	local function setHighlightHoverMode(modeKey)
+		modeKey=modeKey and normalizeHighlightMode(modeKey) or nil
+		if modeKey and not HIGHLIGHT_MODE_BY_KEY[modeKey] then
+			modeKey=nil
+		end
+
+		if highlightHoverMode==modeKey then
+			return
+		end
+
+		highlightHoverMode=modeKey
+		paintHighlightDial(true)
+	end
+
+	local paramsDial=ctx.Page1GameParamsModule
+	local assets=paramsDial and type(paramsDial.GetDialSliceAssets)=="function" and paramsDial.GetDialSliceAssets() or nil
+
+	for _,mode in ipairs(HIGHLIGHT_MODES) do
+		local assetKey=HIGHLIGHT_DIAL_ASSET_KEY[mode.Key]
+		local pageAssets=assets and assets[assetKey]
+		if pageAssets and pageAssets.slice and pageAssets.glow then
+			highlightDialGlowImages[mode.Key]={}
+			for _,layer in ipairs(HIGHLIGHT_DIAL_GLOW_LAYERS) do
+				local pad=layer.pad
+				local glowImage=New("ImageLabel",{
+					BackgroundTransparency=1,
+					Position=UDim2.new(0,-pad,0,-pad),
+					Size=UDim2.new(1,pad*2,1,pad*2),
+					Image=pageAssets.glow,
+					ImageColor3=getUIStrokeColor(),
+					ImageTransparency=1,
+					ResampleMode=Enum.ResamplerMode.Default,
+					ScaleType=Enum.ScaleType.Stretch,
+					ZIndex=layer.z,
+				},highlightDialCanvas)
+				highlightDialGlowImages[mode.Key][#highlightDialGlowImages[mode.Key]+1]=glowImage
+			end
+
+			highlightDialImages[mode.Key]=New("ImageLabel",{
+				BackgroundTransparency=1,
+				Position=UDim2.fromScale(0,0),
+				Size=UDim2.fromScale(1,1),
+				Image=pageAssets.slice,
+				ImageColor3=themeColor("INPUT",THEME.PANEL),
+				ImageTransparency=0.74,
+				ResampleMode=Enum.ResamplerMode.Default,
+				ScaleType=Enum.ScaleType.Stretch,
+				ZIndex=6,
+			},highlightDialCanvas)
+
+			highlightDialHighlightImages[mode.Key]=New("ImageLabel",{
+				BackgroundTransparency=1,
+				Position=UDim2.fromScale(0,0),
+				Size=UDim2.fromScale(1,1),
+				Image=pageAssets.slice,
+				ImageColor3=Color3.new(1,1,1),
+				ImageTransparency=1,
+				ResampleMode=Enum.ResamplerMode.Default,
+				ScaleType=Enum.ScaleType.Stretch,
+				ZIndex=7,
+			},highlightDialCanvas)
+		else
+			local index=mode.Key=="espDefense" and 1 or (mode.Key=="espOffense" and 2 or 3)
+			local fallback=New("TextButton",{
+				Position=UDim2.new((index-1)/3,1,0,8),
+				Size=UDim2.new(1/3,-2,1,-16),
+				BackgroundColor3=themeColor("INPUT",THEME.PANEL),
+				BackgroundTransparency=0.74,
+				BorderSizePixel=0,
+				Text="",
+				AutoButtonColor=false,
+				Selectable=false,
+				ZIndex=6,
+				ThemeRole="INPUT",
+			},highlightDialCanvas)
+			addCorner(fallback,"Control")
+			highlightFallbackSlices[mode.Key]=fallback
+		end
+	end
+
+	if assets and assets._center then
+		local centerSize=math.floor(HIGHLIGHT_DIAL_W*HIGHLIGHT_DIAL_INNER_RADIUS*2+8)
+		highlightDialCenterCap=New("ImageLabel",{
+			AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.fromScale(0.5,0.5),
+			Size=UDim2.fromOffset(centerSize,centerSize),
+			BackgroundTransparency=1,
+			Image=assets._center,
+			ImageColor3=themeColor("INPUT",THEME.PANEL),
+			ImageTransparency=0.03,
+			ResampleMode=Enum.ResamplerMode.Default,
+			ScaleType=Enum.ScaleType.Stretch,
+			ZIndex=8,
+		},highlightDialCanvas)
+	end
+
+	local highlightDialHit=New("TextButton",{
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		Position=UDim2.fromScale(0,0),
+		Size=UDim2.fromScale(1,1),
+		Text="",
+		AutoButtonColor=false,
+		Selectable=false,
+		ZIndex=10,
+	},highlightDialCanvas)
+
+	trackConnection(highlightDialHit.InputBegan:Connect(function(input)
+		if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then
+			return
+		end
+
+		local modeKey=highlightModeAtPosition(pointerPosition(input))
+		if modeKey then
+			setHighlightMode(modeKey)
+		end
+	end))
+
+	trackConnection(highlightDialHit.InputChanged:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch then
+			setHighlightHoverMode(highlightModeAtPosition(pointerPosition(input)))
+		end
+	end))
+
+	trackConnection(highlightDialHit.MouseLeave:Connect(function()
+		setHighlightHoverMode(nil)
+	end))
+
+	highlightPreview=New("Frame",{
+		BackgroundColor3=highlightColor("Fill"),
+		BorderSizePixel=0,
+		Position=UDim2.fromOffset(104,12),
+		Size=UDim2.fromOffset(76,50),
+		SkipThemeRole=true,
+		ZIndex=6,
+		CornerRole="Control",
+	},highlightModeRow)
+	addCorner(highlightPreview,"Control")
+	highlightPreviewStroke=New("UIStroke",{Color=highlightColor("Outline"),Thickness=2,Transparency=highlightTransparency("Outline")},highlightPreview)
+	highlightPreviewStroke:SetAttribute("StrokeRole","Fixed")
+
+	highlightModeLabel=New("TextLabel",{
+		BackgroundTransparency=1,
+		Position=UDim2.fromOffset(104,66),
+		Size=UDim2.new(1,-108,0,20),
+		Text="",
+		Font=Enum.Font.GothamMedium,
+		TextSize=12,
+		TextColor3=THEME.MUTED,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		ZIndex=6,
+	},highlightModeRow)
+
+	local highlightTargetRow=New("Frame",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,28),
+		ZIndex=5,
+		LayoutOrder=2,
+	},highlightPanel)
+	New("UIListLayout",{
+		FillDirection=Enum.FillDirection.Horizontal,
+		Padding=UDim.new(0,8),
+		SortOrder=Enum.SortOrder.LayoutOrder,
+	},highlightTargetRow)
+
+	for i,target in ipairs({"Fill","Outline"}) do
+		local button,marker=makeFlatButton(highlightTargetRow,target,i,0.5)
+		trackConnection(button.Activated:Connect(function()
+			setHighlightTarget(target)
+		end))
+		highlightTargetButtons[target]={Button=button,Marker=marker}
+	end
+
+	local highlightRgbBody=New("Frame",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,94),
+		ZIndex=5,
+		LayoutOrder=3,
+	},highlightPanel)
+	New("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},highlightRgbBody)
+
+	local function applyHighlightRGB()
+		writeActiveHighlightColor(Color3.fromRGB(highlightRgbSliders.R.get(),highlightRgbSliders.G.get(),highlightRgbSliders.B.get()))
+		syncPickerControls()
+		updateEverything()
+	end
+
+	highlightRgbSliders.R=makeMiniSlider(highlightRgbBody,"R",0,255,0,0,Color3.fromRGB(255,0,0),applyHighlightRGB)
+	highlightRgbSliders.G=makeMiniSlider(highlightRgbBody,"G",0,255,0,0,Color3.fromRGB(0,210,80),applyHighlightRGB)
+	highlightRgbSliders.B=makeMiniSlider(highlightRgbBody,"B",0,255,0,0,Color3.fromRGB(0,120,255),applyHighlightRGB)
+
+	local highlightTransparencyBody=New("Frame",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,61),
+		ZIndex=5,
+		LayoutOrder=4,
+	},highlightPanel)
+	New("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},highlightTransparencyBody)
+
+	highlightFillTransparencySlider=makeMiniSlider(highlightTransparencyBody,"F",0,1,highlightTransparency("Fill"),2,highlightColor("Fill"),function(value)
+		writeHighlightTransparency("Fill",value)
+		syncHighlightControls()
+		updateEverything()
+	end)
+
+	highlightOutlineTransparencySlider=makeMiniSlider(highlightTransparencyBody,"O",0,1,highlightTransparency("Outline"),2,highlightColor("Outline"),function(value)
+		writeHighlightTransparency("Outline",value)
+		syncHighlightControls()
+		updateEverything()
+	end)
+
 	paintChoices=function()
 		local primary=getUIPrimaryColor()
 		local stroke=getUIStrokeColor()
@@ -1406,6 +2031,10 @@ function StrokeColour.new(ctx,page)
 
 		if hexBox then
 			hexBox.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
+		end
+
+		if highlightModeLabel then
+			syncHighlightControls()
 		end
 	end
 

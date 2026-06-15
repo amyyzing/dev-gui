@@ -102,6 +102,7 @@ function makeCustomizeCtx()
 		DEFAULT_UI_STYLE=getDefaultUIStyle and getDefaultUIStyle() or UI_STYLE,
 		SG=SG,
 		StrokeColourLogicModule=StrokeColourLogicModule,
+		Page1GameParamsModule=Page1GameParamsModule,
 		makeSection=makeSection,
 		buildSlider=buildSlider,
 		buildToggleRow=buildToggleRow,
@@ -114,6 +115,12 @@ function makeCustomizeCtx()
 		tintSlider=tintSlider,
 		onChanged=function()
 			applyUIStrokeTheme()
+			if PAGE1_APIS and PAGE1_APIS.ESP and PAGE1_APIS.ESP.Refresh then
+				pcall(PAGE1_APIS.ESP.Refresh)
+			end
+			if PAGE1_APIS and PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.Refresh then
+				pcall(PAGE1_APIS.QBAim.Refresh)
+			end
 			requestPlayerAutosave()
 		end,
 	}

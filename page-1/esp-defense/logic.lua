@@ -26,6 +26,41 @@ local ESP_REFRESH_INTERVAL=0.12
 local ESP_TEAM_CACHE_INTERVAL=0.50
 local teamCache=setmetatable({}, {__mode="k"})
 
+local function clampByte(value,fallback)
+	return math.clamp(math.floor((tonumber(value) or fallback or 0)+0.5),0,255)
+end
+
+local function clamp01(value,fallback)
+	local number=tonumber(value)
+	if number==nil then
+		return fallback
+	end
+
+	return math.clamp(number,0,1)
+end
+
+local function styleColor(style,prefix,channel,fallback)
+	if not(style and style[prefix.."CustomColor"]==true) then
+		return fallback
+	end
+
+	return Color3.fromRGB(
+		clampByte(style[prefix..channel.."R"],fallback and fallback.R*255 or 255),
+		clampByte(style[prefix..channel.."G"],fallback and fallback.G*255 or 255),
+		clampByte(style[prefix..channel.."B"],fallback and fallback.B*255 or 255)
+	)
+end
+
+local function highlightStyle(ctx,fallbackColor)
+	local style=ctx and ctx.UI_STYLE
+	return{
+		fill=styleColor(style,"ESPDefense","Fill",fallbackColor),
+		outline=styleColor(style,"ESPDefense","Outline",fallbackColor),
+		fillTransparency=clamp01(style and style.ESPDefenseFillTransparency,0.5),
+		outlineTransparency=clamp01(style and style.ESPDefenseOutlineTransparency,0),
+	}
+end
+
 local function getLiveCharacter(player)
 	if not player then return nil end
 
@@ -362,17 +397,18 @@ local function ensureOwnedHighlight(character)
 	return highlight
 end
 
-local function forceHighlight(character,color)
+local function forceHighlight(ctx,character,color)
 	if not character then return end
 
+	local style=highlightStyle(ctx,color)
 	local owned=ensureOwnedHighlight(character)
 	owned.Adornee=character
 	owned.Enabled=true
 	owned.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-	owned.FillTransparency=0.5
-	owned.OutlineTransparency=0
-	owned.FillColor=color
-	owned.OutlineColor=color
+	owned.FillTransparency=style.fillTransparency
+	owned.OutlineTransparency=style.outlineTransparency
+	owned.FillColor=style.fill
+	owned.OutlineColor=style.outline
 end
 
 local function destroyOwnedHighlight(character)
@@ -418,12 +454,12 @@ function ESPDefense.new(ctx)
 				if character then
 					if shouldHighlightPlayer(player) then
 						if carrierData and player==carrierData.player then
-							forceHighlight(character,blue)
+							forceHighlight(ctx,character,blue)
 						elseif carrierData and isSameTeam(player,carrierData.player) then
 							if isReceiverClosed(player,carrierData,defenderRoots,ctx) then
-								forceHighlight(character,red)
+								forceHighlight(ctx,character,red)
 							else
-								forceHighlight(character,green)
+								forceHighlight(ctx,character,green)
 							end
 						else
 							destroyOwnedHighlight(character)

@@ -662,6 +662,7 @@ end
 function QBAim.new(ctx,parent)
 	local New=ctx.New
 	local THEME=ctx.THEME
+	local UI_STYLE=ctx.UI_STYLE
 	local safeDisconnect=ctx.safeDisconnect
 	local inputToBinding=ctx.inputToBinding
 	local makeSection=ctx.makeSection
@@ -912,6 +913,43 @@ function QBAim.new(ctx,parent)
 		return true
 	end
 
+	local function clampStyleByte(value,fallback)
+		return math.clamp(math.floor((tonumber(value) or fallback or 0)+0.5),0,255)
+	end
+
+	local function clampStyleAlpha(value,fallback)
+		local number=tonumber(value)
+		if number==nil then
+			return fallback
+		end
+
+		return math.clamp(number,0,1)
+	end
+
+	local function qbHighlightColor(channel,fallback)
+		if not(UI_STYLE and UI_STYLE.QBAimHighlightCustomColor==true) then
+			return fallback
+		end
+
+		local prefix="QBAimHighlight"..channel
+		return Color3.fromRGB(
+			clampStyleByte(UI_STYLE[prefix.."R"],fallback and fallback.R*255 or 255),
+			clampStyleByte(UI_STYLE[prefix.."G"],fallback and fallback.G*255 or 255),
+			clampStyleByte(UI_STYLE[prefix.."B"],fallback and fallback.B*255 or 255)
+		)
+	end
+
+	local function qbHighlightStyle()
+		local fallbackFill=THEME.BLUE or THEME.ACC or Color3.fromRGB(21,103,251)
+		local fallbackOutline=THEME.ACC or THEME.BLUE or Color3.fromRGB(32,202,106)
+		return{
+			fill=qbHighlightColor("Fill",fallbackFill),
+			outline=qbHighlightColor("Outline",fallbackOutline),
+			fillTransparency=clampStyleAlpha(UI_STYLE and UI_STYLE.QBAimHighlightFillTransparency,0.65),
+			outlineTransparency=clampStyleAlpha(UI_STYLE and UI_STYLE.QBAimHighlightOutlineTransparency,0),
+		}
+	end
+
 	local function setLeadDelayFromScreenX(screenX,showStatus)
 		if not leadDelaySlider then return false end
 		local pos=leadDelaySlider.AbsolutePosition.X
@@ -993,13 +1031,14 @@ function QBAim.new(ctx,parent)
 
 		highlightedCharacter=character
 		local highlight=ensureQBAimHighlight(character)
+		local style=qbHighlightStyle()
 		highlight.Adornee=character
 		highlight.Enabled=true
 		highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-		highlight.FillTransparency=0.65
-		highlight.OutlineTransparency=0
-		highlight.FillColor=THEME.BLUE or THEME.ACC or Color3.fromRGB(21,103,251)
-		highlight.OutlineColor=THEME.ACC or THEME.BLUE or Color3.fromRGB(32,202,106)
+		highlight.FillTransparency=style.fillTransparency
+		highlight.OutlineTransparency=style.outlineTransparency
+		highlight.FillColor=style.fill
+		highlight.OutlineColor=style.outline
 	end
 
 	local function ensureReceiverData(player,receiverRoot)

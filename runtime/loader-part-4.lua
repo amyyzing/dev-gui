@@ -29,6 +29,13 @@ function disconnectSettingsConnections()
 	table.clear(SETTINGS_CONNECTIONS)
 end
 
+function settingsHoverColor(base)
+	base=base or THEME.BUTTON or THEME.PANEL or THEME.BG
+	local lum=(base.R*0.2126)+(base.G*0.7152)+(base.B*0.0722)
+	local toward=lum<0.55 and Color3.new(1,1,1) or Color3.new(0,0,0)
+	return base:Lerp(toward,0.08)
+end
+
 function destroyPage2APIs()
 	for key,api in pairs(PAGE2_APIS) do
 		if api and api.Destroy then
@@ -86,7 +93,7 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 
 	local function modalButton(text, x, danger)
 		local normalBg=danger and THEME.RED or (THEME.BUTTON or THEME.BG)
-		local hoverBg=danger and Color3.fromRGB(255,124,118) or THEME.CARD
+		local hoverBg=settingsHoverColor(normalBg)
 		local leaveBg=danger and THEME.RED or (THEME.BUTTON or THEME.BG)
 		local textColor=danger and Color3.fromRGB(0,0,0) or THEME.TEXT
 		local b=New("TextButton", {Position=UDim2.fromOffset(x, 120), Size=UDim2.fromOffset(104, 30), BackgroundColor3=normalBg, BorderSizePixel=0, Text=text, Font=Enum.Font.Gotham, TextSize=12, TextColor3=textColor, AutoButtonColor=false, Selectable=true, ZIndex=102}, box)
@@ -143,7 +150,7 @@ end
 function buildUpdateSection()
 	local section=makeSection(actualSettingsPage,1,"Update","Reload latest GUI build")
 	local normalBg=THEME.BUTTON or THEME.BG
-	local hoverBg=THEME.CARD
+	local hoverBg=settingsHoverColor(normalBg)
 	local button=New("TextButton",{
 		BackgroundColor3=normalBg,
 		BorderSizePixel=0,

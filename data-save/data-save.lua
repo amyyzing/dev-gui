@@ -22,6 +22,35 @@ local FALLBACK_UI_STYLE={
 	UILib="original",
 	ThemePanelExpanded=false,
 	ColoursPanelExpanded=false,
+	HighlightPanelExpanded=false,
+	HighlightSelectedMode="espOffense",
+	ESPOffenseCustomColor=false,
+	ESPDefenseCustomColor=false,
+	QBAimHighlightCustomColor=false,
+	ESPOffenseFillR=32,
+	ESPOffenseFillG=202,
+	ESPOffenseFillB=106,
+	ESPOffenseOutlineR=32,
+	ESPOffenseOutlineG=202,
+	ESPOffenseOutlineB=106,
+	ESPOffenseFillTransparency=0.5,
+	ESPOffenseOutlineTransparency=0,
+	ESPDefenseFillR=32,
+	ESPDefenseFillG=202,
+	ESPDefenseFillB=106,
+	ESPDefenseOutlineR=32,
+	ESPDefenseOutlineG=202,
+	ESPDefenseOutlineB=106,
+	ESPDefenseFillTransparency=0.5,
+	ESPDefenseOutlineTransparency=0,
+	QBAimHighlightFillR=21,
+	QBAimHighlightFillG=103,
+	QBAimHighlightFillB=251,
+	QBAimHighlightOutlineR=32,
+	QBAimHighlightOutlineG=202,
+	QBAimHighlightOutlineB=106,
+	QBAimHighlightFillTransparency=0.65,
+	QBAimHighlightOutlineTransparency=0,
 }
 
 local UI_STYLE_NUMBER_FIELDS={
@@ -37,11 +66,38 @@ local UI_STYLE_NUMBER_FIELDS={
 	{"liquidStrokeSpeed","LiquidStrokeSpeed",0,2,1},
 	{"strokeThickness","StrokeThickness",0,8,1},
 	{"strokeTransparency","StrokeTransparency",0,1,0.55},
+	{"espOffenseFillR","ESPOffenseFillR",0,255,32},
+	{"espOffenseFillG","ESPOffenseFillG",0,255,202},
+	{"espOffenseFillB","ESPOffenseFillB",0,255,106},
+	{"espOffenseOutlineR","ESPOffenseOutlineR",0,255,32},
+	{"espOffenseOutlineG","ESPOffenseOutlineG",0,255,202},
+	{"espOffenseOutlineB","ESPOffenseOutlineB",0,255,106},
+	{"espOffenseFillTransparency","ESPOffenseFillTransparency",0,1,0.5},
+	{"espOffenseOutlineTransparency","ESPOffenseOutlineTransparency",0,1,0},
+	{"espDefenseFillR","ESPDefenseFillR",0,255,32},
+	{"espDefenseFillG","ESPDefenseFillG",0,255,202},
+	{"espDefenseFillB","ESPDefenseFillB",0,255,106},
+	{"espDefenseOutlineR","ESPDefenseOutlineR",0,255,32},
+	{"espDefenseOutlineG","ESPDefenseOutlineG",0,255,202},
+	{"espDefenseOutlineB","ESPDefenseOutlineB",0,255,106},
+	{"espDefenseFillTransparency","ESPDefenseFillTransparency",0,1,0.5},
+	{"espDefenseOutlineTransparency","ESPDefenseOutlineTransparency",0,1,0},
+	{"qbAimHighlightFillR","QBAimHighlightFillR",0,255,21},
+	{"qbAimHighlightFillG","QBAimHighlightFillG",0,255,103},
+	{"qbAimHighlightFillB","QBAimHighlightFillB",0,255,251},
+	{"qbAimHighlightOutlineR","QBAimHighlightOutlineR",0,255,32},
+	{"qbAimHighlightOutlineG","QBAimHighlightOutlineG",0,255,202},
+	{"qbAimHighlightOutlineB","QBAimHighlightOutlineB",0,255,106},
+	{"qbAimHighlightFillTransparency","QBAimHighlightFillTransparency",0,1,0.65},
+	{"qbAimHighlightOutlineTransparency","QBAimHighlightOutlineTransparency",0,1,0},
 }
 
 local UI_STYLE_BOOL_FIELDS={
 	{"strokeGradient","StrokeGradient"},
 	{"liquidStroke","LiquidStroke"},
+	{"espOffenseCustomColor","ESPOffenseCustomColor"},
+	{"espDefenseCustomColor","ESPDefenseCustomColor"},
+	{"qbAimHighlightCustomColor","QBAimHighlightCustomColor"},
 }
 
 local APPLY_REFRESH_HOOKS={
@@ -365,6 +421,8 @@ local function collectUIStylePayload(uiStyle,defaultUIStyle)
 	payload.uiLib=tostring(uiStyle.UILib or "")~="" and uiStyle.UILib or defaultUIStyle.UILib or "original"
 	payload.themePanelExpanded=uiStyle.ThemePanelExpanded and true or false
 	payload.coloursPanelExpanded=uiStyle.ColoursPanelExpanded and true or false
+	payload.highlightPanelExpanded=uiStyle.HighlightPanelExpanded and true or false
+	payload.highlightSelectedMode=tostring(uiStyle.HighlightSelectedMode or defaultUIStyle.HighlightSelectedMode or "espOffense")
 
 	return payload
 end
@@ -743,6 +801,16 @@ function DataSave.new(ctx)
 			if coloursExpanded==nil then coloursExpanded=uiStyle.ColorsPanelExpanded end
 			if coloursExpanded==nil then coloursExpanded=uiStyle.ColoursPanelExpanded end
 			if coloursExpanded~=nil then ctx.UI_STYLE.ColoursPanelExpanded=coloursExpanded and true or false end
+
+			local highlightExpanded=uiStyle.highlightPanelExpanded
+			if highlightExpanded==nil then highlightExpanded=uiStyle.HighlightPanelExpanded end
+			if highlightExpanded~=nil then ctx.UI_STYLE.HighlightPanelExpanded=highlightExpanded and true or false end
+
+			if uiStyle.highlightSelectedMode~=nil then
+				ctx.UI_STYLE.HighlightSelectedMode=tostring(uiStyle.highlightSelectedMode)
+			elseif uiStyle.HighlightSelectedMode~=nil then
+				ctx.UI_STYLE.HighlightSelectedMode=tostring(uiStyle.HighlightSelectedMode)
+			end
 
 			if uiStyle.uiLib~=nil and tostring(uiStyle.uiLib)~="" then
 				ctx.UI_STYLE.UILib=tostring(uiStyle.uiLib)

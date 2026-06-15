@@ -156,6 +156,7 @@ function ESP.new(ctx,parent)
 	local inputToBinding=ctx.inputToBinding
 	local state=ctx.State
 	local THEME=ctx.THEME
+	local UI_STYLE=ctx.UI_STYLE
 	local api={}
 	local sectionBody=nil
 	local sectionFrame=nil
@@ -173,7 +174,7 @@ function ESP.new(ctx,parent)
 
 	if DefenseModule and DefenseModule.new then
 		local ok,result=pcall(function()
-			return DefenseModule.new({THEME=THEME,State=state,safeDisconnect=safeDisconnect})
+			return DefenseModule.new({THEME=THEME,UI_STYLE=UI_STYLE,State=state,safeDisconnect=safeDisconnect})
 		end)
 		defenseApi=ok and result or makeNoop()
 	else
@@ -182,7 +183,7 @@ function ESP.new(ctx,parent)
 
 	if OffenseModule and OffenseModule.new then
 		local ok,result=pcall(function()
-			return OffenseModule.new({THEME=THEME,State=state,safeDisconnect=safeDisconnect})
+			return OffenseModule.new({THEME=THEME,UI_STYLE=UI_STYLE,State=state,safeDisconnect=safeDisconnect})
 		end)
 		offenseApi=ok and result or makeNoop()
 	else

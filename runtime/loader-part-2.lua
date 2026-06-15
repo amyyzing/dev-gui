@@ -384,6 +384,7 @@ function makePage1Ctx()
 		New=New,
 		Fusion=FusionModule,
 		THEME=THEME,
+		UI_STYLE=UI_STYLE,
 		State=PAGE1_STATE,
 		makeSection=makeSection,
 		buildSlider=buildSlider,

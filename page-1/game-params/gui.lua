@@ -162,6 +162,10 @@ local function getDialSliceAssets()
 	return assets
 end
 
+function GameParamsGui.GetDialSliceAssets()
+	return getDialSliceAssets()
+end
+
 function GameParamsGui.new(ctx,parent)
 	local runtime=ctx.Page1GameParamsLogicModule.new(ctx)
 	local New=ctx.New
