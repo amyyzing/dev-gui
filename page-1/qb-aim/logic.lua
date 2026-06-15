@@ -1441,7 +1441,9 @@ function QBAim.new(ctx,parent)
 			fallback=Vector3.new(0,0,-1)
 		end
 
-		local lookDirection=unit(direction,fallback)
+		-- Keep the hand/release offset yaw-based. If pitch is allowed into this
+		-- CFrame, the local +Y offset gains XZ drift during jumps and changes lead.
+		local lookDirection=unit(flat(direction or Vector3.zero),fallback)
 		return(CFrame.lookAt(rootPosition,rootPosition+lookDirection)*CFrame.new(QB_RELEASE_LOCAL_OFFSET)).Position
 	end
 
