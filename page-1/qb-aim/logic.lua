@@ -143,7 +143,8 @@ local THROW_REMOTE_LEAD_TIME=0.00 -- fire after the full animation release wait
 local RELEASE_FRAME_PLAN_MAX_AGE=0.075
 local THROW_TARGET_LOCK_ON_INPUT=true
 local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
-local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
+local THROW_TARGET_LOCK_PREVIEW_LIVE=false
+local THROW_RECOMPUTE_AT_RELEASE=true
 local THROW_TARGET_FIRE_IMMEDIATELY=false
 local THROW_INPUT_COOLDOWN=0.85
 local QB_RELEASE_LOCAL_OFFSET=Vector3.new(1,1.5,0)
@@ -155,9 +156,9 @@ local QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME -- kept as ali
 local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
---   1. Keypress computes one locked plan.
---   2. QB release origin drifts by the same time on X, Y, and Z.
---   3. WR is predicted through the full animation release window.
+--   1. The live preview uses the current QB release origin, like the game's arc code.
+--   2. Keypress starts animation and keeps the receiver identity locked.
+--   3. Right before FireServer, rebuild the plan from current QB/WR positions.
 --   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
@@ -2266,10 +2267,9 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
-		-- Target-latch / delayed-remote solver.
-		-- The preview arc locks at keypress, but the remote appears shortly before release.
-		-- Keep the keypress plan frozen during animation, then send that same world Target.
-		-- Do not recompute from the future QB point and do not fire immediately.
+		-- Delayed-remote solver.
+		-- The game waits for the throw animation, then rebuilds the mouse target at
+		-- release. Mirror that by rebuilding the aimbot plan at release time too.
 		if THROW_TARGET_FIRE_IMMEDIATELY then
 			if lockedPlan then
 				previewPlan(lockedPlan)
@@ -2278,16 +2278,15 @@ function QBAim.new(ctx,parent)
 		end
 
 		if THROW_ANIMATION_RELEASE_WAIT<=0 then
-			return lockedPlan or buildPlan(receiver,ballPower,0,releaseBall)
+			return buildPlan(receiver,ballPower,0,releaseBall,0) or lockedPlan,releaseBall
 		end
 
 		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
 		local fireAt=endAt-math.clamp(THROW_REMOTE_LEAD_TIME,0,THROW_ANIMATION_RELEASE_WAIT)
 
 		while os.clock()<fireAt do
-			if THROW_TARGET_LOCK_PREVIEW_LIVE then
-				local remaining=math.max(endAt-os.clock(),0)
-				local livePlan=buildPlan(receiver,ballPower,remaining,releaseBall,remaining)
+			if THROW_RECOMPUTE_AT_RELEASE or THROW_TARGET_LOCK_PREVIEW_LIVE then
+				local livePlan=buildPlan(receiver,ballPower,0,releaseBall,0)
 				if livePlan then
 					previewPlan(livePlan)
 				end
@@ -2296,6 +2295,10 @@ function QBAim.new(ctx,parent)
 			end
 
 			RunService.Heartbeat:Wait()
+		end
+
+		if THROW_RECOMPUTE_AT_RELEASE then
+			return buildPlan(receiver,ballPower,0,releaseBall,0) or lockedPlan,releaseBall
 		end
 
 		return lockedPlan,releaseBall
@@ -2365,12 +2368,11 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		-- Lock one plan at keypress. Keep animation-to-fire timing at 0.2666s,
-		-- but do not use that whole value to move C2/origin. The QB/ball release
-		-- origin gets a small measured drift; the WR prediction uses the full
-		-- animation window.
-		local lockedQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
-		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		-- Build an immediate plan for preview/validation, then rebuild at release.
+		-- Moving the QB origin forward here makes moving+jumping throws stale in XZ,
+		-- because the game's own FootballThrow computes Target after the wait.
+		local lockedQBOffset=THROW_RECOMPUTE_AT_RELEASE and 0 or QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		local lockedWROffset=THROW_RECOMPUTE_AT_RELEASE and 0 or WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		throwInProgress=true
 
 		local function releaseThrowLock()
@@ -2712,7 +2714,7 @@ function QBAim.new(ctx,parent)
 		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
 		preview.last=now
 
-		local previewQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		local previewQBOffset=0
 		local previewWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local plan=buildPlan(trackedReceiver,nil,previewQBOffset,nil,previewWROffset)
 		if plan then
