@@ -76,6 +76,7 @@ local QB_Y_FALL_FACTOR=0
 local QB_Y_MAX_CORRECTION=4.25
 local C2_GROUND_FALLBACK_MARGIN=2.50
 local C2_MAX_ABOVE_BALL=8.00
+local C2_MAX_RELEASE_DISTANCE=12.00
 local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
 local QB_RELEASE_EXTRAPOLATE_VERTICAL=true
 local MIN_T,MAX_T,DT=0.35,6,0.01
@@ -152,7 +153,7 @@ local THROW_TARGET_FIRE_IMMEDIATELY=false
 local THROW_INPUT_COOLDOWN=0.85
 -- Separate timing terms. Do not use the full animation delay to move C2/origin.
 -- The release-origin drift is unified across X/Y/Z: one time value moves the whole origin vector.
-local QB_RELEASE_ORIGIN_DRIFT_TIME=0.04
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0.10
 local QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME -- kept as alias for internal compatibility
 local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
@@ -1169,13 +1170,13 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
-	local function c2Y()
-		-- Use the game's original Center.C2 only as a release-height reference.
+	local function c2Position()
+		-- Use the game's original Center.C2 as the release-position reference.
 		-- Do not read from the cloned preview C2 here, because that creates stale/self-referential C2 values.
 		local center=originalCenter()
 		local c2=center and center:FindFirstChild("C2",true)
 		local cf=c2 and attachmentCFrame(c2)
-		return cf and cf.Position.Y
+		return cf and cf.Position
 	end
 
 	local function setPreviewCenterVisible(visible)
@@ -1521,14 +1522,18 @@ function QBAim.new(ctx,parent)
 		end
 
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
-		local basePosition=ball and ball.Position or qbRoot.Position
-
-		local baseY=basePosition.Y
-		local centerY=c2Y()
-		local y=baseY
-		if centerY and centerY>=baseY-C2_GROUND_FALLBACK_MARGIN and centerY<=baseY+C2_MAX_ABOVE_BALL then
-			y=centerY
+		local fallbackPosition=ball and ball.Position or qbRoot.Position
+		local c2Pos=c2Position()
+		local useC2=false
+		if c2Pos then
+			local referencePosition=ball and ball.Position or qbRoot.Position
+			local yValid=c2Pos.Y>=referencePosition.Y-C2_GROUND_FALLBACK_MARGIN and c2Pos.Y<=referencePosition.Y+C2_MAX_ABOVE_BALL
+			local distanceValid=(c2Pos-referencePosition).Magnitude<=C2_MAX_RELEASE_DISTANCE
+			useC2=yValid and distanceValid
 		end
+
+		local basePosition=useC2 and c2Pos or fallbackPosition
+		local y=basePosition.Y
 
 		local dx,dz=0,0
 		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and xzReleaseOffset>0 then
