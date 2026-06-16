@@ -926,9 +926,11 @@ LOADER_TOTAL=#STARTUP_MODULE_PATHS+#LOADER_PAGE_BUILD_NAMES+4
 
 loaderCurrent=0
 loaderPhaseCurrent=#STARTUP_MODULE_PATHS
+loaderPhaseItems={}
+loaderPhaseNames={"Bootstrap","Modules","Validate","GUI","State","Ready"}
 loaderOverlay=New("Frame",{
 	Name="Loader",
-	BackgroundColor3=Color3.fromRGB(16,16,16),
+	BackgroundColor3=Color3.fromRGB(8,10,18),
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	Size=UDim2.new(1,0,1,0),
@@ -937,7 +939,7 @@ loaderOverlay=New("Frame",{
 
 loaderBackdropA=New("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
-	Position=UDim2.new(0.5,-44,0.5,-28),
+	Position=UDim2.new(0.5,-94,0.5,-54),
 	Size=UDim2.fromOffset(2,2),
 	BackgroundColor3=THEME.GREEN,
 	BackgroundTransparency=1,
@@ -948,7 +950,7 @@ New("UICorner",{CornerRadius=UDim.new(1,0)},loaderBackdropA)
 
 loaderBackdropB=New("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
-	Position=UDim2.new(0.5,52,0.5,34),
+	Position=UDim2.new(0.5,114,0.5,68),
 	Size=UDim2.fromOffset(2,2),
 	BackgroundColor3=THEME.BLUE,
 	BackgroundTransparency=1,
@@ -960,7 +962,7 @@ New("UICorner",{CornerRadius=UDim.new(1,0)},loaderBackdropB)
 loaderBox=New("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,0,0.5,0),
-	Size=UDim2.fromOffset(430,150),
+	Size=UDim2.fromOffset(500,210),
 	BackgroundColor3=THEME.BG,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
@@ -969,7 +971,14 @@ loaderBox=New("Frame",{
 
 loaderBoxScale=New("UIScale",{Scale=0.92},loaderBox)
 loaderBoxStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=1},loaderBox)
-New("UIPadding",{PaddingTop=UDim.new(0,16),PaddingLeft=UDim.new(0,18),PaddingRight=UDim.new(0,18),PaddingBottom=UDim.new(0,16)},loaderBox)
+loaderBoxGradient=New("UIGradient",{
+	Color=ColorSequence.new({
+		ColorSequenceKeypoint.new(0,THEME.TOPBAR or THEME.BG),
+		ColorSequenceKeypoint.new(1,THEME.BG),
+	}),
+	Rotation=90,
+},loaderBox)
+New("UIPadding",{PaddingTop=UDim.new(0,18),PaddingLeft=UDim.new(0,20),PaddingRight=UDim.new(0,20),PaddingBottom=UDim.new(0,18)},loaderBox)
 
 loaderAccent=New("Frame",{
 	BackgroundColor3=THEME.GREEN,
@@ -980,10 +989,22 @@ loaderAccent=New("Frame",{
 	ZIndex=LOADER_Z+2,
 },loaderBox)
 
+loaderPercentPill=New("Frame",{
+	AnchorPoint=Vector2.new(1,0),
+	Position=UDim2.new(1,0,0,0),
+	Size=UDim2.fromOffset(74,28),
+	BackgroundColor3=THEME.PANEL,
+	BackgroundTransparency=1,
+	BorderSizePixel=0,
+	ZIndex=LOADER_Z+2,
+},loaderBox)
+New("UICorner",{CornerRadius=UDim.new(0,5)},loaderPercentPill)
+loaderPercentPillStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=1},loaderPercentPill)
+
 loaderTitle=New("TextLabel",{
 	BackgroundTransparency=1,
-	Size=UDim2.new(1,0,0,26),
-	Text="Loading GUI",
+	Size=UDim2.new(1,-92,0,24),
+	Text="Control Panel",
 	Font=Enum.Font.GothamMedium,
 	TextSize=16,
 	TextColor3=THEME.TEXT,
@@ -992,9 +1013,22 @@ loaderTitle=New("TextLabel",{
 	ZIndex=LOADER_Z+2,
 },loaderBox)
 
+loaderSubtitle=New("TextLabel",{
+	BackgroundTransparency=1,
+	Position=UDim2.fromOffset(0,25),
+	Size=UDim2.new(1,-92,0,18),
+	Text="Preparing modules and interface",
+	Font=Enum.Font.Gotham,
+	TextSize=11,
+	TextColor3=THEME.MUTED,
+	TextTransparency=1,
+	TextXAlignment=Enum.TextXAlignment.Left,
+	ZIndex=LOADER_Z+2,
+},loaderBox)
+
 loaderStatus=New("TextLabel",{
 	BackgroundTransparency=1,
-	Position=UDim2.fromOffset(0,34),
+	Position=UDim2.fromOffset(0,58),
 	Size=UDim2.new(1,0,0,34),
 	Text="Preparing remote modules...",
 	Font=Enum.Font.Gotham,
@@ -1007,14 +1041,15 @@ loaderStatus=New("TextLabel",{
 },loaderBox)
 
 loaderTrack=New("Frame",{
-	Position=UDim2.fromOffset(0,82),
-	Size=UDim2.new(1,0,0,10),
+	Position=UDim2.fromOffset(0,106),
+	Size=UDim2.new(1,0,0,12),
 	BackgroundColor3=THEME.PANEL,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ClipsDescendants=true,
 	ZIndex=LOADER_Z+2,
 },loaderBox)
+New("UICorner",{CornerRadius=UDim.new(0,6)},loaderTrack)
 
 loaderTrackStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=1},loaderTrack)
 
@@ -1025,13 +1060,23 @@ loaderFill=New("Frame",{
 	BorderSizePixel=0,
 	ZIndex=LOADER_Z+3,
 },loaderTrack)
+New("UICorner",{CornerRadius=UDim.new(0,6)},loaderFill)
+
+loaderFillGlow=New("Frame",{
+	Size=UDim2.new(0,0,1,0),
+	BackgroundColor3=THEME.GREEN,
+	BackgroundTransparency=1,
+	BorderSizePixel=0,
+	ZIndex=LOADER_Z+2,
+},loaderTrack)
+New("UICorner",{CornerRadius=UDim.new(0,6)},loaderFillGlow)
 
 loaderScan=New("Frame",{
 	BackgroundColor3=Color3.fromRGB(255,255,255),
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	Position=UDim2.new(0,-72,0,0),
-	Size=UDim2.fromOffset(72,10),
+	Size=UDim2.fromOffset(72,12),
 	ZIndex=LOADER_Z+4,
 },loaderTrack)
 
@@ -1046,25 +1091,131 @@ New("UIGradient",{
 loaderPulse=New("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,0,0.5,0),
-	Size=UDim2.fromOffset(430,150),
+	Size=UDim2.fromOffset(500,210),
 	BackgroundColor3=THEME.GREEN,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ZIndex=LOADER_Z,
 },loaderOverlay)
+New("UICorner",{CornerRadius=UDim.new(0,10)},loaderPulse)
 
 loaderPercent=New("TextLabel",{
 	BackgroundTransparency=1,
-	Position=UDim2.fromOffset(0,100),
-	Size=UDim2.new(1,0,0,18),
+	Size=UDim2.new(1,0,1,0),
 	Text="0%",
+	Font=Enum.Font.GothamMedium,
+	TextSize=12,
+	TextColor3=THEME.TEXT,
+	TextTransparency=1,
+	TextXAlignment=Enum.TextXAlignment.Center,
+	ZIndex=LOADER_Z+3,
+},loaderPercentPill)
+
+loaderPhaseRow=New("Frame",{
+	BackgroundTransparency=1,
+	Position=UDim2.fromOffset(0,136),
+	Size=UDim2.new(1,0,0,34),
+	ZIndex=LOADER_Z+2,
+},loaderBox)
+
+local phaseWidth=72
+local phaseGap=4
+for index,name in ipairs(loaderPhaseNames) do
+	local item=New("Frame",{
+		BackgroundColor3=THEME.PANEL,
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		Position=UDim2.fromOffset((index-1)*(phaseWidth+phaseGap),0),
+		Size=UDim2.fromOffset(phaseWidth,34),
+		ZIndex=LOADER_Z+2,
+	},loaderPhaseRow)
+	New("UICorner",{CornerRadius=UDim.new(0,5)},item)
+	local dot=New("Frame",{
+		AnchorPoint=Vector2.new(0,0.5),
+		Position=UDim2.fromOffset(8,17),
+		Size=UDim2.fromOffset(7,7),
+		BackgroundColor3=THEME.MUTED,
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		ZIndex=LOADER_Z+3,
+	},item)
+	New("UICorner",{CornerRadius=UDim.new(1,0)},dot)
+	local label=New("TextLabel",{
+		BackgroundTransparency=1,
+		Position=UDim2.fromOffset(20,0),
+		Size=UDim2.new(1,-24,1,0),
+		Text=name,
+		Font=Enum.Font.Gotham,
+		TextSize=10,
+		TextColor3=THEME.MUTED,
+		TextTransparency=1,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		ZIndex=LOADER_Z+3,
+	},item)
+	loaderPhaseItems[index]={Frame=item,Dot=dot,Label=label}
+end
+
+loaderMeta=New("TextLabel",{
+	BackgroundTransparency=1,
+	Position=UDim2.fromOffset(0,176),
+	Size=UDim2.new(1,0,0,16),
+	Text="Loading required modules before the panel opens.",
 	Font=Enum.Font.Gotham,
-	TextSize=11,
+	TextSize=10,
 	TextColor3=THEME.MUTED,
 	TextTransparency=1,
 	TextXAlignment=Enum.TextXAlignment.Left,
 	ZIndex=LOADER_Z+2,
 },loaderBox)
+
+local function tweenLoader(obj,props,duration,style,direction)
+	if not obj or not obj.Parent then return end
+	local tween=TweenService:Create(obj,TweenInfo.new(duration or 0.16,style or Enum.EasingStyle.Quad,direction or Enum.EasingDirection.Out),props)
+	tween:Play()
+	return tween
+end
+
+local function loaderPhaseFromStatus(text,current,total)
+	text=tostring(text or ""):lower()
+	if text:find("runtime ready",1,true) or text:find("everything is loaded",1,true) then
+		return 6
+	elseif text:find("restored",1,true) or text:find("binding",1,true) or text:find("applying theme",1,true) then
+		return 5
+	elseif text:find("building page",1,true) or text:find("built all gui",1,true) or text:find("gui build",1,true) then
+		return 4
+	elseif text:find("verified",1,true) or text:find("validate",1,true) then
+		return 3
+	elseif text:find("module",1,true) or text:find("fetch",1,true) or text:find("cached",1,true) then
+		return 2
+	end
+
+	local pct=(tonumber(current) or 0)/math.max(tonumber(total) or LOADER_TOTAL,1)
+	if pct>=0.98 then return 6 end
+	if pct>=0.82 then return 5 end
+	if pct>=0.62 then return 4 end
+	if pct>=0.42 then return 3 end
+	if pct>=0.12 then return 2 end
+	return 1
+end
+
+local function setLoaderPhase(activeIndex,isProblem)
+	activeIndex=math.clamp(tonumber(activeIndex) or 1,1,#loaderPhaseNames)
+	local activeColor=isProblem and THEME.RED or THEME.GREEN
+
+	for index,item in ipairs(loaderPhaseItems) do
+		local completed=index<activeIndex
+		local active=index==activeIndex
+		local itemBg=active and activeColor or THEME.PANEL
+		local dotBg=(completed or active) and activeColor or THEME.MUTED
+		local textColor=(completed or active) and THEME.TEXT or THEME.MUTED
+		local bgTransparency=active and 0.08 or 0.36
+		local dotTransparency=(completed or active) and 0 or 0.42
+
+		tweenLoader(item.Frame,{BackgroundColor3=itemBg,BackgroundTransparency=bgTransparency},0.14)
+		tweenLoader(item.Dot,{BackgroundColor3=dotBg,BackgroundTransparency=dotTransparency},0.14)
+		tweenLoader(item.Label,{TextColor3=textColor,TextTransparency=0},0.14)
+	end
+end
 
 function showLoader()
 	if not loaderOverlay or not loaderOverlay.Parent then return end
@@ -1078,26 +1229,32 @@ function showLoader()
 			if loaderBoxScale then loaderBoxScale.Scale=0.92 end
 			if loaderAccent then loaderAccent.Size=UDim2.new(0,0,0,2) end
 		end,
-		{loaderBackdropA,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.24,{BackgroundTransparency=0.965,Size=UDim2.fromOffset(360,170)}},
-		{loaderBackdropB,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.24,{BackgroundTransparency=0.972,Size=UDim2.fromOffset(320,150)}},
+		{loaderBackdropA,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.24,{BackgroundTransparency=0.955,Size=UDim2.fromOffset(470,230)}},
+		{loaderBackdropB,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.24,{BackgroundTransparency=0.968,Size=UDim2.fromOffset(410,190)}},
 		{loaderBox,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.18,{BackgroundTransparency=0}},
 		{loaderBoxScale,Enum.EasingDirection.Out,Enum.EasingStyle.Back,0.22,{Scale=1}},
 	},true)
 
 	local ti=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
-	TweenService:Create(loaderBoxStroke,ti,{Transparency=0}):Play()
+	TweenService:Create(loaderBoxStroke,ti,{Transparency=0.08}):Play()
 	TweenService:Create(loaderTitle,ti,{TextTransparency=0}):Play()
+	TweenService:Create(loaderSubtitle,ti,{TextTransparency=0}):Play()
 	TweenService:Create(loaderStatus,ti,{TextTransparency=0}):Play()
 	TweenService:Create(loaderPercent,ti,{TextTransparency=0}):Play()
-	TweenService:Create(loaderTrack,ti,{BackgroundTransparency=0}):Play()
-	TweenService:Create(loaderTrackStroke,ti,{Transparency=0}):Play()
+	TweenService:Create(loaderPercentPill,ti,{BackgroundTransparency=0.18}):Play()
+	TweenService:Create(loaderPercentPillStroke,ti,{Transparency=0.35}):Play()
+	TweenService:Create(loaderTrack,ti,{BackgroundTransparency=0.12}):Play()
+	TweenService:Create(loaderTrackStroke,ti,{Transparency=0.35}):Play()
 	TweenService:Create(loaderFill,ti,{BackgroundTransparency=0}):Play()
+	TweenService:Create(loaderFillGlow,ti,{BackgroundTransparency=0.78}):Play()
+	TweenService:Create(loaderMeta,ti,{TextTransparency=0}):Play()
 	TweenService:Create(loaderAccent,TweenInfo.new(0.34,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundTransparency=0,Size=UDim2.new(1,0,0,2)}):Play()
+	setLoaderPhase(1,false)
 
 	task.spawn(function()
 		while loaderAlive and loaderOverlay and loaderOverlay.Parent and loaderScan and loaderScan.Parent do
 			loaderScan.Position=UDim2.new(0,-72,0,0)
-			loaderScan.BackgroundTransparency=0.74
+			loaderScan.BackgroundTransparency=0.68
 			local scanTween=TweenService:Create(loaderScan,TweenInfo.new(0.9,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut),{Position=UDim2.new(1,72,0,0)})
 			scanTween:Play()
 			scanTween.Completed:Wait()
@@ -1119,7 +1276,10 @@ function setLoaderProgress(text,current,total,isProblem)
 	loaderStatus.TextColor3=isProblem and THEME.RED or THEME.MUTED
 	loaderPercent.Text=math.floor(pct*100+0.5).."%"
 	loaderFill.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
-	TweenService:Create(loaderFill,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
+	loaderFillGlow.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
+	TweenService:Create(loaderFill,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
+	TweenService:Create(loaderFillGlow,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
+	setLoaderPhase(loaderPhaseFromStatus(text,current,total),isProblem)
 
 	if loaderAccent then
 		loaderAccent.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
@@ -1127,11 +1287,11 @@ function setLoaderProgress(text,current,total,isProblem)
 
 	if loaderPulse then
 		loaderPulse.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
-		loaderPulse.BackgroundTransparency=0.94
-		loaderPulse.Size=UDim2.fromOffset(410,132)
+		loaderPulse.BackgroundTransparency=0.95
+		loaderPulse.Size=UDim2.fromOffset(500,210)
 		TweenService:Create(loaderPulse,TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
 			BackgroundTransparency=1,
-			Size=UDim2.fromOffset(470,170),
+			Size=UDim2.fromOffset(570,250),
 		}):Play()
 	end
 
@@ -1145,12 +1305,13 @@ end
 function finishLoader()
 	if not loaderOverlay or not loaderOverlay.Parent then return end
 
-	loaderTitle.Text="Welcome, "..me.Name.."!"
+	loaderTitle.Text="Ready, "..me.Name
+	loaderSubtitle.Text="All pages and modules are available"
 	setLoaderProgress("Everything is loaded and up to date.",LOADER_TOTAL,LOADER_TOTAL,false)
 
 	playLoaderKeyframes({
-		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.18,{BackgroundTransparency=0.88,Size=UDim2.fromOffset(520,190)}},
-		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.28,{BackgroundTransparency=1,Size=UDim2.fromOffset(620,240)}},
+		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.18,{BackgroundTransparency=0.88,Size=UDim2.fromOffset(570,250)}},
+		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.28,{BackgroundTransparency=1,Size=UDim2.fromOffset(660,300)}},
 	},true)
 
 	task.delay(0.48,function()

@@ -36,6 +36,15 @@ local CLEAN_TARGET_MISS_TOLERANCE=0.35
 local CLEAN_NEAR_TARGET_MISS_TOLERANCE=0.05
 local CLEAN_USE_DIRECT_LEAD=true
 local WR_LEAD_DELAY=0.38
+-- Catch-window rewrite: Lead Adjust is converted into a preferred spatial lead,
+-- while the solver may choose any catchable point inside the window.
+local CATCH_WINDOW_ENABLED=true
+local CATCH_WINDOW_MIN_AHEAD_STUDS=0.00
+local CATCH_WINDOW_MAX_AHEAD_STUDS=12.00
+local CATCH_WINDOW_EXTRA_MARGIN_STUDS=3.00
+local CATCH_WINDOW_AHEAD_WEIGHT=0.22
+local CATCH_WINDOW_RISING_VY_LIMIT=5.00
+local CATCH_WINDOW_MIN_DESCENT_BONUS=-2.00
 local LEAD_DELAY_BASELINE=0.38 -- clean math: Lead Adjust is direct intentional ahead-time
 local LEAD_DELAY_ZERO_FLIGHT_TIME=0.70
 local LEAD_DELAY_FULL_FLIGHT_TIME=1.35
@@ -205,10 +214,29 @@ local function smoothstep(edge0,edge1,value)
 end
 
 local function leadDelayForFlightTime(time)
-	-- Clean math rebuild: Lead Adjust is not route classification and not radial/tangent damping.
-	-- It is only the intentional ahead-time along the receiver's current velocity vector.
-	-- Set Lead Adjust to 0 for pure catch-time intercept, or 0.35-0.40 for your ahead-of-WR catch window.
+	-- Kept as the UI-facing value for compatibility. The solver converts it
+	-- into a preferred spatial catch-ahead value instead of using t+leadDelay.
 	return math.max(WR_LEAD_DELAY,0)
+end
+
+local function catchAheadStudsFromLead(routeSpeed)
+	if not routeSpeed or routeSpeed<CLEAN_MOVING_SPEED_MIN then
+		return 0
+	end
+
+	return math.clamp(math.max(WR_LEAD_DELAY,0)*MAX_RUN_SPEED,CATCH_WINDOW_MIN_AHEAD_STUDS,CATCH_WINDOW_MAX_AHEAD_STUDS)
+end
+
+local function catchAheadWindow(routeSpeed)
+	if not CATCH_WINDOW_ENABLED or not routeSpeed or routeSpeed<CLEAN_MOVING_SPEED_MIN then
+		return 0,0,0
+	end
+
+	-- Do not make the lead slider the only physically legal target. The window
+	-- stays open from 0 to max ahead, and Lead Adjust only biases the score.
+	-- This is important because a true catch window is not one exact point.
+	local preferred=catchAheadStudsFromLead(routeSpeed)
+	return CATCH_WINDOW_MIN_AHEAD_STUDS,preferred,CATCH_WINDOW_MAX_AHEAD_STUDS
 end
 
 local function safeVectorLerp(a,b,alpha)
@@ -1470,8 +1498,6 @@ function QBAim.new(ctx,parent)
 
 	local function origin(qbRoot,ball,xzReleaseOffset,yReleaseOffset)
 		xzReleaseOffset=xzReleaseOffset or 0
-		-- X/Y/Z share the same release-origin drift time unless explicitly overridden.
-		yReleaseOffset=yReleaseOffset
 		if yReleaseOffset==nil then
 			yReleaseOffset=xzReleaseOffset
 		end
@@ -1479,12 +1505,10 @@ function QBAim.new(ctx,parent)
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
 		local basePosition=ball and ball.Position or qbRoot.Position
 
-		local baseY=basePosition.Y
-		local centerY=c2Y()
-		local y=baseY
-		if centerY and centerY>=baseY-C2_GROUND_FALLBACK_MARGIN and centerY<=baseY+C2_MAX_ABOVE_BALL then
-			y=centerY
-		end
+		-- Do not use original Center.C2 as release truth. Source tracing showed C2 is
+		-- rewritten by the game's UpdateLandingSpot preview path, not by the actual
+		-- server SpawnPos. Use the held football/root state as the release estimate.
+		local y=basePosition.Y
 
 		local dx,dz=0,0
 		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and xzReleaseOffset>0 then
@@ -1522,8 +1546,15 @@ function QBAim.new(ctx,parent)
 		return ballAt(originPosition,velocity,time),time
 	end
 
-	local function targetAtTime(receiverStart,wrVel,time,leadDelay)
-		local target=receiverStart+flat(wrVel)*(time+(leadDelay or 0))
+	local function targetAtTime(receiverStart,wrVel,time,aheadStuds)
+		local wrFlat=flat(wrVel or Vector3.zero)
+		local receiverAtCatch=receiverStart+wrFlat*time
+		local ahead=Vector3.zero
+		if wrFlat.Magnitude>=CLEAN_MOVING_SPEED_MIN and (aheadStuds or 0)~=0 then
+			ahead=wrFlat.Unit*(aheadStuds or 0)
+		end
+
+		local target=receiverAtCatch+ahead
 		return Vector3.new(target.X,WR_MAX_Y+C1_SOLVE_Y_BIAS,target.Z)
 	end
 
@@ -1534,9 +1565,9 @@ function QBAim.new(ctx,parent)
 	local function c1Target(receiverPosition,originPosition,targetVelocity,flightTime,predictorState)
 		local receiverStart=receiverMaxAt(receiverPosition)
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
-		local leadDelay=leadDelayForFlightTime(flightTime)
-		local target=targetAtTime(receiverStart,wrVel,flightTime,leadDelay)
 		local speed=wrVel.Magnitude
+		local aheadStuds=catchAheadStudsFromLead(speed)
+		local target=targetAtTime(receiverStart,wrVel,flightTime,aheadStuds)
 		local losVector=flat(receiverStart-originPosition)
 		local losDir=unit(losVector,speed>0 and wrVel.Unit or Vector3.new(1,0,0))
 		local awayShare=speed>1e-6 and math.clamp(wrVel:Dot(losDir)/speed,-1,1) or 0
@@ -1546,14 +1577,14 @@ function QBAim.new(ctx,parent)
 		return target,{
 			flightLeadXZ=wrVel*flightTime,
 			accelerationLeadXZ=Vector3.zero,
-			extraLeadXZ=wrVel*leadDelay,
+			extraLeadXZ=speed>0 and wrVel.Unit*aheadStuds or Vector3.zero,
 			radialExtraLeadXZ=Vector3.zero,
-			tangentExtraLeadXZ=wrVel*leadDelay,
-			extraLeadTime=leadDelay,
+			tangentExtraLeadXZ=speed>0 and wrVel.Unit*aheadStuds or Vector3.zero,
+			extraLeadTime=speed>0 and aheadStuds/speed or 0,
 			radialExtraTime=0,
-			tangentExtraTime=leadDelay,
+			tangentExtraTime=speed>0 and aheadStuds/speed or 0,
 			tangentBaseTime=0,
-			tangentReactiveTime=leadDelay,
+			tangentReactiveTime=speed>0 and aheadStuds/speed or 0,
 			radialBaseTime=0,
 			radialLDTime=0,
 			adaptiveLeadScale=1,
@@ -1777,57 +1808,213 @@ function QBAim.new(ctx,parent)
 		local ballSpeed=ballPower or GAMEPLAY_BALL_POWER
 		qbReleaseOffset=qbReleaseOffset or 0
 		receiverReleaseOffset=receiverReleaseOffset==nil and qbReleaseOffset or receiverReleaseOffset
+
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
+		local wrSpeed=wrVel.Magnitude
 		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
-		-- Delayed future-release model:
-		-- The throw request is sent near release, but the plan is locked on keypress.
-		-- Predict the actual server SpawnPos/release origin forward by qbReleaseOffset,
-		-- predict the receiver by receiverReleaseOffset, and build the outgoing Target
-		-- ray from that future release point.
+		local inheritedVelocity=flat(qbVel or Vector3.zero)*QB_INHERITANCE
 		local originPosition=origin(qbRoot,ball,qbReleaseOffset,qbReleaseOffset)
 		local receiverReleasePosition=receiverRoot.Position+wrVel*receiverReleaseOffset
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
-		local bestRoot=nil
-		local bestNear=nil
-		local previousTime=MIN_T
-		local previousValue=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,previousTime)
+		local routeDir=wrSpeed>=CLEAN_MOVING_SPEED_MIN and wrVel.Unit or Vector3.new(1,0,0)
+		local minAhead,preferredAhead,maxAhead=catchAheadWindow(wrSpeed)
+		local best=nil
 
-		local function considerNear(time)
-			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,false)
-			if candidate and candidate.targetMiss<=CLEAN_NEAR_TARGET_MISS_TOLERANCE and candidate.yError<=CLEAN_CATCH_Y_TOLERANCE and betterIntercept(candidate,bestNear) then
-				bestNear=candidate
+		local function preferredAngleFor(distance)
+			local yards=distance/YARDS_TO_STUDS
+			if yards<12 then return 13 end
+			if yards<22 then return 15 end
+			if yards<35 then return 18 end
+			if yards<50 then return 21 end
+			if yards<70 then return 24 end
+			return 27
+		end
+
+		local function candidateScore(candidate)
+			local flatDistance=distXZ(candidate.origin,candidate.target)
+			local preferredAngle=preferredAngleFor(flatDistance)
+			local anglePenalty=math.abs(candidate.angleDeg-preferredAngle)*0.65
+			local risingPenalty=math.max(candidate.verticalVelocityAtCatch-CATCH_WINDOW_RISING_VY_LIMIT,0)*2.25
+			local descentBonus=math.clamp(-candidate.verticalVelocityAtCatch,0,8)*CATCH_WINDOW_MIN_DESCENT_BONUS
+			local aheadPenalty=math.abs((candidate.catchAheadStuds or 0)-preferredAhead)*CATCH_WINDOW_AHEAD_WEIGHT
+			local earlyBulletPenalty=0
+			if flatDistance>55 and candidate.time<1.00 then
+				earlyBulletPenalty=(1.00-candidate.time)*8
+			end
+
+			return candidate.targetMiss*1000
+				+candidate.speedError*100
+				+anglePenalty
+				+risingPenalty
+				+aheadPenalty
+				+earlyBulletPenalty
+				+candidate.time*0.12
+				+descentBonus
+		end
+
+		local function makeCandidate(time,aheadStuds,kind)
+			if time<=0 then return nil end
+
+			local target=targetAtTime(receiverStart,wrVel,time,aheadStuds)
+			local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
+			local requiredVelocity=neededDisplacement/time
+			local requiredSpeed=requiredVelocity.Magnitude
+			if requiredSpeed<=1e-6 then return nil end
+
+			local direction=requiredVelocity.Unit
+			local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
+			if angle<GLOBAL_MIN_ANGLE or angle>GLOBAL_MAX_ANGLE then return nil end
+
+			local throwVelocity=direction*ballSpeed
+			local worldVelocity=throwVelocity+inheritedVelocity
+			local catchPosition=ballAt(originPosition,worldVelocity,time)
+			local targetMiss=(catchPosition-target).Magnitude
+			local yError=math.abs(catchPosition.Y-(WR_MAX_Y+C1_SOLVE_Y_BIAS))
+			local speedError=math.abs(requiredSpeed-ballSpeed)
+			local verticalVelocityAtCatch=worldVelocity.Y+G.Y*time
+			local landingPosition,landingTime=landing(originPosition,worldVelocity)
+			local leadTime=wrSpeed>1e-6 and aheadStuds/wrSpeed or 0
+
+			local candidate={
+				score=0,
+				time=time,
+				totalLeadTime=time+leadTime,
+				receiverPredictionDelay=leadTime,
+				receiverPredictionDelayScale=WR_LEAD_DELAY>0 and leadTime/WR_LEAD_DELAY or 0,
+				receiverLeadDistance=aheadStuds,
+				catchAheadStuds=aheadStuds,
+				catchAheadPreferred=preferredAhead,
+				catchAheadMin=minAhead,
+				catchAheadMax=maxAhead,
+				catchWindowKind=kind,
+				origin=originPosition,
+				target=target,
+				c1Point=target,
+				requiredVelocity=requiredVelocity,
+				requiredSpeed=requiredSpeed,
+				direction=direction,
+				throwVelocity=throwVelocity,
+				worldVelocity=worldVelocity,
+				velocity=worldVelocity,
+				speed=ballSpeed,
+				aimPoint=originPosition+direction*AIM_SCALE,
+				angleDeg=angle,
+				preferredAngle=preferredAngleFor(distXZ(originPosition,target)),
+				minDesiredAngle=GLOBAL_MIN_ANGLE,
+				maxAngle=GLOBAL_MAX_ANGLE,
+				totalErr=targetMiss,
+				targetMiss=targetMiss,
+				yError=yError,
+				speedError=speedError,
+				verticalVelocityAtCatch=verticalVelocityAtCatch,
+				interceptResidual=math.abs(requiredSpeed*requiredSpeed-ballSpeed*ballSpeed)*time*time,
+				missEstimate=targetMiss,
+				ballAtCatch=catchPosition,
+				landing=landingPosition,
+				landingTime=landingTime,
+				flatDistNow=distXZ(originPosition,receiverStart),
+				movementShape=shape,
+				predictorState=predictorState,
+				cleanMath=true,
+				catchWindowSolver=true,
+			}
+
+			candidate.score=candidateScore(candidate)
+			candidate.leadInfo=interceptLeadInfo(originPosition,target,wrVel,time,predictorState)
+			local aheadVector=(wrSpeed>1e-6 and routeDir*aheadStuds) or Vector3.zero
+			candidate.leadInfo.extraLeadXZ=aheadVector
+			candidate.leadInfo.tangentExtraLeadXZ=aheadVector
+			candidate.leadInfo.extraLeadTime=leadTime
+			candidate.leadInfo.tangentExtraTime=leadTime
+			candidate.leadInfo.receiverPredictionDelay=leadTime
+			candidate.leadInfo.receiverLeadDistance=aheadStuds
+			candidate.leadInfo.routeSpeed=wrSpeed
+			return candidate
+		end
+
+		local function consider(candidate)
+			if not candidate then return end
+			if candidate.yError>CLEAN_CATCH_Y_TOLERANCE then return end
+			if candidate.speedError>SPEED_TOLERANCE and candidate.targetMiss>CLEAN_TARGET_MISS_TOLERANCE then return end
+			if not best or candidate.score<best.score then
+				best=candidate
 			end
 		end
 
-		local function considerRoot(time)
-			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,false)
-			if candidate and candidate.targetMiss<=CLEAN_TARGET_MISS_TOLERANCE and candidate.yError<=CLEAN_CATCH_Y_TOLERANCE and betterIntercept(candidate,bestRoot) then
-				bestRoot=candidate
+		local function speedValueAt(time,aheadStuds)
+			local target=targetAtTime(receiverStart,wrVel,time,aheadStuds)
+			local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
+			return neededDisplacement:Dot(neededDisplacement)-ballSpeed*ballSpeed*time*time
+		end
+
+		if wrSpeed>=CLEAN_MOVING_SPEED_MIN and CATCH_WINDOW_ENABLED then
+			for time=MIN_T,MAX_T,DT do
+				local baseTarget=targetAtTime(receiverStart,wrVel,time,0)
+				local baseDisplacement=baseTarget-originPosition-inheritedVelocity*time-0.5*G*time*time
+				local b=2*baseDisplacement:Dot(routeDir)
+				local c=baseDisplacement:Dot(baseDisplacement)-ballSpeed*ballSpeed*time*time
+				local discriminant=b*b-4*c
+
+				if discriminant>=0 then
+					local sqrtDisc=math.sqrt(discriminant)
+					local a1=(-b-sqrtDisc)/2
+					local a2=(-b+sqrtDisc)/2
+
+					if a1>=minAhead-1e-4 and a1<=maxAhead+1e-4 then
+						consider(makeCandidate(time,math.clamp(a1,minAhead,maxAhead),"window_root"))
+					end
+
+					if math.abs(a2-a1)>1e-4 and a2>=minAhead-1e-4 and a2<=maxAhead+1e-4 then
+						consider(makeCandidate(time,math.clamp(a2,minAhead,maxAhead),"window_root"))
+					end
+				end
+
+				-- Keep a preferred-ahead fallback. This prevents the quadratic window from
+				-- rejecting otherwise stable throws when the preferred point is close but not exact.
+				local preferredCandidate=makeCandidate(time,preferredAhead,"preferred_scan")
+				if preferredCandidate and preferredCandidate.speedError<=SPEED_TOLERANCE then
+					consider(preferredCandidate)
+				end
+			end
+		else
+			local previousTime=MIN_T
+			local previousValue=speedValueAt(previousTime,0)
+			local function refineAheadZero(lo,hi,loValue)
+				local low=lo
+				local high=hi
+				local lowValue=loValue
+				for _=1,INTERCEPT_BISECTION_STEPS do
+					local mid=(low+high)*0.5
+					local midValue=speedValueAt(mid,0)
+					if math.abs(midValue)<1e-5 then return mid end
+					if (lowValue<0 and midValue>0) or (lowValue>0 and midValue<0) then
+						high=mid
+					else
+						low=mid
+						lowValue=midValue
+					end
+				end
+				return (low+high)*0.5
+			end
+
+			for time=MIN_T+DT,MAX_T,DT do
+				local value=speedValueAt(time,0)
+				local scanCandidate=makeCandidate(time,0,"standing_scan")
+				if scanCandidate and scanCandidate.speedError<=SPEED_TOLERANCE then
+					consider(scanCandidate)
+				end
+
+				if math.abs(value)<1e-8 then
+					consider(makeCandidate(time,0,"standing_root"))
+				elseif (previousValue<0 and value>0) or (previousValue>0 and value<0) then
+					consider(makeCandidate(refineAheadZero(previousTime,time,previousValue),0,"standing_root"))
+				end
+
+				previousTime=time
+				previousValue=value
 			end
 		end
 
-		considerNear(previousTime)
-
-		for time=MIN_T+DT,MAX_T,DT do
-			local value=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
-			considerNear(time)
-
-			if math.abs(value)<1e-8 then
-				considerRoot(time)
-			elseif math.abs(previousValue)<1e-8 then
-				considerRoot(previousTime)
-			elseif (previousValue<0 and value>0) or (previousValue>0 and value<0) then
-				considerRoot(refineInterceptTime(originPosition,receiverStart,wrVel,qbVel,ballSpeed,previousTime,time,previousValue))
-			end
-
-			previousTime=time
-			previousValue=value
-		end
-
-		local best=bestRoot or bestNear
-		if best and not best.leadInfo then
-			best.leadInfo=interceptLeadInfo(originPosition,best.target,wrVel,best.time,predictorState)
-		end
 		if best then
 			best.qbReleaseOffset=qbReleaseOffset
 			best.qbSharedReleaseOffset=qbReleaseOffset
@@ -2142,20 +2329,17 @@ function QBAim.new(ctx,parent)
 		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,receiverReleaseOffset,predictorState),ball
 	end
 
-	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
-		-- Target-latch / delayed-remote solver.
-		-- The preview arc locks at keypress, but the remote appears shortly before release.
-		-- Keep the keypress plan frozen during animation, then send that same world Target.
-		-- Do not recompute from the future QB point and do not fire immediately.
+	local function buildReleasePlan(receiver,ballPower,releaseBall,previewPlanAtPress)
+		-- Source-matched release-frame solver.
+		-- The actual game plays the throw animation, waits 0.266666..., then samples
+		-- the current aim ray and fires ThrowBall. For QB aim, the receiver identity
+		-- is locked on keypress, but the final physics plan is recomputed at fire time.
 		if THROW_TARGET_FIRE_IMMEDIATELY then
-			if lockedPlan then
-				previewPlan(lockedPlan)
-			end
-			return lockedPlan,releaseBall
+			return buildPlan(receiver,ballPower,QB_RELEASE_ORIGIN_DRIFT_TIME,nil,0)
 		end
 
 		if THROW_ANIMATION_RELEASE_WAIT<=0 then
-			return lockedPlan or buildPlan(receiver,ballPower,0,releaseBall)
+			return buildPlan(receiver,ballPower,QB_RELEASE_ORIGIN_DRIFT_TIME,nil,0)
 		end
 
 		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
@@ -2164,18 +2348,25 @@ function QBAim.new(ctx,parent)
 		while os.clock()<fireAt do
 			if THROW_TARGET_LOCK_PREVIEW_LIVE then
 				local remaining=math.max(endAt-os.clock(),0)
-				local livePlan=buildPlan(receiver,ballPower,remaining,releaseBall,remaining)
+				local livePlan=buildPlan(receiver,ballPower,QB_RELEASE_ORIGIN_DRIFT_TIME,nil,remaining)
 				if livePlan then
 					previewPlan(livePlan)
 				end
-			elseif lockedPlan then
-				previewPlan(lockedPlan)
+			elseif previewPlanAtPress then
+				previewPlan(previewPlanAtPress)
 			end
 
 			RunService.Heartbeat:Wait()
 		end
 
-		return lockedPlan,releaseBall
+		local finalPlan,finalBall=buildPlan(receiver,ballPower,QB_RELEASE_ORIGIN_DRIFT_TIME,nil,0)
+		if finalPlan then
+			return finalPlan,finalBall
+		end
+
+		-- Fallback only if the held ball disappears on the final frame.
+		finalPlan,finalBall=buildPlan(receiver,ballPower,QB_RELEASE_ORIGIN_DRIFT_TIME,releaseBall,0)
+		return finalPlan or previewPlanAtPress,finalBall or releaseBall
 	end
 
 	local function fireGameplayThrow(plan)
@@ -2190,8 +2381,13 @@ function QBAim.new(ctx,parent)
 			Power=REMOTE_DISPLAY_POWER,
 		})
 
-		-- Do not call local UnequipFootball here. Normal flow lets the server send the
-		-- incoming Mechanics/UnequipFootball and UpdateFootball events after ThrowBall.
+		pcall(function()
+			local mechanics=getGlobalMechanics()
+			if mechanics and type(mechanics.UnequipFootball)=="function" then
+				mechanics:UnequipFootball()
+			end
+		end)
+
 		return true,nil
 	end
 
@@ -2206,6 +2402,13 @@ function QBAim.new(ctx,parent)
 			AutoThrow=false,
 			Power=REMOTE_DISPLAY_POWER, -- must be 100, not plan.speed/95
 		})
+
+		pcall(function()
+			local mechanics=getGlobalMechanics()
+			if mechanics and type(mechanics.UnequipFootball)=="function" then
+				mechanics:UnequipFootball()
+			end
+		end)
 
 		return true,nil
 	end
@@ -2242,12 +2445,11 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		-- Lock one plan at keypress. Keep animation-to-fire timing at 0.2666s,
-		-- but do not use that whole value to move C2/origin. The QB/ball release
-		-- origin gets a small measured drift; the WR prediction uses the full
-		-- animation window.
-		local lockedQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
-		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		-- Preview one plan on keypress, but do not use it as the final throw.
+		-- The final plan is recomputed after the normal 0.266666s animation wait,
+		-- matching the game's FootballThrow flow.
+		local previewQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		local previewWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		throwInProgress=true
 
 		local function releaseThrowLock()
@@ -2255,20 +2457,17 @@ function QBAim.new(ctx,parent)
 			lastThrowAt=os.clock()
 		end
 
-		local lockedPlan=buildPlan(receiver,power,lockedQBOffset,heldBall,lockedWROffset)
-		if not lockedPlan then
-			releaseThrowLock()
-			setStatus("No target-latch throw solution")
-			return
+		local previewPlanAtPress=buildPlan(receiver,power,previewQBOffset,heldBall,previewWROffset)
+		if previewPlanAtPress then
+			previewPlan(previewPlanAtPress)
 		end
 
-		previewPlan(lockedPlan)
 		playThrowAnimation()
 
-		local plan=buildReleasePlan(receiver,power,heldBall,lockedPlan)
+		local plan=buildReleasePlan(receiver,power,heldBall,previewPlanAtPress)
 		if not plan then
 			releaseThrowLock()
-			setStatus("No target-latch throw solution")
+			setStatus("No release-frame throw solution")
 			return
 		end
 
@@ -2283,7 +2482,7 @@ function QBAim.new(ctx,parent)
 
 		if ok then
 			freezePreviewAtCurrentPlan(plan)
-			setStatus(currentModeText().." delayed future-release throw sent")
+			setStatus(currentModeText().." release-frame catch-window throw sent")
 		else
 			setStatus(err or "Throw failed")
 		end
