@@ -927,7 +927,7 @@ LOADER_TOTAL=#STARTUP_MODULE_PATHS+#LOADER_PAGE_BUILD_NAMES+4
 loaderCurrent=0
 loaderPhaseCurrent=#STARTUP_MODULE_PATHS
 loaderPhaseItems={}
-loaderPhaseNames={"Boot","Modules","Check","GUI","State","Ready"}
+loaderPhaseNames={"Setup","Modules","Interface","Ready"}
 loaderOverlay=New("Frame",{
 	Name="Loader",
 	BackgroundColor3=Color3.fromRGB(8,10,18),
@@ -1114,27 +1114,27 @@ loaderPercent=New("TextLabel",{
 
 loaderPhaseRow=New("Frame",{
 	BackgroundTransparency=1,
-	Position=UDim2.fromOffset(0,158),
-	Size=UDim2.new(1,0,0,36),
+	Position=UDim2.fromOffset(0,160),
+	Size=UDim2.new(1,0,0,38),
 	ZIndex=LOADER_Z+2,
 },loaderBox)
 
-local phaseWidth=79
-local phaseGap=5
+local phaseWidth=118
+local phaseGap=9
 for index,name in ipairs(loaderPhaseNames) do
 	local item=New("Frame",{
 		BackgroundColor3=THEME.PANEL,
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset((index-1)*(phaseWidth+phaseGap),0),
-		Size=UDim2.fromOffset(phaseWidth,36),
+		Size=UDim2.fromOffset(phaseWidth,38),
 		ZIndex=LOADER_Z+2,
 	},loaderPhaseRow)
 	New("UICorner",{CornerRadius=UDim.new(0,5)},item)
 	local dot=New("Frame",{
 		AnchorPoint=Vector2.new(0,0.5),
-		Position=UDim2.fromOffset(10,18),
-		Size=UDim2.fromOffset(7,7),
+		Position=UDim2.fromOffset(12,19),
+		Size=UDim2.fromOffset(8,8),
 		BackgroundColor3=THEME.MUTED,
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
@@ -1143,11 +1143,11 @@ for index,name in ipairs(loaderPhaseNames) do
 	New("UICorner",{CornerRadius=UDim.new(1,0)},dot)
 	local label=New("TextLabel",{
 		BackgroundTransparency=1,
-		Position=UDim2.fromOffset(24,0),
-		Size=UDim2.new(1,-30,1,0),
+		Position=UDim2.fromOffset(30,0),
+		Size=UDim2.new(1,-38,1,0),
 		Text=name,
 		Font=Enum.Font.Gotham,
-		TextSize=10,
+		TextSize=11,
 		TextColor3=THEME.MUTED,
 		TextTransparency=1,
 		TextXAlignment=Enum.TextXAlignment.Left,
@@ -1179,22 +1179,20 @@ end
 local function loaderPhaseFromStatus(text,current,total)
 	text=tostring(text or ""):lower()
 	if text:find("runtime ready",1,true) or text:find("everything is loaded",1,true) then
-		return 6
-	elseif text:find("restored",1,true) or text:find("binding",1,true) or text:find("applying theme",1,true) then
-		return 5
-	elseif text:find("building page",1,true) or text:find("built all gui",1,true) or text:find("gui build",1,true) then
 		return 4
-	elseif text:find("verified",1,true) or text:find("validate",1,true) then
+	elseif text:find("restored",1,true) or text:find("binding",1,true) or text:find("applying theme",1,true) then
 		return 3
+	elseif text:find("building page",1,true) or text:find("built all gui",1,true) or text:find("gui build",1,true) then
+		return 3
+	elseif text:find("verified",1,true) or text:find("validate",1,true) then
+		return 2
 	elseif text:find("module",1,true) or text:find("fetch",1,true) or text:find("cached",1,true) then
 		return 2
 	end
 
 	local pct=(tonumber(current) or 0)/math.max(tonumber(total) or LOADER_TOTAL,1)
-	if pct>=0.98 then return 6 end
-	if pct>=0.82 then return 5 end
-	if pct>=0.62 then return 4 end
-	if pct>=0.42 then return 3 end
+	if pct>=0.94 then return 4 end
+	if pct>=0.46 then return 3 end
 	if pct>=0.12 then return 2 end
 	return 1
 end
@@ -1278,6 +1276,13 @@ function setLoaderProgress(text,current,total,isProblem)
 	loaderPercent.Text=math.floor(pct*100+0.5).."%"
 	loaderFill.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
 	loaderFillGlow.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
+	if loaderMeta then
+		loaderMeta.Text=isProblem and "Fix source/cache, run /update, then re-execute." or "Required modules load before the panel unlocks."
+		loaderMeta.TextColor3=isProblem and THEME.RED or THEME.MUTED
+	end
+	if loaderPercentPillStroke then
+		TweenService:Create(loaderPercentPillStroke,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=isProblem and THEME.RED or THEME.STROKE,Transparency=isProblem and 0.08 or 0.35}):Play()
+	end
 	TweenService:Create(loaderFill,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
 	TweenService:Create(loaderFillGlow,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
 	setLoaderPhase(loaderPhaseFromStatus(text,current,total),isProblem)
