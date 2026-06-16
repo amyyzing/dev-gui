@@ -155,10 +155,14 @@ local QB_RELEASE_ORIGIN_DRIFT_TIME=0.04
 local QB_RELEASE_XZ_DRIFT_TIME=0
 local QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME -- kept as alias for internal compatibility
 local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
+local SOURCE_RELEASE_ORIGIN_ENABLED=true
+local SOURCE_RELEASE_SIDE_OFFSET=1.00
+local SOURCE_RELEASE_UP_OFFSET=1.50
+local SOURCE_RELEASE_ORIGIN_ITERATIONS=2
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
 --   1. Keypress computes one locked plan.
---   2. C2/QB release height drifts by the configured time; XZ is sampled live.
+--   2. Origin is rebuilt like the game arc: QB root + aim-relative side/up offset.
 --   3. WR is predicted through the full animation release window.
 --   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
@@ -1506,8 +1510,62 @@ function QBAim.new(ctx,parent)
 		return Vector3.new(basePosition.X+dx,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+dz)
 	end
 
+	local function sourceReleaseOrigin(qbRoot,ball,aimPoint,throwDirection,yReleaseOffset)
+		local rootPosition=qbRoot.Position
+
+		if QB_RELEASE_EXTRAPOLATE_VERTICAL and yReleaseOffset and yReleaseOffset>0 then
+			local verticalVelocity=releaseVerticalVelocity(qbRoot,ball)
+			local airborne=math.abs(verticalVelocity)>=QB_AIRBORNE_VY_EPSILON or qbRoot.Position.Y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON
+			if airborne then
+				local yOffset=verticalVelocity*yReleaseOffset-0.5*PLAYER_G*yReleaseOffset*yReleaseOffset
+				rootPosition=rootPosition+Vector3.new(0,math.clamp(yOffset,-QB_RELEASE_VERTICAL_DRIFT_MAX,QB_RELEASE_VERTICAL_DRIFT_MAX),0)
+			end
+		end
+
+		rootPosition=rootPosition+Vector3.new(0,QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),0)
+
+		local lookDirection=nil
+		if aimPoint and aimPoint.Magnitude>1e-6 then
+			lookDirection=aimPoint.Unit
+		elseif throwDirection and throwDirection.Magnitude>1e-6 then
+			lookDirection=throwDirection.Unit
+		elseif qbRoot.CFrame then
+			lookDirection=qbRoot.CFrame.LookVector
+		else
+			lookDirection=Vector3.new(0,0,-1)
+		end
+
+		if math.abs(lookDirection:Dot(Vector3.new(0,1,0)))>0.985 then
+			lookDirection=unit(flat(lookDirection),qbRoot.CFrame and qbRoot.CFrame.LookVector or Vector3.new(0,0,-1))
+		end
+
+		local releaseCFrame=CFrame.lookAt(rootPosition,rootPosition+lookDirection)
+		return(releaseCFrame*CFrame.new(SOURCE_RELEASE_SIDE_OFFSET,SOURCE_RELEASE_UP_OFFSET,0)).Position
+	end
+
 	local function velocityNeeded(originPosition,targetPosition,time)
 		return(targetPosition-originPosition-0.5*G*time*time)/time
+	end
+
+	local function resolveSourceOrigin(qbRoot,ball,originSeed,target,time,yReleaseOffset)
+		if not(SOURCE_RELEASE_ORIGIN_ENABLED and qbRoot and target and time and time>0) then
+			return originSeed,nil
+		end
+
+		local releaseOrigin=originSeed
+		local direction=nil
+
+		for _=1,SOURCE_RELEASE_ORIGIN_ITERATIONS do
+			local requiredVelocity=velocityNeeded(releaseOrigin,target,time)
+			if requiredVelocity.Magnitude<=1e-6 then
+				break
+			end
+
+			direction=requiredVelocity.Unit
+			releaseOrigin=sourceReleaseOrigin(qbRoot,ball,releaseOrigin+direction*AIM_SCALE,direction,yReleaseOffset)
+		end
+
+		return releaseOrigin,direction
 	end
 
 	local function ballAt(originPosition,velocity,time)
@@ -1601,11 +1659,12 @@ function QBAim.new(ctx,parent)
 		}
 	end
 
-	local function interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
+	local function interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,qbRoot,ball,qbReleaseOffset)
 		local inheritedVelocity=flat(qbVel or Vector3.zero)*QB_INHERITANCE
 		local receiverLeadDelay=leadDelayForFlightTime(time)
 		local target=targetAtTime(receiverStart,wrVel,time,receiverLeadDelay)
-		local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
+		local releaseOrigin=resolveSourceOrigin(qbRoot,ball,originPosition,target,time,qbReleaseOffset)
+		local neededDisplacement=target-releaseOrigin-inheritedVelocity*time-0.5*G*time*time
 		return neededDisplacement:Dot(neededDisplacement)-ballSpeed*ballSpeed*time*time
 	end
 
@@ -1678,13 +1737,16 @@ function QBAim.new(ctx,parent)
 		}
 	end
 
-	local function interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,includeLeadInfo)
+	local function interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,includeLeadInfo,qbRoot,ball,qbReleaseOffset)
 		if time<=0 then return nil end
 
 		local inheritedVelocity=flat(qbVel or Vector3.zero)*QB_INHERITANCE
 		local receiverLeadDelay=leadDelayForFlightTime(time)
 		local target=targetAtTime(receiverStart,wrVel,time,receiverLeadDelay)
-		local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
+		local releaseOrigin=originPosition
+		local originDirection=nil
+		releaseOrigin,originDirection=resolveSourceOrigin(qbRoot,ball,originPosition,target,time,qbReleaseOffset)
+		local neededDisplacement=target-releaseOrigin-inheritedVelocity*time-0.5*G*time*time
 		local requiredVelocity=neededDisplacement/time
 		local requiredSpeed=requiredVelocity.Magnitude
 		if requiredSpeed<=1e-6 then return nil end
@@ -1695,13 +1757,13 @@ function QBAim.new(ctx,parent)
 
 		local throwVelocity=direction*ballSpeed
 		local worldVelocity=throwVelocity+inheritedVelocity
-		local catchPosition=ballAt(originPosition,worldVelocity,time)
+		local catchPosition=ballAt(releaseOrigin,worldVelocity,time)
 		local targetMiss=(catchPosition-target).Magnitude
 		local yError=math.abs(catchPosition.Y-(WR_MAX_Y+C1_SOLVE_Y_BIAS))
 		local speedError=math.abs(requiredSpeed-ballSpeed)
-		local residual=math.abs(interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time))
+		local residual=math.abs(interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,qbRoot,ball,qbReleaseOffset))
 		local verticalVelocityAtCatch=worldVelocity.Y+G.Y*time
-		local landingPosition,landingTime=landing(originPosition,worldVelocity)
+		local landingPosition,landingTime=landing(releaseOrigin,worldVelocity)
 		local leadDistance=flat(wrVel).Magnitude*receiverLeadDelay
 
 		return{
@@ -1711,7 +1773,10 @@ function QBAim.new(ctx,parent)
 			receiverPredictionDelay=receiverLeadDelay,
 			receiverPredictionDelayScale=WR_LEAD_DELAY>0 and receiverLeadDelay/WR_LEAD_DELAY or 0,
 			receiverLeadDistance=leadDistance,
-			origin=originPosition,
+			origin=releaseOrigin,
+			originSeed=originPosition,
+			sourceReleaseOrigin=SOURCE_RELEASE_ORIGIN_ENABLED and qbRoot~=nil or false,
+			sourceReleaseOriginDirection=originDirection,
 			target=target,
 			c1Point=target,
 			requiredVelocity=requiredVelocity,
@@ -1721,7 +1786,7 @@ function QBAim.new(ctx,parent)
 			worldVelocity=worldVelocity,
 			velocity=worldVelocity,
 			speed=ballSpeed,
-			aimPoint=originPosition+direction*AIM_SCALE,
+			aimPoint=releaseOrigin+direction*AIM_SCALE,
 			angleDeg=angle,
 			preferredAngle=angle,
 			minDesiredAngle=GLOBAL_MIN_ANGLE,
@@ -1736,7 +1801,7 @@ function QBAim.new(ctx,parent)
 			ballAtCatch=catchPosition,
 			landing=landingPosition,
 			landingTime=landingTime,
-			flatDistNow=distXZ(originPosition,receiverStart),
+			flatDistNow=distXZ(releaseOrigin,receiverStart),
 			movementShape=shape,
 			predictorState=predictorState,
 			leadInfo=includeLeadInfo and interceptLeadInfo(originPosition,target,wrVel,time,predictorState) or nil,
@@ -1751,14 +1816,14 @@ function QBAim.new(ctx,parent)
 		return candidate.time<current.time
 	end
 
-	local function refineInterceptTime(originPosition,receiverStart,wrVel,qbVel,ballSpeed,lo,hi,loValue)
+	local function refineInterceptTime(originPosition,receiverStart,wrVel,qbVel,ballSpeed,lo,hi,loValue,qbRoot,ball,qbReleaseOffset)
 		local low=lo
 		local high=hi
-		local lowValue=loValue or interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,low)
+		local lowValue=loValue or interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,low,qbRoot,ball,qbReleaseOffset)
 
 		for _=1,INTERCEPT_BISECTION_STEPS do
 			local mid=(low+high)*0.5
-			local midValue=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,mid)
+			local midValue=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,mid,qbRoot,ball,qbReleaseOffset)
 
 			if math.abs(midValue)<1e-5 then
 				return mid
@@ -1781,28 +1846,27 @@ function QBAim.new(ctx,parent)
 		receiverReleaseOffset=receiverReleaseOffset==nil and qbReleaseOffset or receiverReleaseOffset
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
 		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
-		-- Delayed future-release model:
-		-- The throw request is sent near release, but the plan is locked on keypress.
-		-- Predict the actual server SpawnPos/release origin forward by qbReleaseOffset,
-		-- predict the receiver by receiverReleaseOffset, and build the outgoing Target
-		-- ray from that future release point.
+		-- Source-style release model:
+		-- The game preview starts from QB root + aim-relative side/up offset.
+		-- Use the old ball/root origin only as a seed, then each candidate
+		-- rebuilds origin from the solved throw direction.
 		local originPosition=origin(qbRoot,ball,QB_RELEASE_XZ_DRIFT_TIME,qbReleaseOffset)
 		local receiverReleasePosition=receiverRoot.Position+wrVel*receiverReleaseOffset
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
 		local bestRoot=nil
 		local bestNear=nil
 		local previousTime=MIN_T
-		local previousValue=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,previousTime)
+		local previousValue=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,previousTime,qbRoot,ball,qbReleaseOffset)
 
 		local function considerNear(time)
-			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,false)
+			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,false,qbRoot,ball,qbReleaseOffset)
 			if candidate and candidate.targetMiss<=CLEAN_NEAR_TARGET_MISS_TOLERANCE and candidate.yError<=CLEAN_CATCH_Y_TOLERANCE and betterIntercept(candidate,bestNear) then
 				bestNear=candidate
 			end
 		end
 
 		local function considerRoot(time)
-			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,false)
+			local candidate=interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,false,qbRoot,ball,qbReleaseOffset)
 			if candidate and candidate.targetMiss<=CLEAN_TARGET_MISS_TOLERANCE and candidate.yError<=CLEAN_CATCH_Y_TOLERANCE and betterIntercept(candidate,bestRoot) then
 				bestRoot=candidate
 			end
@@ -1811,7 +1875,7 @@ function QBAim.new(ctx,parent)
 		considerNear(previousTime)
 
 		for time=MIN_T+DT,MAX_T,DT do
-			local value=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
+			local value=interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,qbRoot,ball,qbReleaseOffset)
 			considerNear(time)
 
 			if math.abs(value)<1e-8 then
@@ -1819,7 +1883,7 @@ function QBAim.new(ctx,parent)
 			elseif math.abs(previousValue)<1e-8 then
 				considerRoot(previousTime)
 			elseif (previousValue<0 and value>0) or (previousValue>0 and value<0) then
-				considerRoot(refineInterceptTime(originPosition,receiverStart,wrVel,qbVel,ballSpeed,previousTime,time,previousValue))
+				considerRoot(refineInterceptTime(originPosition,receiverStart,wrVel,qbVel,ballSpeed,previousTime,time,previousValue,qbRoot,ball,qbReleaseOffset))
 			end
 
 			previousTime=time
@@ -1828,7 +1892,7 @@ function QBAim.new(ctx,parent)
 
 		local best=bestRoot or bestNear
 		if best and not best.leadInfo then
-			best.leadInfo=interceptLeadInfo(originPosition,best.target,wrVel,best.time,predictorState)
+			best.leadInfo=interceptLeadInfo(best.origin or originPosition,best.target,wrVel,best.time,predictorState)
 		end
 		if best then
 			best.qbReleaseOffset=qbReleaseOffset
@@ -2244,10 +2308,9 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		-- Lock one plan at keypress. Keep animation-to-fire timing at 0.2666s,
-		-- but do not use that whole value to move origin.XZ. The QB/ball release
-		-- height gets a small measured drift; the WR prediction uses the full
-		-- animation window.
+		-- Lock one plan at keypress. Keep animation-to-fire timing at 0.2666s.
+		-- The release origin follows the game's root + aim-relative hand offset;
+		-- the WR prediction uses the full animation window.
 		local lockedQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		throwInProgress=true
