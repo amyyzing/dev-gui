@@ -1,7 +1,6 @@
 local StrokeColour={}
 
 local TweenService=game:GetService("TweenService")
-local GuiService=game:GetService("GuiService")
 
 local DEFAULTS={
 	PrimaryR=28,
@@ -335,26 +334,15 @@ function StrokeColour.new(ctx,page)
 	local sharedSliderControls={}
 
 	local function pointerPosition(input)
-		local raw
 		local position=input and input.Position
 
 		if typeof(position)=="Vector3" then
-			raw=Vector2.new(position.X,position.Y)
+			return Vector2.new(position.X,position.Y)
 		elseif typeof(position)=="Vector2" then
-			raw=position
-		else
-			raw=UIS:GetMouseLocation()
+			return position
 		end
 
-		local ok,inset=pcall(function()
-			return GuiService:GetGuiInset()
-		end)
-
-		if ok and typeof(inset)=="Vector2" then
-			return raw-inset
-		end
-
-		return raw
+		return UIS:GetMouseLocation()
 	end
 
 	local function trackConnection(conn)
@@ -655,7 +643,6 @@ function StrokeColour.new(ctx,page)
 	local quickChoices={}
 	local rgbSliders={}
 	local hsvSliders={}
-	local highlightRgbSliders={}
 	local highlightDialImages={}
 	local highlightDialGlowImages={}
 	local highlightDialHighlightImages={}
@@ -1744,7 +1731,6 @@ function StrokeColour.new(ctx,page)
 		local state=activeHighlightState()
 		local fillColor=highlightColor("Fill")
 		local outlineColor=highlightColor("Outline")
-		local selectedColor=getActiveHighlightColor()
 		local activeAccent=getUIStrokeColor()
 		local stateEnabled=UI_STYLE[highlightCustomField()]==true
 
@@ -1785,15 +1771,6 @@ function StrokeColour.new(ctx,page)
 			entry.Button.BackgroundColor3=selected and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=activeAccent
-		end
-
-		if highlightRgbSliders.R then
-			highlightRgbSliders.R.set(clampByte(selectedColor.R*255),false)
-			highlightRgbSliders.G.set(clampByte(selectedColor.G*255),false)
-			highlightRgbSliders.B.set(clampByte(selectedColor.B*255),false)
-			tintSlider(highlightRgbSliders.R,Color3.fromRGB(255,0,0))
-			tintSlider(highlightRgbSliders.G,Color3.fromRGB(0,210,80))
-			tintSlider(highlightRgbSliders.B,Color3.fromRGB(0,120,255))
 		end
 
 		if highlightFillTransparencySlider then
@@ -2311,29 +2288,11 @@ function StrokeColour.new(ctx,page)
 		end
 	end))
 
-	local highlightRgbBody=New("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,154),
-		ZIndex=5,
-		LayoutOrder=5,
-	},highlightPanel)
-	New("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},highlightRgbBody)
-
-	local function applyHighlightRGB()
-		writeActiveHighlightColor(Color3.fromRGB(highlightRgbSliders.R.get(),highlightRgbSliders.G.get(),highlightRgbSliders.B.get()))
-		syncPickerControls()
-		updateEverything()
-	end
-
-	highlightRgbSliders.R=makeHighlightSlider(highlightRgbBody,"Red",0,255,0,0,Color3.fromRGB(255,0,0),applyHighlightRGB)
-	highlightRgbSliders.G=makeHighlightSlider(highlightRgbBody,"Green",0,255,0,0,Color3.fromRGB(0,210,80),applyHighlightRGB)
-	highlightRgbSliders.B=makeHighlightSlider(highlightRgbBody,"Blue",0,255,0,0,Color3.fromRGB(0,120,255),applyHighlightRGB)
-
 	local highlightTransparencyBody=New("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,101),
 		ZIndex=5,
-		LayoutOrder=6,
+		LayoutOrder=5,
 	},highlightPanel)
 	New("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},highlightTransparencyBody)
 
