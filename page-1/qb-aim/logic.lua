@@ -159,6 +159,12 @@ local SOURCE_RELEASE_ORIGIN_ENABLED=true
 local SOURCE_RELEASE_SIDE_OFFSET=1.00
 local SOURCE_RELEASE_UP_OFFSET=1.50
 local SOURCE_RELEASE_ORIGIN_ITERATIONS=2
+local RELEASE_ORIGIN_AUTO_CALIBRATION=true
+local RELEASE_ORIGIN_CALIBRATION_ALPHA=0.35
+local RELEASE_ORIGIN_CALIBRATION_MAX_AGE=1.25
+local RELEASE_ORIGIN_CALIBRATION_MATCH_DOT=0.975
+local RELEASE_ORIGIN_CALIBRATION_MAX_ERROR=18.00
+local RELEASE_ORIGIN_CALIBRATION_MAX_COMPONENT=8.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
 --   1. Keypress computes one locked plan.
@@ -687,6 +693,10 @@ function QBAim.new(ctx,parent)
 	local previewFreezeStarted=0
 	local throwInProgress=false
 	local lastThrowAt=-math.huge
+	local lastThrowPlan=nil
+	local lastThrowSentAt=-math.huge
+	local releaseOriginLocalCorrection=Vector3.zero
+	local calibrationEvents={}
 	local highlightedCharacter=nil
 	local connections={}
 	local sectionBody=nil
@@ -1540,7 +1550,12 @@ function QBAim.new(ctx,parent)
 		end
 
 		local releaseCFrame=CFrame.lookAt(rootPosition,rootPosition+lookDirection)
-		return(releaseCFrame*CFrame.new(SOURCE_RELEASE_SIDE_OFFSET,SOURCE_RELEASE_UP_OFFSET,0)).Position
+		local releaseOrigin=(releaseCFrame*CFrame.new(SOURCE_RELEASE_SIDE_OFFSET,SOURCE_RELEASE_UP_OFFSET,0)).Position
+		if releaseOriginLocalCorrection.Magnitude>1e-6 then
+			releaseOrigin=releaseOrigin+releaseCFrame:VectorToWorldSpace(releaseOriginLocalCorrection)
+		end
+
+		return releaseOrigin,releaseCFrame
 	end
 
 	local function velocityNeeded(originPosition,targetPosition,time)
@@ -1554,6 +1569,7 @@ function QBAim.new(ctx,parent)
 
 		local releaseOrigin=originSeed
 		local direction=nil
+		local releaseCFrame=nil
 
 		for _=1,SOURCE_RELEASE_ORIGIN_ITERATIONS do
 			local requiredVelocity=velocityNeeded(releaseOrigin,target,time)
@@ -1562,10 +1578,10 @@ function QBAim.new(ctx,parent)
 			end
 
 			direction=requiredVelocity.Unit
-			releaseOrigin=sourceReleaseOrigin(qbRoot,ball,releaseOrigin+direction*AIM_SCALE,direction,yReleaseOffset)
+			releaseOrigin,releaseCFrame=sourceReleaseOrigin(qbRoot,ball,releaseOrigin+direction*AIM_SCALE,direction,yReleaseOffset)
 		end
 
-		return releaseOrigin,direction
+		return releaseOrigin,direction,releaseCFrame
 	end
 
 	local function ballAt(originPosition,velocity,time)
@@ -1776,7 +1792,8 @@ function QBAim.new(ctx,parent)
 		local target=targetAtTime(receiverStart,wrVel,time,receiverLeadDelay)
 		local releaseOrigin=originPosition
 		local originDirection=nil
-		releaseOrigin,originDirection=resolveSourceOrigin(qbRoot,ball,originPosition,target,time,qbReleaseOffset)
+		local originCFrame=nil
+		releaseOrigin,originDirection,originCFrame=resolveSourceOrigin(qbRoot,ball,originPosition,target,time,qbReleaseOffset)
 		local neededDisplacement=target-releaseOrigin-inheritedVelocity*time-0.5*G*time*time
 		local requiredVelocity=neededDisplacement/time
 		local requiredSpeed=requiredVelocity.Magnitude
@@ -1808,6 +1825,8 @@ function QBAim.new(ctx,parent)
 			originSeed=originPosition,
 			sourceReleaseOrigin=SOURCE_RELEASE_ORIGIN_ENABLED and qbRoot~=nil or false,
 			sourceReleaseOriginDirection=originDirection,
+			sourceReleaseOriginCFrame=originCFrame,
+			releaseOriginLocalCorrection=releaseOriginLocalCorrection,
 			target=target,
 			c1Point=target,
 			requiredVelocity=requiredVelocity,
@@ -2272,6 +2291,83 @@ function QBAim.new(ctx,parent)
 		return lockedPlan,releaseBall
 	end
 
+	local function remotePayload(args,startIndex)
+		for i=startIndex or 1,#args do
+			local value=args[i]
+			if type(value)=="table" and typeof(value.SpawnPos)=="Vector3" and typeof(value.Target)=="Vector3" then
+				return value
+			end
+		end
+
+		return nil
+	end
+
+	local function clampCalibrationComponent(value)
+		return math.clamp(value,-RELEASE_ORIGIN_CALIBRATION_MAX_COMPONENT,RELEASE_ORIGIN_CALIBRATION_MAX_COMPONENT)
+	end
+
+	local function applyReleaseOriginCalibration(payload)
+		if not RELEASE_ORIGIN_AUTO_CALIBRATION then return end
+		local plan=lastThrowPlan
+		if not(plan and plan.origin and plan.aimPoint) then return end
+		if os.clock()-lastThrowSentAt>RELEASE_ORIGIN_CALIBRATION_MAX_AGE then
+			lastThrowPlan=nil
+			return
+		end
+
+		local payloadDirection=unit(payload.Target-payload.SpawnPos,nil)
+		local planDirection=unit(plan.aimPoint-plan.origin,nil)
+		if payloadDirection:Dot(planDirection)<RELEASE_ORIGIN_CALIBRATION_MATCH_DOT then
+			return
+		end
+
+		local worldError=payload.SpawnPos-plan.origin
+		if worldError.Magnitude>RELEASE_ORIGIN_CALIBRATION_MAX_ERROR then
+			lastThrowPlan=nil
+			return
+		end
+
+		local cframe=plan.sourceReleaseOriginCFrame
+		local localError=cframe and cframe:VectorToObjectSpace(worldError) or worldError
+		local clampedError=Vector3.new(
+			clampCalibrationComponent(localError.X),
+			clampCalibrationComponent(localError.Y),
+			clampCalibrationComponent(localError.Z)
+		)
+
+		releaseOriginLocalCorrection=releaseOriginLocalCorrection:Lerp(clampedError,RELEASE_ORIGIN_CALIBRATION_ALPHA)
+		lastThrowPlan=nil
+	end
+
+	local function handleReleaseCalibrationEvent(...)
+		local args={...}
+		local topic=args[1]
+		local payload=nil
+
+		if topic=="UpdateFootball" then
+			payload=remotePayload(args,2)
+		elseif topic=="Mechanics" and (args[2]=="UpdateBall" or args[2]=="UpdateFootball") then
+			payload=remotePayload(args,3)
+		end
+
+		if payload then
+			applyReleaseOriginCalibration(payload)
+		end
+	end
+
+	local function addCalibrationEvent(event)
+		if event and event:IsA("RemoteEvent") and not calibrationEvents[event] then
+			calibrationEvents[event]=true
+			addConnection(event.OnClientEvent:Connect(handleReleaseCalibrationEvent))
+		end
+	end
+
+	local function connectReleaseCalibration()
+		addCalibrationEvent(ReplicatedStorage:FindFirstChild("ReEvent"))
+		addCalibrationEvent(getGameReEvent())
+		addCalibrationEvent(getSquadsReEvent())
+	end
+
 	local function fireGameplayThrow(plan)
 		local reEvent=getGameReEvent()
 		if not reEvent then
@@ -2365,6 +2461,9 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
+		lastThrowPlan=plan
+		lastThrowSentAt=os.clock()
+
 		local ok,err
 		if modeKey=="mode1" then
 			ok,err=fireGameplayThrow(plan)
@@ -2378,6 +2477,7 @@ function QBAim.new(ctx,parent)
 			freezePreviewAtCurrentPlan(plan)
 			setStatus(currentModeText().." delayed future-release throw sent")
 		else
+			lastThrowPlan=nil
 			setStatus(err or "Throw failed")
 		end
 
@@ -2591,6 +2691,7 @@ function QBAim.new(ctx,parent)
 	updateQBDriftVisuals()
 	updateQBYDriftVisuals()
 	updateQBDriftVisuals()
+	connectReleaseCalibration()
 
 	addConnection(RunService.Heartbeat:Connect(function(dt)
 		if not(enabled and isAvailable()) then return end
