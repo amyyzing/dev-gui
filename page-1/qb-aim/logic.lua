@@ -155,9 +155,9 @@ local QB_RELEASE_ORIGIN_DRIFT_TIME=0.04
 local QB_RELEASE_XZ_DRIFT_TIME=0
 local QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME -- kept as alias for internal compatibility
 local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
-local SOURCE_RELEASE_ORIGIN_ENABLED=true
-local SOURCE_RELEASE_SIDE_OFFSET=1.00
-local SOURCE_RELEASE_UP_OFFSET=1.50
+local SOURCE_RELEASE_ORIGIN_ENABLED=false
+local SOURCE_RELEASE_SIDE_OFFSET=0.00
+local SOURCE_RELEASE_UP_OFFSET=0.00
 local SOURCE_RELEASE_ORIGIN_ITERATIONS=2
 local RELEASE_ORIGIN_AUTO_CALIBRATION=true
 local RELEASE_ORIGIN_CALIBRATION_ALPHA=0.35
@@ -168,7 +168,7 @@ local RELEASE_ORIGIN_CALIBRATION_MAX_COMPONENT=8.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
 --   1. Keypress computes one locked plan.
---   2. Origin is rebuilt like the game arc: QB root + aim-relative side/up offset.
+--   2. Origin follows the game's original Center.C2 release attachment when available.
 --   3. WR is predicted through the full animation release window.
 --   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
@@ -1160,13 +1160,18 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
-	local function c2Y()
-		-- Use the game's original Center.C2 only as a release-height reference.
+	local function c2Position()
+		-- Use the game's original Center.C2 as the release point reference.
 		-- Do not read from the cloned preview C2 here, because that creates stale/self-referential C2 values.
 		local center=originalCenter()
 		local c2=center and center:FindFirstChild("C2",true)
 		local cf=c2 and attachmentCFrame(c2)
-		return cf and cf.Position.Y
+		return cf and cf.Position
+	end
+
+	local function c2Y()
+		local position=c2Position()
+		return position and position.Y
 	end
 
 	local function setPreviewCenterVisible(visible)
@@ -1493,10 +1498,11 @@ function QBAim.new(ctx,parent)
 		end
 
 		local rootVelocity=qbRoot.AssemblyLinearVelocity
-		local basePosition=ball and ball.Position or qbRoot.Position
+		local centerPosition=c2Position()
+		local basePosition=centerPosition or (ball and ball.Position) or qbRoot.Position
 
 		local baseY=basePosition.Y
-		local centerY=c2Y()
+		local centerY=centerPosition and centerPosition.Y or c2Y()
 		local y=baseY
 		if centerY and centerY>=baseY-C2_GROUND_FALLBACK_MARGIN and centerY<=baseY+C2_MAX_ABOVE_BALL then
 			y=centerY
@@ -1896,10 +1902,9 @@ function QBAim.new(ctx,parent)
 		receiverReleaseOffset=receiverReleaseOffset==nil and qbReleaseOffset or receiverReleaseOffset
 		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
 		local qbVel=clampMagnitude(flat(qbRoot.AssemblyLinearVelocity),MAX_RUN_SPEED)
-		-- Source-style release model:
-		-- The game preview starts from QB root + aim-relative side/up offset.
-		-- Use the old ball/root origin only as a seed, then each candidate
-		-- rebuilds origin from the solved throw direction.
+		-- C2 release model:
+		-- The game follows the original Center.C2 attachment when the ball is clicked.
+		-- Fall back to ball/root position only if the game arc rig is unavailable.
 		local originPosition=origin(qbRoot,ball,QB_RELEASE_XZ_DRIFT_TIME,qbReleaseOffset)
 		local receiverReleasePosition=receiverRoot.Position+wrVel*receiverReleaseOffset
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
@@ -2433,8 +2438,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		-- Lock one plan at keypress. Keep animation-to-fire timing at 0.2666s.
-		-- The release origin follows the game's root + aim-relative hand offset;
-		-- the WR prediction uses the full animation window.
+		-- The release origin follows Center.C2; the WR prediction uses the full animation window.
 		local lockedQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		throwInProgress=true
