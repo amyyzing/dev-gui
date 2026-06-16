@@ -145,7 +145,7 @@ local THROW_REMOTE_LEAD_TIME=0.00 -- fire after the full animation release wait
 local RELEASE_FRAME_PLAN_MAX_AGE=0.075
 local THROW_TARGET_LOCK_ON_INPUT=true
 local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
-local THROW_TARGET_LOCK_PREVIEW_LIVE=true -- keep preview and final Target on the same release-frame plan
+local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
 local THROW_TARGET_FIRE_IMMEDIATELY=false
 local THROW_INPUT_COOLDOWN=0.85
 -- Separate timing terms. Do not use the full animation delay to move C2/origin.
@@ -159,12 +159,18 @@ local SOURCE_RELEASE_ORIGIN_ENABLED=true
 local SOURCE_RELEASE_SIDE_OFFSET=1.00
 local SOURCE_RELEASE_UP_OFFSET=1.50
 local SOURCE_RELEASE_ORIGIN_ITERATIONS=2
+local RELEASE_ORIGIN_AUTO_CALIBRATION=true
+local RELEASE_ORIGIN_CALIBRATION_ALPHA=0.35
+local RELEASE_ORIGIN_CALIBRATION_MAX_AGE=1.25
+local RELEASE_ORIGIN_CALIBRATION_MATCH_DOT=0.975
+local RELEASE_ORIGIN_CALIBRATION_MAX_ERROR=18.00
+local RELEASE_ORIGIN_CALIBRATION_MAX_COMPONENT=8.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
---   1. Keypress computes an initial plan for instant feedback.
+--   1. Keypress computes one locked plan.
 --   2. Origin is rebuilt like the game arc: QB root + aim-relative side/up offset.
---   3. During the throw animation, preview follows the latest release-frame plan.
---   4. Remote fires the final plan sampled at release time, always after 0.266666...
+--   3. WR is predicted through the full animation release window.
+--   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local ESP_HIGHLIGHT_NAME="MyESPHighlight"
@@ -687,6 +693,10 @@ function QBAim.new(ctx,parent)
 	local previewFreezeStarted=0
 	local throwInProgress=false
 	local lastThrowAt=-math.huge
+	local lastThrowPlan=nil
+	local lastThrowSentAt=-math.huge
+	local releaseOriginLocalCorrection=Vector3.zero
+	local calibrationEvents={}
 	local highlightedCharacter=nil
 	local connections={}
 	local sectionBody=nil
@@ -1541,6 +1551,9 @@ function QBAim.new(ctx,parent)
 
 		local releaseCFrame=CFrame.lookAt(rootPosition,rootPosition+lookDirection)
 		local releaseOrigin=(releaseCFrame*CFrame.new(SOURCE_RELEASE_SIDE_OFFSET,SOURCE_RELEASE_UP_OFFSET,0)).Position
+		if releaseOriginLocalCorrection.Magnitude>1e-6 then
+			releaseOrigin=releaseOrigin+releaseCFrame:VectorToWorldSpace(releaseOriginLocalCorrection)
+		end
 
 		return releaseOrigin,releaseCFrame
 	end
@@ -1813,6 +1826,7 @@ function QBAim.new(ctx,parent)
 			sourceReleaseOrigin=SOURCE_RELEASE_ORIGIN_ENABLED and qbRoot~=nil or false,
 			sourceReleaseOriginDirection=originDirection,
 			sourceReleaseOriginCFrame=originCFrame,
+			releaseOriginLocalCorrection=releaseOriginLocalCorrection,
 			target=target,
 			c1Point=target,
 			requiredVelocity=requiredVelocity,
@@ -2242,10 +2256,10 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
-		-- Delayed-remote solver.
-		-- Keypress gives instant feedback, but the server receives Target at the
-		-- animation release frame. Rebuild the plan on that frame so moving QB
-		-- throws use the same origin/target timing as the fired remote.
+		-- Target-latch / delayed-remote solver.
+		-- The preview arc locks at keypress, but the remote appears shortly before release.
+		-- Keep the keypress plan frozen during animation, then send that same world Target.
+		-- Do not recompute from the future QB point and do not fire immediately.
 		if THROW_TARGET_FIRE_IMMEDIATELY then
 			if lockedPlan then
 				previewPlan(lockedPlan)
@@ -2254,41 +2268,104 @@ function QBAim.new(ctx,parent)
 		end
 
 		if THROW_ANIMATION_RELEASE_WAIT<=0 then
-			local immediatePlan=buildPlan(receiver,ballPower,0,releaseBall,0)
-			if immediatePlan then
-				previewPlan(immediatePlan)
-				return immediatePlan,releaseBall
-			end
-
-			return lockedPlan,releaseBall
+			return lockedPlan or buildPlan(receiver,ballPower,0,releaseBall)
 		end
 
 		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
 		local fireAt=endAt-math.clamp(THROW_REMOTE_LEAD_TIME,0,THROW_ANIMATION_RELEASE_WAIT)
-		local latestPlan=lockedPlan
 
 		while os.clock()<fireAt do
-			local remaining=math.max(fireAt-os.clock(),0)
-			local livePlan=buildPlan(receiver,ballPower,remaining,releaseBall,remaining)
-			if livePlan then
-				latestPlan=livePlan
-				if THROW_TARGET_LOCK_PREVIEW_LIVE then
+			if THROW_TARGET_LOCK_PREVIEW_LIVE then
+				local remaining=math.max(endAt-os.clock(),0)
+				local livePlan=buildPlan(receiver,ballPower,remaining,releaseBall,remaining)
+				if livePlan then
 					previewPlan(livePlan)
 				end
 			elseif lockedPlan then
-				previewPlan(latestPlan or lockedPlan)
+				previewPlan(lockedPlan)
 			end
 
 			RunService.Heartbeat:Wait()
 		end
 
-		local finalPlan=buildPlan(receiver,ballPower,0,releaseBall,0)
-		if finalPlan then
-			previewPlan(finalPlan)
-			return finalPlan,releaseBall
+		return lockedPlan,releaseBall
+	end
+
+	local function remotePayload(args,startIndex)
+		for i=startIndex or 1,#args do
+			local value=args[i]
+			if type(value)=="table" and typeof(value.SpawnPos)=="Vector3" and typeof(value.Target)=="Vector3" then
+				return value
+			end
 		end
 
-		return latestPlan or lockedPlan,releaseBall
+		return nil
+	end
+
+	local function clampCalibrationComponent(value)
+		return math.clamp(value,-RELEASE_ORIGIN_CALIBRATION_MAX_COMPONENT,RELEASE_ORIGIN_CALIBRATION_MAX_COMPONENT)
+	end
+
+	local function applyReleaseOriginCalibration(payload)
+		if not RELEASE_ORIGIN_AUTO_CALIBRATION then return end
+		local plan=lastThrowPlan
+		if not(plan and plan.origin and plan.aimPoint) then return end
+		if os.clock()-lastThrowSentAt>RELEASE_ORIGIN_CALIBRATION_MAX_AGE then
+			lastThrowPlan=nil
+			return
+		end
+
+		local payloadDirection=unit(payload.Target-payload.SpawnPos,nil)
+		local planDirection=unit(plan.aimPoint-plan.origin,nil)
+		if payloadDirection:Dot(planDirection)<RELEASE_ORIGIN_CALIBRATION_MATCH_DOT then
+			return
+		end
+
+		local worldError=payload.SpawnPos-plan.origin
+		if worldError.Magnitude>RELEASE_ORIGIN_CALIBRATION_MAX_ERROR then
+			lastThrowPlan=nil
+			return
+		end
+
+		local cframe=plan.sourceReleaseOriginCFrame
+		local localError=cframe and cframe:VectorToObjectSpace(worldError) or worldError
+		local clampedError=Vector3.new(
+			clampCalibrationComponent(localError.X),
+			clampCalibrationComponent(localError.Y),
+			clampCalibrationComponent(localError.Z)
+		)
+
+		releaseOriginLocalCorrection=releaseOriginLocalCorrection:Lerp(clampedError,RELEASE_ORIGIN_CALIBRATION_ALPHA)
+		lastThrowPlan=nil
+	end
+
+	local function handleReleaseCalibrationEvent(...)
+		local args={...}
+		local topic=args[1]
+		local payload=nil
+
+		if topic=="UpdateFootball" then
+			payload=remotePayload(args,2)
+		elseif topic=="Mechanics" and (args[2]=="UpdateBall" or args[2]=="UpdateFootball") then
+			payload=remotePayload(args,3)
+		end
+
+		if payload then
+			applyReleaseOriginCalibration(payload)
+		end
+	end
+
+	local function addCalibrationEvent(event)
+		if event and event:IsA("RemoteEvent") and not calibrationEvents[event] then
+			calibrationEvents[event]=true
+			addConnection(event.OnClientEvent:Connect(handleReleaseCalibrationEvent))
+		end
+	end
+
+	local function connectReleaseCalibration()
+		addCalibrationEvent(ReplicatedStorage:FindFirstChild("ReEvent"))
+		addCalibrationEvent(getGameReEvent())
+		addCalibrationEvent(getSquadsReEvent())
 	end
 
 	local function fireGameplayThrow(plan)
@@ -2355,9 +2432,9 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		-- Build an initial plan for immediate feedback, then rebuild at the
-		-- animation release frame before sending the remote. This keeps moving-QB
-		-- throws from reusing a target solved from the keypress frame.
+		-- Lock one plan at keypress. Keep animation-to-fire timing at 0.2666s.
+		-- The release origin follows the game's root + aim-relative hand offset;
+		-- the WR prediction uses the full animation window.
 		local lockedQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		throwInProgress=true
@@ -2384,6 +2461,9 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
+		lastThrowPlan=plan
+		lastThrowSentAt=os.clock()
+
 		local ok,err
 		if modeKey=="mode1" then
 			ok,err=fireGameplayThrow(plan)
@@ -2397,6 +2477,7 @@ function QBAim.new(ctx,parent)
 			freezePreviewAtCurrentPlan(plan)
 			setStatus(currentModeText().." delayed future-release throw sent")
 		else
+			lastThrowPlan=nil
 			setStatus(err or "Throw failed")
 		end
 
@@ -2610,6 +2691,7 @@ function QBAim.new(ctx,parent)
 	updateQBDriftVisuals()
 	updateQBYDriftVisuals()
 	updateQBDriftVisuals()
+	connectReleaseCalibration()
 
 	addConnection(RunService.Heartbeat:Connect(function(dt)
 		if not(enabled and isAvailable()) then return end
