@@ -1342,13 +1342,6 @@ function destroyKnownGuiResidue()
 	local guiNames={"HitboxUI_DarkInfluenced_GUIOnly","1",SG_NAME or "HitboxUI"}
 	local parents={guiParent}
 
-	local okCore,coreGui=pcall(function()
-		return game:GetService("CoreGui")
-	end)
-	if okCore and coreGui then
-		table.insert(parents,coreGui)
-	end
-
 	for _,parent in ipairs(parents) do
 		if parent then
 			for _,name in ipairs(guiNames) do
