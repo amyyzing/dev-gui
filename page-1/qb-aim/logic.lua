@@ -148,23 +148,17 @@ local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
 local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
 local THROW_TARGET_FIRE_IMMEDIATELY=false
 local THROW_INPUT_COOLDOWN=0.85
--- Movement-correction model restored.
--- The final target is latched at keypress, but the predicted release origin is moved forward
--- by one unified X/Y/Z drift time. User testing showed 0.13 is closer for moving/jumping throws.
-local QB_RELEASE_ORIGIN_DRIFT_TIME=0.13
+-- Separate timing terms. Do not use the full animation delay to move C2/origin.
+-- The release-origin drift is unified across X/Y/Z: one time value moves the whole origin vector.
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0.04
 local QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME -- kept as alias for internal compatibility
 local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
--- XZ release offset model. Keep Y mostly as-is, but add aim-relative XZ spawn offsets.
--- Positive side is the QB's right side relative to the aimed route; positive forward is toward the target.
-local QB_RELEASE_XZ_SIDE_OFFSET=1.00
-local QB_RELEASE_XZ_FORWARD_OFFSET=0.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
---   1. Keypress computes one movement-corrected locked plan.
---   2. QB release origin uses one shared X/Y/Z drift value.
+--   1. Keypress computes one locked plan.
+--   2. C2/QB origin drifts by the same time on X, Y, and Z.
 --   3. WR is predicted through the full animation release window.
 --   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
---   5. The locked plan is intentionally preserved through the animation.
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local ESP_HIGHLIGHT_NAME="MyESPHighlight"
@@ -715,20 +709,12 @@ function QBAim.new(ctx,parent)
 	local qbYDriftFrame=nil
 	local qbYDriftBox=nil
 	local qbYDriftSliderControl=nil
-	local qbSideOffsetFrame=nil
-	local qbSideOffsetBox=nil
-	local qbSideOffsetSliderControl=nil
-	local qbForwardOffsetFrame=nil
-	local qbForwardOffsetBox=nil
-	local qbForwardOffsetSliderControl=nil
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
 	local PEAK_HEIGHT_MIN=8.00
 	local PEAK_HEIGHT_MAX=20.00
 	local QB_DRIFT_MIN=0.00
 	local QB_DRIFT_MAX=0.25
-	local QB_XZ_OFFSET_MIN=-4.00
-	local QB_XZ_OFFSET_MAX=4.00
 	local QB_Y_DRIFT_MIN=0.00
 	local QB_Y_DRIFT_MAX=0.35
 	local updateTargetHighlight=function() end
@@ -757,26 +743,14 @@ function QBAim.new(ctx,parent)
 		state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
 	end
 
-	if state.qbAimQBReleaseSideOffset==nil then
-		state.qbAimQBReleaseSideOffset=QB_RELEASE_XZ_SIDE_OFFSET
-	end
-
-	if state.qbAimQBReleaseForwardOffset==nil then
-		state.qbAimQBReleaseForwardOffset=QB_RELEASE_XZ_FORWARD_OFFSET
-	end
-
 
 	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
 	WR_MAX_Y=math.clamp(tonumber(state.qbAimPeakHeight) or WR_MAX_Y,PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX)
 	QB_RELEASE_ORIGIN_DRIFT_TIME=math.clamp(tonumber(state.qbAimQBDrift) or QB_RELEASE_ORIGIN_DRIFT_TIME,QB_DRIFT_MIN,QB_DRIFT_MAX)
 	QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME
-	QB_RELEASE_XZ_SIDE_OFFSET=math.clamp(tonumber(state.qbAimQBReleaseSideOffset) or QB_RELEASE_XZ_SIDE_OFFSET,QB_XZ_OFFSET_MIN,QB_XZ_OFFSET_MAX)
-	QB_RELEASE_XZ_FORWARD_OFFSET=math.clamp(tonumber(state.qbAimQBReleaseForwardOffset) or QB_RELEASE_XZ_FORWARD_OFFSET,QB_XZ_OFFSET_MIN,QB_XZ_OFFSET_MAX)
 	state.qbAimPeakHeight=WR_MAX_Y
 	state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
 	state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
-	state.qbAimQBReleaseSideOffset=QB_RELEASE_XZ_SIDE_OFFSET
-	state.qbAimQBReleaseForwardOffset=QB_RELEASE_XZ_FORWARD_OFFSET
 	C1_Y_MIN=WR_MAX_Y
 	C1_Y_MAX=WR_MAX_Y
 	C1_Y_FIXED=WR_MAX_Y
@@ -882,24 +856,6 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
-	local function updateQBReleaseOffsetVisuals()
-		if qbSideOffsetSliderControl then
-			qbSideOffsetSliderControl.set(QB_RELEASE_XZ_SIDE_OFFSET)
-		end
-
-		if qbSideOffsetBox then
-			qbSideOffsetBox.Text=string.format("%.2f",QB_RELEASE_XZ_SIDE_OFFSET)
-		end
-
-		if qbForwardOffsetSliderControl then
-			qbForwardOffsetSliderControl.set(QB_RELEASE_XZ_FORWARD_OFFSET)
-		end
-
-		if qbForwardOffsetBox then
-			qbForwardOffsetBox.Text=string.format("%.2f",QB_RELEASE_XZ_FORWARD_OFFSET)
-		end
-	end
-
 	local function setLeadDelay(value,showStatus)
 		local numberValue=tonumber(value)
 		if not numberValue then
@@ -939,38 +895,6 @@ function QBAim.new(ctx,parent)
 	local function setQBYDrift(value,showStatus)
 		-- Compatibility shim: X/Y/Z release-origin drift is one shared value.
 		return setQBDrift(value,showStatus)
-	end
-
-	local function setQBReleaseSideOffset(value,showStatus)
-		local numberValue=tonumber(value)
-		if not numberValue then
-			updateQBReleaseOffsetVisuals()
-			return false
-		end
-
-		QB_RELEASE_XZ_SIDE_OFFSET=math.clamp(numberValue,QB_XZ_OFFSET_MIN,QB_XZ_OFFSET_MAX)
-		state.qbAimQBReleaseSideOffset=QB_RELEASE_XZ_SIDE_OFFSET
-		updateQBReleaseOffsetVisuals()
-		if showStatus then
-			changed()
-		end
-		return true
-	end
-
-	local function setQBReleaseForwardOffset(value,showStatus)
-		local numberValue=tonumber(value)
-		if not numberValue then
-			updateQBReleaseOffsetVisuals()
-			return false
-		end
-
-		QB_RELEASE_XZ_FORWARD_OFFSET=math.clamp(numberValue,QB_XZ_OFFSET_MIN,QB_XZ_OFFSET_MAX)
-		state.qbAimQBReleaseForwardOffset=QB_RELEASE_XZ_FORWARD_OFFSET
-		updateQBReleaseOffsetVisuals()
-		if showStatus then
-			changed()
-		end
-		return true
 	end
 
 	local function setPeakHeight(value,showStatus)
@@ -1209,7 +1133,6 @@ function QBAim.new(ctx,parent)
 		updatePeakHeightVisuals()
 		updateQBDriftVisuals()
 		updateQBYDriftVisuals()
-		updateQBReleaseOffsetVisuals()
 		setTargetText()
 
 		if not isAvailable() then
@@ -1545,33 +1468,9 @@ function QBAim.new(ctx,parent)
 		return rootVelocity.Y,"root"
 	end
 
-	local function releaseXZBasis(qbRoot,basePosition,aimPosition)
-		local forward=aimPosition and flat(aimPosition-basePosition) or Vector3.zero
-		if forward.Magnitude<1e-6 and qbRoot then
-			forward=flat(qbRoot.CFrame.LookVector)
-		end
-
-		if forward.Magnitude<1e-6 then
-			forward=Vector3.new(0,0,-1)
-		else
-			forward=forward.Unit
-		end
-
-		local right=forward:Cross(Vector3.new(0,1,0))
-		if right.Magnitude<1e-6 then
-			right=Vector3.new(1,0,0)
-		else
-			right=right.Unit
-		end
-
-		return forward,right
-	end
-
-	local function origin(qbRoot,ball,xzReleaseOffset,yReleaseOffset,aimPosition)
+	local function origin(qbRoot,ball,xzReleaseOffset,yReleaseOffset)
 		xzReleaseOffset=xzReleaseOffset or 0
-		-- X/Y/Z still share the drift time, but XZ also gets an aim-relative
-		-- hand/spawn offset. Y is intentionally left on the older C2/vertical model
-		-- because testing showed Y was already close while XZ was the problem.
+		-- X/Y/Z share the same release-origin drift time unless explicitly overridden.
 		yReleaseOffset=yReleaseOffset
 		if yReleaseOffset==nil then
 			yReleaseOffset=xzReleaseOffset
@@ -1593,12 +1492,6 @@ function QBAim.new(ctx,parent)
 			dz=rootVelocity.Z*xzReleaseOffset
 		end
 
-		local aimOffset=Vector3.zero
-		if QB_RELEASE_XZ_SIDE_OFFSET~=0 or QB_RELEASE_XZ_FORWARD_OFFSET~=0 then
-			local forward,right=releaseXZBasis(qbRoot,basePosition,aimPosition)
-			aimOffset=right*QB_RELEASE_XZ_SIDE_OFFSET+forward*QB_RELEASE_XZ_FORWARD_OFFSET
-		end
-
 		if QB_RELEASE_EXTRAPOLATE_VERTICAL and yReleaseOffset>0 then
 			local verticalVelocity=releaseVerticalVelocity(qbRoot,ball)
 			local airborne=math.abs(verticalVelocity)>=QB_AIRBORNE_VY_EPSILON or qbRoot.Position.Y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON
@@ -1608,7 +1501,7 @@ function QBAim.new(ctx,parent)
 			end
 		end
 
-		return Vector3.new(basePosition.X+dx+aimOffset.X,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+dz+aimOffset.Z)
+		return Vector3.new(basePosition.X+dx,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+dz)
 	end
 
 	local function velocityNeeded(originPosition,targetPosition,time)
@@ -1891,8 +1784,8 @@ function QBAim.new(ctx,parent)
 		-- Predict the actual server SpawnPos/release origin forward by qbReleaseOffset,
 		-- predict the receiver by receiverReleaseOffset, and build the outgoing Target
 		-- ray from that future release point.
+		local originPosition=origin(qbRoot,ball,qbReleaseOffset,qbReleaseOffset)
 		local receiverReleasePosition=receiverRoot.Position+wrVel*receiverReleaseOffset
-		local originPosition=origin(qbRoot,ball,qbReleaseOffset,qbReleaseOffset,receiverReleasePosition)
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
 		local bestRoot=nil
 		local bestNear=nil
@@ -2244,7 +2137,7 @@ function QBAim.new(ctx,parent)
 
 		releaseOffset=releaseOffset or 0
 		receiverReleaseOffset=receiverReleaseOffset==nil and releaseOffset or receiverReleaseOffset
-		local originPosition=origin(qbRoot,ball,releaseOffset,releaseOffset,receiverRoot.Position)
+		local originPosition=origin(qbRoot,ball,releaseOffset)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
 		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,receiverReleaseOffset,predictorState),ball
 	end
@@ -2512,19 +2405,10 @@ function QBAim.new(ctx,parent)
 		setQBYDrift(value,fire~=false)
 	end
 
-	function api.SetQBReleaseSideOffset(value,fire)
-		setQBReleaseSideOffset(value,fire~=false)
-	end
-
-	function api.SetQBReleaseForwardOffset(value,fire)
-		setQBReleaseForwardOffset(value,fire~=false)
-	end
-
 	function api.Refresh()
 		syncControls()
 		updateQBDriftVisuals()
 		updateQBYDriftVisuals()
-		updateQBReleaseOffsetVisuals()
 	end
 
 	function api.Reset()
@@ -2588,12 +2472,6 @@ function QBAim.new(ctx,parent)
 		qbDriftSliderControl=buildSlider(sectionBody,"QB XYZ Drift",QB_DRIFT_MIN,QB_DRIFT_MAX,QB_RELEASE_ORIGIN_DRIFT_TIME,2,function(value)
 			api.SetQBDrift(value,true)
 		end)
-		qbSideOffsetSliderControl=buildSlider(sectionBody,"QB Side Offset",QB_XZ_OFFSET_MIN,QB_XZ_OFFSET_MAX,QB_RELEASE_XZ_SIDE_OFFSET,2,function(value)
-			api.SetQBReleaseSideOffset(value,true)
-		end)
-		qbForwardOffsetSliderControl=buildSlider(sectionBody,"QB Forward Offset",QB_XZ_OFFSET_MIN,QB_XZ_OFFSET_MAX,QB_RELEASE_XZ_FORWARD_OFFSET,2,function(value)
-			api.SetQBReleaseForwardOffset(value,true)
-		end)
 	else
 		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
 		leadDelayBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",WR_LEAD_DELAY),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},leadDelayFrame)
@@ -2613,27 +2491,12 @@ function QBAim.new(ctx,parent)
 		addConnection(qbDriftBox.FocusLost:Connect(function()
 			setQBDrift(qbDriftBox.Text,true)
 		end))
-
-		qbSideOffsetFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
-		qbSideOffsetBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",QB_RELEASE_XZ_SIDE_OFFSET),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},qbSideOffsetFrame)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="QB Side Offset",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbSideOffsetFrame)
-		addConnection(qbSideOffsetBox.FocusLost:Connect(function()
-			setQBReleaseSideOffset(qbSideOffsetBox.Text,true)
-		end))
-
-		qbForwardOffsetFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
-		qbForwardOffsetBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",QB_RELEASE_XZ_FORWARD_OFFSET),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},qbForwardOffsetFrame)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="QB Forward Offset",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbForwardOffsetFrame)
-		addConnection(qbForwardOffsetBox.FocusLost:Connect(function()
-			setQBReleaseForwardOffset(qbForwardOffsetBox.Text,true)
-		end))
 	end
 
 	updateLeadDelayVisuals()
 	updatePeakHeightVisuals()
 	updateQBDriftVisuals()
 	updateQBYDriftVisuals()
-	updateQBReleaseOffsetVisuals()
 	updateQBDriftVisuals()
 
 	addConnection(RunService.Heartbeat:Connect(function(dt)
