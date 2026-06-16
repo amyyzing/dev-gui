@@ -2144,11 +2144,206 @@ function QBAim.new(ctx,parent)
 		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,receiverReleaseOffset,predictorState),ball
 	end
 
+	local function releaseFrameOrigin(releaseBall,lockedPlan)
+		local character=LP.Character
+		local qbRoot=root(character)
+		if not qbRoot then return nil,nil,nil end
+
+		local ball=getHeldBall()
+		if not(ball and ball.Parent) then
+			ball=releaseBall and releaseBall.Parent and releaseBall or nil
+		end
+
+		local rawOrigin=origin(qbRoot,ball,0,QB_RELEASE_VERTICAL_DRIFT_TIME)
+		if lockedPlan and lockedPlan.origin then
+			return Vector3.new(rawOrigin.X,lockedPlan.origin.Y,rawOrigin.Z),rawOrigin,qbRoot
+		end
+
+		return rawOrigin,rawOrigin,qbRoot
+	end
+
+	local function staticReleaseValue(originPosition,targetPosition,ballSpeed,time)
+		local neededDisplacement=targetPosition-originPosition-0.5*G*time*time
+		return neededDisplacement:Dot(neededDisplacement)-ballSpeed*ballSpeed*time*time
+	end
+
+	local function refineStaticReleaseTime(originPosition,targetPosition,ballSpeed,lo,hi,loValue)
+		local low=lo
+		local high=hi
+		local lowValue=loValue or staticReleaseValue(originPosition,targetPosition,ballSpeed,low)
+
+		for _=1,INTERCEPT_BISECTION_STEPS do
+			local mid=(low+high)*0.5
+			local midValue=staticReleaseValue(originPosition,targetPosition,ballSpeed,mid)
+			if math.abs(midValue)<1e-5 then
+				return mid
+			end
+
+			if (lowValue<0 and midValue>0) or (lowValue>0 and midValue<0) then
+				high=mid
+			else
+				low=mid
+				lowValue=midValue
+			end
+		end
+
+		return(low+high)*0.5
+	end
+
+	local function staticReleaseCandidate(originPosition,targetPosition,ballSpeed,time,preferredTime)
+		if not(originPosition and targetPosition and time and time>0) then return nil end
+
+		local requiredVelocity=velocityNeeded(originPosition,targetPosition,time)
+		local requiredSpeed=requiredVelocity.Magnitude
+		if requiredSpeed<=1e-6 then return nil end
+
+		local direction=requiredVelocity.Unit
+		local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
+		if angle<GLOBAL_MIN_ANGLE or angle>GLOBAL_MAX_ANGLE then return nil end
+
+		local throwVelocity=direction*ballSpeed
+		local catchPosition=ballAt(originPosition,throwVelocity,time)
+		local targetMiss=(catchPosition-targetPosition).Magnitude
+		local speedError=math.abs(requiredSpeed-ballSpeed)
+		local missEstimate=speedError*time
+		local landingPosition,landingTime=landing(originPosition,throwVelocity)
+		local timeError=math.abs(time-(preferredTime or time))
+
+		return{
+			time=time,
+			timeError=timeError,
+			direction=direction,
+			requiredVelocity=requiredVelocity,
+			requiredSpeed=requiredSpeed,
+			throwVelocity=throwVelocity,
+			worldVelocity=throwVelocity,
+			velocity=throwVelocity,
+			aimPoint=originPosition+direction*AIM_SCALE,
+			angleDeg=angle,
+			speedError=speedError,
+			missEstimate=missEstimate,
+			targetMiss=targetMiss,
+			interceptResidual=math.abs(staticReleaseValue(originPosition,targetPosition,ballSpeed,time)),
+			verticalVelocityAtCatch=throwVelocity.Y+G.Y*time,
+			ballAtCatch=catchPosition,
+			landing=landingPosition,
+			landingTime=landingTime,
+			score=speedError*1000+targetMiss*100+timeError*4+time*0.05,
+		}
+	end
+
+	local function findReleaseRetarget(plan,releaseOrigin)
+		local target=plan and (plan.target or plan.c1Point)
+		local ballSpeed=plan and (plan.speed or MODEL_BALL_SPEED)
+		if not(target and releaseOrigin and ballSpeed) then return nil end
+
+		local preferredTime=plan.time or MIN_T
+		local bestRoot=nil
+		local bestNear=nil
+		local previousTime=MIN_T
+		local previousValue=staticReleaseValue(releaseOrigin,target,ballSpeed,previousTime)
+
+		local function consider(candidate,asRoot)
+			if not candidate then return end
+			local current=asRoot and bestRoot or bestNear
+			if not current or candidate.score<current.score then
+				if asRoot then
+					bestRoot=candidate
+				else
+					bestNear=candidate
+				end
+			end
+		end
+
+		local function considerNear(time)
+			local candidate=staticReleaseCandidate(releaseOrigin,target,ballSpeed,time,preferredTime)
+			if candidate and (candidate.speedError<=SPEED_TOLERANCE or candidate.missEstimate<=CATCH_TOLERANCE) then
+				consider(candidate,false)
+			end
+		end
+
+		local function considerRoot(time)
+			consider(staticReleaseCandidate(releaseOrigin,target,ballSpeed,time,preferredTime),true)
+		end
+
+		considerNear(previousTime)
+		for time=MIN_T+DT,MAX_T,DT do
+			local value=staticReleaseValue(releaseOrigin,target,ballSpeed,time)
+			considerNear(time)
+
+			if math.abs(value)<1e-8 then
+				considerRoot(time)
+			elseif math.abs(previousValue)<1e-8 then
+				considerRoot(previousTime)
+			elseif (previousValue<0 and value>0) or (previousValue>0 and value<0) then
+				considerRoot(refineStaticReleaseTime(releaseOrigin,target,ballSpeed,previousTime,time,previousValue))
+			end
+
+			previousTime=time
+			previousValue=value
+		end
+
+		return bestRoot or bestNear
+	end
+
+	local function retargetPlanAtRelease(plan,releaseOrigin,rawReleaseOrigin)
+		if not(plan and releaseOrigin) then return plan end
+
+		local target=plan.target or plan.c1Point
+		if not target then return plan end
+
+		local oldOrigin=plan.origin
+		local oldAimPoint=plan.aimPoint
+		local retarget=findReleaseRetarget(plan,releaseOrigin)
+		if not retarget then
+			retarget=staticReleaseCandidate(releaseOrigin,target,plan.speed or MODEL_BALL_SPEED,plan.time or MIN_T,plan.time)
+		end
+		if not retarget then return plan end
+
+		plan.lockedOrigin=oldOrigin
+		plan.releaseFrameOrigin=releaseOrigin
+		plan.releaseFrameRawOrigin=rawReleaseOrigin or releaseOrigin
+		plan.releaseOriginDelta=oldOrigin and releaseOrigin-oldOrigin or Vector3.zero
+		plan.releaseOriginDeltaXZ=oldOrigin and flat(releaseOrigin-oldOrigin).Magnitude or 0
+		plan.releaseFrameOldAimPoint=oldAimPoint
+		plan.releaseFrameOldDirection=plan.direction
+		plan.releaseFrameDirection=retarget.direction
+		plan.releaseFrameAimPoint=retarget.aimPoint
+		plan.releaseFrameRequiredSpeed=retarget.requiredSpeed
+		plan.releaseFrameSpeedError=retarget.speedError
+		plan.releaseFrameTargetMiss=retarget.targetMiss
+		plan.releaseFrameTimeError=retarget.timeError
+		plan.releaseFrameRetargeted=true
+
+		plan.origin=releaseOrigin
+		plan.time=retarget.time
+		plan.direction=retarget.direction
+		plan.requiredVelocity=retarget.requiredVelocity
+		plan.requiredSpeed=retarget.requiredSpeed
+		plan.throwVelocity=retarget.throwVelocity
+		plan.worldVelocity=retarget.worldVelocity
+		plan.velocity=retarget.velocity
+		plan.aimPoint=retarget.aimPoint
+		plan.angleDeg=retarget.angleDeg
+		plan.speedError=retarget.speedError
+		plan.totalErr=retarget.targetMiss
+		plan.targetMiss=retarget.targetMiss
+		plan.missEstimate=retarget.missEstimate
+		plan.interceptResidual=retarget.interceptResidual
+		plan.verticalVelocityAtCatch=retarget.verticalVelocityAtCatch
+		plan.ballAtCatch=retarget.ballAtCatch
+		plan.landing=retarget.landing
+		plan.landingTime=retarget.landingTime
+
+		return plan
+	end
+
 	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
 		-- Target-latch / delayed-remote solver.
-		-- The preview arc locks at keypress, but the remote appears shortly before release.
-		-- Keep the keypress plan frozen during animation, then send that same world Target.
-		-- Do not recompute from the future QB point and do not fire immediately.
+		-- The preview arc locks at keypress, but the remote fires near release.
+		-- Keep the keypress C1 frozen during animation, then retarget the outgoing
+		-- ray from the actual release-frame XZ origin so movement does not drag
+		-- the fired ball away from the previewed catch point.
 		if THROW_TARGET_FIRE_IMMEDIATELY then
 			if lockedPlan then
 				previewPlan(lockedPlan)
@@ -2175,6 +2370,11 @@ function QBAim.new(ctx,parent)
 			end
 
 			RunService.Heartbeat:Wait()
+		end
+
+		if lockedPlan then
+			local fireOrigin,rawFireOrigin=releaseFrameOrigin(releaseBall,lockedPlan)
+			retargetPlanAtRelease(lockedPlan,fireOrigin,rawFireOrigin)
 		end
 
 		return lockedPlan,releaseBall
