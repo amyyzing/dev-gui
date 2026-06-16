@@ -135,6 +135,8 @@ local CIRCLE_TANGENT_CLOSING_SCALE_MIN=0.42
 local CIRCLE_RADIAL_BASE_LEAD_TIME=0.20
 local DIAG_STREAK_SIDE_RATIO_MIN=0.30
 local DIAG_STREAK_SIDE_SPEED_MIN=4
+local RECEIVER_CATCH_ANCHOR_MAX_OFFSET=10
+local RECEIVER_CATCH_ANCHOR_BLEND=1.00
 local PLAY_THROW_ANIMATION=true
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
@@ -218,7 +220,14 @@ local function safeVectorLerp(a,b,alpha)
 end
 
 local function root(character)
-	return character and (character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso"))
+	if not character then return nil end
+
+	local primary=character.PrimaryPart
+	if primary and primary:IsA("BasePart") then
+		return primary
+	end
+
+	return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
 end
 
 local function routeSpeed(speed)
@@ -346,6 +355,22 @@ local function getPlayerTeamID(player)
 
 	if ok then
 		return tostring(value)
+	end
+
+	return nil
+end
+
+local function getPlayerTackleBox(player)
+	local replicated=player and player:FindFirstChild("Replicated")
+	local tackleBoxValue=replicated and replicated:FindFirstChild("TackleBox")
+	if not tackleBoxValue then return nil end
+
+	local ok,value=pcall(function()
+		return tackleBoxValue.Value
+	end)
+
+	if ok and typeof(value)=="Instance" and value:IsA("BasePart") and value.Parent then
+		return value
 	end
 
 	return nil
@@ -1438,6 +1463,25 @@ function QBAim.new(ctx,parent)
 		return velocity,movementShape(originPosition,receiverRoot.Position,velocity),state
 	end
 
+	local function receiverCatchAnchor(receiver,receiverRoot)
+		if not receiverRoot then
+			return nil,"none"
+		end
+
+		local rootPosition=receiverRoot.Position
+		local tackleBox=getPlayerTackleBox(receiver)
+		if tackleBox then
+			local boxPosition=tackleBox.Position
+			local offset=boxPosition-rootPosition
+			if flat(offset).Magnitude<=RECEIVER_CATCH_ANCHOR_MAX_OFFSET and math.abs(offset.Y)<=RECEIVER_CATCH_ANCHOR_MAX_OFFSET then
+				local blended=rootPosition:Lerp(boxPosition,RECEIVER_CATCH_ANCHOR_BLEND)
+				return Vector3.new(blended.X,rootPosition.Y,blended.Z),"tackle_box"
+			end
+		end
+
+		return rootPosition,"root"
+	end
+
 	local function receiverMaxAt(position)
 		return Vector3.new(position.X,WR_MAX_Y,position.Z)
 	end
@@ -1773,7 +1817,7 @@ function QBAim.new(ctx,parent)
 		return(low+high)*0.5
 	end
 
-	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower,qbReleaseOffset,receiverReleaseOffset,predictorState)
+	local function solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower,qbReleaseOffset,receiverReleaseOffset,predictorState,receiverAnchorPosition,receiverAnchorSource)
 		local ballSpeed=ballPower or GAMEPLAY_BALL_POWER
 		qbReleaseOffset=qbReleaseOffset or 0
 		receiverReleaseOffset=receiverReleaseOffset==nil and qbReleaseOffset or receiverReleaseOffset
@@ -1785,7 +1829,8 @@ function QBAim.new(ctx,parent)
 		-- predict the receiver by receiverReleaseOffset, and build the outgoing Target
 		-- ray from that future release point.
 		local originPosition=origin(qbRoot,ball,qbReleaseOffset,qbReleaseOffset)
-		local receiverReleasePosition=receiverRoot.Position+wrVel*receiverReleaseOffset
+		local receiverBasePosition=receiverAnchorPosition or receiverRoot.Position
+		local receiverReleasePosition=receiverBasePosition+wrVel*receiverReleaseOffset
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
 		local bestRoot=nil
 		local bestNear=nil
@@ -1832,6 +1877,8 @@ function QBAim.new(ctx,parent)
 			best.qbReleaseOffset=qbReleaseOffset
 			best.qbSharedReleaseOffset=qbReleaseOffset
 			best.receiverReleaseOffset=receiverReleaseOffset
+			best.receiverAnchorSource=receiverAnchorSource or "root"
+			best.receiverAnchorPosition=receiverBasePosition
 			best.futureReleaseOriginLatch=(qbReleaseOffset or 0)>0
 			best.remoteFireDelayed=not THROW_TARGET_FIRE_IMMEDIATELY
 		end
@@ -2138,8 +2185,9 @@ function QBAim.new(ctx,parent)
 		releaseOffset=releaseOffset or 0
 		receiverReleaseOffset=receiverReleaseOffset==nil and releaseOffset or receiverReleaseOffset
 		local originPosition=origin(qbRoot,ball,releaseOffset)
+		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
-		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,receiverReleaseOffset,predictorState),ball
+		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,receiverReleaseOffset,predictorState,receiverAnchorPosition,receiverAnchorSource),ball
 	end
 
 	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
