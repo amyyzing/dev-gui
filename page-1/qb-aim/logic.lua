@@ -1572,6 +1572,37 @@ function QBAim.new(ctx,parent)
 		return originPosition+velocity*time+0.5*G*time*time
 	end
 
+	local function beamDirection(velocity,originPosition,time)
+		local endPosition=ballAt(originPosition,velocity,time)
+		local control1=endPosition-(G*time*time+velocity*time)/3
+		local control0=(0.125*G*time*time+0.5*velocity*time+originPosition-0.125*(originPosition+endPosition))/0.375-control1
+		local curve0=(control0-originPosition).Magnitude
+		local curve1=-(control1-endPosition).Magnitude
+		local chord=unit(originPosition-endPosition,Vector3.new(0,0,-1))
+		local velocityDirection=unit(velocity,Vector3.new(1,0,0))
+		local endVelocityDirection=unit(velocity+G*time,velocityDirection)
+		local tangent0=unit(control0-originPosition,velocityDirection)
+		local binormal0=unit(tangent0:Cross(chord),Vector3.new(0,1,0))
+		local tangent1=unit(control1-endPosition,endVelocityDirection)
+		local binormal1=unit(tangent1:Cross(chord),binormal0)
+		local normal0=unit(binormal0:Cross(tangent0),Vector3.new(0,1,0))
+		local normal1=unit(binormal1:Cross(tangent1),normal0)
+		local startCFrame=CFrame.new(
+			originPosition.X,originPosition.Y,originPosition.Z,
+			tangent0.X,binormal0.X,normal0.X,
+			tangent0.Y,binormal0.Y,normal0.Y,
+			tangent0.Z,binormal0.Z,normal0.Z
+		)
+		local endCFrame=CFrame.new(
+			endPosition.X,endPosition.Y,endPosition.Z,
+			tangent1.X,binormal1.X,normal1.X,
+			tangent1.Y,binormal1.Y,normal1.Y,
+			tangent1.Z,binormal1.Z,normal1.Z
+		)
+
+		return curve0,curve1,startCFrame,endCFrame,endPosition
+	end
+
 	local function landing(originPosition,velocity)
 		local discriminant=velocity.Y*velocity.Y+2*BALL_G*originPosition.Y
 		if discriminant<0 then return nil,nil end
@@ -2128,10 +2159,8 @@ function QBAim.new(ctx,parent)
 		local previewTime=plan.time
 		if not(startPoint and endPoint and previewTime) then return end
 
-		local endVelocity=plan.velocity+G*previewTime
 		local p2=startPoint
 		local p1=endPoint
-		local p3=endPoint
 
 		if preview.p2 then
 			p2=preview.p2:Lerp(p2,PREVIEW_SMOOTH)
@@ -2141,19 +2170,18 @@ function QBAim.new(ctx,parent)
 			p1=preview.p1:Lerp(p1,PREVIEW_SMOOTH)
 		end
 
-		if preview.p3 and (p3-preview.p3).Magnitude<=45 then
-			p3=preview.p3:Lerp(p3,PREVIEW_SMOOTH)
-		end
+		local previewVelocity=velocityNeeded(p2,p1,previewTime)
+		local curve0,curve1,startCFrame,endCFrame,p3=beamDirection(previewVelocity,p2,previewTime)
 
 		preview.p1,preview.p2,preview.p3=p1,p2,p3
-		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity))
-		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*plan.time))
-		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity))
+		setAttachmentCFrame(c2,startCFrame)
+		setAttachmentCFrame(c1,endCFrame)
+		setAttachmentCFrame(c3,endCFrame)
 		updateC1AndC3Info(plan,p1,p3)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
-		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
-		beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
+		beam.CurveSize0=math.clamp(curve0,-ARC_MAX_CURVE,ARC_MAX_CURVE)
+		beam.CurveSize1=math.clamp(curve1,-ARC_MAX_CURVE,ARC_MAX_CURVE)
 		setPreviewCenterVisible(true)
 		beam.Enabled=true
 	end
