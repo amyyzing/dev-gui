@@ -159,14 +159,14 @@ local THROW_TARGET_FIRE_IMMEDIATELY=false
 local THROW_INPUT_COOLDOWN=0.85
 -- Separate timing terms. Do not use the full animation delay to move C2/origin.
 -- The release-origin drift is unified across X/Y/Z: one time value moves the whole origin vector.
-local QB_RELEASE_ORIGIN_DRIFT_TIME=0.04
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0.00
 local QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME -- kept as alias for internal compatibility
 local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
---   1. Keypress computes one locked plan.
---   2. C2/QB origin drifts by the same time on X, Y, and Z.
---   3. WR is predicted through the full animation release window.
+--   1. Keypress locks receiver identity and draws preview.
+--   2. Final throw plan is recomputed after THROW_ANIMATION_RELEASE_WAIT.
+--   3. QB XYZ Drift is only a small SpawnPos calibration, not the animation delay.
 --   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
@@ -895,7 +895,7 @@ function QBAim.new(ctx,parent)
 		state.qbAimLeadDelay=WR_LEAD_DELAY
 		updateLeadDelayVisuals()
 		if showStatus then
-			setStatus(string.format("LD set to %.2fs",WR_LEAD_DELAY))
+			setStatus(string.format("Lead bias set to %.2f",WR_LEAD_DELAY))
 			changed()
 		end
 		return true
@@ -1630,31 +1630,40 @@ function QBAim.new(ctx,parent)
 		}
 	end
 
-	local function interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
+	local function interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,aheadStuds)
 		local inheritedVelocity=flat(qbVel or Vector3.zero)*QB_INHERITANCE
-		local receiverLeadDelay=leadDelayForFlightTime(time)
-		local target=targetAtTime(receiverStart,wrVel,time,receiverLeadDelay)
+		local wrSpeed=flat(wrVel or Vector3.zero).Magnitude
+		if aheadStuds==nil then
+			aheadStuds=catchAheadStudsFromLead(wrSpeed)
+		end
+
+		local target=targetAtTime(receiverStart,wrVel,time,aheadStuds)
 		local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
 		return neededDisplacement:Dot(neededDisplacement)-ballSpeed*ballSpeed*time*time
 	end
 
-	local function interceptLeadInfo(originPosition,target,wrVel,time,predictorState)
-		local speed=math.max(flat(wrVel).Magnitude,1e-6)
+	local function interceptLeadInfo(originPosition,target,wrVel,time,predictorState,aheadStuds)
+		local wrFlat=flat(wrVel or Vector3.zero)
+		local speed=math.max(wrFlat.Magnitude,1e-6)
 		local losVector=flat(target-originPosition)
-		local losDir=unit(losVector,flat(wrVel).Magnitude>0 and flat(wrVel).Unit or Vector3.new(1,0,0))
-		local away=flat(wrVel):Dot(losDir)
+		local losDir=unit(losVector,wrFlat.Magnitude>0 and wrFlat.Unit or Vector3.new(1,0,0))
+		local away=wrFlat:Dot(losDir)
 		local awayShare=math.clamp(away/speed,-1,1)
-		local lateralSpeed=(flat(wrVel)-losDir*away).Magnitude
+		local lateralSpeed=(wrFlat-losDir*away).Magnitude
 		local lateralShare=math.clamp(lateralSpeed/speed,0,1)
-		local receiverPredictionDelay=leadDelayForFlightTime(time)
+		if aheadStuds==nil then
+			aheadStuds=catchAheadStudsFromLead(wrFlat.Magnitude)
+		end
+		local aheadVector=wrFlat.Magnitude>1e-6 and wrFlat.Unit*aheadStuds or Vector3.zero
+		local receiverPredictionDelay=wrFlat.Magnitude>1e-6 and aheadStuds/wrFlat.Magnitude or 0
 		local predictorConfidence=math.clamp(predictorState and predictorState.confidence or 1,PREDICTOR_CONFIDENCE_MIN,PREDICTOR_CONFIDENCE_MAX)
 
 		return{
-			flightLeadXZ=flat(wrVel)*time,
+			flightLeadXZ=wrFlat*time,
 			accelerationLeadXZ=Vector3.zero,
-			extraLeadXZ=flat(wrVel)*receiverPredictionDelay,
+			extraLeadXZ=aheadVector,
 			radialExtraLeadXZ=Vector3.zero,
-			tangentExtraLeadXZ=flat(wrVel)*receiverPredictionDelay,
+			tangentExtraLeadXZ=aheadVector,
 			extraLeadTime=receiverPredictionDelay,
 			radialExtraTime=0,
 			tangentExtraTime=receiverPredictionDelay,
@@ -1699,20 +1708,26 @@ function QBAim.new(ctx,parent)
 			routeAway=away,
 			routeSide=lateralSpeed,
 			routeElevation=0,
-			routeSpeed=flat(wrVel).Magnitude,
+			routeSpeed=wrFlat.Magnitude,
 			fixedIntercept=true,
+			catchWindowLead=true,
 			cleanMath=true,
 			receiverPredictionDelay=receiverPredictionDelay,
 			receiverPredictionDelayScale=WR_LEAD_DELAY>0 and receiverPredictionDelay/WR_LEAD_DELAY or 0,
+			receiverLeadDistance=aheadStuds,
 		}
 	end
 
-	local function interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,includeLeadInfo)
+	local function interceptCandidate(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,includeLeadInfo,aheadStuds)
 		if time<=0 then return nil end
 
 		local inheritedVelocity=flat(qbVel or Vector3.zero)*QB_INHERITANCE
-		local receiverLeadDelay=leadDelayForFlightTime(time)
-		local target=targetAtTime(receiverStart,wrVel,time,receiverLeadDelay)
+		local wrSpeed=flat(wrVel or Vector3.zero).Magnitude
+		if aheadStuds==nil then
+			aheadStuds=catchAheadStudsFromLead(wrSpeed)
+		end
+
+		local target=targetAtTime(receiverStart,wrVel,time,aheadStuds)
 		local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
 		local requiredVelocity=neededDisplacement/time
 		local requiredSpeed=requiredVelocity.Magnitude
@@ -1728,18 +1743,19 @@ function QBAim.new(ctx,parent)
 		local targetMiss=(catchPosition-target).Magnitude
 		local yError=math.abs(catchPosition.Y-(WR_MAX_Y+C1_SOLVE_Y_BIAS))
 		local speedError=math.abs(requiredSpeed-ballSpeed)
-		local residual=math.abs(interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time))
+		local residual=math.abs(interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,aheadStuds))
 		local verticalVelocityAtCatch=worldVelocity.Y+G.Y*time
 		local landingPosition,landingTime=landing(originPosition,worldVelocity)
-		local leadDistance=flat(wrVel).Magnitude*receiverLeadDelay
+		local leadTime=wrSpeed>1e-6 and aheadStuds/wrSpeed or 0
 
 		return{
 			score=targetMiss*1000+speedError*100+time*0.5+math.max(verticalVelocityAtCatch-10,0)*0.25,
 			time=time,
-			totalLeadTime=time+receiverLeadDelay,
-			receiverPredictionDelay=receiverLeadDelay,
-			receiverPredictionDelayScale=WR_LEAD_DELAY>0 and receiverLeadDelay/WR_LEAD_DELAY or 0,
-			receiverLeadDistance=leadDistance,
+			totalLeadTime=time+leadTime,
+			receiverPredictionDelay=leadTime,
+			receiverPredictionDelayScale=WR_LEAD_DELAY>0 and leadTime/WR_LEAD_DELAY or 0,
+			receiverLeadDistance=aheadStuds,
+			catchAheadStuds=aheadStuds,
 			origin=originPosition,
 			target=target,
 			c1Point=target,
@@ -1768,8 +1784,9 @@ function QBAim.new(ctx,parent)
 			flatDistNow=distXZ(originPosition,receiverStart),
 			movementShape=shape,
 			predictorState=predictorState,
-			leadInfo=includeLeadInfo and interceptLeadInfo(originPosition,target,wrVel,time,predictorState) or nil,
+			leadInfo=includeLeadInfo and interceptLeadInfo(originPosition,target,wrVel,time,predictorState,aheadStuds) or nil,
 			cleanMath=true,
+			catchWindowLead=true,
 		}
 	end
 
@@ -1920,7 +1937,7 @@ function QBAim.new(ctx,parent)
 			}
 
 			candidate.score=candidateScore(candidate)
-			candidate.leadInfo=interceptLeadInfo(originPosition,target,wrVel,time,predictorState)
+			candidate.leadInfo=interceptLeadInfo(originPosition,target,wrVel,time,predictorState,aheadStuds)
 			local aheadVector=(wrSpeed>1e-6 and routeDir*aheadStuds) or Vector3.zero
 			candidate.leadInfo.extraLeadXZ=aheadVector
 			candidate.leadInfo.tangentExtraLeadXZ=aheadVector
