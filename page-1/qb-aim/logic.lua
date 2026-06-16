@@ -161,6 +161,7 @@ local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 --   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
+local ESP_HIGHLIGHT_NAME="MyESPHighlight"
 local VALID_TEAM_IDS={
 	HomeTeam=true,
 	AwayTeam=true,
@@ -1004,6 +1005,13 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
+	local function destroyESPHighlight(character)
+		local highlight=character and character:FindFirstChild(ESP_HIGHLIGHT_NAME)
+		if highlight and highlight:IsA("Highlight") then
+			highlight:Destroy()
+		end
+	end
+
 	local function clearTargetHighlights()
 		for _,player in ipairs(Players:GetPlayers()) do
 			local character=player.Character
@@ -1030,6 +1038,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		highlightedCharacter=character
+		destroyESPHighlight(character)
 		local highlight=ensureQBAimHighlight(character)
 		local style=qbHighlightStyle()
 		highlight.Adornee=character

@@ -11,6 +11,7 @@ local VALID_TEAM_IDS={
 }
 
 local ESP_HIGHLIGHT_NAME="MyESPHighlight"
+local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local MODEL_BALL_SPEED=95
@@ -365,6 +366,11 @@ local function getOurHighlight(character)
 	return nil
 end
 
+local function hasActiveQBAimHighlight(character)
+	local highlight=character and character:FindFirstChild(QB_AIM_HIGHLIGHT_NAME)
+	return highlight and highlight:IsA("Highlight") and highlight.Enabled==true
+end
+
 local function ensureOwnedHighlight(character)
 	local highlight=getOurHighlight(character)
 	if highlight then return highlight end
@@ -437,7 +443,9 @@ function ESPOffense.new(ctx)
 				local character=getLiveCharacter(player)
 				if character then
 					if shouldHighlightReceiver(player) then
-						if isReceiverClosed(player,origin,defenderRoots,catchY) then
+						if hasActiveQBAimHighlight(character) then
+							destroyOwnedHighlight(character)
+						elseif isReceiverClosed(player,origin,defenderRoots,catchY) then
 							forceHighlight(ctx,character,"closed",red)
 						else
 							forceHighlight(ctx,character,"open",green)
