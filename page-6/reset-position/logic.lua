@@ -63,8 +63,18 @@ function ResetPosition.new(ctx,page)
 	end
 
 	local section=makeSection(page,2,"GUI Position","Move the panel back to the default spot")
-	local normalBg=THEME.BUTTON or THEME.BG
-	local hoverBg=THEME.CARD or normalBg
+	local function buttonBaseColor()
+		return THEME.BUTTON or THEME.BG
+	end
+
+	local function buttonHoverColor()
+		local base=buttonBaseColor()
+		local lum=(base.R*0.2126)+(base.G*0.7152)+(base.B*0.0722)
+		local toward=lum<0.55 and Color3.new(1,1,1) or Color3.new(0,0,0)
+		return base:Lerp(toward,0.08)
+	end
+
+	local normalBg=buttonBaseColor()
 
 	button=New("TextButton",{
 		BackgroundColor3=normalBg,
@@ -88,11 +98,11 @@ function ResetPosition.new(ctx,page)
 	button.Position=UDim2.fromOffset(0,0)
 
 	connect(button.MouseEnter,function()
-		buttonWrap.BackgroundColor3=hoverBg
+		buttonWrap.BackgroundColor3=buttonHoverColor()
 	end)
 
 	connect(button.MouseLeave,function()
-		buttonWrap.BackgroundColor3=normalBg
+		buttonWrap.BackgroundColor3=buttonBaseColor()
 	end)
 
 	connect(button.Activated,resetPosition)

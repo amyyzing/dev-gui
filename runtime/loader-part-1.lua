@@ -82,6 +82,10 @@ THEMED_STROKES=setmetatable({}, {__mode="k"})
 THEMED_CORNERS=setmetatable({}, {__mode="k"})
 LIQUID_STROKE_GRADIENTS=setmetatable({}, {__mode="k"})
 RUNTIME_CONNECTIONS={}
+RUNTIME_JOBS={}
+RUNTIME_JOB_ORDER={}
+RUNTIME_JOB_CONNECTIONS={}
+RUNTIME_BUILD_ERRORS={}
 
 function trackRuntimeConnection(conn)
 	if conn then
@@ -112,6 +116,9 @@ function disconnectRuntimeConnections()
 	end
 
 	table.clear(RUNTIME_CONNECTIONS)
+	table.clear(RUNTIME_JOBS)
+	table.clear(RUNTIME_JOB_ORDER)
+	table.clear(RUNTIME_JOB_CONNECTIONS)
 end
 
 function registerThemeObject(obj)
@@ -287,6 +294,161 @@ function safeDisconnect(conn)
 		end)
 	end
 end
+
+RuntimeJanitor={}
+RuntimeJanitor.__index=RuntimeJanitor
+
+function RuntimeJanitor.new()
+	return setmetatable({items={}},RuntimeJanitor)
+end
+
+function RuntimeJanitor:Add(item)
+	if item then
+		table.insert(self.items,item)
+	end
+	return item
+end
+
+function RuntimeJanitor:Cleanup()
+	for index=#self.items,1,-1 do
+		local item=self.items[index]
+		self.items[index]=nil
+		if typeof(item)=="RBXScriptConnection" then
+			safeDisconnect(item)
+		elseif typeof(item)=="Instance" then
+			pcall(function()
+				item:Destroy()
+			end)
+		elseif type(item)=="function" then
+			pcall(item)
+		elseif type(item)=="table" and type(item.Destroy)=="function" then
+			pcall(function()
+				item:Destroy()
+			end)
+		end
+	end
+end
+
+RuntimeScheduler={}
+
+local function schedulerStep(kind,dt)
+	local jobs=RUNTIME_JOBS[kind]
+	if not jobs then return end
+
+	for _,id in ipairs(RUNTIME_JOB_ORDER[kind] or {}) do
+		local job=jobs[id]
+		if job and job.enabled~=false then
+			job.elapsed=(job.elapsed or 0)+(dt or 0)
+			if job.elapsed>=job.interval then
+				local elapsed=job.elapsed
+				job.elapsed=0
+				local ok,err=pcall(job.fn,elapsed,dt)
+				if not ok then
+					warn("Runtime scheduler job failed:",id,err)
+				end
+			end
+		end
+	end
+end
+
+function RuntimeScheduler.Register(kind,id,interval,fn)
+	kind=tostring(kind or "Heartbeat")
+	id=tostring(id or "")
+	if id=="" or type(fn)~="function" then
+		return false
+	end
+
+	RUNTIME_JOBS[kind]=RUNTIME_JOBS[kind] or {}
+	RUNTIME_JOB_ORDER[kind]=RUNTIME_JOB_ORDER[kind] or {}
+
+	if not RUNTIME_JOBS[kind][id] then
+		table.insert(RUNTIME_JOB_ORDER[kind],id)
+	end
+
+	RUNTIME_JOBS[kind][id]={
+		id=id,
+		interval=math.max(tonumber(interval) or 0,0),
+		elapsed=0,
+		fn=fn,
+		enabled=true
+	}
+
+	if not RUNTIME_JOB_CONNECTIONS[kind] then
+		local signal=kind=="RenderStepped" and RunService.RenderStepped or RunService.Heartbeat
+		RUNTIME_JOB_CONNECTIONS[kind]=trackRuntimeConnection(signal:Connect(function(dt)
+			schedulerStep(kind,dt)
+		end))
+	end
+
+	return true
+end
+
+function RuntimeScheduler.SetEnabled(kind,id,enabled)
+	local job=RUNTIME_JOBS[tostring(kind or "Heartbeat")] and RUNTIME_JOBS[tostring(kind or "Heartbeat")][tostring(id or "")]
+	if job then
+		job.enabled=enabled and true or false
+	end
+end
+
+function RuntimeScheduler.Unregister(kind,id)
+	kind=tostring(kind or "Heartbeat")
+	id=tostring(id or "")
+	if RUNTIME_JOBS[kind] then
+		RUNTIME_JOBS[kind][id]=nil
+	end
+end
+
+function RuntimeScheduler.Count()
+	local count=0
+	for _,jobs in pairs(RUNTIME_JOBS) do
+		for _ in pairs(jobs) do
+			count=count+1
+		end
+	end
+	return count
+end
+
+RuntimeStateStore={dirty=false}
+
+function RuntimeStateStore.Get(bucket,key,default)
+	local root=getfenv()[bucket]
+	if type(root)=="table" and root[key]~=nil then
+		return root[key]
+	end
+	return default
+end
+
+function RuntimeStateStore.Set(bucket,key,value)
+	local env=getfenv()
+	env[bucket]=type(env[bucket])=="table" and env[bucket] or {}
+	env[bucket][key]=value
+	RuntimeStateStore.dirty=true
+	if requestPlayerAutosave then
+		requestPlayerAutosave()
+	end
+	return value
+end
+
+RuntimeThemeStore={}
+
+function RuntimeThemeStore.Apply()
+	if applyUIStrokeTheme then
+		pcall(applyUIStrokeTheme)
+	end
+end
+
+function RuntimeThemeStore.RefreshObject(obj)
+	if obj and registerThemeObject then
+		registerThemeObject(obj)
+	end
+end
+
+RuntimeServices={
+	Janitor=RuntimeJanitor,
+	Scheduler=RuntimeScheduler,
+	StateStore=RuntimeStateStore,
+	ThemeStore=RuntimeThemeStore
+}
 
 function fmtNumber(n, decimals)
 	decimals=decimals or 2
@@ -576,7 +738,7 @@ for _,path in ipairs(modulePathsFromNames(OPTIONAL_MODULE_NAMES)) do
 	OPTIONAL_MODULE_PATH_SET[path]=true
 end
 MAX_REMOTE_MODULE_BYTES=300000
-REMOTE_MODULE_MARKERS={[MANUAL_REFRESH_RELOAD_PATH]="HB_LOADER_V2"}
+REMOTE_MODULE_MARKERS={[MANUAL_REFRESH_RELOAD_PATH]="HB_LOADER_V3"}
 
 REMOTE_MODULE_CACHE={}
 REMOTE_MODULE_SOURCES={}
@@ -714,7 +876,7 @@ function loadRemoteModuleBatch(paths)
 		end
 	end
 
-	return loaded>0,nil
+	return failed==0,nil
 end
 
 SG_NAME="HitboxUI"
@@ -759,9 +921,11 @@ function playLoaderKeyframes(sequence,asynchronous)
 	end
 end
 
-LOADER_TOTAL=#STARTUP_MODULE_PATHS
+LOADER_PAGE_BUILD_NAMES={"maps","customize","page2","settings","server"}
+LOADER_TOTAL=#STARTUP_MODULE_PATHS+#LOADER_PAGE_BUILD_NAMES+4
 
 loaderCurrent=0
+loaderPhaseCurrent=#STARTUP_MODULE_PATHS
 loaderOverlay=New("Frame",{
 	Name="Loader",
 	BackgroundColor3=Color3.fromRGB(16,16,16),
@@ -1073,13 +1237,15 @@ function runLoaderCheck()
 		table.sort(missing)
 		warn("Loader check found missing modules:",table.concat(missing,", "))
 		setLoaderProgress("Missing modules: "..table.concat(missing,", "),LOADER_TOTAL,LOADER_TOTAL,true)
+		return false
 	else
-		warn("Loader check complete: startup modules loaded. Deferred tabs load on demand.")
-		setLoaderProgress("Verified startup modules.",LOADER_TOTAL,LOADER_TOTAL,false)
+		warn("Loader check complete: all startup modules loaded.")
+		setLoaderProgress("Verified startup modules.",#STARTUP_MODULE_PATHS,LOADER_TOTAL,false)
+		return true
 	end
 end
 
-runLoaderCheck()
+LOADER_MODULES_READY=runLoaderCheck()
 
 local function styleByte(name,fallback)
 	return math.clamp(math.floor((tonumber(UI_STYLE[name]) or fallback)+0.5),0,255)

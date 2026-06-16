@@ -2500,6 +2500,7 @@ function QBAim.new(ctx,parent)
 	updateQBDriftVisuals()
 
 	addConnection(RunService.Heartbeat:Connect(function(dt)
+		if not(enabled and isAvailable()) then return end
 		if not isAlive() then return end
 
 		receiverTrackElapsed=receiverTrackElapsed+(dt or 0)

@@ -57,9 +57,18 @@ function PlayerData.new(ctx,page,deps)
 	end
 
 	local function modalButton(parent,text,x,danger,bucket)
-		local normalBg=danger and THEME.RED or THEME.BG
-		local hoverBg=danger and Color3.fromRGB(255,124,118) or THEME.CARD
-		local leaveBg=danger and THEME.RED or THEME.PANEL
+		local function baseColor()
+			return danger and THEME.RED or (THEME.BUTTON or THEME.BG)
+		end
+
+		local function hoverColor()
+			local base=baseColor()
+			local lum=(base.R*0.2126)+(base.G*0.7152)+(base.B*0.0722)
+			local toward=lum<0.55 and Color3.new(1,1,1) or Color3.new(0,0,0)
+			return base:Lerp(toward,0.08)
+		end
+
+		local normalBg=baseColor()
 		local textColor=danger and Color3.fromRGB(0,0,0) or THEME.TEXT
 		local btn=New("TextButton",{
 			Position=UDim2.fromOffset(x,120),
@@ -82,11 +91,11 @@ function PlayerData.new(ctx,page,deps)
 		end
 
 		trackConnection(btn.MouseEnter:Connect(function()
-			wrap.BackgroundColor3=hoverBg
+			wrap.BackgroundColor3=hoverColor()
 		end),bucket)
 
 		trackConnection(btn.MouseLeave:Connect(function()
-			wrap.BackgroundColor3=leaveBg
+			wrap.BackgroundColor3=baseColor()
 		end),bucket)
 
 		return btn

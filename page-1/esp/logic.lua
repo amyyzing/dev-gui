@@ -157,6 +157,7 @@ function ESP.new(ctx,parent)
 	local state=ctx.State
 	local THEME=ctx.THEME
 	local UI_STYLE=ctx.UI_STYLE
+	local scheduler=ctx.Scheduler
 	local api={}
 	local sectionBody=nil
 	local sectionFrame=nil
@@ -174,7 +175,7 @@ function ESP.new(ctx,parent)
 
 	if DefenseModule and DefenseModule.new then
 		local ok,result=pcall(function()
-			return DefenseModule.new({THEME=THEME,UI_STYLE=UI_STYLE,State=state,safeDisconnect=safeDisconnect})
+			return DefenseModule.new({THEME=THEME,UI_STYLE=UI_STYLE,State=state,safeDisconnect=safeDisconnect,Scheduler=scheduler})
 		end)
 		defenseApi=ok and result or makeNoop()
 	else
@@ -183,7 +184,7 @@ function ESP.new(ctx,parent)
 
 	if OffenseModule and OffenseModule.new then
 		local ok,result=pcall(function()
-			return OffenseModule.new({THEME=THEME,UI_STYLE=UI_STYLE,State=state,safeDisconnect=safeDisconnect})
+			return OffenseModule.new({THEME=THEME,UI_STYLE=UI_STYLE,State=state,safeDisconnect=safeDisconnect,Scheduler=scheduler})
 		end)
 		offenseApi=ok and result or makeNoop()
 	else
@@ -314,6 +315,9 @@ function ESP.new(ctx,parent)
 
 	function api.Destroy()
 		safeDisconnect(keybindConn)
+		if scheduler and scheduler.Unregister then
+			scheduler.Unregister("Heartbeat","ESPControls")
+		end
 		safeDisconnect(heartbeatConn)
 		keybindConn=nil
 		heartbeatConn=nil
@@ -375,12 +379,18 @@ function ESP.new(ctx,parent)
 		handleESPInput(input)
 	end)
 
-	heartbeatConn=RunService.Heartbeat:Connect(function(dt)
-		poll=poll+dt
-		if poll<0.25 then return end
-		poll=0
-		syncControls()
-	end)
+	if scheduler and scheduler.Register then
+		scheduler.Register("Heartbeat","ESPControls",0.25,function()
+			syncControls()
+		end)
+	else
+		heartbeatConn=RunService.Heartbeat:Connect(function(dt)
+			poll=poll+dt
+			if poll<0.25 then return end
+			poll=0
+			syncControls()
+		end)
+	end
 
 	syncControls()
 	return api

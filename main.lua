@@ -1,1 +1,110 @@
-local _0=string.char;local _1=game:GetService("HttpService");local _2=_0(104,116,116,112,115,58,47,47,108,105,110,116,45,98,111,116,45,112,114,111,100,117,99,116,105,111,110,46,117,112,46,114,97,105,108,119,97,121,46,97,112,112);local _3=_0(47,109,111,100,117,108,101,47,103,101,116);local _4=_0(108,111,97,100,101,114,46,108,117,97);local _5=_0(72,66,95,76,79,65,68,69,82,95,86,50);local _6=120000;local _7={Url=_2,Key=_0(116,104,101,107,101,121,116,111,104,101,97,118,101,110)};local function _8()if typeof(syn)=="table"and type(syn.request)=="function"then return syn.request end;if type(request)=="function"then return request end;if type(http_request)=="function"then return http_request end;if typeof(http)=="table"and type(http.request)=="function"then return http.request end;if typeof(fluxus)=="table"and type(fluxus.request)=="function"then return fluxus.request end end;local function _9(_a,_b)if _a~=_3 then return nil,"API path blocked: "..tostring(_a)end;if _7.Url~=_2 then return nil,"API URL verification failed."end;if not _b or _b.path~=_4 then return nil,"Loader path blocked: "..tostring(_b and _b.path)end;local _c=_8();if not _c then return nil,"No client HTTP request function found."end;_b.apiKey=_7.Key;local _d,_e=pcall(function()return _c({Url=_7.Url.._a,Method=_0(80,79,83,84),Headers={[_0(67,111,110,116,101,110,116,45,84,121,112,101)]=_0(97,112,112,108,105,99,97,116,105,111,110,47,106,115,111,110)},Body=_1:JSONEncode(_b)})end);if not _d then return nil,tostring(_e)end;local _f=_e and(_e.Body or _e.body);if not _f then return nil,"Empty response from API."end;local _g,_h=pcall(function()return _1:JSONDecode(_f)end);if not _g then return nil,"Could not decode API response: "..tostring(_f)end;if not _h or not _h.ok or type(_h.source)~="string"then return nil,_h and _h.error or"Loader source missing."end;return _h.source end;local _i,_j=_9(_3,{path=_4});if not _i then error(_0(76,111,97,100,101,114,32,102,101,116,99,104,32,102,97,105,108,101,100,58,32)..tostring(_j))end;if #_i>_6 then error(_0(76,111,97,100,101,114,32,118,101,114,105,102,105,99,97,116,105,111,110,32,102,97,105,108,101,100,58,32,115,111,117,114,99,101,32,116,111,111,32,108,97,114,103,101,46))end;if not _i:find(_5,1,true)then error(_0(76,111,97,100,101,114,32,118,101,114,105,102,105,99,97,116,105,111,110,32,102,97,105,108,101,100,58,32,109,97,114,107,101,114,32,109,105,115,115,105,110,103,46))end;local _k,_l=loadstring(_i);if not _k then error(_0(76,111,97,100,101,114,32,99,111,109,112,105,108,101,32,102,97,105,108,101,100,58,32)..tostring(_l))end;local _m,_n=pcall(_k);if not _m then error(_0(76,111,97,100,101,114,32,114,117,110,32,102,97,105,108,101,100,58,32)..tostring(_n))end
+-- HB_MAIN_V3
+local HttpService=game:GetService("HttpService")
+
+local BOT_URL="https://lint-bot-production.up.railway.app"
+local MODULE_GET="/module/get"
+local LOADER_PATH="loader.lua"
+local LOADER_MARKER="HB_LOADER_V3"
+local API_KEY="thekeytoheaven"
+local MAX_LOADER_SIZE=160000
+
+local function typeOf(value)
+	if typeof then
+		return typeof(value)
+	end
+
+	return type(value)
+end
+
+local function clientRequest()
+	if typeOf(syn)=="table" and type(syn.request)=="function" then
+		return syn.request
+	end
+
+	if type(request)=="function" then
+		return request
+	end
+
+	if type(http_request)=="function" then
+		return http_request
+	end
+
+	if typeOf(http)=="table" and type(http.request)=="function" then
+		return http.request
+	end
+
+	if typeOf(fluxus)=="table" and type(fluxus.request)=="function" then
+		return fluxus.request
+	end
+
+	return nil
+end
+
+local function fetchLoader()
+	local requestFn=clientRequest()
+	if not requestFn then
+		return nil,"No client HTTP request function found."
+	end
+
+	local body=HttpService:JSONEncode({
+		path=LOADER_PATH,
+		apiKey=API_KEY
+	})
+
+	local ok,response=pcall(function()
+		return requestFn({
+			Url=BOT_URL..MODULE_GET,
+			Method="POST",
+			Headers={
+				["Content-Type"]="application/json"
+			},
+			Body=body
+		})
+	end)
+
+	if not ok then
+		return nil,tostring(response)
+	end
+
+	local raw=response and (response.Body or response.body)
+	if not raw then
+		return nil,"Empty response from API."
+	end
+
+	local decodeOk,payload=pcall(function()
+		return HttpService:JSONDecode(raw)
+	end)
+
+	if not decodeOk then
+		return nil,"Could not decode API response: "..tostring(raw)
+	end
+
+	if not payload or payload.ok~=true or type(payload.source)~="string" then
+		return nil,(payload and payload.error) or "Loader source missing."
+	end
+
+	return payload.source,nil
+end
+
+local source,fetchError=fetchLoader()
+if not source then
+	error("Loader fetch failed: "..tostring(fetchError))
+end
+
+if #source>MAX_LOADER_SIZE then
+	error("Loader verification failed: source too large.")
+end
+
+if not source:find(LOADER_MARKER,1,true) then
+	error("Loader verification failed: marker missing.")
+end
+
+local chunk,compileError=loadstring(source)
+if not chunk then
+	error("Loader compile failed: "..tostring(compileError))
+end
+
+local ok,runError=pcall(chunk)
+if not ok then
+	error("Loader run failed: "..tostring(runError))
+end

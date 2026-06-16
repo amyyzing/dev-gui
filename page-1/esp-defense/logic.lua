@@ -437,10 +437,12 @@ end
 function ESPDefense.new(ctx)
 	local THEME=ctx.THEME
 	local safeDisconnect=ctx.safeDisconnect
+	local scheduler=ctx.Scheduler
 	local api={}
 	local heartbeatConn=nil
 	local heartbeatElapsed=0
 	local running=false
+	local schedulerJobId="ESPDefense"
 
 	local function rebuild()
 		if not running then
@@ -483,18 +485,30 @@ function ESPDefense.new(ctx)
 		if running then return end
 		running=true
 		safeDisconnect(heartbeatConn)
+		heartbeatConn=nil
 		heartbeatElapsed=0
-		heartbeatConn=RunService.Heartbeat:Connect(function(dt)
-			heartbeatElapsed=heartbeatElapsed+(dt or 0)
-			if heartbeatElapsed<ESP_REFRESH_INTERVAL then return end
-			heartbeatElapsed=0
-			rebuild()
-		end)
+		if scheduler and scheduler.Register then
+			scheduler.Register("Heartbeat",schedulerJobId,ESP_REFRESH_INTERVAL,function()
+				if running then
+					rebuild()
+				end
+			end)
+		else
+			heartbeatConn=RunService.Heartbeat:Connect(function(dt)
+				heartbeatElapsed=heartbeatElapsed+(dt or 0)
+				if heartbeatElapsed<ESP_REFRESH_INTERVAL then return end
+				heartbeatElapsed=0
+				rebuild()
+			end)
+		end
 		rebuild()
 	end
 
 	function api.Stop()
 		running=false
+		if scheduler and scheduler.Unregister then
+			scheduler.Unregister("Heartbeat",schedulerJobId)
+		end
 		safeDisconnect(heartbeatConn)
 		heartbeatConn=nil
 		clearOwnedHighlights()

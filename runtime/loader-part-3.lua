@@ -47,6 +47,7 @@ function loadDeferredModuleNames(names)
 end
 
 function addRuntimeModuleError(parent,order,title,text)
+	table.insert(RUNTIME_BUILD_ERRORS,tostring(title)..": "..tostring(text))
 	local section=makeSection(parent,order,title,"Remote module failed to load.")
 	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 end
@@ -96,6 +97,11 @@ function makeCustomizeCtx()
 	return{
 		New=New,
 		Fusion=FusionModule,
+		Services=RuntimeServices,
+		Scheduler=RuntimeScheduler,
+		StateStore=RuntimeStateStore,
+		ThemeStore=RuntimeThemeStore,
+		Janitor=RuntimeJanitor,
 		THEME=THEME,
 		UI_STYLE=UI_STYLE,
 		UIS=UIS,
@@ -217,6 +223,11 @@ function makeMapCtx(name)
 	local ctx={
 		New=New,
 		Fusion=FusionModule,
+		Services=RuntimeServices,
+		Scheduler=RuntimeScheduler,
+		StateStore=RuntimeStateStore,
+		ThemeStore=RuntimeThemeStore,
+		Janitor=RuntimeJanitor,
 		THEME=THEME,
 		makeSection=makeSection,
 		buildSlider=buildSlider,
@@ -276,11 +287,38 @@ end
 
 LAZY_PAGE_BUILDERS.maps=buildMapPage
 
-PRELOAD_RUNTIME_PAGE_NAMES={"maps","customize","page2","settings"}
+PRELOAD_RUNTIME_PAGE_NAMES=LOADER_PAGE_BUILD_NAMES or {"maps","customize","page2","settings","server"}
 function buildAllRuntimePages()
+	local okAll=true
+	local pageCount=#PRELOAD_RUNTIME_PAGE_NAMES
+	loaderPhaseCurrent=#STARTUP_MODULE_PATHS
+
 	for _,pageName in ipairs(PRELOAD_RUNTIME_PAGE_NAMES) do
 		if ensureRuntimePageBuilt then
-			pcall(ensureRuntimePageBuilt,pageName)
+			loaderPhaseCurrent=(loaderPhaseCurrent or #STARTUP_MODULE_PATHS)+1
+			if setLoaderProgress then
+				setLoaderProgress("Building page: "..tostring(pageName),loaderPhaseCurrent,LOADER_TOTAL,false)
+			end
+
+			local ok,result=pcall(ensureRuntimePageBuilt,pageName)
+			if not ok or result==false then
+				okAll=false
+				if setLoaderProgress then
+					setLoaderProgress("Failed to build page: "..tostring(pageName),loaderPhaseCurrent,LOADER_TOTAL,true)
+				end
+				warn("Page build failed:",pageName,ok and result or result)
+			end
 		end
 	end
+
+	if #RUNTIME_BUILD_ERRORS>0 then
+		okAll=false
+		if setLoaderProgress then
+			setLoaderProgress("Build errors: "..table.concat(RUNTIME_BUILD_ERRORS,"; "),LOADER_TOTAL,LOADER_TOTAL,true)
+		end
+	elseif okAll and setLoaderProgress then
+		setLoaderProgress("Built all GUI pages.",#STARTUP_MODULE_PATHS+pageCount,LOADER_TOTAL,false)
+	end
+
+	return okAll
 end

@@ -310,6 +310,7 @@ function StrokeColour.new(ctx,page)
 	local THEME=ctx.THEME
 	local UI_STYLE=ctx.UI_STYLE
 	local UIS=ctx.UIS or game:GetService("UserInputService")
+	local GuiService=game:GetService("GuiService")
 	local buildSlider=ctx.buildSlider
 
 	applyDefaultOverrides(ctx.DEFAULT_UI_STYLE)
@@ -334,6 +335,13 @@ function StrokeColour.new(ctx,page)
 	local sharedSliderControls={}
 
 	local function pointerPosition(input)
+		local inputType=typeof(input)
+		if inputType=="Vector2" then
+			return input
+		elseif inputType=="Vector3" then
+			return Vector2.new(input.X,input.Y)
+		end
+
 		local position=input and input.Position
 
 		if typeof(position)=="Vector3" then
@@ -343,6 +351,60 @@ function StrokeColour.new(ctx,page)
 		end
 
 		return UIS:GetMouseLocation()
+	end
+
+	local function guiInset()
+		local ok,inset=pcall(function()
+			return GuiService:GetGuiInset()
+		end)
+
+		if ok and typeof(inset)=="Vector2" then
+			return inset
+		end
+
+		return Vector2.new(0,0)
+	end
+
+	local function distanceToRect(point,pos,size)
+		local dx=0
+		local dy=0
+
+		if point.X<pos.X then
+			dx=pos.X-point.X
+		elseif point.X>pos.X+size.X then
+			dx=point.X-(pos.X+size.X)
+		end
+
+		if point.Y<pos.Y then
+			dy=pos.Y-point.Y
+		elseif point.Y>pos.Y+size.Y then
+			dy=point.Y-(pos.Y+size.Y)
+		end
+
+		return dx*dx+dy*dy
+	end
+
+	local function objectLocalPointer(object,input)
+		local point=pointerPosition(input)
+		local inset=guiInset()
+		local pos=object.AbsolutePosition
+		local size=object.AbsoluteSize
+		local best=point
+		local bestDistance=distanceToRect(point,pos,size)
+		local candidates={
+			point-inset,
+			point+inset,
+		}
+
+		for _,candidate in ipairs(candidates) do
+			local candidateDistance=distanceToRect(candidate,pos,size)
+			if candidateDistance<bestDistance then
+				best=candidate
+				bestDistance=candidateDistance
+			end
+		end
+
+		return best.X-pos.X,best.Y-pos.Y,math.max(size.X,1),math.max(size.Y,1)
 	end
 
 	local function trackConnection(conn)
@@ -993,8 +1055,8 @@ function StrokeColour.new(ctx,page)
 		end
 
 		local function valueFromMouse(input)
-			local mouse=pointerPosition(input)
-			local pct=math.clamp((mouse.X-track.AbsolutePosition.X)/math.max(track.AbsoluteSize.X,1),0,1)
+			local x,_,w=objectLocalPointer(track,input)
+			local pct=math.clamp(x/w,0,1)
 			return roundTo(minVal+(maxVal-minVal)*pct,decimals)
 		end
 
@@ -1552,14 +1614,14 @@ function StrokeColour.new(ctx,page)
 	},squareBody)
 
 	local function updateColorDrag(input)
-		local mouse=pointerPosition(input)
-
 		if colorDrag=="SV" and svSquare.AbsoluteSize.X>0 then
-			pickerSat=math.clamp((mouse.X-svSquare.AbsolutePosition.X)/svSquare.AbsoluteSize.X,0,1)
-			pickerVal=1-math.clamp((mouse.Y-svSquare.AbsolutePosition.Y)/svSquare.AbsoluteSize.Y,0,1)
+			local x,y,w,h=objectLocalPointer(svSquare,input)
+			pickerSat=math.clamp(x/w,0,1)
+			pickerVal=1-math.clamp(y/h,0,1)
 			applyActiveColor(Color3.fromHSV(pickerHue,pickerSat,pickerVal),true)
 		elseif colorDrag=="Hue" and hueStrip.AbsoluteSize.Y>0 then
-			pickerHue=math.clamp((mouse.Y-hueStrip.AbsolutePosition.Y)/hueStrip.AbsoluteSize.Y,0,1)
+			local _,y,_,h=objectLocalPointer(hueStrip,input)
+			pickerHue=math.clamp(y/h,0,1)
 			applyActiveColor(Color3.fromHSV(pickerHue,pickerSat,pickerVal),true)
 		end
 	end
@@ -1713,15 +1775,15 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function updateHighlightColorDrag(input)
-		local mouse=pointerPosition(input)
-
 		if highlightColorDrag=="SV" and highlightSvBase and highlightSvBase.AbsoluteSize.X>0 then
-			highlightPickerSat=math.clamp((mouse.X-highlightSvBase.AbsolutePosition.X)/highlightSvBase.AbsoluteSize.X,0,1)
-			highlightPickerVal=1-math.clamp((mouse.Y-highlightSvBase.AbsolutePosition.Y)/highlightSvBase.AbsoluteSize.Y,0,1)
+			local x,y,w,h=objectLocalPointer(highlightSvBase,input)
+			highlightPickerSat=math.clamp(x/w,0,1)
+			highlightPickerVal=1-math.clamp(y/h,0,1)
 			applyHighlightPickerColor(Color3.fromHSV(highlightPickerHue,highlightPickerSat,highlightPickerVal))
 		elseif highlightColorDrag=="Hue" and highlightHueCursor and highlightHueCursor.Parent and highlightHueCursor.Parent.AbsoluteSize.Y>0 then
 			local hueStrip=highlightHueCursor.Parent
-			highlightPickerHue=math.clamp((mouse.Y-hueStrip.AbsolutePosition.Y)/hueStrip.AbsoluteSize.Y,0,1)
+			local _,y,_,h=objectLocalPointer(hueStrip,input)
+			highlightPickerHue=math.clamp(y/h,0,1)
 			applyHighlightPickerColor(Color3.fromHSV(highlightPickerHue,highlightPickerSat,highlightPickerVal))
 		end
 	end
@@ -1921,10 +1983,8 @@ function StrokeColour.new(ctx,page)
 			return nil
 		end
 
-		local absolutePosition=highlightDialCanvas.AbsolutePosition
 		local absoluteSize=highlightDialCanvas.AbsoluteSize
-		local x=(position.X or 0)-absolutePosition.X
-		local y=(position.Y or 0)-absolutePosition.Y
+		local x,y=objectLocalPointer(highlightDialCanvas,position)
 		local size=math.min(absoluteSize.X,absoluteSize.Y)
 
 		if size<=0 then

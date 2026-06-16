@@ -313,6 +313,11 @@ function buildDataSaveContext()
 		me=me,
 		playerId=tostring(me.UserId),
 		toolAlive=toolAlive,
+		Services=RuntimeServices,
+		Scheduler=RuntimeScheduler,
+		StateStore=RuntimeStateStore,
+		ThemeStore=RuntimeThemeStore,
+		Janitor=RuntimeJanitor,
 
 		State=PAGE1_STATE,
 		Get=getPersistentValue,
@@ -375,15 +380,34 @@ function rebuildDataSaveFromModule(loadRemoteData)
 end
 
 rebuildDataSaveFromModule(true)
+loaderPhaseCurrent=(loaderPhaseCurrent or #STARTUP_MODULE_PATHS)+1
+if setLoaderProgress then
+	setLoaderProgress("Restored saved state.",loaderPhaseCurrent,LOADER_TOTAL,false)
+end
+
+local pagesReady=true
 if buildAllRuntimePages then
-	pcall(buildAllRuntimePages)
+	local ok,result=pcall(buildAllRuntimePages)
+	pagesReady=ok and result~=false
+	if not pagesReady then
+		warn("Complete GUI page build failed:",ok and result or result)
+	end
 end
 
 if AnnouncementModule and AnnouncementModule.new then
+	if setLoaderProgress then
+		setLoaderProgress("Binding announcements.",LOADER_TOTAL-2,LOADER_TOTAL,false)
+	end
+
 	local ok,result=pcall(function()
 		return AnnouncementModule.new({
 			New=New,
 			Fusion=FusionModule,
+			Services=RuntimeServices,
+			Scheduler=RuntimeScheduler,
+			StateStore=RuntimeStateStore,
+			ThemeStore=RuntimeThemeStore,
+			Janitor=RuntimeJanitor,
 			THEME=THEME,
 			SG=SG,
 			BOT_API=BOT_API,
@@ -464,6 +488,9 @@ function sendPlayerLog()
 end
 
 setActivePage("main")
+if setLoaderProgress then
+	setLoaderProgress("Applying theme and refresh state.",LOADER_TOTAL-1,LOADER_TOTAL,false)
+end
 applyUIStrokeTheme()
 refreshAllUI()
 refreshActionStatus()
@@ -474,4 +501,11 @@ elseif modeSubtitle then
 end
 sendPlayerLog()
 initManualRefresh()
-finishLoader()
+if LOADER_MODULES_READY==false then
+	setLoaderProgress("Required modules failed to load. Run /update, then re-execute.",LOADER_TOTAL,LOADER_TOTAL,true)
+elseif pagesReady==false or #RUNTIME_BUILD_ERRORS>0 then
+	setLoaderProgress("GUI build failed: "..table.concat(RUNTIME_BUILD_ERRORS,"; "),LOADER_TOTAL,LOADER_TOTAL,true)
+else
+	setLoaderProgress("Runtime ready. Scheduler jobs: "..tostring(RuntimeScheduler.Count()),LOADER_TOTAL,LOADER_TOTAL,false)
+	finishLoader()
+end

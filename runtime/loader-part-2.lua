@@ -52,7 +52,7 @@ function ensureRuntimePageBuilt(name)
 		if refreshRuntimePageControls then
 			pcall(refreshRuntimePageControls,name,false)
 		end
-		return
+		return true
 	end
 
 	LAZY_PAGE_BUILT[name]=true
@@ -68,6 +68,8 @@ function ensureRuntimePageBuilt(name)
 	if refreshRuntimePageControls then
 		pcall(refreshRuntimePageControls,name,built)
 	end
+
+	return ok and built
 end
 
 MainFrame=MainFrameModule.new({
@@ -383,6 +385,11 @@ function makePage1Ctx()
 	return{
 		New=New,
 		Fusion=FusionModule,
+		Services=RuntimeServices,
+		Scheduler=RuntimeScheduler,
+		StateStore=RuntimeStateStore,
+		ThemeStore=RuntimeThemeStore,
+		Janitor=RuntimeJanitor,
 		THEME=THEME,
 		UI_STYLE=UI_STYLE,
 		State=PAGE1_STATE,
@@ -446,6 +453,7 @@ function makePage1Ctx()
 end
 
 function addPage1Error(parent,order,title,path)
+	table.insert(RUNTIME_BUILD_ERRORS,"Main/"..tostring(title)..": "..tostring(path))
 	local section=makeSection(parent,order,title,"module failed to load")
 	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),Text=path.." could not be loaded.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 end

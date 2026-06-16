@@ -36,6 +36,10 @@ function settingsHoverColor(base)
 	return base:Lerp(toward,0.08)
 end
 
+function settingsButtonBaseColor(danger)
+	return danger and THEME.RED or (THEME.BUTTON or THEME.BG)
+end
+
 function destroyPage2APIs()
 	for key,api in pairs(PAGE2_APIS) do
 		if api and api.Destroy then
@@ -92,9 +96,7 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	New("TextLabel", {BackgroundTransparency=1, Position=UDim2.fromOffset(16, 48), Size=UDim2.new(1, -32, 0, 54), Text=bodyText, Font=Enum.Font.Gotham, TextSize=12, TextWrapped=true, TextColor3=THEME.MUTED, TextXAlignment=Enum.TextXAlignment.Left, TextYAlignment=Enum.TextYAlignment.Top, ZIndex=102}, box)
 
 	local function modalButton(text, x, danger)
-		local normalBg=danger and THEME.RED or (THEME.BUTTON or THEME.BG)
-		local hoverBg=settingsHoverColor(normalBg)
-		local leaveBg=danger and THEME.RED or (THEME.BUTTON or THEME.BG)
+		local normalBg=settingsButtonBaseColor(danger)
 		local textColor=danger and Color3.fromRGB(0,0,0) or THEME.TEXT
 		local b=New("TextButton", {Position=UDim2.fromOffset(x, 120), Size=UDim2.fromOffset(104, 30), BackgroundColor3=normalBg, BorderSizePixel=0, Text=text, Font=Enum.Font.Gotham, TextSize=12, TextColor3=textColor, AutoButtonColor=false, Selectable=true, ZIndex=102}, box)
 
@@ -108,11 +110,11 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 		wrap:SetAttribute("CornerRole","Control")
 
 		connectModal(b.MouseEnter,function()
-			wrap.BackgroundColor3=hoverBg
+			wrap.BackgroundColor3=settingsHoverColor(settingsButtonBaseColor(danger))
 		end)
 
 		connectModal(b.MouseLeave,function()
-			wrap.BackgroundColor3=leaveBg
+			wrap.BackgroundColor3=settingsButtonBaseColor(danger)
 		end)
 
 		return b
@@ -149,8 +151,7 @@ end
 
 function buildUpdateSection()
 	local section=makeSection(actualSettingsPage,1,"Update","Reload latest GUI build")
-	local normalBg=THEME.BUTTON or THEME.BG
-	local hoverBg=settingsHoverColor(normalBg)
+	local normalBg=settingsButtonBaseColor(false)
 	local button=New("TextButton",{
 		BackgroundColor3=normalBg,
 		BorderSizePixel=0,
@@ -174,11 +175,11 @@ function buildUpdateSection()
 	button.Position=UDim2.fromOffset(0,0)
 
 	trackSettingsConnection(button.MouseEnter:Connect(function()
-		wrap.BackgroundColor3=hoverBg
+		wrap.BackgroundColor3=settingsHoverColor(settingsButtonBaseColor(false))
 	end))
 
 	trackSettingsConnection(button.MouseLeave:Connect(function()
-		wrap.BackgroundColor3=normalBg
+		wrap.BackgroundColor3=settingsButtonBaseColor(false)
 	end))
 
 	local busy=false
@@ -217,6 +218,11 @@ function makePlayerDataCtx()
 	return{
 		New=New,
 		Fusion=FusionModule,
+		Services=RuntimeServices,
+		Scheduler=RuntimeScheduler,
+		StateStore=RuntimeStateStore,
+		ThemeStore=RuntimeThemeStore,
+		Janitor=RuntimeJanitor,
 		THEME=THEME,
 		SG=SG,
 		BOT_API=BOT_API,
@@ -249,6 +255,11 @@ function makeDiscordCtx()
 	return{
 		New=New,
 		Fusion=FusionModule,
+		Services=RuntimeServices,
+		Scheduler=RuntimeScheduler,
+		StateStore=RuntimeStateStore,
+		ThemeStore=RuntimeThemeStore,
+		Janitor=RuntimeJanitor,
 		THEME=THEME,
 		BOT_API=BOT_API,
 		DiscordLogicModule=DiscordLogicModule,
@@ -261,6 +272,11 @@ function makeResetPositionCtx()
 	return{
 		New=New,
 		Fusion=FusionModule,
+		Services=RuntimeServices,
+		Scheduler=RuntimeScheduler,
+		StateStore=RuntimeStateStore,
+		ThemeStore=RuntimeThemeStore,
+		Janitor=RuntimeJanitor,
 		THEME=THEME,
 		MainFrame=MainFrame,
 		root=root,
@@ -309,6 +325,7 @@ end
 activeCapture=nil
 
 function addPage2Error(parent,text)
+	table.insert(RUNTIME_BUILD_ERRORS,"Keybinds: "..tostring(text))
 	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},parent)
 end
 
@@ -360,6 +377,11 @@ function makePage2Ctx()
 	return{
 		New=New,
 		Fusion=FusionModule,
+		Services=RuntimeServices,
+		Scheduler=RuntimeScheduler,
+		StateStore=RuntimeStateStore,
+		ThemeStore=RuntimeThemeStore,
+		Janitor=RuntimeJanitor,
 		THEME=THEME,
 		SG=SG,
 		PRESETS=PRESETS,
