@@ -2,13 +2,14 @@
 -- Execute this by itself, run a few throw tests, then press RightShift+J or run:
 -- getgenv().ThrowEventLogger.Copy()
 
-local VERSION="throw-event-logger-v1"
+local VERSION="throw-event-logger-v2"
 local MAX_EVENTS=900
 local MAX_ARG_DEPTH=5
 local MAX_TABLE_ITEMS=55
 local MAX_FOOTBALLS=18
 local MAX_PLAYERS=28
 local THROW_SNAPSHOT_DELAYS={0,0.03,0.08,0.16,0.32,0.65}
+local ENABLE_OUTGOING_HOOK_BY_DEFAULT=false
 
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
@@ -23,6 +24,7 @@ local connections={}
 local connectedRemotes={}
 local startedClock=os.clock()
 local stopped=false
+local outgoingHookAttempted=false
 
 local function round(value)
 	if type(value)~="number" then return value end
@@ -396,7 +398,7 @@ local function connectRemote(remote)
 	addConnection(remote.OnClientEvent:Connect(function(...)
 		local args={...}
 		if argsLookThrow(args) or remote.Name=="ReEvent" then
-			pushEvent("remote_in",{remote=pathOf(remote),args=sanitize(args)},true)
+			pushEvent("remote_in",{remote=pathOf(remote),args=sanitize(args)},false)
 			scheduleThrowSnapshots("remote_in")
 		end
 	end))
@@ -421,18 +423,25 @@ local function watchContainer(container)
 		if descendant:IsA("RemoteEvent") and (descendant.Name=="ReEvent" or descendant.Name=="RemoteEvent") then
 			connectRemote(descendant)
 		elseif looksLikeFootball(descendant) then
-			pushEvent("football_added",{football=partState(descendant)},true)
+			pushEvent("football_added",{football=partState(descendant)},false)
+			scheduleThrowSnapshots("football_added")
 		end
 	end))
 end
 
 local function hookOutgoingFireServer()
+	if outgoingHookAttempted then
+		pushEvent("outgoing_hook_skipped",{reason="already attempted"})
+		return false
+	end
+	outgoingHookAttempted=true
+
 	local hookMetamethod=rawget(getfenv and getfenv() or _G,"hookmetamethod") or rawget(getgenv and getgenv() or _G,"hookmetamethod")
 	local getNamecallMethod=rawget(getfenv and getfenv() or _G,"getnamecallmethod") or rawget(getgenv and getgenv() or _G,"getnamecallmethod")
 	local newCClosure=rawget(getfenv and getfenv() or _G,"newcclosure") or rawget(getgenv and getgenv() or _G,"newcclosure")
 	if type(hookMetamethod)~="function" or type(getNamecallMethod)~="function" then
 		pushEvent("outgoing_hook_unavailable",{reason="hookmetamethod/getnamecallmethod missing"})
-		return
+		return false
 	end
 
 	local oldNamecall=nil
@@ -440,7 +449,7 @@ local function hookOutgoingFireServer()
 		local method=getNamecallMethod()
 		local args={...}
 		if method=="FireServer" and typeof(self)=="Instance" and self:IsA("RemoteEvent") and argsLookThrow(args) then
-			pushEvent("remote_out",{remote=pathOf(self),args=sanitize(args)},true)
+			pushEvent("remote_out",{remote=pathOf(self),args=sanitize(args)},false)
 			scheduleThrowSnapshots("remote_out")
 		end
 		return oldNamecall(self,...)
@@ -450,6 +459,7 @@ local function hookOutgoingFireServer()
 		oldNamecall=hookMetamethod(game,"__namecall",type(newCClosure)=="function" and newCClosure(callback) or callback)
 	end)
 	pushEvent(ok and "outgoing_hook_enabled" or "outgoing_hook_failed",{error=err and tostring(err) or nil})
+	return ok
 end
 
 local function connectAnimationsForPlayer(player)
@@ -547,6 +557,7 @@ local api={
 	Snapshot=function(label)
 		pushEvent("manual_snapshot",{label=label or "manual"},true)
 	end,
+	EnableOutgoingHook=hookOutgoingFireServer,
 	Events=function()
 		return events
 	end,
@@ -574,7 +585,7 @@ addConnection(UserInputService.InputBegan:Connect(function(input,gameProcessed)
 			userInputType=tostring(input.UserInputType),
 			gameProcessed=gameProcessed,
 			mouse=LP and LP:GetMouse() and {x=LP:GetMouse().X,y=LP:GetMouse().Y,hit=cf(LP:GetMouse().Hit)} or nil,
-		},true)
+		},false)
 		scheduleThrowSnapshots("input")
 	end
 
@@ -604,7 +615,14 @@ addConnection(UserInputService.InputEnded:Connect(function(input,gameProcessed)
 	end
 end))
 
-hookOutgoingFireServer()
+if ENABLE_OUTGOING_HOOK_BY_DEFAULT then
+	hookOutgoingFireServer()
+else
+	pushEvent("outgoing_hook_disabled",{
+		reason="non-invasive default",
+		enableCommand="getgenv().ThrowEventLogger.EnableOutgoingHook()",
+	})
+end
 pushEvent("logger_started",{
 	version=VERSION,
 	localPlayer=LP and LP.Name or nil,
@@ -613,8 +631,9 @@ pushEvent("logger_started",{
 		"Press RightShift+K to add a manual snapshot.",
 		"Press RightShift+J to copy JSON.",
 		"Or run getgenv().ThrowEventLogger.Copy().",
+		"Outgoing FireServer hooks are off by default. Run getgenv().ThrowEventLogger.EnableOutgoingHook() only if needed.",
 		"Press RightShift+L to stop the logger.",
 	},
 },true)
 
-print("[ThrowLogger] started. Press RightShift+J to copy JSON, RightShift+K snapshot, RightShift+L stop.")
+print("[ThrowLogger] started in non-invasive mode. Press RightShift+J to copy JSON, RightShift+K snapshot, RightShift+L stop.")
