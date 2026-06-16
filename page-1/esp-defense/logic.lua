@@ -39,8 +39,14 @@ local function clamp01(value,fallback)
 	return math.clamp(number,0,1)
 end
 
-local function styleColor(style,prefix,channel,fallback)
-	if not(style and style[prefix.."CustomColor"]==true) then
+local function styleColor(style,prefix,legacyPrefix,channel,fallback)
+	local custom=style and style[prefix.."CustomColor"]==true
+	if not custom and legacyPrefix then
+		custom=style and style[legacyPrefix.."CustomColor"]==true
+		prefix=legacyPrefix
+	end
+
+	if not custom then
 		return fallback
 	end
 
@@ -51,13 +57,14 @@ local function styleColor(style,prefix,channel,fallback)
 	)
 end
 
-local function highlightStyle(ctx,fallbackColor)
+local function highlightStyle(ctx,stateKey,fallbackColor)
 	local style=ctx and ctx.UI_STYLE
+	local prefix=stateKey=="holder" and "ESPDefenseHolder" or (stateKey=="closed" and "ESPDefenseClosed" or "ESPDefenseOpen")
 	return{
-		fill=styleColor(style,"ESPDefense","Fill",fallbackColor),
-		outline=styleColor(style,"ESPDefense","Outline",fallbackColor),
-		fillTransparency=clamp01(style and style.ESPDefenseFillTransparency,0.5),
-		outlineTransparency=clamp01(style and style.ESPDefenseOutlineTransparency,0),
+		fill=styleColor(style,prefix,"ESPDefense","Fill",fallbackColor),
+		outline=styleColor(style,prefix,"ESPDefense","Outline",fallbackColor),
+		fillTransparency=clamp01(style and (style[prefix.."FillTransparency"] or style.ESPDefenseFillTransparency),0.5),
+		outlineTransparency=clamp01(style and (style[prefix.."OutlineTransparency"] or style.ESPDefenseOutlineTransparency),0),
 	}
 end
 
@@ -397,10 +404,10 @@ local function ensureOwnedHighlight(character)
 	return highlight
 end
 
-local function forceHighlight(ctx,character,color)
+local function forceHighlight(ctx,character,stateKey,color)
 	if not character then return end
 
-	local style=highlightStyle(ctx,color)
+	local style=highlightStyle(ctx,stateKey,color)
 	local owned=ensureOwnedHighlight(character)
 	owned.Adornee=character
 	owned.Enabled=true
@@ -454,12 +461,12 @@ function ESPDefense.new(ctx)
 				if character then
 					if shouldHighlightPlayer(player) then
 						if carrierData and player==carrierData.player then
-							forceHighlight(ctx,character,blue)
+							forceHighlight(ctx,character,"holder",blue)
 						elseif carrierData and isSameTeam(player,carrierData.player) then
 							if isReceiverClosed(player,carrierData,defenderRoots,ctx) then
-								forceHighlight(ctx,character,red)
+								forceHighlight(ctx,character,"closed",red)
 							else
-								forceHighlight(ctx,character,green)
+								forceHighlight(ctx,character,"open",green)
 							end
 						else
 							destroyOwnedHighlight(character)

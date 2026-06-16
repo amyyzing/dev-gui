@@ -39,8 +39,14 @@ local function clamp01(value,fallback)
 	return math.clamp(number,0,1)
 end
 
-local function styleColor(style,prefix,channel,fallback)
-	if not(style and style[prefix.."CustomColor"]==true) then
+local function styleColor(style,prefix,legacyPrefix,channel,fallback)
+	local custom=style and style[prefix.."CustomColor"]==true
+	if not custom and legacyPrefix then
+		custom=style and style[legacyPrefix.."CustomColor"]==true
+		prefix=legacyPrefix
+	end
+
+	if not custom then
 		return fallback
 	end
 
@@ -51,13 +57,14 @@ local function styleColor(style,prefix,channel,fallback)
 	)
 end
 
-local function highlightStyle(ctx,fallbackColor)
+local function highlightStyle(ctx,stateKey,fallbackColor)
 	local style=ctx and ctx.UI_STYLE
+	local prefix=stateKey=="closed" and "ESPOffenseClosed" or "ESPOffenseOpen"
 	return{
-		fill=styleColor(style,"ESPOffense","Fill",fallbackColor),
-		outline=styleColor(style,"ESPOffense","Outline",fallbackColor),
-		fillTransparency=clamp01(style and style.ESPOffenseFillTransparency,0.5),
-		outlineTransparency=clamp01(style and style.ESPOffenseOutlineTransparency,0),
+		fill=styleColor(style,prefix,"ESPOffense","Fill",fallbackColor),
+		outline=styleColor(style,prefix,"ESPOffense","Outline",fallbackColor),
+		fillTransparency=clamp01(style and (style[prefix.."FillTransparency"] or style.ESPOffenseFillTransparency),0.5),
+		outlineTransparency=clamp01(style and (style[prefix.."OutlineTransparency"] or style.ESPOffenseOutlineTransparency),0),
 	}
 end
 
@@ -368,10 +375,10 @@ local function ensureOwnedHighlight(character)
 	return highlight
 end
 
-local function forceHighlight(ctx,character,color)
+local function forceHighlight(ctx,character,stateKey,color)
 	if not character then return end
 
-	local style=highlightStyle(ctx,color)
+	local style=highlightStyle(ctx,stateKey,color)
 	local owned=ensureOwnedHighlight(character)
 	owned.Adornee=character
 	owned.Enabled=true
@@ -431,9 +438,9 @@ function ESPOffense.new(ctx)
 				if character then
 					if shouldHighlightReceiver(player) then
 						if isReceiverClosed(player,origin,defenderRoots,catchY) then
-							forceHighlight(ctx,character,red)
+							forceHighlight(ctx,character,"closed",red)
 						else
-							forceHighlight(ctx,character,green)
+							forceHighlight(ctx,character,"open",green)
 						end
 					else
 						destroyOwnedHighlight(character)

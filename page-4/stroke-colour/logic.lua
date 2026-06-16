@@ -30,9 +30,15 @@ local DEFAULTS={
 	ColoursPanelExpanded=false,
 	HighlightPanelExpanded=false,
 	HighlightSelectedMode="espOffense",
+	HighlightSelectedState="open",
 	ESPOffenseCustomColor=false,
 	ESPDefenseCustomColor=false,
 	QBAimHighlightCustomColor=false,
+	ESPOffenseOpenCustomColor=false,
+	ESPOffenseClosedCustomColor=false,
+	ESPDefenseHolderCustomColor=false,
+	ESPDefenseOpenCustomColor=false,
+	ESPDefenseClosedCustomColor=false,
 	ESPOffenseFillR=32,
 	ESPOffenseFillG=202,
 	ESPOffenseFillB=106,
@@ -41,6 +47,22 @@ local DEFAULTS={
 	ESPOffenseOutlineB=106,
 	ESPOffenseFillTransparency=0.5,
 	ESPOffenseOutlineTransparency=0,
+	ESPOffenseOpenFillR=32,
+	ESPOffenseOpenFillG=202,
+	ESPOffenseOpenFillB=106,
+	ESPOffenseOpenOutlineR=32,
+	ESPOffenseOpenOutlineG=202,
+	ESPOffenseOpenOutlineB=106,
+	ESPOffenseOpenFillTransparency=0.5,
+	ESPOffenseOpenOutlineTransparency=0,
+	ESPOffenseClosedFillR=254,
+	ESPOffenseClosedFillG=94,
+	ESPOffenseClosedFillB=86,
+	ESPOffenseClosedOutlineR=254,
+	ESPOffenseClosedOutlineG=94,
+	ESPOffenseClosedOutlineB=86,
+	ESPOffenseClosedFillTransparency=0.5,
+	ESPOffenseClosedOutlineTransparency=0,
 	ESPDefenseFillR=32,
 	ESPDefenseFillG=202,
 	ESPDefenseFillB=106,
@@ -49,6 +71,30 @@ local DEFAULTS={
 	ESPDefenseOutlineB=106,
 	ESPDefenseFillTransparency=0.5,
 	ESPDefenseOutlineTransparency=0,
+	ESPDefenseHolderFillR=21,
+	ESPDefenseHolderFillG=103,
+	ESPDefenseHolderFillB=251,
+	ESPDefenseHolderOutlineR=21,
+	ESPDefenseHolderOutlineG=103,
+	ESPDefenseHolderOutlineB=251,
+	ESPDefenseHolderFillTransparency=0.45,
+	ESPDefenseHolderOutlineTransparency=0,
+	ESPDefenseOpenFillR=32,
+	ESPDefenseOpenFillG=202,
+	ESPDefenseOpenFillB=106,
+	ESPDefenseOpenOutlineR=32,
+	ESPDefenseOpenOutlineG=202,
+	ESPDefenseOpenOutlineB=106,
+	ESPDefenseOpenFillTransparency=0.5,
+	ESPDefenseOpenOutlineTransparency=0,
+	ESPDefenseClosedFillR=254,
+	ESPDefenseClosedFillG=94,
+	ESPDefenseClosedFillB=86,
+	ESPDefenseClosedOutlineR=254,
+	ESPDefenseClosedOutlineG=94,
+	ESPDefenseClosedOutlineB=86,
+	ESPDefenseClosedFillTransparency=0.5,
+	ESPDefenseClosedOutlineTransparency=0,
 	QBAimHighlightFillR=21,
 	QBAimHighlightFillG=103,
 	QBAimHighlightFillB=251,
@@ -93,6 +139,11 @@ local BOOL_FIELDS={
 	ESPOffenseCustomColor=true,
 	ESPDefenseCustomColor=true,
 	QBAimHighlightCustomColor=true,
+	ESPOffenseOpenCustomColor=true,
+	ESPOffenseClosedCustomColor=true,
+	ESPDefenseHolderCustomColor=true,
+	ESPDefenseOpenCustomColor=true,
+	ESPDefenseClosedCustomColor=true,
 }
 local NUMBER_LIMITS={
 	LiquidStrokeSpeed={0,2},
@@ -100,20 +151,35 @@ local NUMBER_LIMITS={
 	StrokeTransparency={0,1},
 	ESPOffenseFillTransparency={0,1},
 	ESPOffenseOutlineTransparency={0,1},
+	ESPOffenseOpenFillTransparency={0,1},
+	ESPOffenseOpenOutlineTransparency={0,1},
+	ESPOffenseClosedFillTransparency={0,1},
+	ESPOffenseClosedOutlineTransparency={0,1},
 	ESPDefenseFillTransparency={0,1},
 	ESPDefenseOutlineTransparency={0,1},
+	ESPDefenseHolderFillTransparency={0,1},
+	ESPDefenseHolderOutlineTransparency={0,1},
+	ESPDefenseOpenFillTransparency={0,1},
+	ESPDefenseOpenOutlineTransparency={0,1},
+	ESPDefenseClosedFillTransparency={0,1},
+	ESPDefenseClosedOutlineTransparency={0,1},
 	QBAimHighlightFillTransparency={0,1},
 	QBAimHighlightOutlineTransparency={0,1},
 }
 
 local HIGHLIGHT_MODES={
-	{Key="espOffense",Prefix="ESPOffense",Label="ESP Offense",Short="O"},
-	{Key="espDefense",Prefix="ESPDefense",Label="ESP Defense",Short="D"},
-	{Key="qbHighlight",Prefix="QBAimHighlight",Label="QB Highlight",Short="Q"},
+	{Key="espOffense",Prefix="ESPOffense",Label="ESP Offense",Short="O",States={{Key="open",Suffix="Open",Label="Open"},{Key="closed",Suffix="Closed",Label="Closed"}}},
+	{Key="espDefense",Prefix="ESPDefense",Label="ESP Defense",Short="D",States={{Key="holder",Suffix="Holder",Label="Holder"},{Key="open",Suffix="Open",Label="Open"},{Key="closed",Suffix="Closed",Label="Closed"}}},
+	{Key="qbHighlight",Prefix="QBAimHighlight",Label="QB Highlight",Short="Q",States={{Key="target",Suffix="",Label="Target"}}},
 }
 local HIGHLIGHT_MODE_BY_KEY={}
+local HIGHLIGHT_STATE_BY_MODE={}
 for _,mode in ipairs(HIGHLIGHT_MODES) do
 	HIGHLIGHT_MODE_BY_KEY[mode.Key]=mode
+	HIGHLIGHT_STATE_BY_MODE[mode.Key]={}
+	for _,state in ipairs(mode.States) do
+		HIGHLIGHT_STATE_BY_MODE[mode.Key][state.Key]=state
+	end
 end
 local HIGHLIGHT_DIAL_W=96
 local HIGHLIGHT_DIAL_H=96
@@ -578,10 +644,13 @@ function StrokeColour.new(ctx,page)
 	local highlightHoverMode=nil
 	local pickerHue,pickerSat,pickerVal=0,0,1
 	local colorDrag=nil
+	local highlightPickerHue,highlightPickerSat,highlightPickerVal=0,0,1
+	local highlightColorDrag=nil
 
 	local targetButtons={}
 	local modeButtons={}
 	local highlightTargetButtons={}
+	local highlightStateButtons={}
 	local themeCards={}
 	local quickChoices={}
 	local rgbSliders={}
@@ -597,6 +666,7 @@ function StrokeColour.new(ctx,page)
 	local modeBodies={}
 	local colorPreview,previewHex,hexBox
 	local svBase,svCursor,hueCursor
+	local highlightSvBase,highlightSvCursor,highlightHueCursor,highlightPreviewHex,highlightPickerPreview
 	local highlightModeLabel,highlightPreview,highlightPreviewStroke,highlightFillTransparencySlider,highlightOutlineTransparencySlider
 	local paintHighlightDial=function() end
 
@@ -1013,12 +1083,36 @@ function StrokeColour.new(ctx,page)
 		return HIGHLIGHT_MODE_BY_KEY[UI_STYLE.HighlightSelectedMode] or HIGHLIGHT_MODE_BY_KEY[DEFAULTS.HighlightSelectedMode]
 	end
 
+	local function normalizeHighlightState(value,mode)
+		mode=mode or activeHighlightMode()
+		local key=tostring(value or ""):lower():gsub("%s+","")
+		local stateMap=HIGHLIGHT_STATE_BY_MODE[mode.Key] or {}
+		if stateMap[key] then
+			return key
+		end
+
+		local first=mode.States and mode.States[1]
+		return first and first.Key or "target"
+	end
+
+	local function activeHighlightState()
+		local mode=activeHighlightMode()
+		UI_STYLE.HighlightSelectedState=normalizeHighlightState(UI_STYLE.HighlightSelectedState,mode)
+		return (HIGHLIGHT_STATE_BY_MODE[mode.Key] or {})[UI_STYLE.HighlightSelectedState] or mode.States[1]
+	end
+
+	local function activeHighlightPrefix()
+		local mode=activeHighlightMode()
+		local state=activeHighlightState()
+		return mode.Prefix..(state.Suffix or "")
+	end
+
 	local function highlightField(channel,suffix)
-		return activeHighlightMode().Prefix..channel..suffix
+		return activeHighlightPrefix()..channel..suffix
 	end
 
 	local function highlightCustomField()
-		return activeHighlightMode().Prefix.."CustomColor"
+		return activeHighlightPrefix().."CustomColor"
 	end
 
 	local function highlightColor(channel)
@@ -1115,6 +1209,13 @@ function StrokeColour.new(ctx,page)
 
 	local function setHighlightMode(modeKey)
 		UI_STYLE.HighlightSelectedMode=normalizeHighlightMode(modeKey)
+		UI_STYLE.HighlightSelectedState=normalizeHighlightState(UI_STYLE.HighlightSelectedState,activeHighlightMode())
+		setPickerFromColor(getActiveColor())
+		syncPickerControls()
+	end
+
+	local function setHighlightState(stateKey)
+		UI_STYLE.HighlightSelectedState=normalizeHighlightState(stateKey,activeHighlightMode())
 		setPickerFromColor(getActiveColor())
 		syncPickerControls()
 	end
@@ -1585,17 +1686,70 @@ function StrokeColour.new(ctx,page)
 
 	trackConnection(applyHex.Activated:Connect(commitHex))
 
-	local function syncHighlightControls()
+	local syncHighlightControls
+
+	local function setHighlightPickerFromColor(color)
+		highlightPickerHue,highlightPickerSat,highlightPickerVal=toHSV(color)
+	end
+
+	local function syncHighlightPicker()
+		local color=getActiveHighlightColor()
+		setHighlightPickerFromColor(color)
+
+		if highlightSvBase then
+			highlightSvBase.BackgroundColor3=Color3.fromHSV(highlightPickerHue,1,1)
+		end
+
+		if highlightSvCursor then
+			highlightSvCursor.Position=UDim2.new(highlightPickerSat,-4,1-highlightPickerVal,-4)
+		end
+
+		if highlightHueCursor then
+			highlightHueCursor.Position=UDim2.new(0,0,highlightPickerHue,-1)
+		end
+
+		if highlightPickerPreview then
+			highlightPickerPreview.BackgroundColor3=color
+		end
+
+		if highlightPreviewHex then
+			highlightPreviewHex.Text=colorToHex(color)
+		end
+	end
+
+	local function applyHighlightPickerColor(color)
+		setHighlightPickerFromColor(color)
+		writeActiveHighlightColor(color)
+		syncHighlightControls()
+		syncPickerControls()
+		updateEverything()
+	end
+
+	local function updateHighlightColorDrag(input)
+		local mouse=pointerPosition(input)
+
+		if highlightColorDrag=="SV" and highlightSvBase and highlightSvBase.AbsoluteSize.X>0 then
+			highlightPickerSat=math.clamp((mouse.X-highlightSvBase.AbsolutePosition.X)/highlightSvBase.AbsoluteSize.X,0,1)
+			highlightPickerVal=1-math.clamp((mouse.Y-highlightSvBase.AbsolutePosition.Y)/highlightSvBase.AbsoluteSize.Y,0,1)
+			applyHighlightPickerColor(Color3.fromHSV(highlightPickerHue,highlightPickerSat,highlightPickerVal))
+		elseif highlightColorDrag=="Hue" and highlightHueCursor and highlightHueCursor.Parent and highlightHueCursor.Parent.AbsoluteSize.Y>0 then
+			local hueStrip=highlightHueCursor.Parent
+			highlightPickerHue=math.clamp((mouse.Y-hueStrip.AbsolutePosition.Y)/hueStrip.AbsoluteSize.Y,0,1)
+			applyHighlightPickerColor(Color3.fromHSV(highlightPickerHue,highlightPickerSat,highlightPickerVal))
+		end
+	end
+
+	syncHighlightControls=function()
 		local mode=activeHighlightMode()
+		local state=activeHighlightState()
 		local fillColor=highlightColor("Fill")
 		local outlineColor=highlightColor("Outline")
 		local selectedColor=getActiveHighlightColor()
 		local activeAccent=getUIStrokeColor()
-		local inactive=themeColor("BUTTON",THEME.PANEL)
-		local enabled=UI_STYLE[mode.Prefix.."CustomColor"]==true
+		local stateEnabled=UI_STYLE[highlightCustomField()]==true
 
 		if highlightModeLabel then
-			highlightModeLabel.Text=mode.Label..(enabled and " custom" or " default colours")
+			highlightModeLabel.Text=mode.Label.." / "..state.Label..(stateEnabled and " custom" or " default")
 		end
 
 		if highlightPreview then
@@ -1608,7 +1762,23 @@ function StrokeColour.new(ctx,page)
 			highlightPreviewStroke.Transparency=highlightTransparency("Outline")
 		end
 
+		syncHighlightPicker()
+
 		paintHighlightDial(false)
+
+		local states=mode.States or {}
+		local stateCount=math.max(#states,1)
+		for index,entry in ipairs(highlightStateButtons) do
+			local stateInfo=states[index]
+			local visible=stateInfo~=nil
+			entry.Button.Visible=visible
+			entry.Button.Size=UDim2.new(visible and (1/stateCount) or 0,visible and -6 or 0,1,0)
+			entry.Button.Text=visible and stateInfo.Label or ""
+			entry.Key=visible and stateInfo.Key or nil
+			entry.Marker.Visible=visible and stateInfo.Key==state.Key
+			entry.Marker.BackgroundColor3=activeAccent
+			entry.Button.BackgroundColor3=(visible and stateInfo.Key==state.Key) and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
+		end
 
 		for key,entry in pairs(highlightTargetButtons) do
 			local selected=key==activeHighlightTarget
@@ -1685,6 +1855,12 @@ function StrokeColour.new(ctx,page)
 			local isSelected=key==selected
 			local isHover=key==highlightHoverMode
 			local isCustom=UI_STYLE[mode.Prefix.."CustomColor"]==true
+			for _,state in ipairs(mode.States or {}) do
+				if UI_STYLE[mode.Prefix..(state.Suffix or "").."CustomColor"]==true then
+					isCustom=true
+					break
+				end
+			end
 			local color=muted
 			local transparency=0.74
 			local highlightTransparency=1
@@ -1955,11 +2131,34 @@ function StrokeColour.new(ctx,page)
 		ZIndex=6,
 	},highlightModeRow)
 
-	local highlightTargetRow=New("Frame",{
+	local highlightStateRow=New("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,28),
 		ZIndex=5,
 		LayoutOrder=2,
+	},highlightPanel)
+	New("UIListLayout",{
+		FillDirection=Enum.FillDirection.Horizontal,
+		Padding=UDim.new(0,8),
+		SortOrder=Enum.SortOrder.LayoutOrder,
+	},highlightStateRow)
+
+	for index=1,3 do
+		local button,marker=makeFlatButton(highlightStateRow,"",index,0.333)
+		local entry={Button=button,Marker=marker,Key=nil}
+		trackConnection(button.Activated:Connect(function()
+			if entry.Key then
+				setHighlightState(entry.Key)
+			end
+		end))
+		highlightStateButtons[index]=entry
+	end
+
+	local highlightTargetRow=New("Frame",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,28),
+		ZIndex=5,
+		LayoutOrder=3,
 	},highlightPanel)
 	New("UIListLayout",{
 		FillDirection=Enum.FillDirection.Horizontal,
@@ -1975,11 +2174,148 @@ function StrokeColour.new(ctx,page)
 		highlightTargetButtons[target]={Button=button,Marker=marker}
 	end
 
+	local highlightPickerBody=New("Frame",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,128),
+		ZIndex=5,
+		LayoutOrder=4,
+	},highlightPanel)
+
+	highlightSvBase=New("Frame",{
+		BackgroundColor3=Color3.fromRGB(255,0,0),
+		BorderSizePixel=0,
+		Position=UDim2.fromOffset(0,8),
+		Size=UDim2.fromOffset(148,104),
+		SkipThemeRole=true,
+		ZIndex=6,
+	},highlightPickerBody)
+	addCorner(highlightSvBase,"Section")
+
+	local highlightWhiteOverlay=New("Frame",{
+		BackgroundColor3=Color3.fromRGB(255,255,255),
+		BorderSizePixel=0,
+		Size=UDim2.new(1,0,1,0),
+		SkipThemeRole=true,
+		ZIndex=7,
+	},highlightSvBase)
+	addCorner(highlightWhiteOverlay,"Section")
+	New("UIGradient",{
+		Transparency=NumberSequence.new({
+			NumberSequenceKeypoint.new(0,0),
+			NumberSequenceKeypoint.new(1,1),
+		}),
+	},highlightWhiteOverlay)
+
+	local highlightBlackOverlay=New("Frame",{
+		BackgroundColor3=Color3.fromRGB(0,0,0),
+		BorderSizePixel=0,
+		Size=UDim2.new(1,0,1,0),
+		SkipThemeRole=true,
+		ZIndex=8,
+	},highlightSvBase)
+	addCorner(highlightBlackOverlay,"Section")
+	New("UIGradient",{
+		Rotation=90,
+		Transparency=NumberSequence.new({
+			NumberSequenceKeypoint.new(0,1),
+			NumberSequenceKeypoint.new(1,0),
+		}),
+	},highlightBlackOverlay)
+
+	highlightSvCursor=New("Frame",{
+		BackgroundColor3=Color3.fromRGB(255,255,255),
+		BorderSizePixel=0,
+		Size=UDim2.fromOffset(8,8),
+		SkipThemeRole=true,
+		ZIndex=9,
+	},highlightSvBase)
+	addCorner(highlightSvCursor,"Control")
+	New("UIStroke",{Color=Color3.fromRGB(0,0,0),Thickness=1,Transparency=0.35,StrokeRole="Fixed"},highlightSvCursor)
+
+	local highlightHueStrip=New("Frame",{
+		BackgroundColor3=Color3.fromRGB(255,255,255),
+		BorderSizePixel=0,
+		Position=UDim2.fromOffset(158,8),
+		Size=UDim2.fromOffset(18,104),
+		SkipThemeRole=true,
+		ZIndex=6,
+	},highlightPickerBody)
+	addCorner(highlightHueStrip,"Slider")
+	New("UIGradient",{
+		Rotation=90,
+		Color=ColorSequence.new({
+			ColorSequenceKeypoint.new(0,Color3.fromHSV(0,1,1)),
+			ColorSequenceKeypoint.new(0.17,Color3.fromHSV(0.17,1,1)),
+			ColorSequenceKeypoint.new(0.33,Color3.fromHSV(0.33,1,1)),
+			ColorSequenceKeypoint.new(0.5,Color3.fromHSV(0.5,1,1)),
+			ColorSequenceKeypoint.new(0.67,Color3.fromHSV(0.67,1,1)),
+			ColorSequenceKeypoint.new(0.83,Color3.fromHSV(0.83,1,1)),
+			ColorSequenceKeypoint.new(1,Color3.fromHSV(1,1,1)),
+		}),
+	},highlightHueStrip)
+
+	highlightHueCursor=New("Frame",{
+		BackgroundColor3=Color3.fromRGB(255,255,255),
+		BorderSizePixel=0,
+		Size=UDim2.new(1,0,0,3),
+		SkipThemeRole=true,
+		ZIndex=8,
+	},highlightHueStrip)
+	addCorner(highlightHueCursor,"Slider")
+
+	highlightPickerPreview=New("Frame",{
+		BackgroundColor3=getActiveHighlightColor(),
+		BorderSizePixel=0,
+		Position=UDim2.fromOffset(192,8),
+		Size=UDim2.fromOffset(92,54),
+		SkipThemeRole=true,
+		ZIndex=6,
+	},highlightPickerBody)
+	addCorner(highlightPickerPreview,"Control")
+
+	highlightPreviewHex=New("TextLabel",{
+		BackgroundTransparency=1,
+		Position=UDim2.fromOffset(192,70),
+		Size=UDim2.fromOffset(92,18),
+		Text=colorToHex(getActiveHighlightColor()),
+		Font=Enum.Font.GothamMedium,
+		TextSize=12,
+		TextColor3=THEME.TEXT,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		ZIndex=6,
+	},highlightPickerBody)
+
+	trackConnection(highlightSvBase.InputBegan:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseButton1 then
+			highlightColorDrag="SV"
+			updateHighlightColorDrag(input)
+		end
+	end))
+
+	trackConnection(highlightHueStrip.InputBegan:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseButton1 then
+			highlightColorDrag="Hue"
+			updateHighlightColorDrag(input)
+		end
+	end))
+
+	trackConnection(UIS.InputChanged:Connect(function(input)
+		if highlightColorDrag and input.UserInputType==Enum.UserInputType.MouseMovement then
+			updateHighlightColorDrag(input)
+		end
+	end))
+
+	trackConnection(UIS.InputEnded:Connect(function(input)
+		if input.UserInputType==Enum.UserInputType.MouseButton1 then
+			highlightColorDrag=nil
+		end
+	end))
+
 	local highlightRgbBody=New("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,154),
 		ZIndex=5,
-		LayoutOrder=3,
+		LayoutOrder=5,
 	},highlightPanel)
 	New("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},highlightRgbBody)
 
@@ -1997,7 +2333,7 @@ function StrokeColour.new(ctx,page)
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,101),
 		ZIndex=5,
-		LayoutOrder=4,
+		LayoutOrder=6,
 	},highlightPanel)
 	New("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},highlightTransparencyBody)
 
