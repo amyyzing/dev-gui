@@ -24,6 +24,7 @@ makeSection=GuiLogic.makeSection
 makeBox=GuiLogic.makeBox
 buildSlider=GuiLogic.buildSlider
 buildToggleRow=GuiLogic.buildToggleRow
+objectLocalPointer=GuiLogic.objectLocalPointer
 HITBOX_ORIGINALS=HITBOX_ORIGINALS or {
 	Transparency=setmetatable({}, {__mode="k"}),
 	Size=setmetatable({}, {__mode="k"}),
@@ -396,6 +397,7 @@ function makePage1Ctx()
 		makeSection=makeSection,
 		buildSlider=buildSlider,
 		buildToggleRow=buildToggleRow,
+		objectLocalPointer=objectLocalPointer,
 		HITBOX_ORIGINALS=HITBOX_ORIGINALS,
 		fmtNumber=fmtNumber,
 		safeDisconnect=safeDisconnect,

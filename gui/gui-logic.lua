@@ -6,6 +6,7 @@ function GuiLogic.new(ctx)
 	local THEME=ctx.THEME
 	local UI_STYLE=ctx.UI_STYLE or {}
 	local UIS=ctx.UIS
+	local GuiService=ctx.GuiService or game:GetService("GuiService")
 	local TweenService=ctx.TweenService
 	local fmtNumber=ctx.fmtNumber
 	local BOX_WRAPPERS=ctx.BOX_WRAPPERS or setmetatable({}, {__mode="k"})
@@ -131,6 +132,88 @@ function GuiLogic.new(ctx)
 
 		return Color3.fromRGB(22,22,22)
 	end
+
+	local function hoverColor(base,amount)
+		base=base or THEME.BUTTON or THEME.BG
+		amount=tonumber(amount) or 0.08
+		local toward=luminance(base)<0.55 and Color3.new(1,1,1) or Color3.new(0,0,0)
+		return base:Lerp(toward,amount)
+	end
+
+	local function pointerPosition(input)
+		local inputType=typeof(input)
+		if inputType=="Vector2" then
+			return input
+		elseif inputType=="Vector3" then
+			return Vector2.new(input.X,input.Y)
+		end
+
+		local position=input and input.Position
+		if typeof(position)=="Vector3" then
+			return Vector2.new(position.X,position.Y)
+		elseif typeof(position)=="Vector2" then
+			return position
+		end
+
+		return UIS:GetMouseLocation()
+	end
+
+	local function guiInset()
+		local ok,inset=pcall(function()
+			return GuiService:GetGuiInset()
+		end)
+
+		if ok and typeof(inset)=="Vector2" then
+			return inset
+		end
+
+		return Vector2.new(0,0)
+	end
+
+	local function distanceToRect(point,pos,size)
+		local dx=0
+		local dy=0
+
+		if point.X<pos.X then
+			dx=pos.X-point.X
+		elseif point.X>pos.X+size.X then
+			dx=point.X-(pos.X+size.X)
+		end
+
+		if point.Y<pos.Y then
+			dy=pos.Y-point.Y
+		elseif point.Y>pos.Y+size.Y then
+			dy=point.Y-(pos.Y+size.Y)
+		end
+
+		return dx*dx+dy*dy
+	end
+
+	local function objectLocalPointer(object,input)
+		local point=pointerPosition(input)
+		local inset=guiInset()
+		local pos=object.AbsolutePosition
+		local size=object.AbsoluteSize
+		local best=point
+		local bestDistance=distanceToRect(point,pos,size)
+		local candidates={
+			point-inset,
+			point+inset
+		}
+
+		for _,candidate in ipairs(candidates) do
+			local candidateDistance=distanceToRect(candidate,pos,size)
+			if candidateDistance<bestDistance then
+				best=candidate
+				bestDistance=candidateDistance
+			end
+		end
+
+		return best.X-pos.X,best.Y-pos.Y,math.max(size.X,1),math.max(size.Y,1)
+	end
+
+	api.pointerPosition=pointerPosition
+	api.objectLocalPointer=objectLocalPointer
 
 	local function createSwitch(parent,startState,onChange,width,height,_knobSize,_pad,zIndex)
 		local c=components()
@@ -395,23 +478,31 @@ function GuiLogic.new(ctx)
 	end
 
 	function api.attachHover(button,normalBg,hoverBg,normalText,hoverText)
+		local function resolve(value)
+			if type(value)=="function" then
+				return value()
+			end
+
+			return value
+		end
+
 		button.MouseEnter:Connect(function()
 			if button.BackgroundTransparency<1 then
-				button.BackgroundColor3=hoverBg
+				button.BackgroundColor3=resolve(hoverBg)
 			end
 
 			if button:IsA("TextButton") or button:IsA("TextLabel") then
-				button.TextColor3=hoverText or normalText or THEME.TEXT
+				button.TextColor3=resolve(hoverText) or resolve(normalText) or THEME.TEXT
 			end
 		end)
 
 		button.MouseLeave:Connect(function()
 			if button.BackgroundTransparency<1 then
-				button.BackgroundColor3=normalBg
+				button.BackgroundColor3=resolve(normalBg)
 			end
 
 			if button:IsA("TextButton") or button:IsA("TextLabel") then
-				button.TextColor3=normalText or THEME.TEXT
+				button.TextColor3=resolve(normalText) or THEME.TEXT
 			end
 		end)
 	end
@@ -604,8 +695,14 @@ function GuiLogic.new(ctx)
 
 		if headerButtonOptions then
 			local customBg=headerButtonOptions.backgroundColor or headerButtonOptions.BackgroundColor3
-			local normalBg=customBg or (headerButtonOptions.danger and THEME.RED) or themeColor("BUTTON",THEME.BG)
-			local hoverBg=headerButtonOptions.hoverBackgroundColor or headerButtonOptions.HoverBackgroundColor3 or (headerButtonOptions.danger and Color3.fromRGB(255,124,118)) or THEME.CARD
+			local explicitHoverBg=headerButtonOptions.hoverBackgroundColor or headerButtonOptions.HoverBackgroundColor3
+			local function headerButtonBg()
+				return customBg or (headerButtonOptions.danger and THEME.RED) or themeColor("BUTTON",THEME.BG)
+			end
+			local function headerButtonHoverBg()
+				return explicitHoverBg or hoverColor(headerButtonBg(),headerButtonOptions.danger and 0.18 or 0.08)
+			end
+			local normalBg=headerButtonBg()
 			local textColor=headerButtonOptions.textColor or headerButtonOptions.TextColor3 or (headerButtonOptions.danger and Color3.fromRGB(0,0,0)) or THEME.TEXT
 			local headerButtonHeight=componentNumber("HeaderButtonHeight",22)
 			local button=New("TextButton",{Size=UDim2.fromOffset(headerButtonWidth,headerButtonHeight),Position=UDim2.new(1,-headerRightOffset-headerButtonWidth,0.5,-headerButtonHeight/2),BackgroundColor3=normalBg,BorderSizePixel=0,Text=headerButtonOptions.text or headerButtonOptions.Text or "ACTION",Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=11,TextColor3=textColor,AutoButtonColor=false,Selectable=true,ZIndex=6},header)
@@ -620,11 +717,11 @@ function GuiLogic.new(ctx)
 			end
 
 			connectSection(button.MouseEnter,function()
-				buttonWrap.BackgroundColor3=hoverBg
+				buttonWrap.BackgroundColor3=headerButtonHoverBg()
 			end)
 
 			connectSection(button.MouseLeave,function()
-				buttonWrap.BackgroundColor3=customBg or (headerButtonOptions.danger and THEME.RED) or themeColor("BUTTON",THEME.BG)
+				buttonWrap.BackgroundColor3=headerButtonBg()
 			end)
 
 			connectSection(button.Activated,function()
@@ -1022,21 +1119,14 @@ function GuiLogic.new(ctx)
 			valueBox.Text=fmtNumber(v,decimals)
 		end
 
-		local function valueFromMouseX(mx)
-			local absPos=track.AbsolutePosition.X
-			local absSize=track.AbsoluteSize.X
-			if absSize<=0 then return value end
-
-			local pct=math.clamp((mx-absPos)/absSize,0,1)
+		local function valueFromPercent(percent)
+			local pct=math.clamp(percent,0,1)
 			return roundTo(minVal+(maxVal-minVal)*pct,decimals)
 		end
 
 		local function valueFromInput(input)
-			if input and input.Position then
-				return valueFromMouseX(input.Position.X)
-			end
-
-			return valueFromMouseX(UIS:GetMouseLocation().X)
+			local x,_,w=objectLocalPointer(track,input)
+			return valueFromPercent(x/w)
 		end
 
 		local function setValue(v,fire)

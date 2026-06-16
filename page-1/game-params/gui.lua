@@ -196,6 +196,7 @@ function GameParamsGui.new(ctx,parent)
 	local section=nil
 	local sectionControls=nil
 	local destroyConn=nil
+	local connections={}
 	local destroyed=false
 
 	local function disconnect(conn)
@@ -206,6 +207,19 @@ function GameParamsGui.new(ctx,parent)
 				conn:Disconnect()
 			end)
 		end
+	end
+
+	local function trackConnection(conn)
+		connections[#connections+1]=conn
+		return conn
+	end
+
+	local function disconnectConnections()
+		for _,conn in ipairs(connections) do
+			disconnect(conn)
+		end
+
+		table.clear(connections)
 	end
 
 	local function isPageEnabled(pageKey)
@@ -510,10 +524,15 @@ function GameParamsGui.new(ctx,parent)
 
 		local assets=getDialSliceAssets()
 		local function pageAtPosition(position)
-			local absolutePosition=canvas.AbsolutePosition
 			local absoluteSize=canvas.AbsoluteSize
-			local x=(position.X or 0)-absolutePosition.X
-			local y=(position.Y or 0)-absolutePosition.Y
+			local x,y
+			if type(ctx.objectLocalPointer)=="function" then
+				x,y=ctx.objectLocalPointer(canvas,position)
+			else
+				local absolutePosition=canvas.AbsolutePosition
+				x=(position.X or 0)-absolutePosition.X
+				y=(position.Y or 0)-absolutePosition.Y
+			end
 			local size=math.min(absoluteSize.X,absoluteSize.Y)
 
 			if size<=0 then
@@ -646,7 +665,7 @@ function GameParamsGui.new(ctx,parent)
 			ZIndex=10,
 		},canvas)
 
-		hitLayer.InputBegan:Connect(function(input)
+		trackConnection(hitLayer.InputBegan:Connect(function(input)
 			if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then
 				return
 			end
@@ -655,17 +674,17 @@ function GameParamsGui.new(ctx,parent)
 			if pageKey then
 				api.ActivateParamsPage(pageKey,true)
 			end
-		end)
+		end))
 
-		hitLayer.InputChanged:Connect(function(input)
+		trackConnection(hitLayer.InputChanged:Connect(function(input)
 			if input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch then
 				setHoverPage(pageAtPosition(input.Position))
 			end
-		end)
+		end))
 
-		hitLayer.MouseLeave:Connect(function()
+		trackConnection(hitLayer.MouseLeave:Connect(function()
 			setHoverPage(nil)
-		end)
+		end))
 	end
 
 	local function createPageEditor(parentFrame)
@@ -756,6 +775,7 @@ function GameParamsGui.new(ctx,parent)
 		destroyControl(diveSlider)
 		cancelPageTweens()
 		cancelPaintTweens()
+		disconnectConnections()
 		if runtime.SetOnStateChanged then
 			runtime.SetOnStateChanged(nil)
 		end
