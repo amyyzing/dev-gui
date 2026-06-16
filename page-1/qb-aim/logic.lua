@@ -1,4 +1,4 @@
-﻿local QBAim={}
+local QBAim={}
 
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
