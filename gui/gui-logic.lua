@@ -997,7 +997,7 @@ function GuiLogic.new(ctx)
 					knobTween:Play()
 				end
 
-				glowSerial+=1
+				glowSerial=glowSerial+1
 				local thisGlow=glowSerial
 				task.delay(0.18,function()
 					if sliderDestroyed or thisGlow~=glowSerial or not fillGlow.Parent then
@@ -1055,9 +1055,9 @@ function GuiLogic.new(ctx)
 		local function keyboardStep()
 			local step=10^(-(tonumber(decimals) or 0))
 			if UIS:IsKeyDown(Enum.KeyCode.LeftShift) or UIS:IsKeyDown(Enum.KeyCode.RightShift) then
-				step*=10
+				step=step*10
 			elseif UIS:IsKeyDown(Enum.KeyCode.LeftControl) or UIS:IsKeyDown(Enum.KeyCode.RightControl) then
-				step/=10
+				step=step/10
 			end
 
 			return math.max(step,10^-4)

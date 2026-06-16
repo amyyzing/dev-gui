@@ -97,7 +97,7 @@ function MapCleaner.new(ctx,page)
 			local inst=parent and parent:FindFirstChild(target.name)
 			if inst then
 				if removeOne(inst,target,parent) then
-					changed+=1
+					changed=changed+1
 				end
 			end
 		end

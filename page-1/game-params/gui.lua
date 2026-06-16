@@ -532,7 +532,7 @@ function GameParamsGui.new(ctx,parent)
 
 			local angle=math.deg(atan2(-dy,dx))
 			if angle<0 then
-				angle+=360
+				angle=angle+360
 			end
 
 			for _,sector in ipairs(DIAL_SECTORS) do

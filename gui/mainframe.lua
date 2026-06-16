@@ -849,7 +849,7 @@ function MainFrame.new(ctx)
 
 	local toastOrder=0
 	local function showToast(message,variant,duration)
-		toastOrder+=1
+		toastOrder=toastOrder+1
 		variant=tostring(variant or "info"):lower()
 		duration=tonumber(duration) or 2.2
 

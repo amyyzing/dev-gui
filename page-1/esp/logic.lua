@@ -376,7 +376,7 @@ function ESP.new(ctx,parent)
 	end)
 
 	heartbeatConn=RunService.Heartbeat:Connect(function(dt)
-		poll+=dt
+		poll=poll+dt
 		if poll<0.25 then return end
 		poll=0
 		syncControls()

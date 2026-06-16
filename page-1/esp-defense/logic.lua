@@ -485,7 +485,7 @@ function ESPDefense.new(ctx)
 		safeDisconnect(heartbeatConn)
 		heartbeatElapsed=0
 		heartbeatConn=RunService.Heartbeat:Connect(function(dt)
-			heartbeatElapsed+=(dt or 0)
+			heartbeatElapsed=heartbeatElapsed+(dt or 0)
 			if heartbeatElapsed<ESP_REFRESH_INTERVAL then return end
 			heartbeatElapsed=0
 			rebuild()

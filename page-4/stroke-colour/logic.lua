@@ -1943,7 +1943,7 @@ function StrokeColour.new(ctx,page)
 
 		local angle=math.deg(atan2(-dy,dx))
 		if angle<0 then
-			angle+=360
+			angle=angle+360
 		end
 
 		for _,sector in ipairs(HIGHLIGHT_DIAL_SECTORS) do

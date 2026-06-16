@@ -2502,7 +2502,7 @@ function QBAim.new(ctx,parent)
 	addConnection(RunService.Heartbeat:Connect(function(dt)
 		if not isAlive() then return end
 
-		receiverTrackElapsed+=(dt or 0)
+		receiverTrackElapsed=receiverTrackElapsed+(dt or 0)
 		if receiverTrackElapsed<RECEIVER_TRACK_INTERVAL then return end
 		receiverTrackElapsed=0
 

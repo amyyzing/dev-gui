@@ -1,2 +1,182 @@
--- HB_LOADER_V2
-local _0=string.char;local _1=game:GetService("HttpService");local _2=_0(104,116,116,112,115,58,47,47,108,105,110,116,45,98,111,116,45,112,114,111,100,117,99,116,105,111,110,46,117,112,46,114,97,105,108,119,97,121,46,97,112,112);local _3=_0(47,109,111,100,117,108,101,47,103,101,116);local _4=300000;local _5={_0(114,117,110,116,105,109,101,47,108,111,97,100,101,114,45,112,97,114,116,45,49,46,108,117,97),_0(114,117,110,116,105,109,101,47,108,111,97,100,101,114,45,112,97,114,116,45,50,46,108,117,97),_0(114,117,110,116,105,109,101,47,108,111,97,100,101,114,45,112,97,114,116,45,51,46,108,117,97),_0(114,117,110,116,105,109,101,47,108,111,97,100,101,114,45,112,97,114,116,45,52,46,108,117,97),_0(114,117,110,116,105,109,101,47,108,111,97,100,101,114,45,112,97,114,116,45,53,46,108,117,97)};local _6={[_5[1]]=_0(72,66,95,82,85,78,84,73,77,69,95,80,65,82,84,95,49),[_5[2]]=_0(72,66,95,82,85,78,84,73,77,69,95,80,65,82,84,95,50),[_5[3]]=_0(72,66,95,82,85,78,84,73,77,69,95,80,65,82,84,95,51),[_5[4]]=_0(72,66,95,82,85,78,84,73,77,69,95,80,65,82,84,95,52),[_5[5]]=_0(72,66,95,82,85,78,84,73,77,69,95,80,65,82,84,95,53)};local _7={};for _,_8 in ipairs(_5)do _7[_8]=true end;local _9={Url=_2,Key=_0(116,104,101,107,101,121,116,111,104,101,97,118,101,110)};local function _a()if typeof(syn)=="table"and type(syn.request)=="function"then return syn.request end;if type(request)=="function"then return request end;if type(http_request)=="function"then return http_request end;if typeof(http)=="table"and type(http.request)=="function"then return http.request end;if typeof(fluxus)=="table"and type(fluxus.request)=="function"then return fluxus.request end end;local function _b(_c,_d)if _c~=_3 then return nil,"API path blocked: "..tostring(_c)end;if _9.Url~=_2 then return nil,"API URL verification failed."end;if not _d or not _7[_d.path]then return nil,"Runtime path blocked: "..tostring(_d and _d.path)end;local _e=_a();if not _e then return nil,"No client HTTP request function found."end;_d.apiKey=_9.Key;local _f,_g=pcall(function()return _e({Url=_9.Url.._c,Method=_0(80,79,83,84),Headers={[_0(67,111,110,116,101,110,116,45,84,121,112,101)]=_0(97,112,112,108,105,99,97,116,105,111,110,47,106,115,111,110)},Body=_1:JSONEncode(_d)})end);if not _f then return nil,tostring(_g)end;local _h=_g and(_g.Body or _g.body);if not _h then return nil,"Empty response from API."end;local _i,_j=pcall(function()return _1:JSONDecode(_h)end);if not _i then return nil,"Could not decode API response: "..tostring(_h)end;if not _j or not _j.ok or type(_j.source)~="string"then return nil,_j and _j.error or"Runtime source missing."end;return _j,nil end;local function _k(_l,_m)if not _7[_l]then return false,"Runtime path is not allowed."end;if type(_m)~="string"or _m==""then return false,"Runtime source missing."end;if #_m>_4 then return false,"Runtime source too large."end;local _n=_6[_l];if _n and not _m:find(_n,1,true)then return false,"Runtime marker verification failed."end;return true end;local _o={};local _p=(getfenv and getfenv(0))or _G;local _q=_p;if type(getgenv)=="function"then local _r,_s=pcall(getgenv);if _r and type(_s)=="table"then _q=_s end end;local _t=setmetatable({APP_RUNTIME_PATHS=_5,APP_RUNTIME_SOURCES=_o,APP_RUNTIME_MARKERS=_6,BOOT_BOT_API=_9},{__index=_p});_t._G=_t;for _,_u in ipairs(_5)do local _v,_w=_b(_3,{path=_u});if not _v then error("Loader failed to fetch ".._u..": "..tostring(_w))end;local _x,_y=_k(_u,_v.source);if not _x then error("Loader rejected ".._u..": "..tostring(_y))end;_o[_u]=_v.source;local _z,_A=loadstring(_v.source);if not _z then error("Loader failed to compile ".._u..": "..tostring(_A))end;if setfenv then setfenv(_z,_t)end;local _B,_C=pcall(_z);if not _B then error("Loader failed while running ".._u..": "..tostring(_C))end end;if _q.HB_LOADER_DEBUG==true then warn(_0(72,66,32,108,111,97,100,101,114,32,99,111,109,112,108,101,116,101,58,32)..tostring(#_5).._0(32,114,117,110,116,105,109,101,32,99,104,117,110,107,115,32,108,111,97,100,101,100,46))end
+-- HB_LOADER_V3
+local HttpService=game:GetService("HttpService")
+
+local BOT_URL="https://lint-bot-production.up.railway.app"
+local MODULE_GET="/module/get"
+local API_KEY="thekeytoheaven"
+local MAX_SOURCE_SIZE=300000
+
+local RUNTIME_PATHS={
+	"runtime/loader-part-1.lua",
+	"runtime/loader-part-2.lua",
+	"runtime/loader-part-3.lua",
+	"runtime/loader-part-4.lua",
+	"runtime/loader-part-5.lua"
+}
+
+local RUNTIME_MARKERS={
+	[RUNTIME_PATHS[1]]="HB_RUNTIME_PART_1",
+	[RUNTIME_PATHS[2]]="HB_RUNTIME_PART_2",
+	[RUNTIME_PATHS[3]]="HB_RUNTIME_PART_3",
+	[RUNTIME_PATHS[4]]="HB_RUNTIME_PART_4",
+	[RUNTIME_PATHS[5]]="HB_RUNTIME_PART_5"
+}
+
+local ALLOWED_PATHS={}
+for _,path in ipairs(RUNTIME_PATHS) do
+	ALLOWED_PATHS[path]=true
+end
+
+local function typeOf(value)
+	if typeof then
+		return typeof(value)
+	end
+
+	return type(value)
+end
+
+local function clientRequest()
+	if typeOf(syn)=="table" and type(syn.request)=="function" then
+		return syn.request
+	end
+
+	if type(request)=="function" then
+		return request
+	end
+
+	if type(http_request)=="function" then
+		return http_request
+	end
+
+	if typeOf(http)=="table" and type(http.request)=="function" then
+		return http.request
+	end
+
+	if typeOf(fluxus)=="table" and type(fluxus.request)=="function" then
+		return fluxus.request
+	end
+
+	return nil
+end
+
+local function fetchModule(path)
+	if not ALLOWED_PATHS[path] then
+		return nil,"Runtime path blocked: "..tostring(path)
+	end
+
+	local requestFn=clientRequest()
+	if not requestFn then
+		return nil,"No client HTTP request function found."
+	end
+
+	local body=HttpService:JSONEncode({
+		path=path,
+		apiKey=API_KEY
+	})
+
+	local ok,response=pcall(function()
+		return requestFn({
+			Url=BOT_URL..MODULE_GET,
+			Method="POST",
+			Headers={
+				["Content-Type"]="application/json"
+			},
+			Body=body
+		})
+	end)
+
+	if not ok then
+		return nil,tostring(response)
+	end
+
+	local responseBody=response and (response.Body or response.body)
+	if not responseBody then
+		return nil,"Empty response from API."
+	end
+
+	local decodeOk,payload=pcall(function()
+		return HttpService:JSONDecode(responseBody)
+	end)
+
+	if not decodeOk then
+		return nil,"Could not decode API response: "..tostring(responseBody)
+	end
+
+	if not payload or payload.ok~=true or type(payload.source)~="string" then
+		return nil,(payload and payload.error) or "Runtime source missing."
+	end
+
+	return payload.source,nil
+end
+
+local function validateSource(path,source)
+	if type(source)~="string" or source=="" then
+		return false,"Runtime source missing."
+	end
+
+	if #source>MAX_SOURCE_SIZE then
+		return false,"Runtime source too large."
+	end
+
+	local marker=RUNTIME_MARKERS[path]
+	if marker and not source:find(marker,1,true) then
+		return false,"Runtime marker verification failed."
+	end
+
+	return true,nil
+end
+
+local runtimeSources={}
+local parentEnv=(getfenv and getfenv(0)) or _G
+local debugEnv=parentEnv
+
+if type(getgenv)=="function" then
+	local ok,result=pcall(getgenv)
+	if ok and type(result)=="table" then
+		debugEnv=result
+	end
+end
+
+local runtimeEnv=setmetatable({
+	APP_RUNTIME_PATHS=RUNTIME_PATHS,
+	APP_RUNTIME_SOURCES=runtimeSources,
+	APP_RUNTIME_MARKERS=RUNTIME_MARKERS,
+	BOOT_BOT_API={
+		Url=BOT_URL,
+		Key=API_KEY
+	}
+},{__index=parentEnv})
+
+runtimeEnv._G=runtimeEnv
+
+for _,path in ipairs(RUNTIME_PATHS) do
+	local source,fetchError=fetchModule(path)
+	if not source then
+		error("Loader failed to fetch "..path..": "..tostring(fetchError))
+	end
+
+	local valid,validateError=validateSource(path,source)
+	if not valid then
+		error("Loader rejected "..path..": "..tostring(validateError))
+	end
+
+	runtimeSources[path]=source
+
+	local chunk,compileError=loadstring(source)
+	if not chunk then
+		error("Loader failed to compile "..path..": "..tostring(compileError))
+	end
+
+	if setfenv then
+		setfenv(chunk,runtimeEnv)
+	end
+
+	local ok,runError=pcall(chunk)
+	if not ok then
+		error("Loader failed while running "..path..": "..tostring(runError))
+	end
+end
+
+if debugEnv.HB_LOADER_DEBUG==true then
+	warn("HB loader complete: "..tostring(#RUNTIME_PATHS).." runtime chunks loaded.")
+end

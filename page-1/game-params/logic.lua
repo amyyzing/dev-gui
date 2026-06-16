@@ -216,7 +216,7 @@ function GameParams.new(ctx)
 				return
 			end
 
-			speedElapsed+=(dt or 0)
+			speedElapsed=speedElapsed+(dt or 0)
 			if speedElapsed<SPEED_FORCE_INTERVAL then
 				return
 			end
