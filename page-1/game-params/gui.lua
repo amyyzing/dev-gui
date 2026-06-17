@@ -10,9 +10,10 @@ local DIAL_INNER_RADIUS=0.22
 local DIAL_OUTER_RADIUS=0.43
 local DIAL_GAP_DEG=8
 local DIAL_GLOW_LAYERS={
-	{pad=1,z=5},
-	{pad=4,z=4},
-	{pad=8,z=3},
+	{pad=2,z=5},
+	{pad=6,z=4},
+	{pad=11,z=3},
+	{pad=17,z=2},
 }
 local PARAMS_PAGE_H=112
 local PAGE_TWEEN=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
@@ -361,7 +362,7 @@ function GameParamsGui.new(ctx,parent)
 		local active=accentColor()
 		local coreColor=brightenColor(active,0.10)
 		local hoverColor=brightenColor(active,0.22)
-		local haloColor=brightenColor(active,0.32)
+		local haloColor=brightenColor(active,0.56)
 		local muted=mutedColor()
 
 		for _,pageKey in ipairs(PAGE_ORDER) do
@@ -374,25 +375,29 @@ function GameParamsGui.new(ctx,parent)
 			local nearGlowTransparency=1
 			local midGlowTransparency=1
 			local farGlowTransparency=1
+			local outerGlowTransparency=1
 
 			if enabled then
 				targetColor=isHover and hoverColor or coreColor
 				if isSelected then
 					targetTransparency=isHover and 0.04 or 0.08
-					nearGlowTransparency=isHover and 0.46 or 0.56
-					midGlowTransparency=isHover and 0.66 or 0.74
-					farGlowTransparency=isHover and 0.84 or 0.90
-					highlightTransparency=isHover and 0.68 or 0.76
+					nearGlowTransparency=isHover and 0.12 or 0.20
+					midGlowTransparency=isHover and 0.28 or 0.38
+					farGlowTransparency=isHover and 0.50 or 0.62
+					outerGlowTransparency=isHover and 0.72 or 0.82
+					highlightTransparency=isHover and 0.50 or 0.62
 				elseif isHover then
 					targetTransparency=0.18
-					nearGlowTransparency=0.68
-					midGlowTransparency=0.84
-					farGlowTransparency=0.94
-					highlightTransparency=0.86
+					nearGlowTransparency=0.40
+					midGlowTransparency=0.62
+					farGlowTransparency=0.80
+					outerGlowTransparency=0.92
+					highlightTransparency=0.78
 				else
 					targetTransparency=0.42
-					nearGlowTransparency=0.90
-					midGlowTransparency=0.97
+					nearGlowTransparency=0.78
+					midGlowTransparency=0.92
+					farGlowTransparency=0.98
 				end
 			elseif isSelected then
 				targetColor=brightenColor(muted,0.12)
@@ -422,7 +427,7 @@ function GameParamsGui.new(ctx,parent)
 
 			if dialGlowImages[pageKey] then
 				for index,glow in ipairs(dialGlowImages[pageKey]) do
-					local glowTransparency=index==1 and nearGlowTransparency or (index==2 and midGlowTransparency or farGlowTransparency)
+					local glowTransparency=index==1 and nearGlowTransparency or (index==2 and midGlowTransparency or (index==3 and farGlowTransparency or outerGlowTransparency))
 					if animate then
 						tweenObject(glow,{ImageColor3=haloColor,ImageTransparency=glowTransparency})
 					else
