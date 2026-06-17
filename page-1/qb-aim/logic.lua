@@ -151,6 +151,8 @@ local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
 local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
 local THROW_TARGET_FIRE_IMMEDIATELY=false
 local THROW_INPUT_COOLDOWN=0.85
+local THROW_RELEASE_CONFIRM_TIMEOUT=1.75
+local THROW_RELEASE_CONFIRM_STABLE_TIME=0.08
 -- Separate timing terms. Do not use the full animation delay to move C2/origin.
 -- The release-origin drift is unified across X/Y/Z: one time value moves the whole origin vector.
 local QB_RELEASE_ORIGIN_DRIFT_TIME=0.15
@@ -2152,6 +2154,30 @@ function QBAim.new(ctx,parent)
 		return getHeldBall()~=nil
 	end
 
+	local function throwBlocked()
+		return throwInProgress or os.clock()-lastThrowAt<THROW_INPUT_COOLDOWN
+	end
+
+	local function waitForHeldBallRelease()
+		local deadline=os.clock()+THROW_RELEASE_CONFIRM_TIMEOUT
+		local detachedSince=nil
+
+		while os.clock()<deadline do
+			if not getHeldBall() then
+				detachedSince=detachedSince or os.clock()
+				if os.clock()-detachedSince>=THROW_RELEASE_CONFIRM_STABLE_TIME then
+					return true
+				end
+			else
+				detachedSince=nil
+			end
+
+			RunService.Heartbeat:Wait()
+		end
+
+		return false
+	end
+
 	local function clearPreviewForMissingBall(statusText)
 		clearPreviewVisuals()
 		if highlightedCharacter then
@@ -2266,8 +2292,7 @@ function QBAim.new(ctx,parent)
 	local function throwTo(receiver)
 		if not(enabled and isAvailable()) then return end
 
-		local now=os.clock()
-		if throwInProgress or now-lastThrowAt<THROW_INPUT_COOLDOWN then
+		if throwBlocked() then
 			setStatus("Throw already in progress")
 			return
 		end
@@ -2325,17 +2350,25 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		local ok,err
-		if modeKey=="mode1" then
-			ok,err=fireGameplayThrow(plan)
-		elseif modeKey=="mode3" then
-			ok,err=fireSquadsThrow(plan)
-		else
-			ok,err=false,"Park route unknown"
+		local fired,ok,err=pcall(function()
+			if modeKey=="mode1" then
+				return fireGameplayThrow(plan)
+			elseif modeKey=="mode3" then
+				return fireSquadsThrow(plan)
+			end
+
+			return false,"Park route unknown"
+		end)
+
+		if not fired then
+			local thrownErr=ok
+			ok=false
+			err=thrownErr or "Throw failed"
 		end
 
 		if ok then
 			freezePreviewAtCurrentPlan(plan)
+			waitForHeldBallRelease()
 			setStatus(currentModeText().." delayed future-release throw sent")
 		else
 			setStatus(err or "Throw failed")
@@ -2663,7 +2696,12 @@ function QBAim.new(ctx,parent)
 		local wantsThrow=bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T)
 		if not(wantsLock or wantsThrow) then return false end
 
-		if wantsThrow and (throwInProgress or os.clock()-lastThrowAt<THROW_INPUT_COOLDOWN) then
+		if wantsLock then
+			lockReceiverUnderCursor()
+			return true
+		end
+
+		if wantsThrow and throwBlocked() then
 			setStatus("Throw already in progress")
 			return true
 		end
@@ -2673,9 +2711,7 @@ function QBAim.new(ctx,parent)
 			return true
 		end
 
-		if wantsLock then
-			lockReceiverUnderCursor()
-		elseif wantsThrow then
+		if wantsThrow then
 			if trackedReceiver then
 				throwTo(trackedReceiver)
 			else
