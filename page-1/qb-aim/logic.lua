@@ -77,6 +77,13 @@ local QB_Y_MAX_CORRECTION=4.25
 local C2_GROUND_FALLBACK_MARGIN=2.50
 local C2_MAX_ABOVE_BALL=8.00
 local C2_MAX_RELEASE_DISTANCE=12.00
+local USE_FULL_C2_RELEASE_ORIGIN=true
+local C2_RELEASE_DRIFT_WHEN_USED=false
+local THROW_REBASE_REMOTE_TARGET_AT_FIRE=false
+local THROW_RECOMPUTE_RELEASE_PLAN=false
+-- Rebase is available but off by default because it makes the sent ray differ from
+-- the frozen preview and can break fixed-speed timing if the old plan.time no longer
+-- matches the new release origin.
 local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
 local QB_RELEASE_EXTRAPOLATE_VERTICAL=true
 local MIN_T,MAX_T,DT=0.35,6,0.01
@@ -144,6 +151,8 @@ local THROW_ANIMATION_SPEED=1.35
 -- Animation-to-remote timing stays fixed. User testing showed the outgoing ThrowBall
 -- should wait for the normal animation release window, not fire immediately.
 local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
+local THROW_ANIMATION_RELEASE_WAIT_MIN=0.18
+local THROW_ANIMATION_RELEASE_WAIT_MAX=0.38
 local THROW_REMOTE_LEAD_TIME=0.00 -- fire after the full animation release wait
 local RELEASE_FRAME_PLAN_MAX_AGE=0.075
 local THROW_TARGET_LOCK_ON_INPUT=true
@@ -208,10 +217,16 @@ local function smoothstep(edge0,edge1,value)
 end
 
 local function leadDelayForFlightTime(time)
-	-- Clean math rebuild: Lead Adjust is not route classification and not radial/tangent damping.
-	-- It is only the intentional ahead-time along the receiver's current velocity vector.
-	-- Set Lead Adjust to 0 for pure catch-time intercept, or 0.35-0.40 for your ahead-of-WR catch window.
-	return math.max(WR_LEAD_DELAY,0)
+	-- Lead Adjust remains a user-facing ahead-time, but it should not behave
+	-- identically on a quick flat pass and a long-developing throw.  The old
+	-- constants existed for this, but the function ignored them.
+	local base=math.max(WR_LEAD_DELAY,0)
+	if not ADAPTIVE_LEAD_ENABLED then
+		return base
+	end
+
+	local scale=smoothstep(LEAD_DELAY_ZERO_FLIGHT_TIME,LEAD_DELAY_FULL_FLIGHT_TIME,time or 0)
+	return base*scale
 end
 
 local function safeVectorLerp(a,b,alpha)
@@ -232,14 +247,15 @@ local function root(character)
 end
 
 local function routeSpeed(speed)
-	-- Clean math rebuild: receivers are modeled as either stopped or moving at route speed.
-	-- This removes partial-speed formula drift and keeps the prediction equation simple.
+	-- Preserve the stopped-vs-moving gate, but do not force every moving sample to
+	-- exactly 21 studs/s.  That was overpredicting strafes, cuts, slows, and short
+	-- routes.  A small gain keeps the old lead feel without making every route max speed.
 	local clamped=math.clamp(speed or 0,0,MAX_RUN_SPEED)
 	if clamped<CLEAN_MOVING_SPEED_MIN then
 		return 0
 	end
 
-	return MAX_RUN_SPEED
+	return math.clamp(clamped*ROUTE_SPEED_PARTIAL_GAIN,0,MAX_RUN_SPEED)
 end
 
 local function getModeKey(ctx)
@@ -735,6 +751,9 @@ function QBAim.new(ctx,parent)
 	local qbYDriftFrame=nil
 	local qbYDriftBox=nil
 	local qbYDriftSliderControl=nil
+	local releaseWaitFrame=nil
+	local releaseWaitBox=nil
+	local releaseWaitSliderControl=nil
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
 	local PEAK_HEIGHT_MIN=8.00
@@ -769,14 +788,24 @@ function QBAim.new(ctx,parent)
 		state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
 	end
 
+	if state.qbAimQBYDrift==nil then
+		state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
+	end
+
+	if state.qbAimReleaseWait==nil then
+		state.qbAimReleaseWait=THROW_ANIMATION_RELEASE_WAIT
+	end
 
 	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
 	WR_MAX_Y=math.clamp(tonumber(state.qbAimPeakHeight) or WR_MAX_Y,PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX)
 	QB_RELEASE_ORIGIN_DRIFT_TIME=math.clamp(tonumber(state.qbAimQBDrift) or QB_RELEASE_ORIGIN_DRIFT_TIME,QB_DRIFT_MIN,QB_DRIFT_MAX)
-	QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME
+	QB_RELEASE_VERTICAL_DRIFT_TIME=math.clamp(tonumber(state.qbAimQBYDrift) or QB_RELEASE_VERTICAL_DRIFT_TIME,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
+	THROW_ANIMATION_RELEASE_WAIT=math.clamp(tonumber(state.qbAimReleaseWait) or THROW_ANIMATION_RELEASE_WAIT,THROW_ANIMATION_RELEASE_WAIT_MIN,THROW_ANIMATION_RELEASE_WAIT_MAX)
+	WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 	state.qbAimPeakHeight=WR_MAX_Y
 	state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
 	state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
+	state.qbAimReleaseWait=THROW_ANIMATION_RELEASE_WAIT
 	C1_Y_MIN=WR_MAX_Y
 	C1_Y_MAX=WR_MAX_Y
 	C1_Y_FIXED=WR_MAX_Y
@@ -882,6 +911,16 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
+	local function updateReleaseWaitVisuals()
+		if releaseWaitSliderControl then
+			releaseWaitSliderControl.set(THROW_ANIMATION_RELEASE_WAIT)
+		end
+
+		if releaseWaitBox then
+			releaseWaitBox.Text=string.format("%.3f",THROW_ANIMATION_RELEASE_WAIT)
+		end
+	end
+
 	local function setLeadDelay(value,showStatus)
 		local numberValue=tonumber(value)
 		if not numberValue then
@@ -907,11 +946,8 @@ function QBAim.new(ctx,parent)
 		end
 
 		QB_RELEASE_ORIGIN_DRIFT_TIME=math.clamp(numberValue,QB_DRIFT_MIN,QB_DRIFT_MAX)
-		QB_RELEASE_VERTICAL_DRIFT_TIME=QB_RELEASE_ORIGIN_DRIFT_TIME
 		state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
-		state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
 		updateQBDriftVisuals()
-		updateQBYDriftVisuals()
 		if showStatus then
 			changed()
 		end
@@ -919,8 +955,36 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function setQBYDrift(value,showStatus)
-		-- Compatibility shim: X/Y/Z release-origin drift is one shared value.
-		return setQBDrift(value,showStatus)
+		local numberValue=tonumber(value)
+		if not numberValue then
+			updateQBYDriftVisuals()
+			return false
+		end
+
+		QB_RELEASE_VERTICAL_DRIFT_TIME=math.clamp(numberValue,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
+		state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
+		updateQBYDriftVisuals()
+		if showStatus then
+			changed()
+		end
+		return true
+	end
+
+	local function setReleaseWait(value,showStatus)
+		local numberValue=tonumber(value)
+		if not numberValue then
+			updateReleaseWaitVisuals()
+			return false
+		end
+
+		THROW_ANIMATION_RELEASE_WAIT=math.clamp(numberValue,THROW_ANIMATION_RELEASE_WAIT_MIN,THROW_ANIMATION_RELEASE_WAIT_MAX)
+		WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
+		state.qbAimReleaseWait=THROW_ANIMATION_RELEASE_WAIT
+		updateReleaseWaitVisuals()
+		if showStatus then
+			changed()
+		end
+		return true
 	end
 
 	local function setPeakHeight(value,showStatus)
@@ -1159,6 +1223,7 @@ function QBAim.new(ctx,parent)
 		updatePeakHeightVisuals()
 		updateQBDriftVisuals()
 		updateQBYDriftVisuals()
+		updateReleaseWaitVisuals()
 		setTargetText()
 
 		if not isAvailable() then
@@ -1355,8 +1420,9 @@ function QBAim.new(ctx,parent)
 		local now=os.clock()
 		local rawVelocity,source,rawSpeed=currentReceiverRawVelocity(data,receiverRoot,fallbackVelocity)
 		local routeVelocity=Vector3.zero
-		if rawVelocity.Magnitude>=CLEAN_MOVING_SPEED_MIN then
-			routeVelocity=rawVelocity.Unit*MAX_RUN_SPEED
+		local modeledSpeed=routeSpeed(rawVelocity.Magnitude)
+		if modeledSpeed>0 then
+			routeVelocity=rawVelocity.Unit*modeledSpeed
 		end
 
 		local acceleration=clampMagnitude(flat(data and data.accel or Vector3.zero),PREDICTOR_ACCEL_MAX)
@@ -1436,13 +1502,17 @@ function QBAim.new(ctx,parent)
 		local ball=getHeldBall()
 		local characterRoot=LP.Character and root(LP.Character)
 		local qbPosition=(ball and ball.Position) or (characterRoot and characterRoot.Position) or receiverRoot.Position
-		local routeVelocity=velocity.Unit*MAX_RUN_SPEED
+		local modeledSpeed=routeSpeed(velocity.Magnitude)
+		if modeledSpeed<=0 then
+			return nil
+		end
+		local routeVelocity=velocity.Unit*modeledSpeed
 
 		return{
 			player=receiver,
 			createdAt=os.clock(),
 			routeDir=routeVelocity.Unit,
-			routeSpeed=MAX_RUN_SPEED,
+			routeSpeed=modeledSpeed,
 			routeVelocity=routeVelocity,
 			stableSource=source,
 			shape=movementShape(qbPosition,receiverRoot.Position,routeVelocity),
@@ -1459,7 +1529,8 @@ function QBAim.new(ctx,parent)
 		end
 
 		-- H locks receiver identity only. Direction always uses the current raw vector.
-		velocity=velocity.Unit*MAX_RUN_SPEED
+		-- predictionState() already applies routeSpeed(), so do not apply routeSpeed()
+		-- a second time here. Double-applying the gain overpredicts non-max routes.
 		state.routeVelocity=velocity
 		return velocity,movementShape(originPosition,receiverRoot.Position,velocity),state
 	end
@@ -1515,8 +1586,6 @@ function QBAim.new(ctx,parent)
 
 	local function origin(qbRoot,ball,xzReleaseOffset,yReleaseOffset)
 		xzReleaseOffset=xzReleaseOffset or 0
-		-- X/Y/Z share the same release-origin drift time unless explicitly overridden.
-		yReleaseOffset=yReleaseOffset
 		if yReleaseOffset==nil then
 			yReleaseOffset=xzReleaseOffset
 		end
@@ -1525,23 +1594,26 @@ function QBAim.new(ctx,parent)
 		local fallbackPosition=ball and ball.Position or qbRoot.Position
 		local c2Pos=c2Position()
 		local useC2=false
-		if c2Pos then
-			local referencePosition=ball and ball.Position or qbRoot.Position
+		if USE_FULL_C2_RELEASE_ORIGIN and c2Pos then
+			-- Validate C2 against the QB/root, not only against the football mesh.  The
+			-- ball part can be visually/weld-offset from the actual throw attachment.
+			local referencePosition=qbRoot.Position
 			local yValid=c2Pos.Y>=referencePosition.Y-C2_GROUND_FALLBACK_MARGIN and c2Pos.Y<=referencePosition.Y+C2_MAX_ABOVE_BALL
-			local distanceValid=(c2Pos-referencePosition).Magnitude<=C2_MAX_RELEASE_DISTANCE
+			local distanceValid=distXZ(c2Pos,referencePosition)<=C2_MAX_RELEASE_DISTANCE
 			useC2=yValid and distanceValid
 		end
 
 		local basePosition=useC2 and c2Pos or fallbackPosition
 		local y=basePosition.Y
+		local applyDrift=(not useC2) or C2_RELEASE_DRIFT_WHEN_USED
 
 		local dx,dz=0,0
-		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and xzReleaseOffset>0 then
+		if applyDrift and QB_RELEASE_EXTRAPOLATE_HORIZONTAL and xzReleaseOffset>0 then
 			dx=rootVelocity.X*xzReleaseOffset
 			dz=rootVelocity.Z*xzReleaseOffset
 		end
 
-		if QB_RELEASE_EXTRAPOLATE_VERTICAL and yReleaseOffset>0 then
+		if applyDrift and QB_RELEASE_EXTRAPOLATE_VERTICAL and yReleaseOffset>0 then
 			local verticalVelocity=releaseVerticalVelocity(qbRoot,ball)
 			local airborne=math.abs(verticalVelocity)>=QB_AIRBORNE_VY_EPSILON or qbRoot.Position.Y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON
 			if airborne then
@@ -1833,7 +1905,7 @@ function QBAim.new(ctx,parent)
 		-- Predict the actual server SpawnPos/release origin forward by qbReleaseOffset,
 		-- predict the receiver by receiverReleaseOffset, and build the outgoing Target
 		-- ray from that future release point.
-		local originPosition=origin(qbRoot,ball,qbReleaseOffset,qbReleaseOffset)
+		local originPosition=origin(qbRoot,ball,qbReleaseOffset,QB_RELEASE_VERTICAL_DRIFT_TIME)
 		local receiverBasePosition=receiverAnchorPosition or receiverRoot.Position
 		local receiverReleasePosition=receiverBasePosition+wrVel*receiverReleaseOffset
 		local receiverStart=receiverMaxAt(receiverReleasePosition)
@@ -2144,8 +2216,15 @@ function QBAim.new(ctx,parent)
 		beam.Enabled=true
 	end
 
+	local function currentRemotePower()
+		local mechanics=getGlobalMechanics()
+		local power=mechanics and tonumber(mechanics.BallPower) or REMOTE_DISPLAY_POWER
+		return math.clamp(power or REMOTE_DISPLAY_POWER,30,100)
+	end
+
 	local function currentBallPower()
-		return getModeKey(ctx)=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
+		-- Game source uses display power * 0.95 for modeled football speed.
+		return currentRemotePower()*0.95
 	end
 
 	local function hasHeldBallForPreview()
@@ -2189,17 +2268,55 @@ function QBAim.new(ctx,parent)
 
 		releaseOffset=releaseOffset or 0
 		receiverReleaseOffset=receiverReleaseOffset==nil and releaseOffset or receiverReleaseOffset
-		local originPosition=origin(qbRoot,ball,releaseOffset)
+		local originPosition=origin(qbRoot,ball,releaseOffset,QB_RELEASE_VERTICAL_DRIFT_TIME)
 		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
 		return solve(qbRoot,ball,receiverRoot,targetVelocity,shape,ballPower or currentBallPower(),releaseOffset,receiverReleaseOffset,predictorState,receiverAnchorPosition,receiverAnchorSource),ball
 	end
 
+	local function shallowCopyPlan(plan)
+		local copy={}
+		for key,value in pairs(plan) do
+			copy[key]=value
+		end
+		return copy
+	end
+
+	local function rebasePlanToCurrentReleaseOrigin(plan,releaseBall)
+		local character=LP.Character
+		local qbRoot=root(character)
+		local ball=(releaseBall and releaseBall.Parent and releaseBall) or getHeldBall()
+		if not(qbRoot and ball and plan and plan.target and plan.time and plan.time>0) then
+			return plan
+		end
+
+		-- At fire time, C2/hand/ball state may have moved.  Keep the locked catch
+		-- target, but rebuild the outgoing ray from the current release estimate so
+		-- the server does not reinterpret the old world Target from a shifted SpawnPos.
+		local releaseOrigin=origin(qbRoot,ball,0,0)
+		local target=plan.target or plan.c1Point
+		local time=plan.time
+		local neededVelocity=(target-releaseOrigin-0.5*G*time*time)/time
+		if neededVelocity.Magnitude<=1e-6 then
+			return plan
+		end
+
+		local direction=neededVelocity.Unit
+		local rebased=shallowCopyPlan(plan)
+		rebased.origin=releaseOrigin
+		rebased.requiredVelocity=neededVelocity
+		rebased.requiredSpeed=neededVelocity.Magnitude
+		rebased.direction=direction
+		rebased.throwVelocity=direction*(plan.speed or currentBallPower())
+		rebased.worldVelocity=rebased.throwVelocity
+		rebased.velocity=rebased.worldVelocity
+		rebased.aimPoint=releaseOrigin+direction*AIM_SCALE
+		rebased.angleDeg=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
+		rebased.rebasedAtFire=true
+		return rebased
+	end
+
 	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
-		-- Target-latch / delayed-remote solver.
-		-- The preview arc locks at keypress, but the remote appears shortly before release.
-		-- Keep the keypress plan frozen during animation, then send that same world Target.
-		-- Do not recompute from the future QB point and do not fire immediately.
 		if THROW_TARGET_FIRE_IMMEDIATELY then
 			if lockedPlan then
 				previewPlan(lockedPlan)
@@ -2228,6 +2345,17 @@ function QBAim.new(ctx,parent)
 			RunService.Heartbeat:Wait()
 		end
 
+		if THROW_RECOMPUTE_RELEASE_PLAN then
+			local finalPlan=buildPlan(receiver,ballPower,0,nil,0)
+			if finalPlan then
+				return finalPlan,nil
+			end
+		end
+
+		if THROW_REBASE_REMOTE_TARGET_AT_FIRE and lockedPlan then
+			return rebasePlanToCurrentReleaseOrigin(lockedPlan,releaseBall),releaseBall
+		end
+
 		return lockedPlan,releaseBall
 	end
 
@@ -2240,7 +2368,7 @@ function QBAim.new(ctx,parent)
 		reEvent:FireServer("Mechanics","ThrowBall",{
 			Target=plan.aimPoint,
 			AutoThrow=false,
-			Power=REMOTE_DISPLAY_POWER,
+			Power=currentRemotePower(),
 		})
 
 		-- Do not call local UnequipFootball here. Normal flow lets the server send the
@@ -2257,7 +2385,7 @@ function QBAim.new(ctx,parent)
 		reEvent:FireServer("Mechanics","ThrowBall",{
 			Target=plan.aimPoint,
 			AutoThrow=false,
-			Power=REMOTE_DISPLAY_POWER, -- must be 100, not plan.speed/95
+			Power=currentRemotePower(), -- must be 100, not plan.speed/95
 		})
 
 		return true,nil
@@ -2288,7 +2416,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		local modeKey=getModeKey(ctx)
-		local power=modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
+		local power=currentBallPower()
 		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
 		if not receiverRoot then
 			setStatus("No receiver locked")
@@ -2458,10 +2586,15 @@ function QBAim.new(ctx,parent)
 		setQBYDrift(value,fire~=false)
 	end
 
+	function api.SetReleaseWait(value,fire)
+		setReleaseWait(value,fire~=false)
+	end
+
 	function api.Refresh()
 		syncControls()
 		updateQBDriftVisuals()
 		updateQBYDriftVisuals()
+		updateReleaseWaitVisuals()
 	end
 
 	function api.Reset()
@@ -2522,8 +2655,14 @@ function QBAim.new(ctx,parent)
 		peakHeightSliderControl=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
 			api.SetPeakHeight(value,true)
 		end)
-		qbDriftSliderControl=buildSlider(sectionBody,"QB XYZ Drift",QB_DRIFT_MIN,QB_DRIFT_MAX,QB_RELEASE_ORIGIN_DRIFT_TIME,2,function(value)
+		qbDriftSliderControl=buildSlider(sectionBody,"QB XZ Drift",QB_DRIFT_MIN,QB_DRIFT_MAX,QB_RELEASE_ORIGIN_DRIFT_TIME,2,function(value)
 			api.SetQBDrift(value,true)
+		end)
+		qbYDriftSliderControl=buildSlider(sectionBody,"QB Y Drift",QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX,QB_RELEASE_VERTICAL_DRIFT_TIME,2,function(value)
+			api.SetQBYDrift(value,true)
+		end)
+		releaseWaitSliderControl=buildSlider(sectionBody,"Release Wait",THROW_ANIMATION_RELEASE_WAIT_MIN,THROW_ANIMATION_RELEASE_WAIT_MAX,THROW_ANIMATION_RELEASE_WAIT,3,function(value)
+			api.SetReleaseWait(value,true)
 		end)
 	else
 		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
@@ -2540,9 +2679,21 @@ function QBAim.new(ctx,parent)
 		end))
 		qbDriftFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
 		qbDriftBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",QB_RELEASE_ORIGIN_DRIFT_TIME),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},qbDriftFrame)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="QB XYZ Drift",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbDriftFrame)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="QB XZ Drift",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbDriftFrame)
 		addConnection(qbDriftBox.FocusLost:Connect(function()
 			setQBDrift(qbDriftBox.Text,true)
+		end))
+		qbYDriftFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
+		qbYDriftBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",QB_RELEASE_VERTICAL_DRIFT_TIME),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},qbYDriftFrame)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="QB Y Drift",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbYDriftFrame)
+		addConnection(qbYDriftBox.FocusLost:Connect(function()
+			setQBYDrift(qbYDriftBox.Text,true)
+		end))
+		releaseWaitFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
+		releaseWaitBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.3f",THROW_ANIMATION_RELEASE_WAIT),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},releaseWaitFrame)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="Release Wait",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},releaseWaitFrame)
+		addConnection(releaseWaitBox.FocusLost:Connect(function()
+			setReleaseWait(releaseWaitBox.Text,true)
 		end))
 	end
 
@@ -2550,6 +2701,7 @@ function QBAim.new(ctx,parent)
 	updatePeakHeightVisuals()
 	updateQBDriftVisuals()
 	updateQBYDriftVisuals()
+	updateReleaseWaitVisuals()
 	updateQBDriftVisuals()
 
 	addConnection(RunService.Heartbeat:Connect(function(dt)
