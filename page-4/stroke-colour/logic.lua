@@ -11,9 +11,9 @@ local DEFAULTS={
 	StrokeG=76,
 	StrokeB=76,
 
-	GradientR=45,
-	GradientG=45,
-	GradientB=45,
+	GradientR=76,
+	GradientG=76,
+	GradientB=76,
 
 	StrokeGradient=false,
 	LiquidStroke=false,
@@ -489,6 +489,8 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function syncColourControls()
+		UI_STYLE.StrokeGradient=false
+
 		if prSlider then prSlider.set(UI_STYLE.PrimaryR) end
 		if pgSlider then pgSlider.set(UI_STYLE.PrimaryG) end
 		if pbSlider then pbSlider.set(UI_STYLE.PrimaryB) end
@@ -505,7 +507,7 @@ function StrokeColour.new(ctx,page)
 		if thicknessSlider then thicknessSlider.set(UI_STYLE.StrokeThickness) end
 		if transparencySlider then transparencySlider.set(UI_STYLE.StrokeTransparency) end
 
-		if gradientToggle then gradientToggle.set(UI_STYLE.StrokeGradient) end
+		if gradientToggle then gradientToggle.set(false) end
 		if liquidToggle then liquidToggle.set(UI_STYLE.LiquidStroke) end
 
 		tintSlider(prSlider,Color3.fromRGB(clampByte(UI_STYLE.PrimaryR),0,0))
@@ -525,7 +527,7 @@ function StrokeColour.new(ctx,page)
 		tintSlider(transparencySlider,getUIStrokeColor())
 	end
 
-	local function tweenStyleTo(c1,c2,gradientEnabled)
+	local function tweenStyleTo(c1)
 		colourTweenToken=colourTweenToken+1
 
 		local token=colourTweenToken
@@ -535,7 +537,7 @@ function StrokeColour.new(ctx,page)
 		mainValue.Value=getUIStrokeColor()
 		gradientValue.Value=getUIStrokeGradientColor()
 
-		UI_STYLE.StrokeGradient=gradientEnabled and true or false
+		UI_STYLE.StrokeGradient=false
 
 		local function applyStep()
 			if token~=colourTweenToken then return end
@@ -567,12 +569,12 @@ function StrokeColour.new(ctx,page)
 
 		local info=TweenInfo.new(0.24,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 		local t1=TweenService:Create(mainValue,info,{Value=c1})
-		local t2=TweenService:Create(gradientValue,info,{Value=c2 or c1})
+		local t2=TweenService:Create(gradientValue,info,{Value=c1})
 
 		trackValueConnection(t2.Completed:Connect(function()
 			if token==colourTweenToken then
 				setMainColour(c1)
-				setGradientColour(c2 or c1)
+				setGradientColour(c1)
 
 				syncColourControls()
 				updateEverything()
@@ -655,18 +657,18 @@ function StrokeColour.new(ctx,page)
 	end
 
 	function api.ApplyGradient(c1,c2)
-		UI_STYLE.StrokeGradient=true
+		UI_STYLE.StrokeGradient=false
 		UI_STYLE.LiquidStroke=false
 
 		if gradientToggle then
-			gradientToggle.set(true)
+			gradientToggle.set(false)
 		end
 
 		if liquidToggle then
 			liquidToggle.set(false)
 		end
 
-		tweenStyleTo(c1,c2,true)
+		tweenStyleTo(c1 or c2 or getUIStrokeColor())
 		setPickerFromColor(getActiveColor())
 		syncPickerControls()
 	end
@@ -1205,10 +1207,6 @@ function StrokeColour.new(ctx,page)
 			return getUIPrimaryColor()
 		end
 
-		if activeTarget=="Gradient" then
-			return getUIStrokeGradientColor()
-		end
-
 		return getUIStrokeColor()
 	end
 
@@ -1225,11 +1223,9 @@ function StrokeColour.new(ctx,page)
 
 		if activeTarget=="Primary" then
 			setPrimaryColour(color)
-		elseif activeTarget=="Gradient" then
-			UI_STYLE.StrokeGradient=true
-			setGradientColour(color)
 		else
 			setMainColour(color)
+			setGradientColour(color)
 		end
 
 		syncColourControls()
@@ -1246,6 +1242,10 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function setActiveTarget(target)
+		if target=="Gradient" then
+			target="Stroke"
+		end
+
 		activeTarget=target
 		setPickerFromColor(getActiveColor())
 		syncPickerControls()
@@ -1323,22 +1323,23 @@ function StrokeColour.new(ctx,page)
 	},themeGrid)
 
 	local themePresets={
-		{Name="Void",Primary=Color3.fromRGB(28,28,28),Stroke=Color3.fromRGB(76,76,76),Gradient=Color3.fromRGB(45,45,45),GradientOn=false},
-		{Name="Polar",Primary=Color3.fromRGB(238,238,238),Stroke=Color3.fromRGB(190,190,190),Gradient=Color3.fromRGB(115,115,115),GradientOn=false},
-		{Name="Midnight",Primary=Color3.fromRGB(12,18,38),Stroke=Color3.fromRGB(72,98,158),Gradient=Color3.fromRGB(21,103,251),GradientOn=true},
-		{Name="Crimson",Primary=Color3.fromRGB(58,17,24),Stroke=Color3.fromRGB(150,45,54),Gradient=Color3.fromRGB(254,94,86),GradientOn=true},
-		{Name="Evergreen",Primary=Color3.fromRGB(18,36,34),Stroke=Color3.fromRGB(45,112,78),Gradient=Color3.fromRGB(32,202,106),GradientOn=true},
-		{Name="Steel",Primary=Color3.fromRGB(24,27,34),Stroke=Color3.fromRGB(96,110,132),Gradient=Color3.fromRGB(158,170,188),GradientOn=true},
+		{Name="Void",Primary=Color3.fromRGB(28,28,28),Stroke=Color3.fromRGB(76,76,76),Gradient=Color3.fromRGB(76,76,76),GradientOn=false},
+		{Name="Polar",Primary=Color3.fromRGB(238,238,238),Stroke=Color3.fromRGB(190,190,190),Gradient=Color3.fromRGB(190,190,190),GradientOn=false},
+		{Name="Midnight",Primary=Color3.fromRGB(12,18,38),Stroke=Color3.fromRGB(72,98,158),Gradient=Color3.fromRGB(72,98,158),GradientOn=false},
+		{Name="Crimson",Primary=Color3.fromRGB(58,17,24),Stroke=Color3.fromRGB(150,45,54),Gradient=Color3.fromRGB(150,45,54),GradientOn=false},
+		{Name="Evergreen",Primary=Color3.fromRGB(18,36,34),Stroke=Color3.fromRGB(45,112,78),Gradient=Color3.fromRGB(45,112,78),GradientOn=false},
+		{Name="Sakura",Primary=Color3.fromRGB(43,3,33),Stroke=Color3.fromRGB(215,136,236),Gradient=Color3.fromRGB(215,136,236),GradientOn=false},
 	}
 
 	local function applyThemePreset(preset)
 		setPrimaryColour(preset.Primary)
+		UI_STYLE.StrokeGradient=false
 		UI_STYLE.LiquidStroke=false
 		UI_STYLE.StrokeThickness=1
 		UI_STYLE.StrokeTransparency=0.84
 		syncColourControls()
 		updateEverything()
-		tweenStyleTo(preset.Stroke,preset.Gradient,preset.GradientOn)
+		tweenStyleTo(preset.Stroke)
 		setPickerFromColor(getActiveColor())
 		syncPickerControls()
 	end
@@ -1404,7 +1405,7 @@ function StrokeColour.new(ctx,page)
 		SortOrder=Enum.SortOrder.LayoutOrder,
 	},targetRow)
 
-	for i,target in ipairs({"Primary","Stroke","Gradient"}) do
+	for i,target in ipairs({"Primary","Stroke"}) do
 		local button,marker=makeFlatButton(targetRow,target,i)
 		trackConnection(button.Activated:Connect(function()
 			setActiveTarget(target)
@@ -2371,19 +2372,11 @@ function StrokeColour.new(ctx,page)
 	paintChoices=function()
 		local primary=getUIPrimaryColor()
 		local stroke=getUIStrokeColor()
-		local gradient=getUIStrokeGradientColor()
-		local strokeGradient=UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke
 		local activeColor=getActiveColor()
 
 		for _,entry in ipairs(themeCards) do
 			local preset=entry.Preset
 			local selected=colorsMatch(primary,preset.Primary) and colorsMatch(stroke,preset.Stroke)
-
-			if preset.GradientOn then
-				selected=selected and strokeGradient and colorsMatch(gradient,preset.Gradient)
-			else
-				selected=selected and not strokeGradient
-			end
 
 			entry.Card.BackgroundColor3=selected and preset.Primary:Lerp(readableTextColor(preset.Primary),0.06) or preset.Primary
 			entry.Marker.Visible=selected

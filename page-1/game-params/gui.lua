@@ -361,6 +361,7 @@ function GameParamsGui.new(ctx,parent)
 		local selected=normalizePageKey(state.paramsSelectedPage)
 		local active=accentColor()
 		local coreColor=brightenColor(active,0.10)
+		local enabledIdleColor=brightenColor(active,0.24)
 		local hoverColor=brightenColor(active,0.22)
 		local haloColor=brightenColor(active,0.56)
 		local muted=mutedColor()
@@ -378,8 +379,8 @@ function GameParamsGui.new(ctx,parent)
 			local outerGlowTransparency=1
 
 			if enabled then
-				targetColor=isHover and hoverColor or coreColor
 				if isSelected then
+					targetColor=isHover and hoverColor or coreColor
 					targetTransparency=isHover and 0.04 or 0.08
 					nearGlowTransparency=isHover and 0.12 or 0.20
 					midGlowTransparency=isHover and 0.28 or 0.38
@@ -387,17 +388,21 @@ function GameParamsGui.new(ctx,parent)
 					outerGlowTransparency=isHover and 0.72 or 0.82
 					highlightTransparency=isHover and 0.50 or 0.62
 				elseif isHover then
+					targetColor=hoverColor
 					targetTransparency=0.18
-					nearGlowTransparency=0.40
-					midGlowTransparency=0.62
-					farGlowTransparency=0.80
-					outerGlowTransparency=0.92
-					highlightTransparency=0.78
+					nearGlowTransparency=0.30
+					midGlowTransparency=0.52
+					farGlowTransparency=0.74
+					outerGlowTransparency=0.88
+					highlightTransparency=0.68
 				else
-					targetTransparency=0.42
-					nearGlowTransparency=0.78
-					midGlowTransparency=0.92
-					farGlowTransparency=0.98
+					targetColor=enabledIdleColor
+					targetTransparency=0.24
+					nearGlowTransparency=0.52
+					midGlowTransparency=0.74
+					farGlowTransparency=0.88
+					outerGlowTransparency=0.96
+					highlightTransparency=0.82
 				end
 			elseif isSelected then
 				targetColor=brightenColor(muted,0.12)

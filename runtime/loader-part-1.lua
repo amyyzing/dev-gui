@@ -1400,7 +1400,7 @@ local function styleByte(name,fallback)
 	return math.clamp(math.floor((tonumber(UI_STYLE[name]) or fallback)+0.5),0,255)
 end
 
-local STYLE_COLOR_DEFAULTS={Stroke={76,76,76},Gradient={45,45,45},Primary={28,28,28}}
+local STYLE_COLOR_DEFAULTS={Stroke={76,76,76},Gradient={76,76,76},Primary={28,28,28}}
 
 local function styleColor(prefix,defaults)
 	return Color3.fromRGB(
@@ -1428,7 +1428,7 @@ UILibOriginalModule={
 	Style={
 		Primary=Color3.fromRGB(28,28,28),
 		Stroke=Color3.fromRGB(76,76,76),
-		Gradient=Color3.fromRGB(45,45,45),
+		Gradient=Color3.fromRGB(76,76,76),
 		GradientOn=false,
 		StrokeThickness=1,
 		StrokeTransparency=0.84,
@@ -1465,7 +1465,7 @@ UILibOriginalModule={
 		ControlStrokeTransparency=0.78,
 	},
 	Defaults={
-		PrimaryR=28,PrimaryG=28,PrimaryB=28,StrokeR=76,StrokeG=76,StrokeB=76,GradientR=45,GradientG=45,GradientB=45,
+		PrimaryR=28,PrimaryG=28,PrimaryB=28,StrokeR=76,StrokeG=76,StrokeB=76,GradientR=76,GradientG=76,GradientB=76,
 		StrokeGradient=false,LiquidStroke=false,LiquidStrokeSpeed=1,LiquidStrokeDirection="Right",StrokeThickness=1,StrokeTransparency=0.84,CornerRadius=0,UILib="original",
 		ThemePanelExpanded=false,ColoursPanelExpanded=false,HighlightPanelExpanded=false,HighlightSelectedMode="espOffense",HighlightSelectedState="open",
 		ESPOffenseCustomColor=false,ESPDefenseCustomColor=false,QBAimHighlightCustomColor=false,
@@ -1958,8 +1958,9 @@ end
 
 applyUIStrokeTheme=function()
 	local color=getUIStrokeColor()
-	local color2=getUIStrokeGradientColor()
+	local color2=color
 	local strokeHideTransparency=0.86
+	UI_STYLE.StrokeGradient=false
 	THEME.STROKE=color
 	applyUIPrimaryTheme()
 
@@ -1995,7 +1996,7 @@ applyUIStrokeTheme=function()
 
 				local gradient=obj:FindFirstChild("StrokeGradient")
 
-				if (UI_STYLE.StrokeGradient or UI_STYLE.LiquidStroke) and accentRole then
+				if UI_STYLE.LiquidStroke and accentRole then
 					if not gradient then
 						gradient=Instance.new("UIGradient")
 						gradient.Name="StrokeGradient"
