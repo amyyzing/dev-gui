@@ -88,15 +88,21 @@ local GLOBAL_MIN_ANGLE=-5
 local GLOBAL_MAX_ANGLE=55
 local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
-local ARC_PREVIEW_UPDATE_INTERVAL=0.035
-local ARC_ATTACHMENT_ROLL=math.rad(90)
-local ARC_UNSAFE_COLOR=Color3.fromRGB(254,94,86)
-local DEFENDER_SPEED_STUDS=21
-local DEFENDER_REACTION_BUFFER=0.05
-local DEFENDER_CATCH_HEIGHT_TOLERANCE=0.25
-local DEFENDER_SAMPLE_DT=0.08
-local DEFENDER_SAMPLE_MAX=28
-local RECEIVER_TRACK_INTERVAL=0.05
+local ARC_SETTINGS={
+	UpdateInterval=0.035,
+	AttachmentRoll=math.rad(90),
+	UnsafeColor=Color3.fromRGB(254,94,86),
+}
+local DEFENDER_SETTINGS={
+	Speed=21,
+	ReactionBuffer=0.05,
+	CatchHeightTolerance=0.25,
+	SampleDt=0.08,
+	SampleMax=28,
+}
+local TRACK_SETTINGS={
+	ReceiverInterval=0.05,
+}
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
 local PREVIEW_MISSING_BALL_GRACE=0.2
@@ -401,21 +407,6 @@ local function isSameTeam(playerA,playerB)
 	return teamA==teamB
 end
 
-local function isOpposingPlayer(player,referencePlayer)
-	if not player or not referencePlayer or player==referencePlayer then
-		return false
-	end
-
-	local playerTeam=getPlayerTeamID(player)
-	local referenceTeam=getPlayerTeamID(referencePlayer)
-
-	if not isValidGameTeamID(playerTeam) or not isValidGameTeamID(referenceTeam) then
-		return false
-	end
-
-	return playerTeam~=referenceTeam
-end
-
 local function getFootballFromFolder(folder)
 	if not folder then return nil end
 
@@ -543,10 +534,6 @@ local function xAxisCFrame(position,xVector)
 	return CFrame.fromMatrix(position,xVector,y,z)
 end
 
-local function arcAttachmentCFrame(position,xVector)
-	return xAxisCFrame(position,xVector)*CFrame.Angles(ARC_ATTACHMENT_ROLL,0,0)
-end
-
 local function prepPreviewObject(object)
 	if not object then return end
 
@@ -608,28 +595,28 @@ local function getSquadsReEvent()
 	return nil,nil
 end
 
-local cachedMechanics=nil
+QBAim._cachedMechanics=nil
 
-local function getGlobalMechanics()
+function QBAim._getGlobalMechanics()
 	local function valid(mechanics)
 		return mechanics and (type(mechanics.PlayAnimation)=="function" or type(mechanics.UnequipFootball)=="function")
 	end
 
-	if valid(cachedMechanics) then
-		return cachedMechanics
+	if valid(QBAim._cachedMechanics) then
+		return QBAim._cachedMechanics
 	end
 
 	local globals=(typeof(getgenv)=="function" and getgenv()) or _G or {}
 	if type(globals)=="table" then
 		local mechanics=rawget(globals,"Mechanics")
 		if valid(mechanics) then
-			cachedMechanics=mechanics
+			QBAim._cachedMechanics=mechanics
 			return mechanics
 		end
 
 		local variables=rawget(globals,"Variables")
 		if type(variables)=="table" and valid(variables.Mechanics) then
-			cachedMechanics=variables.Mechanics
+			QBAim._cachedMechanics=variables.Mechanics
 			return variables.Mechanics
 		end
 	end
@@ -641,7 +628,7 @@ local function getGlobalMechanics()
 	if variablesModule then
 		local ok,variables=pcall(require,variablesModule)
 		if ok and type(variables)=="table" and valid(variables.Mechanics) then
-			cachedMechanics=variables.Mechanics
+			QBAim._cachedMechanics=variables.Mechanics
 			return variables.Mechanics
 		end
 	end
@@ -649,7 +636,7 @@ local function getGlobalMechanics()
 	return nil
 end
 
-local function findThrowAnimation()
+function QBAim._findThrowAnimation()
 	local containers={
 		ReplicatedStorage,
 		LP:FindFirstChild("PlayerScripts"),
@@ -666,12 +653,12 @@ local function findThrowAnimation()
 	return nil
 end
 
-local function playLocalThrowAnimation()
+function QBAim._playLocalThrowAnimation()
 	local character=LP.Character or Workspace:FindFirstChild(LP.Name)
 	local humanoid=character and character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return false end
 
-	local animation=findThrowAnimation()
+	local animation=QBAim._findThrowAnimation()
 	if not animation then return false end
 
 	local animator=humanoid:FindFirstChildOfClass("Animator")
@@ -693,10 +680,10 @@ local function playLocalThrowAnimation()
 	return true
 end
 
-local function playThrowAnimation()
+function QBAim._playThrowAnimation()
 	if not PLAY_THROW_ANIMATION or not getHeldBall() then return false end
 
-	local mechanics=getGlobalMechanics()
+	local mechanics=QBAim._getGlobalMechanics()
 	if mechanics and type(mechanics.PlayAnimation)=="function" then
 		local ok=pcall(function()
 			mechanics:PlayAnimation(THROW_ANIMATION_NAME,THROW_ANIMATION_SPEED)
@@ -707,7 +694,7 @@ local function playThrowAnimation()
 	end
 
 	if PLAY_THROW_LOCAL_FALLBACK then
-		local ok=playLocalThrowAnimation()
+		local ok=QBAim._playLocalThrowAnimation()
 		return ok,"local"
 	end
 
@@ -2129,9 +2116,11 @@ function QBAim.new(ctx,parent)
 
 	local function collectArcDefenderRoots(receiver)
 		local roots={}
+		local localTeam=getPlayerTeamID(LP)
 
 		for _,player in ipairs(Players:GetPlayers()) do
-			if player~=receiver and isOpposingPlayer(player,LP) then
+			local playerTeam=getPlayerTeamID(player)
+			if player~=receiver and player~=LP and isValidGameTeamID(playerTeam) and isValidGameTeamID(localTeam) and playerTeam~=localTeam then
 				local character=Workspace:FindFirstChild(player.Name) or player.Character
 				local defenderRoot=root(character)
 				if defenderRoot then
@@ -2148,11 +2137,11 @@ function QBAim.new(ctx,parent)
 			return false
 		end
 
-		if ballPosition.Y>catchY+DEFENDER_CATCH_HEIGHT_TOLERANCE then
+		if ballPosition.Y>catchY+DEFENDER_SETTINGS.CatchHeightTolerance then
 			return false
 		end
 
-		local reachRadius=DEFENDER_SPEED_STUDS*(elapsed+DEFENDER_REACTION_BUFFER)
+		local reachRadius=DEFENDER_SETTINGS.Speed*(elapsed+DEFENDER_SETTINGS.ReactionBuffer)
 		return (flat(defenderRoot.Position)-flat(ballPosition)).Magnitude<=reachRadius
 	end
 
@@ -2179,7 +2168,7 @@ function QBAim.new(ctx,parent)
 			end
 		end
 
-		local sampleCount=math.clamp(math.ceil(catchTime/DEFENDER_SAMPLE_DT),4,DEFENDER_SAMPLE_MAX)
+		local sampleCount=math.clamp(math.ceil(catchTime/DEFENDER_SETTINGS.SampleDt),4,DEFENDER_SETTINGS.SampleMax)
 		for sampleIndex=1,sampleCount do
 			local time=catchTime*sampleIndex/sampleCount
 			local ballPosition=ballAt(plan.origin,plan.velocity,time)
@@ -2198,7 +2187,7 @@ function QBAim.new(ctx,parent)
 		if not beam then return end
 
 		if unsafe then
-			beam.Color=ColorSequence.new(ARC_UNSAFE_COLOR)
+			beam.Color=ColorSequence.new(ARC_SETTINGS.UnsafeColor)
 		elseif preview.beamDefaultColor then
 			beam.Color=preview.beamDefaultColor
 		end
@@ -2253,9 +2242,9 @@ function QBAim.new(ctx,parent)
 		end
 
 		preview.p1,preview.p2,preview.p3=p1,p2,p3
-		setAttachmentCFrame(c2,arcAttachmentCFrame(p2,plan.velocity))
-		setAttachmentCFrame(c1,arcAttachmentCFrame(p1,plan.velocity+G*catchTime))
-		setAttachmentCFrame(c3,arcAttachmentCFrame(p3,endVelocity))
+		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity)*CFrame.Angles(ARC_SETTINGS.AttachmentRoll,0,0))
+		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*catchTime)*CFrame.Angles(ARC_SETTINGS.AttachmentRoll,0,0))
+		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity)*CFrame.Angles(ARC_SETTINGS.AttachmentRoll,0,0))
 		updateC1AndC3Info(plan,p1,p3)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
@@ -2467,7 +2456,7 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		playThrowAnimation()
+		QBAim._playThrowAnimation()
 
 		local plan=buildReleasePlan(receiver,power,heldBall,lockedPlan)
 		if not plan then
@@ -2735,7 +2724,7 @@ function QBAim.new(ctx,parent)
 		if not isAlive() then return end
 
 		receiverTrackElapsed=receiverTrackElapsed+(dt or 0)
-		if receiverTrackElapsed<RECEIVER_TRACK_INTERVAL then return end
+		if receiverTrackElapsed<TRACK_SETTINGS.ReceiverInterval then return end
 		receiverTrackElapsed=0
 
 		local now=os.clock()
@@ -2816,7 +2805,7 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		if now-preview.last<ARC_PREVIEW_UPDATE_INTERVAL then return end
+		if now-preview.last<ARC_SETTINGS.UpdateInterval then return end
 		preview.last=now
 
 		local previewQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
