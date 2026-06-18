@@ -3,17 +3,17 @@ local StrokeColour={}
 local TweenService=game:GetService("TweenService")
 
 local DEFAULTS={
-	PrimaryR=28,
-	PrimaryG=28,
-	PrimaryB=28,
+	PrimaryR=12,
+	PrimaryG=12,
+	PrimaryB=12,
 
-	StrokeR=76,
-	StrokeG=76,
-	StrokeB=76,
+	StrokeR=182,
+	StrokeG=180,
+	StrokeB=180,
 
-	GradientR=76,
-	GradientG=76,
-	GradientB=76,
+	GradientR=182,
+	GradientG=180,
+	GradientB=180,
 
 	StrokeGradient=false,
 	LiquidStroke=false,
@@ -1323,8 +1323,8 @@ function StrokeColour.new(ctx,page)
 	},themeGrid)
 
 	local themePresets={
-		{Name="Void",Primary=Color3.fromRGB(28,28,28),Stroke=Color3.fromRGB(76,76,76),Gradient=Color3.fromRGB(76,76,76),GradientOn=false},
-		{Name="Polar",Primary=Color3.fromRGB(238,238,238),Stroke=Color3.fromRGB(190,190,190),Gradient=Color3.fromRGB(190,190,190),GradientOn=false},
+		{Name="Dark",Primary=Color3.fromRGB(12,12,12),Stroke=Color3.fromRGB(182,180,180),Gradient=Color3.fromRGB(182,180,180),GradientOn=false},
+		{Name="Light",Primary=Color3.fromRGB(238,238,238),Stroke=Color3.fromRGB(60,60,60),Gradient=Color3.fromRGB(60,60,60),GradientOn=false},
 		{Name="Midnight",Primary=Color3.fromRGB(12,18,38),Stroke=Color3.fromRGB(72,98,158),Gradient=Color3.fromRGB(72,98,158),GradientOn=false},
 		{Name="Crimson",Primary=Color3.fromRGB(58,17,24),Stroke=Color3.fromRGB(150,45,54),Gradient=Color3.fromRGB(150,45,54),GradientOn=false},
 		{Name="Evergreen",Primary=Color3.fromRGB(18,36,34),Stroke=Color3.fromRGB(45,112,78),Gradient=Color3.fromRGB(45,112,78),GradientOn=false},
@@ -1450,9 +1450,9 @@ function StrokeColour.new(ctx,page)
 	},quickRow)
 
 	for i,color in ipairs({
-		Color3.fromRGB(28,28,28),
+		Color3.fromRGB(12,12,12),
 		Color3.fromRGB(238,238,238),
-		Color3.fromRGB(76,76,76),
+		Color3.fromRGB(60,60,60),
 		Color3.fromRGB(32,202,106),
 		Color3.fromRGB(21,103,251),
 		Color3.fromRGB(254,94,86),

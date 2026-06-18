@@ -10,7 +10,7 @@ Workspace=game:GetService("Workspace")
 me=Players.LocalPlayer
 guiParent=me:WaitForChild("PlayerGui")
 
-THEME={BG=Color3.fromRGB(28,28,28), PANEL=Color3.fromRGB(33,33,33), CARD=Color3.fromRGB(38,38,38), ACC=Color3.fromRGB(32,202,106), TEXT=Color3.fromRGB(195,195,195), MUTED=Color3.fromRGB(168,168,168), STROKE=Color3.fromRGB(76,76,76), RED=Color3.fromRGB(254,94,86), BLUE=Color3.fromRGB(21,103,251), GREEN=Color3.fromRGB(32,202,106)}
+THEME={BG=Color3.fromRGB(12,12,12), PANEL=Color3.fromRGB(24,24,24), CARD=Color3.fromRGB(31,31,31), ACC=Color3.fromRGB(32,202,106), TEXT=Color3.fromRGB(238,238,238), MUTED=Color3.fromRGB(182,180,180), STROKE=Color3.fromRGB(182,180,180), RED=Color3.fromRGB(254,94,86), BLUE=Color3.fromRGB(21,103,251), GREEN=Color3.fromRGB(32,202,106)}
 
 UI_STYLE={}
 
@@ -948,7 +948,7 @@ loaderBackdropA=New("Frame",{
 	BorderSizePixel=0,
 	ZIndex=LOADER_Z,
 },loaderOverlay)
-New("UICorner",{CornerRadius=UDim.new(1,0)},loaderBackdropA)
+New("UICorner",{CornerRadius=UDim.new(0,0)},loaderBackdropA)
 
 loaderBackdropB=New("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
@@ -959,7 +959,7 @@ loaderBackdropB=New("Frame",{
 	BorderSizePixel=0,
 	ZIndex=LOADER_Z,
 },loaderOverlay)
-New("UICorner",{CornerRadius=UDim.new(1,0)},loaderBackdropB)
+New("UICorner",{CornerRadius=UDim.new(0,0)},loaderBackdropB)
 
 loaderBox=New("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
@@ -1000,7 +1000,7 @@ loaderPercentPill=New("Frame",{
 	BorderSizePixel=0,
 	ZIndex=LOADER_Z+2,
 },loaderBox)
-New("UICorner",{CornerRadius=UDim.new(0,5)},loaderPercentPill)
+New("UICorner",{CornerRadius=UDim.new(0,0)},loaderPercentPill)
 loaderPercentPillStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=1},loaderPercentPill)
 
 loaderTitle=New("TextLabel",{
@@ -1052,7 +1052,7 @@ loaderTrack=New("Frame",{
 	ClipsDescendants=true,
 	ZIndex=LOADER_Z+2,
 },loaderBox)
-New("UICorner",{CornerRadius=UDim.new(0,6)},loaderTrack)
+New("UICorner",{CornerRadius=UDim.new(0,0)},loaderTrack)
 
 loaderTrackStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=1},loaderTrack)
 
@@ -1063,7 +1063,7 @@ loaderFill=New("Frame",{
 	BorderSizePixel=0,
 	ZIndex=LOADER_Z+3,
 },loaderTrack)
-New("UICorner",{CornerRadius=UDim.new(0,6)},loaderFill)
+New("UICorner",{CornerRadius=UDim.new(0,0)},loaderFill)
 
 loaderFillGlow=New("Frame",{
 	Size=UDim2.new(0,0,1,0),
@@ -1072,7 +1072,7 @@ loaderFillGlow=New("Frame",{
 	BorderSizePixel=0,
 	ZIndex=LOADER_Z+2,
 },loaderTrack)
-New("UICorner",{CornerRadius=UDim.new(0,6)},loaderFillGlow)
+New("UICorner",{CornerRadius=UDim.new(0,0)},loaderFillGlow)
 
 loaderScan=New("Frame",{
 	BackgroundColor3=Color3.fromRGB(255,255,255),
@@ -1100,7 +1100,7 @@ loaderPulse=New("Frame",{
 	BorderSizePixel=0,
 	ZIndex=LOADER_Z,
 },loaderOverlay)
-New("UICorner",{CornerRadius=UDim.new(0,10)},loaderPulse)
+New("UICorner",{CornerRadius=UDim.new(0,0)},loaderPulse)
 
 loaderPercent=New("TextLabel",{
 	BackgroundTransparency=1,
@@ -1132,7 +1132,7 @@ for index,name in ipairs(loaderPhaseNames) do
 		Size=UDim2.fromOffset(phaseWidth,42),
 		ZIndex=LOADER_Z+2,
 	},loaderPhaseRow)
-	New("UICorner",{CornerRadius=UDim.new(0,5)},item)
+	New("UICorner",{CornerRadius=UDim.new(0,0)},item)
 	local dot=New("Frame",{
 		AnchorPoint=Vector2.new(0,0.5),
 		Position=UDim2.fromOffset(12,21),
@@ -1142,7 +1142,7 @@ for index,name in ipairs(loaderPhaseNames) do
 		BorderSizePixel=0,
 		ZIndex=LOADER_Z+3,
 	},item)
-	New("UICorner",{CornerRadius=UDim.new(1,0)},dot)
+	New("UICorner",{CornerRadius=UDim.new(0,0)},dot)
 	local label=New("TextLabel",{
 		BackgroundTransparency=1,
 		Position=UDim2.fromOffset(30,0),
@@ -1402,7 +1402,7 @@ local function styleByte(name,fallback)
 	return math.clamp(math.floor((tonumber(UI_STYLE[name]) or fallback)+0.5),0,255)
 end
 
-local STYLE_COLOR_DEFAULTS={Stroke={76,76,76},Gradient={76,76,76},Primary={28,28,28}}
+local STYLE_COLOR_DEFAULTS={Stroke={182,180,180},Gradient={182,180,180},Primary={12,12,12}}
 
 local function styleColor(prefix,defaults)
 	return Color3.fromRGB(
@@ -1428,9 +1428,9 @@ UILibOriginalModule={
 	Id="original",
 	Name="Original",
 	Style={
-		Primary=Color3.fromRGB(28,28,28),
-		Stroke=Color3.fromRGB(76,76,76),
-		Gradient=Color3.fromRGB(76,76,76),
+		Primary=Color3.fromRGB(12,12,12),
+		Stroke=Color3.fromRGB(182,180,180),
+		Gradient=Color3.fromRGB(182,180,180),
 		GradientOn=false,
 		StrokeThickness=1,
 		StrokeTransparency=0.84,
@@ -1467,7 +1467,7 @@ UILibOriginalModule={
 		ControlStrokeTransparency=0.78,
 	},
 	Defaults={
-		PrimaryR=28,PrimaryG=28,PrimaryB=28,StrokeR=76,StrokeG=76,StrokeB=76,GradientR=76,GradientG=76,GradientB=76,
+		PrimaryR=12,PrimaryG=12,PrimaryB=12,StrokeR=182,StrokeG=180,StrokeB=180,GradientR=182,GradientG=180,GradientB=180,
 		StrokeGradient=false,LiquidStroke=false,LiquidStrokeSpeed=1,LiquidStrokeDirection="Right",StrokeThickness=1,StrokeTransparency=0.84,CornerRadius=0,UILib="original",
 		ThemePanelExpanded=false,ColoursPanelExpanded=false,HighlightPanelExpanded=false,HighlightSelectedMode="espOffense",HighlightSelectedState="open",
 		ESPOffenseCustomColor=false,ESPDefenseCustomColor=false,QBAimHighlightCustomColor=false,
@@ -1563,12 +1563,26 @@ function refreshThemePalette()
 	local lum=(primary.R*0.2126)+(primary.G*0.7152)+(primary.B*0.0722)
 	local toward=lum<0.52 and Color3.new(1,1,1) or Color3.new(0,0,0)
 	local away=lum<0.52 and Color3.new(0,0,0) or Color3.new(1,1,1)
+	local function applyReadableText(surfaceLum)
+		if surfaceLum<=0.16 then
+			THEME.TEXT=Color3.fromRGB(248,248,248)
+			THEME.MUTED=Color3.fromRGB(184,184,184)
+		elseif surfaceLum>=0.78 then
+			THEME.TEXT=Color3.fromRGB(10,10,10)
+			THEME.MUTED=Color3.fromRGB(60,60,60)
+		elseif surfaceLum<0.58 then
+			THEME.TEXT=Color3.fromRGB(236,238,246)
+			THEME.MUTED=Color3.fromRGB(176,176,184)
+		else
+			THEME.TEXT=Color3.fromRGB(20,22,28)
+			THEME.MUTED=Color3.fromRGB(76,76,82)
+		end
+	end
 
 	THEME.BG=primary
 	THEME.PANEL=primary:Lerp(toward,lum<0.52 and 0.07 or 0.09)
 	THEME.CARD=primary:Lerp(toward,lum<0.52 and 0.12 or 0.16)
-	THEME.TEXT=lum<0.58 and Color3.fromRGB(226,226,226) or Color3.fromRGB(24,24,24)
-	THEME.MUTED=lum<0.58 and Color3.fromRGB(168,168,168) or Color3.fromRGB(82,82,82)
+	applyReadableText(lum)
 	THEME.ACC=THEME.GREEN
 
 	if lum>=0.72 then
@@ -1615,8 +1629,7 @@ function refreshThemePalette()
 		THEME.STROKE_SOFT=surface(tones.strokeSoft)
 
 		local textLum=(THEME.BG.R*0.2126)+(THEME.BG.G*0.7152)+(THEME.BG.B*0.0722)
-		THEME.TEXT=textLum<0.58 and Color3.fromRGB(236,238,246) or Color3.fromRGB(20,22,28)
-		THEME.MUTED=textLum<0.58 and THEME.TEXT:Lerp(THEME.BG,0.42) or THEME.TEXT:Lerp(THEME.BG,0.5)
+		applyReadableText(textLum)
 	end
 
 	THEME.ACC=THEME.SLIDER_FILL or THEME.GREEN

@@ -368,7 +368,7 @@ function GameParamsGui.new(ctx,parent)
 	paintDial=function(animate)
 		local selected=normalizePageKey(state.paramsSelectedPage)
 		local activeBase=accentColor()
-		local surface=themeColor(THEME,"PANEL",themeColor(THEME,"BG",Color3.fromRGB(28,28,28)))
+		local surface=themeColor(THEME,"PANEL",themeColor(THEME,"BG",Color3.fromRGB(12,12,12)))
 		local lightTheme=colorLuminance(surface)>0.70
 		local active=lightTheme and darkenColor(activeBase,0.28) or activeBase
 		local coreColor=lightTheme and darkenColor(active,0.04) or brightenColor(active,0.04)
