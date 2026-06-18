@@ -1,4 +1,11 @@
-local Scope = require(script.Parent.scope)
+local env = (getfenv and getfenv()) or _G
+local Scope = rawget(env, "CoreScope") or rawget(env, "CoreScopeModule")
+
+if not Scope and script and script.Parent then
+	Scope = require(script.Parent.scope)
+end
+
+assert(Scope, "CoreScope must load before CoreScheduler")
 
 local Scheduler = {}
 Scheduler.__index = Scheduler

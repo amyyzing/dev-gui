@@ -87,9 +87,13 @@ RUNTIME_JOBS={}
 RUNTIME_JOB_ORDER={}
 RUNTIME_JOB_CONNECTIONS={}
 RUNTIME_BUILD_ERRORS={}
+RUNTIME_ROOT_SCOPE=nil
 
 function trackRuntimeConnection(conn)
 	if conn then
+		if RUNTIME_ROOT_SCOPE and RUNTIME_ROOT_SCOPE.add then
+			RUNTIME_ROOT_SCOPE:add(conn)
+		end
 		table.insert(RUNTIME_CONNECTIONS,conn)
 	end
 
@@ -106,6 +110,12 @@ function untrackRuntimeConnection(conn)
 end
 
 function disconnectRuntimeConnections()
+	if RUNTIME_ROOT_SCOPE and RUNTIME_ROOT_SCOPE.destroy then
+		pcall(function()
+			RUNTIME_ROOT_SCOPE:destroy()
+		end)
+	end
+
 	for _,conn in ipairs(RUNTIME_CONNECTIONS) do
 		if typeof(conn)=="RBXScriptConnection" then
 			pcall(function()
@@ -120,6 +130,10 @@ function disconnectRuntimeConnections()
 	table.clear(RUNTIME_JOBS)
 	table.clear(RUNTIME_JOB_ORDER)
 	table.clear(RUNTIME_JOB_CONNECTIONS)
+
+	if CoreScope and CoreScope.new then
+		RUNTIME_ROOT_SCOPE=CoreScope.new("runtime")
+	end
 end
 
 function registerThemeObject(obj)
@@ -303,160 +317,13 @@ function safeDisconnect(conn)
 	end
 end
 
-RuntimeJanitor={}
-RuntimeJanitor.__index=RuntimeJanitor
-
-function RuntimeJanitor.new()
-	return setmetatable({items={}},RuntimeJanitor)
-end
-
-function RuntimeJanitor:Add(item)
-	if item then
-		table.insert(self.items,item)
-	end
-	return item
-end
-
-function RuntimeJanitor:Cleanup()
-	for index=#self.items,1,-1 do
-		local item=self.items[index]
-		self.items[index]=nil
-		if typeof(item)=="RBXScriptConnection" then
-			safeDisconnect(item)
-		elseif typeof(item)=="Instance" then
-			pcall(function()
-				item:Destroy()
-			end)
-		elseif type(item)=="function" then
-			pcall(item)
-		elseif type(item)=="table" and type(item.Destroy)=="function" then
-			pcall(function()
-				item:Destroy()
-			end)
-		end
-	end
-end
-
-RuntimeScheduler={}
-
-local function schedulerStep(kind,dt)
-	local jobs=RUNTIME_JOBS[kind]
-	if not jobs then return end
-
-	for _,id in ipairs(RUNTIME_JOB_ORDER[kind] or {}) do
-		local job=jobs[id]
-		if job and job.enabled~=false then
-			job.elapsed=(job.elapsed or 0)+(dt or 0)
-			if job.elapsed>=job.interval then
-				local elapsed=job.elapsed
-				job.elapsed=0
-				local ok,err=pcall(job.fn,elapsed,dt)
-				if not ok then
-					warn("Runtime scheduler job failed:",id,err)
-				end
-			end
-		end
-	end
-end
-
-function RuntimeScheduler.Register(kind,id,interval,fn)
-	kind=tostring(kind or "Heartbeat")
-	id=tostring(id or "")
-	if id=="" or type(fn)~="function" then
-		return false
-	end
-
-	RUNTIME_JOBS[kind]=RUNTIME_JOBS[kind] or {}
-	RUNTIME_JOB_ORDER[kind]=RUNTIME_JOB_ORDER[kind] or {}
-
-	if not RUNTIME_JOBS[kind][id] then
-		table.insert(RUNTIME_JOB_ORDER[kind],id)
-	end
-
-	RUNTIME_JOBS[kind][id]={
-		id=id,
-		interval=math.max(tonumber(interval) or 0,0),
-		elapsed=0,
-		fn=fn,
-		enabled=true
-	}
-
-	if not RUNTIME_JOB_CONNECTIONS[kind] then
-		local signal=kind=="RenderStepped" and RunService.RenderStepped or RunService.Heartbeat
-		RUNTIME_JOB_CONNECTIONS[kind]=trackRuntimeConnection(signal:Connect(function(dt)
-			schedulerStep(kind,dt)
-		end))
-	end
-
-	return true
-end
-
-function RuntimeScheduler.SetEnabled(kind,id,enabled)
-	local job=RUNTIME_JOBS[tostring(kind or "Heartbeat")] and RUNTIME_JOBS[tostring(kind or "Heartbeat")][tostring(id or "")]
-	if job then
-		job.enabled=enabled and true or false
-	end
-end
-
-function RuntimeScheduler.Unregister(kind,id)
-	kind=tostring(kind or "Heartbeat")
-	id=tostring(id or "")
-	if RUNTIME_JOBS[kind] then
-		RUNTIME_JOBS[kind][id]=nil
-	end
-end
-
-function RuntimeScheduler.Count()
-	local count=0
-	for _,jobs in pairs(RUNTIME_JOBS) do
-		for _ in pairs(jobs) do
-			count=count+1
-		end
-	end
-	return count
-end
-
-RuntimeStateStore={dirty=false}
-
-function RuntimeStateStore.Get(bucket,key,default)
-	local root=getfenv()[bucket]
-	if type(root)=="table" and root[key]~=nil then
-		return root[key]
-	end
-	return default
-end
-
-function RuntimeStateStore.Set(bucket,key,value)
-	local env=getfenv()
-	env[bucket]=type(env[bucket])=="table" and env[bucket] or {}
-	env[bucket][key]=value
-	RuntimeStateStore.dirty=true
-	if requestPlayerAutosave then
-		requestPlayerAutosave()
-	end
-	return value
-end
-
-RuntimeThemeStore={}
-
-function RuntimeThemeStore.Apply()
-	if applyUIStrokeTheme then
-		pcall(applyUIStrokeTheme)
-	end
-end
-
-function RuntimeThemeStore.RefreshObject(obj)
-	if obj and registerThemeObject then
-		registerThemeObject(obj)
-	end
-end
-
-RuntimeServices={
-	Janitor=RuntimeJanitor,
-	Scheduler=RuntimeScheduler,
-	StateStore=RuntimeStateStore,
-	ThemeStore=RuntimeThemeStore
-}
+RuntimeJanitor={new=function()
+	return{Add=function(_,item) return item end,Cleanup=function() end,Destroy=function() end}
+end}
+RuntimeScheduler={Register=function() return false end,SetEnabled=function() end,Unregister=function() end,Count=function() return 0 end}
+RuntimeStateStore={dirty=false,Get=function(_,_,default) return default end,Set=function(_,_,value) return value end}
+RuntimeThemeStore={Apply=function() end,RefreshObject=function() end}
+RuntimeServices={Janitor=RuntimeJanitor,Scheduler=RuntimeScheduler,StateStore=RuntimeStateStore,ThemeStore=RuntimeThemeStore}
 
 function fmtNumber(n, decimals)
 	decimals=decimals or 2
@@ -641,6 +508,18 @@ end
 MANUAL_REFRESH_RELOAD_PATH="loader.lua"
 
 MODULE_PATHS={
+	CoreScope="core/scope.lua",
+	CoreSignal="core/signal.lua",
+	CoreScheduler="core/scheduler.lua",
+	StateStore="state/store.lua",
+	DesignTokens="design/tokens.lua",
+	DesignThemeResolver="design/resolver.lua",
+	DesignThemeDark="design/themes/dark.lua",
+	DesignThemeLight="design/themes/light.lua",
+	DesignThemeMidnight="design/themes/midnight.lua",
+	DesignThemeCrimson="design/themes/crimson.lua",
+	DesignThemeEvergreen="design/themes/evergreen.lua",
+	DesignThemeSakura="design/themes/sakura.lua",
 	Announcement="announcement.lua",
 	GuiFusion="gui/fusion.lua",
 	GuiLogic="gui/gui-logic.lua",
@@ -687,8 +566,22 @@ MODULE_PATHS={
 	DiscordLogic="page-6/discord/logic.lua",
 	DataSave="data-save/data-save.lua",
 }
-MODULE_GLOBAL_NAMES={GuiFusion="FusionModule"}
-STARTUP_MODULE_NAMES={"GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimMath","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds","StrokeColourLogic","StrokeColour","HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor","PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord","DataSave"}
+MODULE_GLOBAL_NAMES={
+	CoreScope="CoreScope",
+	CoreSignal="CoreSignal",
+	CoreScheduler="CoreScheduler",
+	StateStore="StateStore",
+	DesignTokens="DesignTokens",
+	DesignThemeResolver="DesignThemeResolver",
+	DesignThemeDark="DesignThemeDark",
+	DesignThemeLight="DesignThemeLight",
+	DesignThemeMidnight="DesignThemeMidnight",
+	DesignThemeCrimson="DesignThemeCrimson",
+	DesignThemeEvergreen="DesignThemeEvergreen",
+	DesignThemeSakura="DesignThemeSakura",
+	GuiFusion="FusionModule"
+}
+STARTUP_MODULE_NAMES={"CoreScope","CoreSignal","CoreScheduler","StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura","GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimMath","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds","StrokeColourLogic","StrokeColour","HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor","PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord","DataSave"}
 OPTIONAL_MODULE_NAMES={}
 MAP_RELOAD_NAMES={"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds"}
 CUSTOMIZE_RELOAD_NAMES={"StrokeColourLogic","StrokeColour"}
@@ -701,6 +594,16 @@ end
 
 function setLoadedModule(name,module)
 	getfenv()[moduleGlobalName(name)]=module
+	return module
+end
+
+function setLoadedModuleByPath(path,module)
+	for name,modulePath in pairs(MODULE_PATHS) do
+		if modulePath==path then
+			return setLoadedModule(name,module)
+		end
+	end
+
 	return module
 end
 
@@ -869,6 +772,7 @@ function loadRemoteModuleBatch(paths)
 		end
 
 		if module then
+			setLoadedModuleByPath(modulePath,module)
 			loaded=loaded+1
 		else
 			failed=failed+1
@@ -1382,6 +1286,198 @@ end
 for _,name in ipairs(STARTUP_MODULE_NAMES) do
 	loadRemoteModuleStepByName(name)
 end
+
+function installRuntimeArchitecture()
+	if CoreScope and CoreScope.new then
+		RUNTIME_ROOT_SCOPE=RUNTIME_ROOT_SCOPE or CoreScope.new("runtime")
+
+		RuntimeJanitor={}
+		RuntimeJanitor.__index=RuntimeJanitor
+
+		function RuntimeJanitor.new(name)
+			return setmetatable({_scope=CoreScope.new(name or "janitor")},RuntimeJanitor)
+		end
+
+		function RuntimeJanitor:Add(item)
+			return self._scope:add(item)
+		end
+
+		function RuntimeJanitor:Cleanup()
+			self._scope:cleanup()
+		end
+
+		function RuntimeJanitor:Destroy()
+			self._scope:destroy()
+		end
+	end
+
+	if CoreScheduler and CoreScheduler.new then
+		local scheduler=CoreScheduler.new(RunService,RUNTIME_ROOT_SCOPE)
+		local handles={}
+
+		RuntimeScheduler={}
+
+		local function schedulerKey(kind,id)
+			return tostring(kind or "Heartbeat")..":"..tostring(id or "")
+		end
+
+		function RuntimeScheduler.Register(kind,id,interval,fn)
+			kind=tostring(kind or "Heartbeat")
+			id=tostring(id or "")
+			interval=math.max(tonumber(interval) or 0,0)
+
+			if id=="" or type(fn)~="function" then
+				return false
+			end
+
+			RuntimeScheduler.Unregister(kind,id)
+
+			local key=schedulerKey(kind,id)
+			local state={enabled=true,elapsed=0}
+			local function run(dt)
+				if not state.enabled then
+					return
+				end
+
+				state.elapsed=state.elapsed+(dt or 0)
+				if state.elapsed<interval then
+					return
+				end
+
+				local elapsed=state.elapsed
+				state.elapsed=0
+				local ok,err=pcall(fn,elapsed,dt)
+				if not ok then
+					warn("Runtime scheduler job failed:",id,err)
+				end
+			end
+
+			local handle
+			if kind=="RenderStepped" then
+				handle=scheduler:onRender(key,0,run,RUNTIME_ROOT_SCOPE)
+			else
+				handle=scheduler:onHeartbeat(key,0,run,RUNTIME_ROOT_SCOPE)
+			end
+
+			handles[key]={handle=handle,state=state}
+			return true
+		end
+
+		function RuntimeScheduler.SetEnabled(kind,id,enabled)
+			local entry=handles[schedulerKey(kind,id)]
+			if entry then
+				entry.state.enabled=enabled and true or false
+			end
+		end
+
+		function RuntimeScheduler.Unregister(kind,id)
+			local key=schedulerKey(kind,id)
+			local entry=handles[key]
+			if entry then
+				if entry.handle and entry.handle.cancel then
+					entry.handle:cancel()
+				end
+				handles[key]=nil
+			end
+		end
+
+		function RuntimeScheduler.Count()
+			local count=0
+			for _ in pairs(handles) do
+				count=count+1
+			end
+			return count
+		end
+
+		function RuntimeScheduler.Destroy()
+			for key,entry in pairs(handles) do
+				if entry.handle and entry.handle.cancel then
+					entry.handle:cancel()
+				end
+				handles[key]=nil
+			end
+			scheduler:destroy()
+		end
+	end
+
+	if StateStore and StateStore.new then
+		local store=StateStore.new()
+		RuntimeStateStore={dirty=false,Store=store}
+
+		function RuntimeStateStore.CreateSlice(config)
+			return store:createSlice(config)
+		end
+
+		function RuntimeStateStore.GetSlice(name)
+			return store:getSlice(name)
+		end
+
+		function RuntimeStateStore.Snapshot()
+			return store:snapshot()
+		end
+
+		function RuntimeStateStore.Get(bucket,key,default)
+			local root=getfenv()[bucket]
+			if type(root)=="table" and root[key]~=nil then
+				return root[key]
+			end
+			return default
+		end
+
+		function RuntimeStateStore.Set(bucket,key,value)
+			local env=getfenv()
+			env[bucket]=type(env[bucket])=="table" and env[bucket] or {}
+			env[bucket][key]=value
+			RuntimeStateStore.dirty=true
+			if requestPlayerAutosave then
+				requestPlayerAutosave()
+			end
+			return value
+		end
+	end
+
+	RuntimeThemeStore={
+		Tokens=DesignTokens,
+		Resolver=DesignThemeResolver,
+		Themes={
+			dark=DesignThemeDark,
+			light=DesignThemeLight,
+			midnight=DesignThemeMidnight,
+			crimson=DesignThemeCrimson,
+			evergreen=DesignThemeEvergreen,
+			sakura=DesignThemeSakura
+		}
+	}
+
+	function RuntimeThemeStore.Resolve(id,overrides)
+		local theme=RuntimeThemeStore.Themes and RuntimeThemeStore.Themes[tostring(id or "dark"):lower()]
+		if DesignThemeResolver and DesignThemeResolver.resolve and theme then
+			return DesignThemeResolver.resolve(theme,overrides)
+		end
+		return nil
+	end
+
+	function RuntimeThemeStore.Apply()
+		if applyUIStrokeTheme then
+			pcall(applyUIStrokeTheme)
+		end
+	end
+
+	function RuntimeThemeStore.RefreshObject(obj)
+		if obj and registerThemeObject then
+			registerThemeObject(obj)
+		end
+	end
+
+	RuntimeServices={
+		Janitor=RuntimeJanitor,
+		Scheduler=RuntimeScheduler,
+		StateStore=RuntimeStateStore,
+		ThemeStore=RuntimeThemeStore
+	}
+end
+
+installRuntimeArchitecture()
 
 function runLoaderCheck()
 	local missing={}

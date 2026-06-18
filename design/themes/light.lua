@@ -1,4 +1,11 @@
-local Tokens = require(script.Parent.Parent.tokens)
+local env = (getfenv and getfenv()) or _G
+local Tokens = rawget(env, "DesignTokens") or rawget(env, "DesignTokensModule")
+
+if not Tokens and script and script.Parent and script.Parent.Parent then
+	Tokens = require(script.Parent.Parent.tokens)
+end
+
+assert(Tokens, "DesignTokens must load before light theme")
 
 return {
 	id = "light",

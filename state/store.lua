@@ -1,4 +1,11 @@
-local Signal = require(script.Parent.Parent.core.signal)
+local env = (getfenv and getfenv()) or _G
+local Signal = rawget(env, "CoreSignal") or rawget(env, "CoreSignalModule")
+
+if not Signal and script and script.Parent and script.Parent.Parent then
+	Signal = require(script.Parent.Parent.core.signal)
+end
+
+assert(Signal, "CoreSignal must load before StateStore")
 
 local Store = {}
 Store.__index = Store
