@@ -89,6 +89,13 @@ local GLOBAL_MAX_ANGLE=55
 local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
 local ARC_PREVIEW_UPDATE_INTERVAL=0.035
+local ARC_ATTACHMENT_ROLL=math.rad(90)
+local ARC_UNSAFE_COLOR=Color3.fromRGB(254,94,86)
+local DEFENDER_SPEED_STUDS=21
+local DEFENDER_REACTION_BUFFER=0.05
+local DEFENDER_CATCH_HEIGHT_TOLERANCE=0.25
+local DEFENDER_SAMPLE_DT=0.08
+local DEFENDER_SAMPLE_MAX=28
 local RECEIVER_TRACK_INTERVAL=0.05
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
@@ -394,6 +401,21 @@ local function isSameTeam(playerA,playerB)
 	return teamA==teamB
 end
 
+local function isOpposingPlayer(player,referencePlayer)
+	if not player or not referencePlayer or player==referencePlayer then
+		return false
+	end
+
+	local playerTeam=getPlayerTeamID(player)
+	local referenceTeam=getPlayerTeamID(referencePlayer)
+
+	if not isValidGameTeamID(playerTeam) or not isValidGameTeamID(referenceTeam) then
+		return false
+	end
+
+	return playerTeam~=referenceTeam
+end
+
 local function getFootballFromFolder(folder)
 	if not folder then return nil end
 
@@ -519,6 +541,10 @@ local function xAxisCFrame(position,xVector)
 	local z=unit(xVector:Cross(up),Vector3.new(0,0,1))
 	local y=unit(z:Cross(xVector),Vector3.new(0,1,0))
 	return CFrame.fromMatrix(position,xVector,y,z)
+end
+
+local function arcAttachmentCFrame(position,xVector)
+	return xAxisCFrame(position,xVector)*CFrame.Angles(ARC_ATTACHMENT_ROLL,0,0)
 end
 
 local function prepPreviewObject(object)
@@ -704,7 +730,7 @@ function QBAim.new(ctx,parent)
 	local selectedRouteLock=nil
 	local receiverData={}
 	local receiverTrackElapsed=0
-	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,orig=nil,p1=nil,p2=nil,p3=nil,ballMissingSince=nil}
+	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,beamDefaultColor=nil,orig=nil,p1=nil,p2=nil,p3=nil,ballMissingSince=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
 	local throwInProgress=false
@@ -716,6 +742,7 @@ function QBAim.new(ctx,parent)
 	local enabledToggle=nil
 	local teamFilterToggle=nil
 	local arcToggle=nil
+	local safeArcToggle=nil
 	local highlightToggle=nil
 	local leadDelayFrame=nil
 	local leadDelayBox=nil
@@ -753,6 +780,10 @@ function QBAim.new(ctx,parent)
 
 	if state.qbAimShowArc==nil then
 		state.qbAimShowArc=true
+	end
+
+	if state.qbAimSafeArc==nil then
+		state.qbAimSafeArc=true
 	end
 
 	if state.qbAimTargetHighlight==nil then
@@ -1153,6 +1184,10 @@ function QBAim.new(ctx,parent)
 			arcToggle.set(state.qbAimShowArc~=false)
 		end
 
+		if safeArcToggle then
+			safeArcToggle.set(state.qbAimSafeArc~=false)
+		end
+
 		if highlightToggle then
 			highlightToggle.set(state.qbAimTargetHighlight~=false)
 		end
@@ -1216,6 +1251,7 @@ function QBAim.new(ctx,parent)
 		preview.c2=nil
 		preview.c3=nil
 		preview.beam=nil
+		preview.beamDefaultColor=nil
 		preview.orig=nil
 	end
 
@@ -1242,6 +1278,9 @@ function QBAim.new(ctx,parent)
 		if preview.beam then
 			preview.beam.Attachment0=preview.c2
 			preview.beam.Attachment1=preview.c3
+			if not preview.beamDefaultColor then
+				preview.beamDefaultColor=preview.beam.Color
+			end
 			preview.beam.Enabled=state.qbAimShowArc~=false
 		end
 
@@ -2072,6 +2111,7 @@ function QBAim.new(ctx,parent)
 		if preview.beam and preview.beam.Parent then
 			pcall(function()
 				preview.beam.Enabled=false
+				preview.beam.Color=preview.beamDefaultColor or preview.beam.Color
 			end)
 		end
 
@@ -2085,6 +2125,83 @@ function QBAim.new(ctx,parent)
 		end
 
 		hideC1AndC3Info()
+	end
+
+	local function collectArcDefenderRoots(receiver)
+		local roots={}
+
+		for _,player in ipairs(Players:GetPlayers()) do
+			if player~=receiver and isOpposingPlayer(player,LP) then
+				local character=Workspace:FindFirstChild(player.Name) or player.Character
+				local defenderRoot=root(character)
+				if defenderRoot then
+					roots[#roots+1]=defenderRoot
+				end
+			end
+		end
+
+		return roots
+	end
+
+	local function defenderCanReachBall(defenderRoot,ballPosition,elapsed,catchY)
+		if not defenderRoot or not ballPosition or elapsed<=0 then
+			return false
+		end
+
+		if ballPosition.Y>catchY+DEFENDER_CATCH_HEIGHT_TOLERANCE then
+			return false
+		end
+
+		local reachRadius=DEFENDER_SPEED_STUDS*(elapsed+DEFENDER_REACTION_BUFFER)
+		return (flat(defenderRoot.Position)-flat(ballPosition)).Magnitude<=reachRadius
+	end
+
+	local function planCanBeDefended(plan,receiver)
+		if state.qbAimSafeArc==false or not plan then
+			return false
+		end
+
+		local defenderRoots=collectArcDefenderRoots(receiver)
+		if #defenderRoots==0 then
+			return false
+		end
+
+		local catchY=WR_MAX_Y+C1_SOLVE_Y_BIAS
+		local catchPoint=plan.target or plan.c1Point
+		local catchTime=plan.time
+		if not(catchPoint and catchTime and catchTime>0) then
+			return true
+		end
+
+		for _,defenderRoot in ipairs(defenderRoots) do
+			if defenderCanReachBall(defenderRoot,catchPoint,catchTime,catchY) then
+				return true
+			end
+		end
+
+		local sampleCount=math.clamp(math.ceil(catchTime/DEFENDER_SAMPLE_DT),4,DEFENDER_SAMPLE_MAX)
+		for sampleIndex=1,sampleCount do
+			local time=catchTime*sampleIndex/sampleCount
+			local ballPosition=ballAt(plan.origin,plan.velocity,time)
+
+			for _,defenderRoot in ipairs(defenderRoots) do
+				if defenderCanReachBall(defenderRoot,ballPosition,time,catchY) then
+					return true
+				end
+			end
+		end
+
+		return false
+	end
+
+	local function updateArcSafetyColor(beam,unsafe)
+		if not beam then return end
+
+		if unsafe then
+			beam.Color=ColorSequence.new(ARC_UNSAFE_COLOR)
+		elseif preview.beamDefaultColor then
+			beam.Color=preview.beamDefaultColor
+		end
 	end
 
 	local function clearPreviewVisuals(destroyCenter)
@@ -2112,13 +2229,15 @@ function QBAim.new(ctx,parent)
 		if not(c2 and c1 and c3 and beam) then return end
 
 		local startPoint=plan.origin
-		local endPoint=plan.target or plan.c1Point
-		local previewTime=plan.time
-		if not(startPoint and endPoint and previewTime) then return end
+		local catchPoint=plan.target or plan.c1Point
+		local endPoint=plan.landing or catchPoint
+		local previewTime=plan.landingTime or plan.time
+		local catchTime=plan.time
+		if not(startPoint and catchPoint and endPoint and previewTime and catchTime) then return end
 
 		local endVelocity=plan.velocity+G*previewTime
 		local p2=startPoint
-		local p1=endPoint
+		local p1=catchPoint
 		local p3=endPoint
 
 		if preview.p2 then
@@ -2129,19 +2248,20 @@ function QBAim.new(ctx,parent)
 			p1=preview.p1:Lerp(p1,PREVIEW_SMOOTH)
 		end
 
-		if preview.p3 and (p3-preview.p3).Magnitude<=45 then
+		if preview.p3 and (p3-preview.p3).Magnitude<=85 then
 			p3=preview.p3:Lerp(p3,PREVIEW_SMOOTH)
 		end
 
 		preview.p1,preview.p2,preview.p3=p1,p2,p3
-		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity))
-		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*plan.time))
-		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity))
+		setAttachmentCFrame(c2,arcAttachmentCFrame(p2,plan.velocity))
+		setAttachmentCFrame(c1,arcAttachmentCFrame(p1,plan.velocity+G*catchTime))
+		setAttachmentCFrame(c3,arcAttachmentCFrame(p3,endVelocity))
 		updateC1AndC3Info(plan,p1,p3)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
 		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
 		beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
+		updateArcSafetyColor(beam,planCanBeDefended(plan,trackedReceiver))
 		setPreviewCenterVisible(true)
 		beam.Enabled=true
 	end
@@ -2464,6 +2584,14 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
+	function api.SetSafeArcState(value,fire)
+		state.qbAimSafeArc=value and true or false
+		syncControls()
+		if fire~=false then
+			changed()
+		end
+	end
+
 	function api.SetTargetHighlightState(value,fire)
 		state.qbAimTargetHighlight=value and true or false
 		if not state.qbAimTargetHighlight then
@@ -2542,6 +2670,10 @@ function QBAim.new(ctx,parent)
 
 	arcToggle=buildToggleRow(sectionBody,"Show Arc",state.qbAimShowArc~=false,function(value)
 		api.SetShowArcState(value,true)
+	end)
+
+	safeArcToggle=buildToggleRow(sectionBody,"Safe Arc",state.qbAimSafeArc~=false,function(value)
+		api.SetSafeArcState(value,true)
 	end)
 
 	highlightToggle=buildToggleRow(sectionBody,"Target Highlight",state.qbAimTargetHighlight~=false,function(value)

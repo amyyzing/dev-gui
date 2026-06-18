@@ -61,6 +61,7 @@ QB_AIM_THROW_KEY=Enum.KeyCode.T
 QB_AIM_TOGGLE_KEY=Enum.KeyCode.P
 qbAimTeamFilter=true
 qbAimShowArc=true
+qbAimSafeArc=true
 qbAimTargetHighlight=true
 qbAimLeadDelay=0.38
 qbAimPeakHeight=14.00
