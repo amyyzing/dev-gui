@@ -11,6 +11,15 @@
         "data-save": {
           "$path": "data-save"
         },
+        "core": {
+          "$path": "core"
+        },
+        "design": {
+          "$path": "design"
+        },
+        "state": {
+          "$path": "state"
+        },
         "gui": {
           "$path": "gui"
         },
