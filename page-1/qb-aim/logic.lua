@@ -2461,12 +2461,25 @@ function QBAim.new(ctx,parent)
 		end
 
 		previewPlan(lockedPlan)
+		if planCanBeDefended(lockedPlan,receiver) then
+			releaseThrowLock()
+			setStatus("Unsafe throw blocked")
+			return
+		end
+
 		playThrowAnimation()
 
 		local plan=buildReleasePlan(receiver,power,heldBall,lockedPlan)
 		if not plan then
 			releaseThrowLock()
 			setStatus("No target-latch throw solution")
+			return
+		end
+
+		if planCanBeDefended(plan,receiver) then
+			previewPlan(plan)
+			releaseThrowLock()
+			setStatus("Unsafe throw blocked")
 			return
 		end
 
