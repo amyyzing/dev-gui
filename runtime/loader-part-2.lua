@@ -409,6 +409,7 @@ function makePage1Ctx()
 		Page1ESPLogicModule=Page1ESPLogicModule,
 		Page1ESPDefenseLogicModule=Page1ESPDefenseLogicModule,
 		Page1ESPOffenseLogicModule=Page1ESPOffenseLogicModule,
+		Page1QBAimMathModule=Page1QBAimMathModule,
 		Page1QBAimLogicModule=Page1QBAimLogicModule,
 		Page1TestingLogicModule=Page1TestingLogicModule,
 		getCurrentModeKey=function() return CURRENT_MODE_KEY end,

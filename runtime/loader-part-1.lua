@@ -658,6 +658,7 @@ MODULE_PATHS={
 	Page1ESPOffense="page-1/esp-offense/gui.lua",
 	Page1ESPOffenseLogic="page-1/esp-offense/logic.lua",
 	Page1QBAim="page-1/qb-aim/gui.lua",
+	Page1QBAimMath="page-1/qb-aim/math.lua",
 	Page1QBAimLogic="page-1/qb-aim/logic.lua",
 	Page1Testing="page-1/testing/gui.lua",
 	Page1TestingLogic="page-1/testing/logic.lua",
@@ -680,7 +681,7 @@ MODULE_PATHS={
 	DataSave="data-save/data-save.lua",
 }
 MODULE_GLOBAL_NAMES={GuiFusion="FusionModule"}
-STARTUP_MODULE_NAMES={"GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds","StrokeColourLogic","StrokeColour","HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor","PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord","DataSave"}
+STARTUP_MODULE_NAMES={"GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimMath","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds","StrokeColourLogic","StrokeColour","HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor","PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord","DataSave"}
 OPTIONAL_MODULE_NAMES={}
 MAP_RELOAD_NAMES={"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds"}
 CUSTOMIZE_RELOAD_NAMES={"StrokeColourLogic","StrokeColour"}

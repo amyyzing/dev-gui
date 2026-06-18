@@ -365,6 +365,7 @@ local Page1ESPLogicModule=moduleAt("page-1/esp/logic")
 local Page1ESPModule=moduleAt("page-1/esp/gui")
 local Page1ESPDefenseLogicModule=moduleAt("page-1/esp-defense/logic")
 local Page1ESPOffenseLogicModule=moduleAt("page-1/esp-offense/logic")
+local Page1QBAimMathModule=moduleAt("page-1/qb-aim/math")
 local Page1QBAimLogicModule=moduleAt("page-1/qb-aim/logic")
 local Page1QBAimModule=moduleAt("page-1/qb-aim/gui")
 local Page1TestingLogicModule=moduleAt("page-1/testing/logic")
@@ -464,6 +465,7 @@ local function makePage1Ctx()
 		Page1ESPLogicModule=Page1ESPLogicModule,
 		Page1ESPDefenseLogicModule=Page1ESPDefenseLogicModule,
 		Page1ESPOffenseLogicModule=Page1ESPOffenseLogicModule,
+		Page1QBAimMathModule=Page1QBAimMathModule,
 		Page1QBAimLogicModule=Page1QBAimLogicModule,
 		Page1TestingLogicModule=Page1TestingLogicModule,
 		getCurrentModeKey=function() return currentModeKey end,
