@@ -8,7 +8,6 @@ local ReplicatedStorage=game:GetService("ReplicatedStorage")
 
 local LP=Players.LocalPlayer
 
-local YARDS_TO_STUDS=3
 local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local MODEL_BALL_SPEED=95
@@ -16,57 +15,25 @@ local REMOTE_DISPLAY_POWER=100 -- send to remote; server converts incoming Updat
 local GAMEPLAY_BALL_POWER=MODEL_BALL_SPEED
 local SQUADS_BALL_POWER=MODEL_BALL_SPEED
 local PLAYER_G=196.2
-local JUMP_POWER=55.5
-local WR_STANDING_TOP_Y=6.00
 local DEFAULT_WR_MAX_Y=14.00 -- clean default catch peak; original jump formula is ~=13.85
 local WR_MAX_Y=DEFAULT_WR_MAX_Y
 local C1_Y_MIN=WR_MAX_Y
 local C1_Y_MAX=WR_MAX_Y
 local C1_Y_FIXED=WR_MAX_Y
-local C1_Y_POTENTIAL_EXPONENT=1.00
 local C1_SOLVE_Y_BIAS=0.00
 local MAX_RUN_SPEED=21
-local NORMAL_ROUTE_MIN_SPEED=19
-local ROUTE_LOCK_MIN_SPEED=2.5
-local ROUTE_LOCK_MAX_AGE=1.5
-local CLEAN_MATH_ENABLED=true
 local CLEAN_MOVING_SPEED_MIN=5.0
 local CLEAN_CATCH_Y_TOLERANCE=0.35
 local CLEAN_TARGET_MISS_TOLERANCE=0.35
 local CLEAN_NEAR_TARGET_MISS_TOLERANCE=0.05
-local CLEAN_USE_DIRECT_LEAD=true
 local WR_LEAD_DELAY=0.38
 local LEAD_DELAY_BASELINE=0.38 -- clean math: Lead Adjust is direct intentional ahead-time
-local LEAD_DELAY_ZERO_FLIGHT_TIME=0.70
-local LEAD_DELAY_FULL_FLIGHT_TIME=1.35
-local ADAPTIVE_LEAD_ENABLED=true
-local ROUTE_SPEED_PARTIAL_GAIN=1.08
 local PREDICTOR_HISTORY_MAX_AGE=0.30
-local PREDICTOR_MIN_SAMPLES=3
-local PREDICTOR_LS_BLEND=0.00
-local PREDICTOR_VELOCITY_BLEND=1.00
-local PREDICTOR_ACCEL_BLEND=0.28
 local PREDICTOR_ACCEL_MAX=48
-local PREDICTOR_ACCEL_TIME_MAX=1.05
-local PREDICTOR_ACCEL_LEAD_SCALE=0.22
-local PREDICTOR_ACCEL_LEAD_MAX=9.5
 local PREDICTOR_CONFIDENCE_MIN=0.30
 local PREDICTOR_CONFIDENCE_MAX=1.00
 local PREDICTOR_STALE_AFTER=0.35
-local ADAPTIVE_RADIAL_FLIGHT_SCALE_MIN=0.45
-local ADAPTIVE_RADIAL_FLIGHT_SCALE_MAX=1.12
-local ADAPTIVE_TANGENT_FLIGHT_SCALE_MIN=0.38
-local ADAPTIVE_TANGENT_FLIGHT_SCALE_MAX=0.95
-local ADAPTIVE_CLOSING_TANGENT_DAMPING=0.55
-local ADAPTIVE_UNCERTAINTY_DAMPING=0.45
-local AXIS_INVARIANT_LEAD_ENABLED=true
-local AXIS_EXTRA_LEAD_FRACTION=0.08
-local AXIS_EXTRA_LEAD_TIME_MAX=0.16
-local AXIS_LOS_RATE_GAIN=3.00
-local AXIS_CLOSING_EXTRA_DAMPING=0.75
-local AXIS_BRAKE_FLIGHT_DAMPING=0.38
 local QB_RELEASE_DELAY=0.25
-local QB_XZ_RELEASE_FACTOR=0
 local QB_LAUNCH_Y_BIAS=0
 local QB_GROUND_ROOT_Y=3.648
 local QB_AIRBORNE_Y_EPSILON=0.35
@@ -82,8 +49,6 @@ local QB_RELEASE_EXTRAPOLATE_VERTICAL=true
 local MIN_T,MAX_T,DT=0.35,6,0.01
 local QB_INHERITANCE=0
 local INTERCEPT_BISECTION_STEPS=12
-local SPEED_TOLERANCE=1.25
-local CATCH_TOLERANCE=2.0
 local GLOBAL_MIN_ANGLE=-5
 local GLOBAL_MAX_ANGLE=55
 local AIM_SCALE=1000
@@ -113,42 +78,7 @@ local C1_MARKER_SIZE=1.65
 local C3_INFO_GUI_ENABLED=false
 local C3_INFO_GUI_SIZE=UDim2.new(0,220,0,78)
 local C3_INFO_GUI_OFFSET=Vector3.new(0,3.2,0)
-local STABLE_WINDOW=0.48
-local STABLE_MIN_DIST=2
-local STABLE_MIN_SPEED=5
-local STABLE_HOLD=0.55
-local STABLE_STOP_SPEED=1.75
-local STABLE_DOT_REPLACE=0.72
-local STABLE_BLEND=0.18
-local CIRCLE_RADIUS_FULL_LEAD=180
-local CIRCLE_DISTANCE_SCALE_MIN=0.35
-local CIRCLE_DISTANCE_SCALE_MAX=1.00
-local CIRCLE_RADIAL_EXTRA_BASE=0.55
-local CIRCLE_RADIAL_EXTRA_GAIN=0.45
-local CIRCLE_RADIAL_EXTRA_MIN=0.25
-local CIRCLE_RADIAL_EXTRA_MAX=1
-local CIRCLE_TANGENT_EXTRA_BASE=0.25
-local CIRCLE_TANGENT_EXTRA_GAIN=0.50
-local CIRCLE_TANGENT_EXTRA_MIN=0.15
-local CIRCLE_TANGENT_EXTRA_MAX=0.70
-local CIRCLE_LOS_RATE_GAIN=6
-local CIRCLE_LOS_RATE_EPSILON=1.00
-local CIRCLE_EXTRA_LEAD_TIME_MAX=0.78
-local CIRCLE_BALANCE_LEAD_SCALE_MIN=0.72
-local CIRCLE_BALANCE_LEAD_SCALE_MAX=1.00
-local CIRCLE_TANGENT_REACTIVE_LEAD=0.58
-local CIRCLE_TANGENT_REACTIVE_LOS_GAIN=1.25
-local CIRCLE_TANGENT_ALIGNMENT_BOOST=0.30
-local CIRCLE_TANGENT_BALANCE_BOOST=0.35
-local CIRCLE_TANGENT_DOMINANCE_SCALE_MIN=0.35
-local CIRCLE_TANGENT_DOMINANCE_SCALE_MAX=1.00
-local CIRCLE_TANGENT_DOMINANCE_LIFT=0.30
 local CIRCLE_TANGENT_DOMINANCE_EPSILON=1e-6
-local CIRCLE_TANGENT_CLOSING_DAMPING=0.95
-local CIRCLE_TANGENT_CLOSING_SCALE_MIN=0.42
-local CIRCLE_RADIAL_BASE_LEAD_TIME=0.20
-local DIAG_STREAK_SIDE_RATIO_MIN=0.30
-local DIAG_STREAK_SIDE_SPEED_MIN=4
 local RECEIVER_CATCH_ANCHOR_MAX_OFFSET=10
 local RECEIVER_CATCH_ANCHOR_BLEND=1.00
 local PLAY_THROW_ANIMATION=true
@@ -158,8 +88,6 @@ local THROW_ANIMATION_SPEED=1.35
 -- should wait for the normal animation release window, not fire immediately.
 local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
 local THROW_REMOTE_LEAD_TIME=0.00 -- fire after the full animation release wait
-local RELEASE_FRAME_PLAN_MAX_AGE=0.075
-local THROW_TARGET_LOCK_ON_INPUT=true
 local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
 local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
 local THROW_TARGET_FIRE_IMMEDIATELY=false
@@ -213,26 +141,11 @@ local function clampMagnitude(v,maxMagnitude)
 	return v
 end
 
-local function smoothstep(edge0,edge1,value)
-	if edge1<=edge0 then
-		return value>=edge1 and 1 or 0
-	end
-
-	local alpha=math.clamp((value-edge0)/(edge1-edge0),0,1)
-	return alpha*alpha*(3-2*alpha)
-end
-
 local function leadDelayForFlightTime(time)
 	-- Clean math rebuild: Lead Adjust is not route classification and not radial/tangent damping.
 	-- It is only the intentional ahead-time along the receiver's current velocity vector.
 	-- Set Lead Adjust to 0 for pure catch-time intercept, or 0.35-0.40 for your ahead-of-WR catch window.
 	return math.max(WR_LEAD_DELAY,0)
-end
-
-local function safeVectorLerp(a,b,alpha)
-	if not a then return b or Vector3.zero end
-	if not b then return a or Vector3.zero end
-	return a:Lerp(b,math.clamp(alpha or 0,0,1))
 end
 
 local function root(character)
@@ -405,31 +318,6 @@ local function isSameTeam(playerA,playerB)
 	end
 
 	return teamA==teamB
-end
-
-local function getFootballFromFolder(folder)
-	if not folder then return nil end
-
-	for _,descendant in ipairs(folder:GetDescendants()) do
-		if descendant:IsA("BasePart") and descendant.Name=="Football" then
-			return descendant
-		end
-	end
-
-	return nil
-end
-
-local function getModeFootball(modeKey)
-	local heldBall=getHeldBall()
-	if heldBall then
-		return heldBall
-	end
-
-	if modeKey=="mode3" then
-		return getFootballFromFolder(Workspace:FindFirstChild("MiniGames")) or getFootballFromFolder(ReplicatedStorage:FindFirstChild("MiniGames"))
-	end
-
-	return nil
 end
 
 local function getGameReEvent()
@@ -1602,78 +1490,6 @@ function QBAim.new(ctx,parent)
 	local function targetAtTime(receiverStart,wrVel,time,leadDelay)
 		local target=receiverStart+flat(wrVel)*(time+(leadDelay or 0))
 		return Vector3.new(target.X,WR_MAX_Y+C1_SOLVE_Y_BIAS,target.Z)
-	end
-
-	local function c1HeightFromMagnitudePotential(potential,speed)
-		return C1_Y_FIXED
-	end
-
-	local function c1Target(receiverPosition,originPosition,targetVelocity,flightTime,predictorState)
-		local receiverStart=receiverMaxAt(receiverPosition)
-		local wrVel=clampMagnitude(flat(targetVelocity or Vector3.zero),MAX_RUN_SPEED)
-		local leadDelay=leadDelayForFlightTime(flightTime)
-		local target=targetAtTime(receiverStart,wrVel,flightTime,leadDelay)
-		local speed=wrVel.Magnitude
-		local losVector=flat(receiverStart-originPosition)
-		local losDir=unit(losVector,speed>0 and wrVel.Unit or Vector3.new(1,0,0))
-		local awayShare=speed>1e-6 and math.clamp(wrVel:Dot(losDir)/speed,-1,1) or 0
-		local lateralSpeed=(wrVel-losDir*wrVel:Dot(losDir)).Magnitude
-		local lateralShare=speed>1e-6 and math.clamp(lateralSpeed/speed,0,1) or 0
-
-		return target,{
-			flightLeadXZ=wrVel*flightTime,
-			accelerationLeadXZ=Vector3.zero,
-			extraLeadXZ=wrVel*leadDelay,
-			radialExtraLeadXZ=Vector3.zero,
-			tangentExtraLeadXZ=wrVel*leadDelay,
-			extraLeadTime=leadDelay,
-			radialExtraTime=0,
-			tangentExtraTime=leadDelay,
-			tangentBaseTime=0,
-			tangentReactiveTime=leadDelay,
-			radialBaseTime=0,
-			radialLDTime=0,
-			adaptiveLeadScale=1,
-			leadUserScale=math.clamp(WR_LEAD_DELAY/math.max(LEAD_DELAY_BASELINE,0.01),0,2.25),
-			predictorConfidence=predictorState and predictorState.confidence or 1,
-			radialFlightScale=1,
-			tangentFlightScale=1,
-			accelTime=0,
-			magnitudeChangePotential=0,
-			c1Height=C1_Y_FIXED,
-			c1HeightMin=C1_Y_MIN,
-			c1HeightMax=C1_Y_MAX,
-			c1SolveYBias=C1_SOLVE_Y_BIAS,
-			distance3DNow=(receiverStart-originPosition).Magnitude,
-			distanceXZNow=distXZ(originPosition,receiverStart),
-			distanceScale=1,
-			awayShare=awayShare,
-			positiveAwayShare=math.clamp(awayShare,0,1),
-			radialShareAbs=math.abs(awayShare),
-			lateralShare=lateralShare,
-			routeBalance=1-math.abs(math.abs(awayShare)-lateralShare),
-			balanceLeadScale=1,
-			radialGain=0,
-			tangentGain=0,
-			losRate=0,
-			losDamping=1,
-			reactiveLosDamping=1,
-			tangentAlignment=1,
-			tangentAlignmentBoost=1,
-			tangentBalanceBoost=1,
-			tangentDominance=lateralShare*lateralShare/(awayShare*awayShare+lateralShare*lateralShare+CIRCLE_TANGENT_DOMINANCE_EPSILON),
-			tangentBalancePeak=1,
-			tangentDominanceScale=1,
-			closingShare=math.clamp(-awayShare,0,1),
-			tangentClosingScale=1,
-			tangentSignedScale=1,
-			routeAway=wrVel:Dot(losDir),
-			routeSide=lateralSpeed,
-			routeElevation=0,
-			routeSpeed=speed,
-			axisInvariant=true,
-			cleanMath=true,
-		}
 	end
 
 	local function interceptValue(originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
