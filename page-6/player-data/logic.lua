@@ -79,6 +79,7 @@ function PlayerData.new(ctx,page,deps)
 			Font=Enum.Font.Gotham,
 			TextSize=12,
 			TextColor3=textColor,
+			SkipTextRole=danger,
 			AutoButtonColor=false,
 			Selectable=true,
 			ZIndex=102,
@@ -297,6 +298,7 @@ function PlayerData.new(ctx,page,deps)
 		Font=Enum.Font.GothamMedium,
 		TextSize=10,
 		TextColor3=THEME.MUTED,
+		SkipTextRole=true,
 		TextXAlignment=Enum.TextXAlignment.Center,
 		ZIndex=7,
 	},statusPill)
@@ -308,6 +310,7 @@ function PlayerData.new(ctx,page,deps)
 		Font=Enum.Font.Gotham,
 		TextSize=11,
 		TextColor3=THEME.MUTED,
+		SkipTextRole=true,
 		TextWrapped=true,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		TextYAlignment=Enum.TextYAlignment.Top,

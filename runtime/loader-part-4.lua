@@ -98,7 +98,7 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	local function modalButton(text, x, danger)
 		local normalBg=settingsButtonBaseColor(danger)
 		local textColor=danger and Color3.fromRGB(0,0,0) or THEME.TEXT
-		local b=New("TextButton", {Position=UDim2.fromOffset(x, 120), Size=UDim2.fromOffset(104, 30), BackgroundColor3=normalBg, BorderSizePixel=0, Text=text, Font=Enum.Font.Gotham, TextSize=12, TextColor3=textColor, AutoButtonColor=false, Selectable=true, ZIndex=102}, box)
+		local b=New("TextButton", {Position=UDim2.fromOffset(x, 120), Size=UDim2.fromOffset(104, 30), BackgroundColor3=normalBg, BorderSizePixel=0, Text=text, Font=Enum.Font.Gotham, TextSize=12, TextColor3=textColor, SkipTextRole=danger, AutoButtonColor=false, Selectable=true, ZIndex=102}, box)
 
 		local wrap=wrapTextButton(b, normalBg, 2)
 		wrap.BackgroundColor3=normalBg

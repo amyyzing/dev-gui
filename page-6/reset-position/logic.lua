@@ -114,6 +114,7 @@ function ResetPosition.new(ctx,page)
 		Font=Enum.Font.Gotham,
 		TextSize=11,
 		TextColor3=THEME.MUTED,
+		SkipTextRole=true,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
 	},section)

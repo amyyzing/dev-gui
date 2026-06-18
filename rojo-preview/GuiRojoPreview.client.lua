@@ -141,7 +141,7 @@ local function markThemeRole(obj,color)
 	end
 end
 
-local function markThemeTextRole(obj,color)
+local function markThemeTextRole(obj,color,defaultRole)
 	if not(obj and color) then return end
 	registerThemeObject(obj)
 
@@ -155,18 +155,23 @@ local function markThemeTextRole(obj,color)
 		obj:SetAttribute("ThemeTextRole","GREEN")
 	elseif colorClose(color,THEME.BLUE) then
 		obj:SetAttribute("ThemeTextRole","BLUE")
+	elseif defaultRole then
+		obj:SetAttribute("ThemeTextRole",defaultRole)
 	end
 end
 
 local function New(class,props,parent)
 	props=props or {}
 	local skipThemeRole=props.SkipThemeRole
+	local skipTextRole=props.SkipTextRole
 	local forcedThemeRole=props.ThemeRole
 	local forcedTextRole=props.TextRole
 	local forcedStrokeRole=props.StrokeRole
 	local forcedCornerRole=props.CornerRole
+	local isTextClass=class=="TextLabel" or class=="TextButton" or class=="TextBox"
 
 	props.SkipThemeRole=nil
+	props.SkipTextRole=nil
 	props.ThemeRole=nil
 	props.TextRole=nil
 	props.StrokeRole=nil
@@ -176,7 +181,7 @@ local function New(class,props,parent)
 		props.Active=true
 	end
 
-	if class=="TextLabel" or class=="TextButton" or class=="TextBox" then
+	if isTextClass then
 		props.TextColor3=props.TextColor3 or THEME.TEXT
 		props.Font=props.Font or Enum.Font.Gotham
 		props.TextStrokeTransparency=1
@@ -213,10 +218,14 @@ local function New(class,props,parent)
 		markThemeRole(obj,props.BackgroundColor3)
 	end
 
-	if forcedTextRole and (class=="TextLabel" or class=="TextButton" or class=="TextBox") then
+	if skipTextRole and isTextClass then
+		obj:SetAttribute("SkipTextRole",true)
+	end
+
+	if forcedTextRole and isTextClass then
 		obj:SetAttribute("ThemeTextRole",forcedTextRole)
-	elseif class=="TextLabel" or class=="TextButton" or class=="TextBox" then
-		markThemeTextRole(obj,props.TextColor3)
+	elseif isTextClass and not skipTextRole then
+		markThemeTextRole(obj,props.TextColor3,"TEXT")
 	end
 
 	if forcedCornerRole then

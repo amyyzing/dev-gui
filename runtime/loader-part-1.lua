@@ -165,13 +165,13 @@ function markThemeRole(obj,color)
 	end
 end
 
-function markThemeTextRole(obj,color)
+function markThemeTextRole(obj,color,defaultRole)
 	if not(obj and color) then return end
 	registerThemeObject(obj)
 
 	local role=findThemeRole(color,THEME_TEXT_ROLE_NAMES)
-	if role then
-		obj:SetAttribute("ThemeTextRole",role)
+	if role or defaultRole then
+		obj:SetAttribute("ThemeTextRole",role or defaultRole)
 	end
 end
 
@@ -194,12 +194,15 @@ end
 function New(class, props, parent)
 	props=props or {}
 	local skipThemeRole=props.SkipThemeRole
+	local skipTextRole=props.SkipTextRole
 	local forcedThemeRole=props.ThemeRole
 	local forcedTextRole=props.TextRole
 	local forcedStrokeRole=props.StrokeRole
 	local forcedCornerRole=props.CornerRole
+	local isTextClass=class=="TextLabel" or class=="TextButton" or class=="TextBox"
 
 	props.SkipThemeRole=nil
+	props.SkipTextRole=nil
 	props.ThemeRole=nil
 	props.TextRole=nil
 	props.StrokeRole=nil
@@ -209,7 +212,7 @@ function New(class, props, parent)
 		props.Active=true
 	end
 
-	if class=="TextLabel" or class=="TextButton" or class=="TextBox" then
+	if isTextClass then
 		if props.TextColor3==nil then props.TextColor3=THEME.TEXT end
 		if props.Font==nil then props.Font=Enum.Font.Gotham end
 		props.TextStrokeTransparency=1
@@ -255,10 +258,14 @@ function New(class, props, parent)
 		markThemeRole(obj,props.BackgroundColor3)
 	end
 
-	if forcedTextRole and (class=="TextLabel" or class=="TextButton" or class=="TextBox") then
+	if skipTextRole and isTextClass then
+		obj:SetAttribute("SkipTextRole",true)
+	end
+
+	if forcedTextRole and isTextClass then
 		obj:SetAttribute("ThemeTextRole",forcedTextRole)
-	elseif class=="TextLabel" or class=="TextButton" or class=="TextBox" then
-		markThemeTextRole(obj,props.TextColor3)
+	elseif isTextClass and not skipTextRole then
+		markThemeTextRole(obj,props.TextColor3,"TEXT")
 	end
 
 	if forcedCornerRole then
@@ -1152,6 +1159,7 @@ for index,name in ipairs(loaderPhaseNames) do
 		TextSize=11,
 		TextColor3=THEME.MUTED,
 		TextTransparency=1,
+		SkipTextRole=true,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=LOADER_Z+3,
 	},item)
@@ -1657,7 +1665,11 @@ function applyUIPrimaryTheme()
 			THEMED_TEXT_OBJECTS[obj]=nil
 		elseif obj:IsDescendantOf(SG) then
 			local textRole=obj:GetAttribute("ThemeTextRole")
-			if textRole and THEME[textRole] then
+			if not textRole and not obj:GetAttribute("SkipTextRole") then
+				textRole="TEXT"
+				obj:SetAttribute("ThemeTextRole",textRole)
+			end
+			if textRole and THEME[textRole] and not obj:GetAttribute("SkipTextRole") then
 				obj.TextColor3=THEME[textRole]
 			end
 		end

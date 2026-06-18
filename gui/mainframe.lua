@@ -884,6 +884,7 @@ function MainFrame.new(ctx)
 			Font=textFont,
 			TextSize=12,
 			TextColor3=textColor,
+			SkipTextRole=true,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			TextTruncate=Enum.TextTruncate.AtEnd,
 			ZIndex=82,

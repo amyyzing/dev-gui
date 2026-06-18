@@ -1378,6 +1378,7 @@ function StrokeColour.new(ctx,page)
 			Font=Enum.Font.GothamBold,
 			TextSize=11,
 			TextColor3=textColor,
+			SkipTextRole=true,
 			TextXAlignment=Enum.TextXAlignment.Center,
 			TextYAlignment=Enum.TextYAlignment.Center,
 			ZIndex=7,

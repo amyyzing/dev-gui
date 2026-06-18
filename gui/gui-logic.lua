@@ -705,7 +705,7 @@ function GuiLogic.new(ctx)
 			local normalBg=headerButtonBg()
 			local textColor=headerButtonOptions.textColor or headerButtonOptions.TextColor3 or (headerButtonOptions.danger and Color3.fromRGB(0,0,0)) or THEME.TEXT
 			local headerButtonHeight=componentNumber("HeaderButtonHeight",22)
-			local button=New("TextButton",{Size=UDim2.fromOffset(headerButtonWidth,headerButtonHeight),Position=UDim2.new(1,-headerRightOffset-headerButtonWidth,0.5,-headerButtonHeight/2),BackgroundColor3=normalBg,BorderSizePixel=0,Text=headerButtonOptions.text or headerButtonOptions.Text or "ACTION",Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=11,TextColor3=textColor,AutoButtonColor=false,Selectable=true,ZIndex=6},header)
+			local button=New("TextButton",{Size=UDim2.fromOffset(headerButtonWidth,headerButtonHeight),Position=UDim2.new(1,-headerRightOffset-headerButtonWidth,0.5,-headerButtonHeight/2),BackgroundColor3=normalBg,BorderSizePixel=0,Text=headerButtonOptions.text or headerButtonOptions.Text or "ACTION",Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=11,TextColor3=textColor,SkipTextRole=headerButtonOptions.danger or headerButtonOptions.textColor~=nil or headerButtonOptions.TextColor3~=nil,AutoButtonColor=false,Selectable=true,ZIndex=6},header)
 			local buttonWrap=api.wrapTextButton(button,normalBg,2)
 			buttonWrap.BackgroundColor3=normalBg
 			if headerButtonOptions.themeRole or headerButtonOptions.ThemeRole then
