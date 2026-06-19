@@ -81,9 +81,6 @@ local THROW_TARGET_FIRE_IMMEDIATELY=false
 local THROW_INPUT_COOLDOWN=0.85
 local THROW_RELEASE_CONFIRM_TIMEOUT=1.75
 local THROW_RELEASE_CONFIRM_STABLE_TIME=0.08
-local SERVER_RELEASE_LATENCY_ENABLED=true
-local SERVER_RELEASE_LATENCY_SCALE=0.50 -- full one-way ping projected the arc too far ahead
-local SERVER_RELEASE_LATENCY_MAX=0.12
 local QB_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
@@ -91,8 +88,7 @@ local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 --   2. Original Center.C2 is snapshotted as the local release-frame anchor.
 --   3. The release point is projected to the animation release frame on X/Z.
 --   4. WR is predicted through the same release window.
---   5. Native remote still fires after THROW_ANIMATION_RELEASE_WAIT.
---   6. The remote target is solved for the estimated server receive frame.
+--   5. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local ESP_HIGHLIGHT_NAME="MyESPHighlight"
@@ -123,53 +119,6 @@ local function clampMagnitude(v,maxMagnitude)
 	end
 
 	return v
-end
-
-local function getServerReleaseLatency()
-	if not SERVER_RELEASE_LATENCY_ENABLED then
-		return 0
-	end
-
-	local ok,stats=pcall(function()
-		return game:GetService("Stats")
-	end)
-	local network=ok and stats and stats:FindFirstChild("Network")
-	local serverStats=network and network:FindFirstChild("ServerStatsItem")
-	local dataPing=serverStats and serverStats:FindFirstChild("Data Ping")
-	local value
-	if dataPing then
-		ok,value=pcall(function()
-			return dataPing:GetValue()
-		end)
-		if ok and type(value)=="number" and value>0 then
-			return math.clamp((value/2000)*SERVER_RELEASE_LATENCY_SCALE,0,SERVER_RELEASE_LATENCY_MAX)
-		end
-
-		ok,value=pcall(function()
-			return dataPing:GetValueString()
-		end)
-		if ok and type(value)=="string" then
-			local numeric=tonumber(value:match("[%d%.]+"))
-			if numeric and numeric>0 then
-				return math.clamp((numeric/2000)*SERVER_RELEASE_LATENCY_SCALE,0,SERVER_RELEASE_LATENCY_MAX)
-			end
-		end
-	end
-
-	local ping
-	ok,ping=pcall(function()
-		if LP and type(LP.GetNetworkPing)=="function" then
-			return LP:GetNetworkPing()
-		end
-	end)
-	if ok and type(ping)=="number" and ping>0 then
-		if ping>1 then
-			ping=ping/2000
-		end
-		return math.clamp(ping*SERVER_RELEASE_LATENCY_SCALE,0,SERVER_RELEASE_LATENCY_MAX)
-	end
-
-	return 0
 end
 
 local function root(character)
@@ -1853,8 +1802,7 @@ function QBAim.new(ctx,parent)
 
 		while os.clock()<fireAt do
 			local remaining=math.max(endAt-os.clock(),0)
-			local serverOffset=remaining+getServerReleaseLatency()
-			local livePlan=buildPlan(receiver,ballPower,serverOffset,releaseBall,serverOffset)
+			local livePlan=buildPlan(receiver,ballPower,remaining,releaseBall,remaining)
 			if livePlan then
 				latestPlan=livePlan
 				previewPlan(livePlan)
@@ -1864,8 +1812,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		local finalRemaining=math.max(endAt-os.clock(),0)
-		local finalOffset=finalRemaining+getServerReleaseLatency()
-		local finalPlan=buildPlan(receiver,ballPower,finalOffset,releaseBall,finalOffset) or latestPlan
+		local finalPlan=buildPlan(receiver,ballPower,finalRemaining,releaseBall,finalRemaining) or latestPlan
 		if finalPlan then
 			previewPlan(finalPlan)
 		end
@@ -1887,13 +1834,10 @@ function QBAim.new(ctx,parent)
 		override={
 			active=true,
 			anyReEvent=true,
-			releaseEnd=os.clock()+THROW_ANIMATION_RELEASE_WAIT,
 			fallbackPlan=fallbackPlan,
 			planProvider=function()
 				local liveBall=(releaseBall and releaseBall.Parent and releaseBall) and releaseBall or getHeldBall() or releaseBall
-				local remaining=math.max((override.releaseEnd or os.clock())-os.clock(),0)
-				local serverOffset=remaining+getServerReleaseLatency()
-				local plan=buildPlan(receiver,ballPower,serverOffset,liveBall,serverOffset)
+				local plan=buildPlan(receiver,ballPower,0,liveBall,0)
 				if plan then
 					override.latestPlan=plan
 					previewPlan(plan)
@@ -2006,9 +1950,8 @@ function QBAim.new(ctx,parent)
 		-- Lock one plan at keypress. Keep animation-to-fire timing at 0.2666s,
 		-- and solve from the captured C2 projected to that same release frame.
 		-- The WR prediction uses the same release window.
-		local serverLatency=getServerReleaseLatency()
-		local lockedQBOffset=QB_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY+serverLatency
-		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY+serverLatency
+		local lockedQBOffset=QB_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local releaseFrame=captureReleaseFrame(root(LP.Character),heldBall)
 		throwInProgress=true
 
@@ -2374,9 +2317,8 @@ function QBAim.new(ctx,parent)
 		if now-preview.last<ARC_SETTINGS.UpdateInterval then return end
 		preview.last=now
 
-		local previewLatency=getServerReleaseLatency()
-		local previewQBOffset=QB_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY+previewLatency
-		local previewWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY+previewLatency
+		local previewQBOffset=QB_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		local previewWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local plan=buildPlan(trackedReceiver,nil,previewQBOffset,nil,previewWROffset)
 		if plan then
 			previewPlan(plan)
