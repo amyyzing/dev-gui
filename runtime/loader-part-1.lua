@@ -704,6 +704,10 @@ function loadModuleFromSource(modulePath,source)
 		return nil,err
 	end
 
+	if setfenv then
+		setfenv(chunk,getfenv())
+	end
+
 	local ok,module=pcall(chunk)
 	if not ok then
 		REMOTE_MODULE_SOURCES[modulePath]=source
