@@ -60,8 +60,6 @@ local DEFENDER_SETTINGS={
 	Speed=21,
 	ReactionBuffer=0.05,
 	CatchHeightTolerance=0.25,
-	SampleDt=0.08,
-	SampleMax=28,
 }
 local TRACK_SETTINGS={
 	ReceiverInterval=0.05,
@@ -1688,18 +1686,6 @@ function QBAim.new(ctx,parent)
 		for _,defenderRoot in ipairs(defenderRoots) do
 			if defenderCanReachBall(defenderRoot,catchPoint,catchTime,catchY) then
 				return true
-			end
-		end
-
-		local sampleCount=math.clamp(math.ceil(catchTime/DEFENDER_SETTINGS.SampleDt),4,DEFENDER_SETTINGS.SampleMax)
-		for sampleIndex=1,sampleCount do
-			local time=catchTime*sampleIndex/sampleCount
-			local ballPosition=mathCore.ballAt(plan.origin,plan.velocity,time)
-
-			for _,defenderRoot in ipairs(defenderRoots) do
-				if defenderCanReachBall(defenderRoot,ballPosition,time,catchY) then
-					return true
-				end
 			end
 		end
 
