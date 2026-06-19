@@ -1857,7 +1857,10 @@ function QBAim.new(ctx,parent)
 		end
 
 		if not ok then
-			return false,tostring(err or "Native FootballThrow failed"),nil,false
+			if override.done then
+				return true,nil,override.plan or fallbackPlan,false
+			end
+			return false,tostring(err or "Native FootballThrow failed"),nil,true
 		end
 
 		if override.blocked then
@@ -1865,7 +1868,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		if not override.done then
-			return false,"Native FootballThrow did not send ThrowBall",nil,false
+			return false,"Native FootballThrow did not send ThrowBall",nil,true
 		end
 
 		return true,nil,override.plan or fallbackPlan,false
