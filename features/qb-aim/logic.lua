@@ -446,10 +446,12 @@ local function getSquadsReEvent()
 end
 
 QBAim._cachedMechanics=nil
+QBAim._throwTargetHookInstalled=false
+QBAim._throwTargetOverride=nil
 
 function QBAim._getGlobalMechanics()
 	local function valid(mechanics)
-		return mechanics and (type(mechanics.PlayAnimation)=="function" or type(mechanics.UnequipFootball)=="function")
+		return mechanics and (type(mechanics.FootballThrow)=="function" or type(mechanics.PlayAnimation)=="function" or type(mechanics.UnequipFootball)=="function")
 	end
 
 	if valid(QBAim._cachedMechanics) then
@@ -484,6 +486,59 @@ function QBAim._getGlobalMechanics()
 	end
 
 	return nil
+end
+
+function QBAim._ensureThrowTargetHook()
+	if QBAim._throwTargetHookInstalled then
+		return true
+	end
+
+	if type(hookmetamethod)~="function" or type(getnamecallmethod)~="function" then
+		return false,"hookmetamethod unavailable"
+	end
+
+	local oldNamecall
+	local function hook(self,...)
+		local pending=QBAim._throwTargetOverride
+		local remoteMatches=pending and pending.active and (pending.anyReEvent or self==pending.reEvent or (pending.reEvents and pending.reEvents[self]))
+		if remoteMatches and getnamecallmethod()=="FireServer" then
+			local args={...}
+			if args[1]=="Mechanics" and args[2]=="ThrowBall" and type(args[3])=="table" then
+				local payload=args[3]
+				local plan=pending.planProvider and pending.planProvider()
+				if (not plan or (pending.isUnsafe and pending.isUnsafe(plan))) and pending.fallbackPlan and not(pending.isUnsafe and pending.isUnsafe(pending.fallbackPlan)) then
+					plan=pending.fallbackPlan
+				end
+
+				if plan then
+					payload.Target=plan.aimPoint
+					payload.Power=REMOTE_DISPLAY_POWER
+					payload.AutoThrow=false
+					pending.plan=plan
+					pending.done=true
+				else
+					pending.blocked=true
+					pending.failReason="No safe release-frame throw solution"
+					return nil
+				end
+			end
+		end
+
+		return oldNamecall(self,...)
+	end
+
+	if type(newcclosure)=="function" then
+		hook=newcclosure(hook)
+	end
+
+	local ok,result=pcall(hookmetamethod,game,"__namecall",hook)
+	if not(ok and type(result)=="function") then
+		return false,"target override hook failed"
+	end
+
+	oldNamecall=result
+	QBAim._throwTargetHookInstalled=true
+	return true
 end
 
 function QBAim._findThrowAnimation()
@@ -1764,6 +1819,58 @@ function QBAim.new(ctx,parent)
 		return finalPlan,releaseBall
 	end
 
+	local function runNativeClientThrow(receiver,ballPower,releaseBall,fallbackPlan)
+		local mechanics=QBAim._getGlobalMechanics()
+		if not(mechanics and type(mechanics.FootballThrow)=="function") then
+			return false,"Native FootballThrow unavailable",nil,true
+		end
+
+		local hookOk,hookErr=QBAim._ensureThrowTargetHook()
+		if not hookOk then
+			return false,hookErr or "Target override hook unavailable",nil,true
+		end
+
+		local override={
+			active=true,
+			anyReEvent=true,
+			fallbackPlan=fallbackPlan,
+			planProvider=function()
+				local liveBall=(releaseBall and releaseBall.Parent and releaseBall) and releaseBall or getHeldBall() or releaseBall
+				local plan=buildPlan(receiver,ballPower,0,liveBall,0)
+				if plan then
+					previewPlan(plan)
+				end
+				return plan
+			end,
+			isUnsafe=function(plan)
+				return planCanBeDefended(plan,receiver)
+			end,
+		}
+
+		QBAim._throwTargetOverride=override
+		local ok,err=pcall(function()
+			mechanics:FootballThrow(nil,REMOTE_DISPLAY_POWER)
+		end)
+		override.active=false
+		if QBAim._throwTargetOverride==override then
+			QBAim._throwTargetOverride=nil
+		end
+
+		if not ok then
+			return false,tostring(err or "Native FootballThrow failed"),nil,false
+		end
+
+		if override.blocked then
+			return false,override.failReason or "Unsafe throw blocked",nil,false
+		end
+
+		if not override.done then
+			return false,"Native FootballThrow did not send ThrowBall",nil,false
+		end
+
+		return true,nil,override.plan or fallbackPlan,false
+	end
+
 	local function fireGameplayThrow(plan)
 		local reEvent=getGameReEvent()
 		if not reEvent then
@@ -1851,6 +1958,19 @@ function QBAim.new(ctx,parent)
 		if planCanBeDefended(lockedPlan,receiver) then
 			releaseThrowLock()
 			setStatus("Unsafe throw blocked")
+			return
+		end
+
+		local nativeOk,nativeErr,nativePlan,canFallback=runNativeClientThrow(receiver,power,heldBall,lockedPlan)
+		if nativeOk then
+			freezePreviewAtCurrentPlan(nativePlan)
+			waitForHeldBallRelease()
+			setStatus(currentModeText().." native client throw sent")
+			releaseThrowLock()
+			return
+		elseif canFallback==false then
+			releaseThrowLock()
+			setStatus(nativeErr or "Native client throw failed")
 			return
 		end
 
