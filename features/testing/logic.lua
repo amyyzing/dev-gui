@@ -7,11 +7,12 @@ local Workspace=game:GetService("Workspace")
 local LP=Players.LocalPlayer
 
 local BALL_G=28
-local PLAYER_G=196.2
-local JUMP_POWER=55.5
-local WR_MAX_Y=6+(JUMP_POWER*JUMP_POWER)/(2*PLAYER_G)
+local TESTING_C1_Y=14.22
 local C1_MARKER_HEIGHT=80
 local C1_MARKER_THICKNESS=0.12
+local GROUND_MARKER_DIAMETER=5.5
+local GROUND_MARKER_THICKNESS=0.05
+local GROUND_MARKER_TRANSPARENCY=0.75
 
 local function firstFolder(container)
 	if not container then return nil end
@@ -72,7 +73,7 @@ local function c1FromPayload(payload)
 	local velocity=delta.Unit*power
 	local a=0.5*BALL_G
 	local b=-velocity.Y
-	local c=WR_MAX_Y-payload.SpawnPos.Y
+	local c=TESTING_C1_Y-payload.SpawnPos.Y
 	local disc=b*b-4*a*c
 	if disc<0 then
 		local apexTime=math.max(velocity.Y/BALL_G,0)
@@ -175,6 +176,7 @@ function Testing.new(ctx,parent)
 	local toggle=nil
 	local statusLabel=nil
 	local marker=nil
+	local groundMarker=nil
 	local remoteConnections={}
 	local topologyConnections={}
 	local lifetimeConnections={}
@@ -231,8 +233,12 @@ function Testing.new(ctx,parent)
 		if marker and marker.Parent then
 			marker:Destroy()
 		end
+		if groundMarker and groundMarker.Parent then
+			groundMarker:Destroy()
+		end
 
 		marker=nil
+		groundMarker=nil
 	end
 
 	local function styleMarker(part)
@@ -245,6 +251,31 @@ function Testing.new(ctx,parent)
 		part.Material=Enum.Material.Neon
 		part.Color=THEME.GREEN or Color3.fromRGB(80,220,140)
 		part.Transparency=0.15
+	end
+
+	local function styleGroundMarker(part)
+		part.Shape=Enum.PartType.Cylinder
+		part.Size=Vector3.new(GROUND_MARKER_THICKNESS,GROUND_MARKER_DIAMETER,GROUND_MARKER_DIAMETER)
+		part.Anchored=true
+		part.CanCollide=false
+		part.CanTouch=false
+		part.CanQuery=false
+		part.Material=Enum.Material.Neon
+		part.Color=THEME.GREEN or Color3.fromRGB(80,220,140)
+		part.Transparency=GROUND_MARKER_TRANSPARENCY
+	end
+
+	local function groundYAt(position)
+		local params=RaycastParams.new()
+		params.FilterType=Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances={marker,groundMarker}
+
+		local result=Workspace:Raycast(position+Vector3.new(0,10,0),Vector3.new(0,-300,0),params)
+		if result then
+			return result.Position.Y+GROUND_MARKER_THICKNESS*0.5+0.01
+		end
+
+		return GROUND_MARKER_THICKNESS*0.5+0.01
 	end
 
 	local function ensureMarker(parentFolder)
@@ -289,6 +320,21 @@ function Testing.new(ctx,parent)
 		return marker
 	end
 
+	local function ensureGroundMarker(parentFolder)
+		if groundMarker and groundMarker.Parent then
+			styleGroundMarker(groundMarker)
+			return groundMarker
+		end
+
+		local parent=parentFolder or Workspace
+		local existing=parent:FindFirstChild("TestingC1GroundMarker")
+		groundMarker=(existing and existing:IsA("BasePart")) and existing or Instance.new("Part")
+		groundMarker.Name="TestingC1GroundMarker"
+		styleGroundMarker(groundMarker)
+		groundMarker.Parent=parent
+		return groundMarker
+	end
+
 	local function captureC1(source,payload)
 		if not state.testingEnabled then return end
 
@@ -307,7 +353,9 @@ function Testing.new(ctx,parent)
 			return
 		end
 
+		pos=Vector3.new(pos.X,TESTING_C1_Y,pos.Z)
 		ensureMarker(folder).CFrame=CFrame.new(pos)
+		ensureGroundMarker(folder).CFrame=CFrame.new(pos.X,groundYAt(pos),pos.Z)*CFrame.Angles(0,0,math.rad(90))
 		local powerText=payload and (" "..fmtPower(payload.Power)) or ""
 		local timeText=flightTime and string.format(" %.2fs",flightTime) or ""
 		local label=(lastThrower and (lastThrower.." ") or "")..(fromPayload and "C1 calc" or "C1")..powerText..timeText..": "..fmtVector(pos)

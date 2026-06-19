@@ -1800,6 +1800,7 @@ function destroyKnownGuiResidue()
 		PreviewC1Marker=true,
 		PreviewC3InfoAnchor=true,
 		TestingC1Marker=true,
+		TestingC1GroundMarker=true,
 		QBAimTargetHighlight=true,
 		MyESPHighlight=true,
 	}
