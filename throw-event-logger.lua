@@ -1,14 +1,14 @@
--- Standalone throw diagnostics logger.
--- Execute this by itself, run a few throw tests, then press RightShift+J or run:
--- getgenv().ThrowEventLogger.Copy()
+-- Standalone normal-click throw diagnostics logger.
+-- Execute this by itself before a normal click throw, then press RightShift+J or run:
+-- getgenv().QBAimThrowLoggerDump()
 
-local VERSION="throw-event-logger-v2"
-local MAX_EVENTS=900
+local VERSION="throw-event-logger-v3"
+local MAX_EVENTS=700
 local MAX_ARG_DEPTH=5
 local MAX_TABLE_ITEMS=55
 local MAX_FOOTBALLS=18
 local MAX_PLAYERS=28
-local THROW_SNAPSHOT_DELAYS={0,0.03,0.08,0.16,0.32,0.65}
+local THROW_SNAPSHOT_DELAYS={0,0.02,0.05,0.10,0.18,0.32,0.55,0.90}
 local ENABLE_OUTGOING_HOOK_BY_DEFAULT=false
 
 local Players=game:GetService("Players")
@@ -25,6 +25,9 @@ local connectedRemotes={}
 local startedClock=os.clock()
 local stopped=false
 local outgoingHookAttempted=false
+local lastInputEvent=nil
+local snapshotToken=0
+local snapshotWindowUntil=0
 
 local function round(value)
 	if type(value)~="number" then return value end
@@ -273,6 +276,103 @@ local function arcState()
 	return result
 end
 
+local function arcPoint(name)
+	local localFolder=getLocalFolder()
+	local center=localFolder and localFolder:FindFirstChild("Center")
+	local attachment=center and center:FindFirstChild(name,true)
+	local cframe=attachment and attachmentCFrame(attachment)
+	return cframe and cframe.Position or nil
+end
+
+local function distanceBetween(a,b)
+	if typeof(a)~="Vector3" or typeof(b)~="Vector3" then return nil end
+	return round((a-b).Magnitude)
+end
+
+local function deltaBetween(a,b)
+	if typeof(a)~="Vector3" or typeof(b)~="Vector3" then return nil end
+	return vec(a-b)
+end
+
+local function closestFootballTo(position)
+	if typeof(position)~="Vector3" then return nil end
+	local best=nil
+	local bestDistance=nil
+
+	local function scan(container)
+		if not container then return end
+		for _,descendant in ipairs(container:GetDescendants()) do
+			if looksLikeFootball(descendant) then
+				local distance=(descendant.Position-position).Magnitude
+				if not bestDistance or distance<bestDistance then
+					best=descendant
+					bestDistance=distance
+				end
+			end
+		end
+	end
+
+	if LP and LP.Character then
+		scan(LP.Character)
+	end
+	scan(Workspace)
+	return best,bestDistance
+end
+
+local function payloadSummary(payload)
+	if type(payload)~="table" then return nil end
+	local spawn=payload.SpawnPos
+	local target=payload.Target
+	return{
+		power=payload.Power,
+		launchTime=payload.LaunchTime,
+		spinType=payload.SpinType,
+		gameId=payload.GameID,
+		spawnPos=vec(spawn),
+		target=vec(target),
+		centerWorld=vec(payload.CenterWorld),
+		targetMinusSpawn=deltaBetween(target,spawn),
+		targetDistance=distanceBetween(target,spawn),
+	}
+end
+
+local function releaseDiagnostics(payload)
+	if type(payload)~="table" then return nil end
+
+	local spawn=payload.SpawnPos
+	local target=payload.Target
+	local c1=arcPoint("C1")
+	local c2=arcPoint("C2")
+	local c3=arcPoint("C3")
+	local character=LP and LP.Character or nil
+	local characterRoot=root(character)
+	local rootPosition=characterRoot and characterRoot.Position or nil
+	local closestBall,closestBallDistance=closestFootballTo(rootPosition or spawn)
+	local ballPosition=closestBall and closestBall.Position or nil
+	local nowClock=os.clock()-startedClock
+
+	return{
+		payload=payloadSummary(payload),
+		inputToThisClock=lastInputEvent and round(nowClock-lastInputEvent.clock) or nil,
+		inputToThisServerTime=lastInputEvent and round(Workspace:GetServerTimeNow()-lastInputEvent.serverTime) or nil,
+		lastInput=lastInputEvent,
+		localRoot=partState(characterRoot),
+		nearestFootball=partState(closestBall),
+		nearestFootballDistance=round(closestBallDistance),
+		c1=vec(c1),
+		c2=vec(c2),
+		c3=vec(c3),
+		spawnMinusC2=deltaBetween(spawn,c2),
+		spawnDistanceFromC2=distanceBetween(spawn,c2),
+		spawnMinusRoot=deltaBetween(spawn,rootPosition),
+		spawnDistanceFromRoot=distanceBetween(spawn,rootPosition),
+		spawnMinusBall=deltaBetween(spawn,ballPosition),
+		spawnDistanceFromBall=distanceBetween(spawn,ballPosition),
+		targetMinusC1=deltaBetween(target,c1),
+		targetDistanceFromC1=distanceBetween(target,c1),
+	}
+end
+
 local function humanoidState(character)
 	local humanoid=character and character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return nil end
@@ -378,9 +478,44 @@ local function argsLookThrow(args)
 	return false
 end
 
+local function throwPayloadFromArgs(args)
+	for _,value in ipairs(args) do
+		if type(value)=="table" and (value.Target~=nil or value.SpawnPos~=nil or value.Power~=nil or value.CenterWorld~=nil or value.LaunchTime~=nil) then
+			return value
+		end
+	end
+	return nil
+end
+
+local function remoteThrowKind(args)
+	local first=args[1]
+	local second=args[2]
+	if first=="UpdateFootball" then
+		return"update_football",throwPayloadFromArgs(args)
+	end
+	if first=="Mechanics" and (second=="ThrowBall" or second=="UpdateBall" or second=="UpdateFootball" or second=="UnequipFootball") then
+		return"mechanics_"..string.lower(tostring(second)),throwPayloadFromArgs(args)
+	end
+	if first=="AddEvent" and type(second)=="table" and tostring(second.Name)=="Throw" then
+		return"add_event_throw",throwPayloadFromArgs(args)
+	end
+	if argsLookThrow(args) then
+		return"throw_related",throwPayloadFromArgs(args)
+	end
+	return nil,nil
+end
+
 local function scheduleThrowSnapshots(label)
+	local nowClock=os.clock()-startedClock
+	if nowClock<snapshotWindowUntil then
+		return
+	end
+	snapshotWindowUntil=nowClock+1.05
+	snapshotToken=snapshotToken+1
+	local token=snapshotToken
 	for _,delayTime in ipairs(THROW_SNAPSHOT_DELAYS) do
 		task.delay(delayTime,function()
+			if stopped or token~=snapshotToken then return end
 			pushEvent("snapshot:"..label,{delay=delayTime},true)
 		end)
 	end
@@ -397,8 +532,15 @@ local function connectRemote(remote)
 	pushEvent("remote_watch",{remote=pathOf(remote),name=remote.Name})
 	addConnection(remote.OnClientEvent:Connect(function(...)
 		local args={...}
-		if argsLookThrow(args) or remote.Name=="ReEvent" then
-			pushEvent("remote_in",{remote=pathOf(remote),args=sanitize(args)},false)
+		local kind,payload=remoteThrowKind(args)
+		if kind then
+			pushEvent("remote_in",{
+				remote=pathOf(remote),
+				remoteName=remote.Name,
+				kind=kind,
+				args=sanitize(args),
+				release=releaseDiagnostics(payload),
+			},payload~=nil)
 			scheduleThrowSnapshots("remote_in")
 		end
 	end))
@@ -424,7 +566,9 @@ local function watchContainer(container)
 			connectRemote(descendant)
 		elseif looksLikeFootball(descendant) then
 			pushEvent("football_added",{football=partState(descendant)},false)
-			scheduleThrowSnapshots("football_added")
+			if os.clock()-startedClock<snapshotWindowUntil then
+				scheduleThrowSnapshots("football_added")
+			end
 		end
 	end))
 end
@@ -448,9 +592,20 @@ local function hookOutgoingFireServer()
 	local callback=function(self,...)
 		local method=getNamecallMethod()
 		local args={...}
-		if method=="FireServer" and typeof(self)=="Instance" and self:IsA("RemoteEvent") and argsLookThrow(args) then
-			pushEvent("remote_out",{remote=pathOf(self),args=sanitize(args)},false)
-			scheduleThrowSnapshots("remote_out")
+		if method=="FireServer" and typeof(self)=="Instance" and self:IsA("RemoteEvent") then
+			pcall(function()
+				local kind,payload=remoteThrowKind(args)
+				if kind then
+					pushEvent("remote_out",{
+						remote=pathOf(self),
+						remoteName=self.Name,
+						kind=kind,
+						args=sanitize(args),
+						release=releaseDiagnostics(payload),
+					},payload~=nil)
+					scheduleThrowSnapshots("remote_out")
+				end
+			end)
 		end
 		return oldNamecall(self,...)
 	end
@@ -565,6 +720,8 @@ local api={
 
 local globals=(type(getgenv)=="function" and getgenv()) or _G
 globals.ThrowEventLogger=api
+globals.QBAimThrowLoggerDump=copyJson
+globals.QBAimThrowLoggerStop=stopLogger
 
 watchContainer(ReplicatedStorage)
 watchContainer(Workspace)
@@ -580,11 +737,21 @@ addConnection(UserInputService.InputBegan:Connect(function(input,gameProcessed)
 		or input.KeyCode==Enum.KeyCode.ButtonR2
 		or input.KeyCode==Enum.KeyCode.ButtonR1
 	if interesting then
+		lastInputEvent={
+			clock=round(os.clock()-startedClock),
+			serverTime=round(Workspace:GetServerTimeNow()),
+			key=tostring(input.KeyCode),
+			userInputType=tostring(input.UserInputType),
+			gameProcessed=gameProcessed,
+			mouse=LP and LP:GetMouse() and {x=round(LP:GetMouse().X),y=round(LP:GetMouse().Y),hit=cf(LP:GetMouse().Hit)} or nil,
+			arc=arcState(),
+		}
 		pushEvent("input_began",{
 			key=tostring(input.KeyCode),
 			userInputType=tostring(input.UserInputType),
 			gameProcessed=gameProcessed,
 			mouse=LP and LP:GetMouse() and {x=LP:GetMouse().X,y=LP:GetMouse().Y,hit=cf(LP:GetMouse().Hit)} or nil,
+			arc=arcState(),
 		},false)
 		scheduleThrowSnapshots("input")
 	end
@@ -630,10 +797,10 @@ pushEvent("logger_started",{
 		"Run throws/clicks normally.",
 		"Press RightShift+K to add a manual snapshot.",
 		"Press RightShift+J to copy JSON.",
-		"Or run getgenv().ThrowEventLogger.Copy().",
+		"Or run getgenv().QBAimThrowLoggerDump().",
 		"Outgoing FireServer hooks are off by default. Run getgenv().ThrowEventLogger.EnableOutgoingHook() only if needed.",
 		"Press RightShift+L to stop the logger.",
 	},
 },true)
 
-print("[ThrowLogger] started in non-invasive mode. Press RightShift+J to copy JSON, RightShift+K snapshot, RightShift+L stop.")
+print("[ThrowLogger] started in non-invasive mode. Normal click throw, then RightShift+J or getgenv().QBAimThrowLoggerDump().")
