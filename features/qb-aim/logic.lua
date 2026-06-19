@@ -100,9 +100,10 @@ local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
 --   1. Keypress computes one locked plan.
---   2. C2/QB origin drifts by the same time on X, Y, and Z.
---   3. WR is predicted through the full animation release window.
---   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
+--   2. Original Center.C2 is snapshotted as the local release-frame anchor.
+--   3. QB drift only applies as a fallback when C2 is unavailable/invalid.
+--   4. WR is predicted through the full animation release window.
+--   5. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local ESP_HIGHLIGHT_NAME="MyESPHighlight"
@@ -1072,6 +1073,17 @@ function QBAim.new(ctx,parent)
 		return cf and cf.Position
 	end
 
+	local function captureReleaseFrame(qbRoot,ball)
+		return{
+			t=os.clock(),
+			c2=c2Position(),
+			rootPos=qbRoot and qbRoot.Position or nil,
+			ballPos=ball and ball.Position or nil,
+			rootVel=qbRoot and qbRoot.AssemblyLinearVelocity or Vector3.zero,
+			ballVel=ball and ball.AssemblyLinearVelocity or Vector3.zero,
+		}
+	end
+
 	local function setPreviewCenterVisible(visible)
 		local center=preview.center
 		if not(center and center.Parent) then return end
@@ -1402,7 +1414,7 @@ function QBAim.new(ctx,parent)
 		return rootVelocity.Y,"root"
 	end
 
-	local function origin(qbRoot,ball,xzReleaseOffset,yReleaseOffset)
+	local function origin(qbRoot,ball,xzReleaseOffset,yReleaseOffset,releaseFrame)
 		xzReleaseOffset=xzReleaseOffset or 0
 		-- X/Y/Z share the same release-origin drift time unless explicitly overridden.
 		yReleaseOffset=yReleaseOffset
@@ -1410,9 +1422,9 @@ function QBAim.new(ctx,parent)
 			yReleaseOffset=xzReleaseOffset
 		end
 
-		local rootVelocity=qbRoot.AssemblyLinearVelocity
-		local fallbackPosition=ball and ball.Position or qbRoot.Position
-		local c2Pos=c2Position()
+		local rootVelocity=(releaseFrame and releaseFrame.rootVel) or qbRoot.AssemblyLinearVelocity
+		local fallbackPosition=(releaseFrame and (releaseFrame.ballPos or releaseFrame.rootPos)) or (ball and ball.Position) or qbRoot.Position
+		local c2Pos=releaseFrame and releaseFrame.c2 or c2Position()
 		local useC2=false
 		if c2Pos then
 			local referencePosition=ball and ball.Position or qbRoot.Position
@@ -1425,13 +1437,18 @@ function QBAim.new(ctx,parent)
 		local y=basePosition.Y
 
 		local dx,dz=0,0
-		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and xzReleaseOffset>0 then
+		if not useC2 and QB_RELEASE_EXTRAPOLATE_HORIZONTAL and xzReleaseOffset>0 then
 			dx=rootVelocity.X*xzReleaseOffset
 			dz=rootVelocity.Z*xzReleaseOffset
 		end
 
-		if QB_RELEASE_EXTRAPOLATE_VERTICAL and yReleaseOffset>0 then
-			local verticalVelocity=releaseVerticalVelocity(qbRoot,ball)
+		if not useC2 and QB_RELEASE_EXTRAPOLATE_VERTICAL and yReleaseOffset>0 then
+			local verticalVelocity
+			if releaseFrame then
+				verticalVelocity=math.abs(releaseFrame.ballVel.Y)>=QB_AIRBORNE_VY_EPSILON and releaseFrame.ballVel.Y or releaseFrame.rootVel.Y
+			else
+				verticalVelocity=releaseVerticalVelocity(qbRoot,ball)
+			end
 			local airborne=math.abs(verticalVelocity)>=QB_AIRBORNE_VY_EPSILON or qbRoot.Position.Y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON
 			if airborne then
 				local yOffset=verticalVelocity*yReleaseOffset-0.5*PLAYER_G*yReleaseOffset*yReleaseOffset
@@ -1439,7 +1456,7 @@ function QBAim.new(ctx,parent)
 			end
 		end
 
-		return Vector3.new(basePosition.X+dx,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+dz)
+		return Vector3.new(basePosition.X+dx,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+dz),useC2 and "center_c2" or (ball and "ball" or "root"),useC2
 	end
 
 	local function ensureC1Marker()
@@ -1830,7 +1847,7 @@ function QBAim.new(ctx,parent)
 		previewFreezeStarted=os.clock()
 	end
 
-	local function buildPlan(receiver,ballPower,releaseOffset,releaseBall,receiverReleaseOffset)
+	local function buildPlan(receiver,ballPower,releaseOffset,releaseBall,receiverReleaseOffset,releaseFrame)
 		if not canTargetReceiver(receiver) then
 			return nil,nil
 		end
@@ -1847,10 +1864,11 @@ function QBAim.new(ctx,parent)
 
 		releaseOffset=releaseOffset or 0
 		receiverReleaseOffset=receiverReleaseOffset==nil and releaseOffset or receiverReleaseOffset
-		local originPosition=origin(qbRoot,ball,releaseOffset)
+		releaseFrame=releaseFrame or captureReleaseFrame(qbRoot,ball)
+		local originPosition,originSource,originUsesC2=origin(qbRoot,ball,releaseOffset,nil,releaseFrame)
 		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
-		return mathCore.solve({
+		local plan=mathCore.solve({
 			originPosition=originPosition,
 			receiverPosition=receiverRoot.Position,
 			receiverAnchorPosition=receiverAnchorPosition,
@@ -1882,7 +1900,16 @@ function QBAim.new(ctx,parent)
 			predictorConfidenceMax=PREDICTOR_CONFIDENCE_MAX,
 			tangentDominanceEpsilon=CIRCLE_TANGENT_DOMINANCE_EPSILON,
 			remoteFireDelayed=not THROW_TARGET_FIRE_IMMEDIATELY,
-		}),ball
+		})
+
+		if plan then
+			plan.releaseOriginSource=originSource
+			plan.releaseUsesC2=originUsesC2
+			plan.releaseFrameAge=releaseFrame and math.max(os.clock()-(releaseFrame.t or os.clock()),0) or 0
+			plan.clientServerMixedRelease=true
+		end
+
+		return plan,ball
 	end
 
 	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
@@ -1985,11 +2012,11 @@ function QBAim.new(ctx,parent)
 		end
 
 		-- Lock one plan at keypress. Keep animation-to-fire timing at 0.2666s,
-		-- but do not use that whole value to move C2/origin. The QB/ball release
-		-- origin gets a small measured drift; the WR prediction uses the full
-		-- animation window.
+		-- but keep the local Center.C2 release anchor fixed to this input frame.
+		-- The WR prediction still uses the full animation window.
 		local lockedQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		local releaseFrame=captureReleaseFrame(root(LP.Character),heldBall)
 		throwInProgress=true
 
 		local function releaseThrowLock()
@@ -1997,7 +2024,7 @@ function QBAim.new(ctx,parent)
 			lastThrowAt=os.clock()
 		end
 
-		local lockedPlan=buildPlan(receiver,power,lockedQBOffset,heldBall,lockedWROffset)
+		local lockedPlan=buildPlan(receiver,power,lockedQBOffset,heldBall,lockedWROffset,releaseFrame)
 		if not lockedPlan then
 			releaseThrowLock()
 			setStatus("No target-latch throw solution")
