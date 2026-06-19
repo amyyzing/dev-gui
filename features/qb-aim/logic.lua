@@ -1830,7 +1830,8 @@ function QBAim.new(ctx,parent)
 			return false,hookErr or "Target override hook unavailable",nil,true
 		end
 
-		local override={
+		local override
+		override={
 			active=true,
 			anyReEvent=true,
 			fallbackPlan=fallbackPlan,
@@ -1838,6 +1839,7 @@ function QBAim.new(ctx,parent)
 				local liveBall=(releaseBall and releaseBall.Parent and releaseBall) and releaseBall or getHeldBall() or releaseBall
 				local plan=buildPlan(receiver,ballPower,0,liveBall,0)
 				if plan then
+					override.latestPlan=plan
 					previewPlan(plan)
 				end
 				return plan
@@ -1848,6 +1850,14 @@ function QBAim.new(ctx,parent)
 		}
 
 		QBAim._throwTargetOverride=override
+		override.planProvider()
+		task.spawn(function()
+			while override.active and not override.done and not override.blocked do
+				override.planProvider()
+				RunService.Heartbeat:Wait()
+			end
+		end)
+
 		local ok,err=pcall(function()
 			mechanics:FootballThrow(nil,REMOTE_DISPLAY_POWER)
 		end)
@@ -1858,7 +1868,7 @@ function QBAim.new(ctx,parent)
 
 		if not ok then
 			if override.done then
-				return true,nil,override.plan or fallbackPlan,false
+				return true,nil,override.plan or override.latestPlan or fallbackPlan,false
 			end
 			return false,tostring(err or "Native FootballThrow failed"),nil,true
 		end
@@ -1871,7 +1881,7 @@ function QBAim.new(ctx,parent)
 			return false,"Native FootballThrow did not send ThrowBall",nil,true
 		end
 
-		return true,nil,override.plan or fallbackPlan,false
+		return true,nil,override.plan or override.latestPlan or fallbackPlan,false
 	end
 
 	local function fireGameplayThrow(plan)
