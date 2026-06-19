@@ -88,8 +88,6 @@ local PAGE1_STATE={
 	qbAimSafeArc=true,
 	qbAimLeadDelay=0.38,
 	qbAimPeakHeight=14.00,
-	qbAimQBDrift=0.04,
-	qbAimQBYDrift=0.04,
 	testingEnabled=false,
 }
 
