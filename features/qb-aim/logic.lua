@@ -77,7 +77,6 @@ local THROW_ANIMATION_SPEED=1.35
 local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
 local THROW_REMOTE_LEAD_TIME=0.00 -- fire after the full animation release wait
 local THROW_TARGET_LOCK_EXTRA_DELAY=0.00
-local THROW_TARGET_LOCK_PREVIEW_LIVE=false -- freeze locked plan during animation; normal game preview appears to latch here
 local THROW_TARGET_FIRE_IMMEDIATELY=false
 local THROW_INPUT_COOLDOWN=0.85
 local THROW_RELEASE_CONFIRM_TIMEOUT=1.75
@@ -1729,10 +1728,8 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
-		-- Target-latch / delayed-remote solver.
-		-- The preview arc locks at keypress, but the remote appears shortly before release.
-		-- Keep the keypress plan frozen during animation, then send that same world Target.
-		-- Do not recompute from the future QB point and do not fire immediately.
+		-- Rebuild during the animation wait. The remote fires at release time, so each
+		-- iteration solves from the current C2/root state projected by the remaining wait.
 		if THROW_TARGET_FIRE_IMMEDIATELY then
 			if lockedPlan then
 				previewPlan(lockedPlan)
@@ -1741,27 +1738,30 @@ function QBAim.new(ctx,parent)
 		end
 
 		if THROW_ANIMATION_RELEASE_WAIT<=0 then
-			return lockedPlan or buildPlan(receiver,ballPower,0,releaseBall)
+			return buildPlan(receiver,ballPower,0,releaseBall,0) or lockedPlan,releaseBall
 		end
 
 		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
 		local fireAt=endAt-math.clamp(THROW_REMOTE_LEAD_TIME,0,THROW_ANIMATION_RELEASE_WAIT)
+		local latestPlan=lockedPlan
 
 		while os.clock()<fireAt do
-			if THROW_TARGET_LOCK_PREVIEW_LIVE then
-				local remaining=math.max(endAt-os.clock(),0)
-				local livePlan=buildPlan(receiver,ballPower,remaining,releaseBall,remaining)
-				if livePlan then
-					previewPlan(livePlan)
-				end
-			elseif lockedPlan then
-				previewPlan(lockedPlan)
+			local remaining=math.max(endAt-os.clock(),0)
+			local livePlan=buildPlan(receiver,ballPower,remaining,releaseBall,remaining)
+			if livePlan then
+				latestPlan=livePlan
+				previewPlan(livePlan)
 			end
 
 			RunService.Heartbeat:Wait()
 		end
 
-		return lockedPlan,releaseBall
+		local finalRemaining=math.max(endAt-os.clock(),0)
+		local finalPlan=buildPlan(receiver,ballPower,finalRemaining,releaseBall,finalRemaining) or latestPlan
+		if finalPlan then
+			previewPlan(finalPlan)
+		end
+		return finalPlan,releaseBall
 	end
 
 	local function fireGameplayThrow(plan)
