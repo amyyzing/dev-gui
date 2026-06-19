@@ -2,7 +2,7 @@
 -- Execute this by itself before a normal click throw, then press RightShift+J or run:
 -- getgenv().QBAimThrowLoggerDump()
 
-local VERSION="throw-event-logger-v3"
+local VERSION="throw-event-logger-v4"
 local MAX_EVENTS=700
 local MAX_ARG_DEPTH=5
 local MAX_TABLE_ITEMS=55
@@ -521,6 +521,10 @@ local function scheduleThrowSnapshots(label)
 	end
 end
 
+local function throwWindowActive()
+	return os.clock()-startedClock<snapshotWindowUntil
+end
+
 local function addConnection(connection)
 	table.insert(connections,connection)
 	return connection
@@ -627,15 +631,22 @@ local function connectAnimationsForPlayer(player)
 			local name=track.Name or ""
 			local animationId=animation and animation.AnimationId or ""
 			local lower=string.lower(name.." "..animationId)
-			if string.find(lower,"throw",1,true) or string.find(lower,"quarterback",1,true) or player==LP then
+			local relevant=string.find(lower,"throw",1,true)
+				or string.find(lower,"quarterback",1,true)
+				or string.find(lower,"football",1,true)
+				or string.find(lower,"catch",1,true)
+				or string.find(lower,"hike",1,true)
+			if relevant or (player==LP and throwWindowActive()) then
 				pushEvent("animation_played",{
 					player=player.Name,
 					track=name,
 					animationId=animationId,
 					speed=round(track.Speed),
 					length=round(track.Length),
-				},player==LP)
-				if string.find(lower,"throw",1,true) or string.find(lower,"quarterback",1,true) then
+					inputAge=lastInputEvent and round(os.clock()-startedClock-lastInputEvent.clock) or nil,
+					lastInput=lastInputEvent,
+				},player==LP and throwWindowActive())
+				if relevant then
 					scheduleThrowSnapshots("animation")
 				end
 			end
@@ -762,6 +773,9 @@ addConnection(UserInputService.InputBegan:Connect(function(input,gameProcessed)
 		elseif input.KeyCode==Enum.KeyCode.K then
 			pushEvent("manual_hotkey_snapshot",{},true)
 			print("[ThrowLogger] snapshot added")
+		elseif input.KeyCode==Enum.KeyCode.O then
+			local ok=hookOutgoingFireServer()
+			print("[ThrowLogger] outgoing FireServer hook",ok and "enabled" or "unavailable")
 		elseif input.KeyCode==Enum.KeyCode.L then
 			stopLogger()
 		end
@@ -795,6 +809,7 @@ pushEvent("logger_started",{
 	localPlayer=LP and LP.Name or nil,
 	instructions={
 		"Run throws/clicks normally.",
+		"Press RightShift+O before a test to also log outgoing FireServer calls.",
 		"Press RightShift+K to add a manual snapshot.",
 		"Press RightShift+J to copy JSON.",
 		"Or run getgenv().QBAimThrowLoggerDump().",
@@ -803,4 +818,4 @@ pushEvent("logger_started",{
 	},
 },true)
 
-print("[ThrowLogger] started in non-invasive mode. Normal click throw, then RightShift+J or getgenv().QBAimThrowLoggerDump().")
+print("[ThrowLogger] started. RightShift+O enables outgoing remote logging; RightShift+J copies JSON.")

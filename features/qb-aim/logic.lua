@@ -85,8 +85,8 @@ local QB_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
 --   1. Keypress computes one locked plan.
---   2. The held football is the preferred release-frame anchor.
---   3. Center.C2 is only a fallback when the football is unavailable.
+--   2. Original Center.C2 is snapshotted as the local release-frame anchor.
+--   3. The release point is projected to the animation release frame on X/Z.
 --   4. WR is predicted through the same release window.
 --   5. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
@@ -1313,22 +1313,20 @@ function QBAim.new(ctx,parent)
 
 	local function origin(qbRoot,ball,releaseFrame,releaseOffset)
 		releaseOffset=math.max(tonumber(releaseOffset) or 0,0)
-		local ballPosition=(releaseFrame and releaseFrame.ballPos) or (ball and ball.Position)
-		local fallbackPosition=ballPosition or (releaseFrame and releaseFrame.rootPos) or qbRoot.Position
+		local fallbackPosition=(releaseFrame and (releaseFrame.ballPos or releaseFrame.rootPos)) or (ball and ball.Position) or qbRoot.Position
 		local c2Pos=releaseFrame and releaseFrame.c2 or c2Position()
 		local useC2=false
-		if not ballPosition and c2Pos then
+		if c2Pos then
 			local referencePosition=fallbackPosition
 			local yValid=c2Pos.Y>=referencePosition.Y-C2_GROUND_FALLBACK_MARGIN and c2Pos.Y<=referencePosition.Y+C2_MAX_ABOVE_BALL
 			local distanceValid=(c2Pos-referencePosition).Magnitude<=C2_MAX_RELEASE_DISTANCE
 			useC2=yValid and distanceValid
 		end
 
-		local basePosition=ballPosition or (useC2 and c2Pos) or fallbackPosition
+		local basePosition=useC2 and c2Pos or fallbackPosition
 		local releaseVelocity=flat((releaseFrame and releaseFrame.rootVel) or qbRoot.AssemblyLinearVelocity or Vector3.zero)
 		local predictedXZ=basePosition+releaseVelocity*releaseOffset
-		local source=ballPosition and "ball_projected" or (useC2 and "center_c2_projected" or "root_projected")
-		return Vector3.new(predictedXZ.X,basePosition.Y+QB_LAUNCH_Y_BIAS,predictedXZ.Z),source,useC2
+		return Vector3.new(predictedXZ.X,basePosition.Y+QB_LAUNCH_Y_BIAS,predictedXZ.Z),useC2 and "center_c2_projected" or (ball and "ball_projected" or "root_projected"),useC2
 	end
 
 	local function ensureC1Marker()
