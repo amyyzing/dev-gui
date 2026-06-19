@@ -82,12 +82,14 @@ local THROW_TARGET_FIRE_IMMEDIATELY=false
 local THROW_INPUT_COOLDOWN=0.85
 local THROW_RELEASE_CONFIRM_TIMEOUT=1.75
 local THROW_RELEASE_CONFIRM_STABLE_TIME=0.08
+local QB_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
 --   1. Keypress computes one locked plan.
 --   2. Original Center.C2 is snapshotted as the local release-frame anchor.
---   3. WR is predicted through the full animation release window.
---   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
+--   3. The release point is projected to the animation release frame on X/Z.
+--   4. WR is predicted through the same release window.
+--   5. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local ESP_HIGHLIGHT_NAME="MyESPHighlight"
@@ -987,6 +989,7 @@ function QBAim.new(ctx,parent)
 			c2=c2Position(),
 			rootPos=qbRoot and qbRoot.Position or nil,
 			ballPos=ball and ball.Position or nil,
+			rootVel=qbRoot and qbRoot.AssemblyLinearVelocity or Vector3.zero,
 		}
 	end
 
@@ -1254,7 +1257,8 @@ function QBAim.new(ctx,parent)
 		return rootPosition,"root"
 	end
 
-	local function origin(qbRoot,ball,releaseFrame)
+	local function origin(qbRoot,ball,releaseFrame,releaseOffset)
+		releaseOffset=math.max(tonumber(releaseOffset) or 0,0)
 		local fallbackPosition=(releaseFrame and (releaseFrame.ballPos or releaseFrame.rootPos)) or (ball and ball.Position) or qbRoot.Position
 		local c2Pos=releaseFrame and releaseFrame.c2 or c2Position()
 		local useC2=false
@@ -1266,7 +1270,9 @@ function QBAim.new(ctx,parent)
 		end
 
 		local basePosition=useC2 and c2Pos or fallbackPosition
-		return Vector3.new(basePosition.X,basePosition.Y+QB_LAUNCH_Y_BIAS,basePosition.Z),useC2 and "center_c2" or (ball and "ball" or "root"),useC2
+		local releaseVelocity=flat((releaseFrame and releaseFrame.rootVel) or qbRoot.AssemblyLinearVelocity or Vector3.zero)
+		local predictedXZ=basePosition+releaseVelocity*releaseOffset
+		return Vector3.new(predictedXZ.X,basePosition.Y+QB_LAUNCH_Y_BIAS,predictedXZ.Z),useC2 and "center_c2_projected" or (ball and "ball_projected" or "root_projected"),useC2
 	end
 
 	local function ensureC1Marker()
@@ -1675,7 +1681,7 @@ function QBAim.new(ctx,parent)
 		releaseOffset=releaseOffset or 0
 		receiverReleaseOffset=receiverReleaseOffset==nil and releaseOffset or receiverReleaseOffset
 		releaseFrame=releaseFrame or captureReleaseFrame(qbRoot,ball)
-		local originPosition,originSource,originUsesC2=origin(qbRoot,ball,releaseFrame)
+		local originPosition,originSource,originUsesC2=origin(qbRoot,ball,releaseFrame,releaseOffset)
 		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
 		local plan=mathCore.solve({
@@ -1822,9 +1828,9 @@ function QBAim.new(ctx,parent)
 		end
 
 		-- Lock one plan at keypress. Keep animation-to-fire timing at 0.2666s,
-		-- but keep the local Center.C2 release anchor fixed to this input frame.
-		-- The WR prediction still uses the full animation window.
-		local lockedQBOffset=THROW_TARGET_LOCK_EXTRA_DELAY
+		-- and solve from the captured C2 projected to that same release frame.
+		-- The WR prediction uses the same release window.
+		local lockedQBOffset=QB_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local releaseFrame=captureReleaseFrame(root(LP.Character),heldBall)
 		throwInProgress=true
@@ -2178,7 +2184,7 @@ function QBAim.new(ctx,parent)
 		if now-preview.last<ARC_SETTINGS.UpdateInterval then return end
 		preview.last=now
 
-		local previewQBOffset=THROW_TARGET_LOCK_EXTRA_DELAY
+		local previewQBOffset=QB_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local previewWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local plan=buildPlan(trackedReceiver,nil,previewQBOffset,nil,previewWROffset)
 		if plan then
