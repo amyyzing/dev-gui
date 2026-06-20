@@ -154,7 +154,38 @@ local function rootMoveDirection(rootPart)
 	return flat(direction)
 end
 
+local function isLocalRoot(rootPart)
+	local character=rootPart and rootPart.Parent
+	return character~=nil and (character==LP.Character or character==Workspace:FindFirstChild(LP.Name))
+end
+
+local function localMoveKeyDown()
+	local keys={
+		Enum.KeyCode.W,
+		Enum.KeyCode.A,
+		Enum.KeyCode.S,
+		Enum.KeyCode.D,
+		Enum.KeyCode.Up,
+		Enum.KeyCode.Down,
+		Enum.KeyCode.Left,
+		Enum.KeyCode.Right,
+	}
+
+	for _,keyCode in ipairs(keys) do
+		local ok,isDown=pcall(UIS.IsKeyDown,UIS,keyCode)
+		if ok and isDown then
+			return true
+		end
+	end
+
+	return false
+end
+
 local function rootHasMoveInput(rootPart)
+	if isLocalRoot(rootPart) then
+		return localMoveKeyDown()
+	end
+
 	return rootMoveDirection(rootPart).Magnitude>MOVE_DIRECTION_EPSILON
 end
 
