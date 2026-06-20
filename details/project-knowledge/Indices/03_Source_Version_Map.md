@@ -2,7 +2,10 @@
 
 | File | Bytes | SHA-256 prefix | Notes |
 |---|---:|---|---|
-| `features/qb-aim/logic.lua` | 76602 | `6e574522980f9c6b` | Current live repo source restored to the pre-Catch-Ahead lead-delay solver. |
+| `features/qb-aim/logic.lua` | 76242 | `e61fd5661097a35b` | Current live repo source with fixed server-origin compensation, separate Server XZ/Y lead, and C2 used only for Y. |
+| `data-save/data-save.lua` | 38796 | `d82f4c9af349703c` | Runtime persistence source; saves and restores fixed Server XZ/Y lead with legacy drift fallback. |
+| `Patches/QBAim_Fixed_Server_Origin_Compensation.md` | 6898 | `a923099dcb8dcd64` | Reviewed implementation guide for fixed server-origin compensation. |
+| `Patches/apply_qb_aim_fixed_server_origin.py` | 20011 | `2cacb3428dee21af` | Strict idempotent apply/check helper for the fixed server-origin compensation patch. |
 | `FootballMath.md` | 22430 | `1536b0751ae8321b` | Decompiled game-source markdown; confirms gravity, power coefficient, pass velocity, and beam math. |
 | `Mechanics.md` | 5049 | `94609a84d5a01bd6` | Decompiled game-source markdown; confirms mechanics state, ball power defaults, and module load shape. |
 | `MECH_ControlsQuarterback.md` | 27693 | `0d70c717ca36af8c` | Decompiled game-source markdown; confirms FootballThrow animation wait and ThrowBall payload. |

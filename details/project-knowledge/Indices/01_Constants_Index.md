@@ -78,14 +78,22 @@ local QB_Y_FALL_FACTOR=0
 local QB_Y_MAX_CORRECTION=4.25
 local C2_GROUND_FALLBACK_MARGIN=2.50
 local C2_MAX_ABOVE_BALL=8.00
+local C2_MAX_Y_DELTA=10.00
 local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
-local QB_RELEASE_EXTRAPOLATE_VERTICAL=false
+local QB_RELEASE_EXTRAPOLATE_VERTICAL=true
+local QB_SERVER_HORIZONTAL_DEADZONE=0.75
+local QB_SERVER_HORIZONTAL_SPEED_MAX=24
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0.15
+local QB_RELEASE_VERTICAL_DRIFT_TIME=0.15
+local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 ```
 
-- The restored runtime uses the held ball/root position as base origin.
-- Original game `Center.C2.Y` is used when it is within the ball-relative fallback range.
-- Horizontal release extrapolation moves origin X/Z by QB root velocity during release wait.
-- Vertical release extrapolation is disabled.
+- The runtime uses held ball/root XZ as the base origin.
+- Original game `Center.C2.Y` is used only as a Y reference after independent Y validation.
+- C2 X/Z is not mixed with server-origin drift.
+- `Server XZ Lead` persists through `state.qbAimQBDrift`, defaulting to `0.15` and clamped from `0.00` to `0.25`.
+- `Server Y Lead` persists through `state.qbAimQBYDrift`, defaulting to `0.15` and clamped from `0.00` to `0.35`.
+- Horizontal release extrapolation uses actual QB assembly velocity with dead zone and speed cap, not local key-state detection.
 
 ## Fixed-speed intercept solver
 

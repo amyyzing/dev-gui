@@ -218,6 +218,8 @@ local DATA_SAVE_STATE_SETTERS={
 	setQBAimTargetHighlight={"qbAimTargetHighlight",true,"QBAim","SetTargetHighlightState",true},
 	setQBAimLeadDelay={"qbAimLeadDelay",false,"QBAim","SetLeadDelay",true},
 	setQBAimPeakHeight={"qbAimPeakHeight",false,"QBAim","SetPeakHeight",true},
+	setQBAimQBDrift={"qbAimQBDrift",false,"QBAim","SetQBDrift",true},
+	setQBAimQBYDrift={"qbAimQBYDrift",false,"QBAim","SetQBYDrift",true},
 	setTestingState={"testingEnabled",true,"Testing","SetTestingState",true},
 }
 
