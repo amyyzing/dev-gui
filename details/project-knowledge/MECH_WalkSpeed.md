@@ -1,63 +1,73 @@
--- Script Path: game:GetService("ReplicatedStorage").Assets.Modules.Client.Mechanics.Modules.General.MECH_WalkSpeed
+-- Script Path: game:GetChildren()[117]:GetChildren()[12]:GetChildren()[3]:GetChildren()[2]:GetChildren()[1]:GetChildren()[6]:GetChildren()[1]:GetChildren()[11]
+-- Took 0.07s to decompile.
+-- Executor: YuBX (2.0.0.0-YB)
 
+-- Decompiled using ByteFall
+-- discord.gg/bytefall
 return {
-    GetWalkspeed = function(p1) --[[ GetWalkspeed | Line: 10 ]]
-        local sum = 0
+    GetWalkspeed = function(p1)
+        local n1 = 0
 
-        for k, v in pairs(p1.WalkSpeedFactors) do
-            sum = sum + v
+        for _, v in pairs(p1.WalkSpeedFactors) do
+            n1 += v
         end
 
-        return math.max(0, sum)
+        return (math.max(0, n1))
     end,
-    UpdateWalkspeedFactor = function(p1, p2, p3) --[[ UpdateWalkspeedFactor | Line: 18 ]]
-        local v1
+    UpdateWalkspeedFactor = function(p2, p3, p4)
+        local v8
 
-        if p2 == "Normal" then
-            v1 = math.clamp(p3, 0, p1.Variables.Functions.GameParams:GetGameParam("WalkSpeed") or p1.Variables.GlobalVariables.DefaultWalkSpeed)
-        elseif p2 == "RouteRelease" then
-            v1 = math.clamp(p3, 0, p1.Variables.GlobalVariables.DefaultPadBoost)
-        elseif p2 == "Sprint" then
-            v1 = math.clamp(p3, 0, p1.Variables.GlobalVariables.DefaultSprintBoost)
-        elseif p2 == "Bike" or (p2 == "GolfCart" or p2 == "Hoverboard") then
-            v1 = math.max(0, p3)
-        elseif p2 == "Server" then
-            local v10 = not game.ReplicatedStorage.Settings.PrivateServer.Value and math.clamp(p3, -1000, (p1.Variables.Functions.GameParams:GetGameParam("WalkSpeed"))) or p3
+        if p3 == "Normal" then
+            local v9 = p2.Variables.Functions.GameParams:GetGameParam("WalkSpeed") or p2.Variables.GlobalVariables.DefaultWalkSpeed
 
-            if v10 < 0 then
-                p1.WalkSpeedFactors.Sprint = 0
+            v8 = math.clamp(p4, 0, v9)
+        elseif p3 == "RouteRelease" then
+            v8 = math.clamp(p4, 0, p2.Variables.GlobalVariables.DefaultPadBoost)
+        elseif p3 == "Sprint" then
+            v8 = math.clamp(p4, 0, p2.Variables.GlobalVariables.DefaultSprintBoost)
+        elseif p3 == "Bike" then
+            v8 = math.max(0, p4)
+        elseif p3 == "GolfCart" then
+            v8 = math.max(0, p4)
+        elseif p3 == "Hoverboard" then
+            v8 = math.max(0, p4)
+        elseif p3 == "Server" then
+            local v10 = p2.Variables.Functions.GameParams:GetGameParam("WalkSpeed")
+
+            v8 = not game.ReplicatedStorage.Settings.PrivateServer.Value and math.clamp(p4, -1000, v10) or p4
+
+            if v8 < 0 then
+                p2.WalkSpeedFactors.Sprint = 0
             end
-
-            v1 = v10
         else
-            if p2 ~= "Trucking" then
+            if p3 ~= "Trucking" then
                 return false
             end
 
-            v1 = math.clamp(p3, -4, 0)
+            v8 = math.clamp(p4, -4, 0)
         end
 
-        p1.WalkSpeedFactors[p2] = v1
-        p1:WalkSpeed()
+        p2.WalkSpeedFactors[p3] = v8
+        p2:WalkSpeed()
 
         return true
     end,
-    WalkSpeed = function(p1) --[[ WalkSpeed | Line: 48 ]]
-        p1.Variables.LP.Character.Humanoid.WalkSpeed = p1:GetWalkspeed()
+    WalkSpeed = function(p5)
+        p5.Variables.LP.Character.Humanoid.WalkSpeed = p5:GetWalkspeed()
     end,
-    GetTargetVehicleSpeed = function(p1, p2) --[[ GetTargetVehicleSpeed | Line: 53 ]]
-        if p2 == "Bike" then
-            return p1.WalkSpeedFactors.Normal + p1.WalkSpeedFactors.Bike
+    GetTargetVehicleSpeed = function(p6, p7)
+        if p7 == "Bike" then
+            return p6.WalkSpeedFactors.Normal + p6.WalkSpeedFactors.Bike
         end
 
-        if p2 == "GolfCart" then
-            return p1.WalkSpeedFactors.Normal + p1.WalkSpeedFactors.GolfCart
+        if p7 == "GolfCart" then
+            return p6.WalkSpeedFactors.Normal + p6.WalkSpeedFactors.GolfCart
         end
 
-        if p2 == "Hoverboard" then
-            return p1.WalkSpeedFactors.Normal + p1.WalkSpeedFactors.Hoverboard
+        if p7 == "Hoverboard" then
+            return p6.WalkSpeedFactors.Normal + p6.WalkSpeedFactors.Hoverboard
         end
 
-        return p1.WalkSpeedFactors.Normal or 0
+        return p6.WalkSpeedFactors.Normal or 0
     end
 }

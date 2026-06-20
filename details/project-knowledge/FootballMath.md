@@ -1,302 +1,634 @@
--- Script Path: game:GetService("ReplicatedStorage").Assets.Modules.Shared.Services.FootballMath
+-- Script Path: game:GetChildren()[117]:GetChildren()[12]:GetChildren()[3]:GetChildren()[1]:GetChildren()[5]:GetChildren()[1]
+-- Took 0.13s to decompile.
+-- Executor: YuBX (2.0.0.0-YB)
 
-local t = {
+-- Decompiled using ByteFall
+-- discord.gg/bytefall
+local t1 = {
     Settings = {}
 }
 
-t.Settings.FPS = 60
-t.Settings.TimeScale = 1
-t.Settings.Gravity = -28
-t.Settings.GravityVector = Vector3.new(0, t.Settings.Gravity / t.Settings.FPS, 0)
-t.Settings.GravityVectorConstant = Vector3.new(0, t.Settings.Gravity, 0)
-t.Settings.MaxPower = 100
-t.Settings.MinPower = 30
-t.Settings.MaximumInaccurateYards = 6
-t.Settings.MinimumInaccurateYards = 3
-t.Settings.MaximumPowerCoefficient = 0.95
-t.Settings.MinHeightToArcRatio = 0.01
-t.Settings.MaxTimeInAir = 6
-function t.BeamDirection(p1, p2, p3, p4) --[[ BeamDirection | Line: 36 | Upvalues: t (copy) ]]
-    local v1 = p4 * t.Settings.TimeScale
-    local v2 = t.Settings.GravityVector * t.Settings.FPS
-    local v3 = 0.5 * v2 * v1 * v1 + p2 * v1 + p3
-    local v4 = v3 - (v2 * v1 * v1 + p2 * v1) / 3
-    local v5 = (0.125 * v2 * v1 * v1 + 0.5 * p2 * v1 + p3 - 0.125 * (p3 + v3)) / 0.375 - v4
-    local unit = (p3 - v3).unit
-    local unit2 = (v5 - p3).unit
-    local unit3 = unit2:Cross(unit).unit
-    local unit4 = (v4 - v3).unit
-    local unit5 = unit4:Cross(unit).unit
-    local unit6 = unit3:Cross(unit2).unit
+t1.Settings.FPS = 60
+t1.Settings.TimeScale = 1
+t1.Settings.Gravity = -28
+t1.Settings.GravityVector = Vector3.new(0, t1.Settings.Gravity / t1.Settings.FPS, 0)
+t1.Settings.GravityVectorConstant = Vector3.new(0, t1.Settings.Gravity, 0)
+t1.Settings.MaxPower = 100
+t1.Settings.MinPower = 30
+t1.Settings.MaximumInaccurateYards = 6
+t1.Settings.MinimumInaccurateYards = 3
+t1.Settings.MaximumPowerCoefficient = 0.95
+t1.Settings.MinHeightToArcRatio = 0.01
+t1.Settings.MaxTimeInAir = 6
 
-    return (v5 - p3).magnitude, -(v4 - v3).magnitude, CFrame.new(p3.x, p3.y, p3.z, unit2.x, unit3.x, unit6.x, unit2.y, unit3.y, unit6.y, unit2.z, unit3.z, unit6.z), CFrame.new(v3.x, v3.y, v3.z, unit4.x, unit5.x, unit6.x, unit4.y, unit5.y, unit6.y, unit4.z, unit5.z, unit6.z)
+function t1.BeamDirection(_, p2, p3, p4)
+    local n1 = p4 * t1.Settings.TimeScale
+    local n2 = t1.Settings.GravityVector * t1.Settings.FPS
+    local n3 = 0.5 * n2 * n1 * n1 + p2 * n1 + p3
+    local n4 = n3 - (n2 * n1 * n1 + p2 * n1) / 3
+    local n5 = (0.125 * n2 * n1 * n1 + 0.5 * p2 * n1 + p3 - 0.125 * (p3 + n3)) / 0.375 - n4
+    local v11 = (n5 - p3).magnitude
+    local v12 = (n4 - n3).magnitude
+    local v13 = (p3 - n3).unit
+    local v14 = (n5 - p3).unit
+    local v15 = v14:Cross(v13).unit
+    local v16 = (n4 - n3).unit
+    local v17 = v16:Cross(v13).unit
+    local v18 = v15:Cross(v14).unit
+    local cFrame = CFrame.new(p3.x, p3.y, p3.z, v14.x, v15.x, v18.x, v14.y, v15.y, v18.y, v14.z, v15.z, v18.z)
+    local cFrame2 = CFrame.new(n3.x, n3.y, n3.z, v16.x, v17.x, v18.x, v16.y, v17.y, v18.y, v16.z, v17.z, v18.z)
+
+    return v11, -v12, cFrame, cFrame2
 end
-function t.CheckTackleContact(p1, p2, p3) --[[ CheckTackleContact | Line: 75 ]]
-    local v1 = OverlapParams.new()
+function t1.CheckTackleContact(_, p6, p7)
+    local v24 = OverlapParams.new()
 
-    v1.CollisionGroup = "TackleBoxes_" .. p2.Name
+    v24.CollisionGroup = "TackleBoxes_" .. p6.Name
 
-    local v2 = game.Workspace:GetPartsInPart(p3, v1)
+    local v25 = game.Workspace:GetPartsInPart(p7, v24)
 
-    if v2[1] and v2[1].CollisionGroup ~= "CBAdminPlayerCollisionGroup" then
-        return true, v2[1]
+    if v25[1] and v25[1].CollisionGroup ~= "CBAdminPlayerCollisionGroup" then
+        return true, v25[1]
     end
 
     return false
 end
-function t.GetBounceDirection(p1, p2, p3, p4) --[[ GetBounceDirection | Line: 97 ]]
-    local v1 = RaycastParams.new()
+function t1.GetBounceDirection(_, p9, p10, p11)
+    local v30 = RaycastParams.new()
 
-    v1.FilterType = Enum.RaycastFilterType.Include
-    v1.FilterDescendantsInstances = p3
+    v30.FilterType = Enum.RaycastFilterType.Include
+    v30.FilterDescendantsInstances = p10
 
-    local VectorVelocity = p2.LinearVelocity.VectorVelocity
-    local v2 = VectorVelocity ~= Vector3.new() and VectorVelocity.unit or Vector3.new()
-    local v3 = game.Workspace:Blockcast(p2.CFrame - v2 * 10, p2.Size, v2 * 10 * 2, v1)
+    local v31 = p9.LinearVelocity.VectorVelocity
+    local v32 = v31 ~= Vector3.new() and v31.unit or Vector3.new()
+    local v33 = game.Workspace:Blockcast(p9.CFrame - v32 * 10, p9.Size, v32 * 10 * 2, v30)
 
-    if v3 == nil or not v3.Instance then
-        if not p4 then
+    if v33 ~= nil and v33.Instance then
+        local u34 = true
+
+        if v33.Instance.Transparency >= 1 then
+            u34 = true
+
+            if v33.Instance.Name:lower() ~= "catchbox" then
+                u34 = v33.Instance.Name:lower() == "touchdetect"
+            end
+        end
+
+        if not u34 then
             return nil, false
         end
 
-        print("DIDN\'T HIT ANYTHING")
+        local v35 = v32:Dot(v33.Normal)
+        local n1 = (v32 - 2 * v35 * v33.Normal) * p9.LinearVelocity.VectorVelocity.magnitude
 
-        return nil, false
+        if p11 then
+            print("BOUNCE")
+        end
+
+        return n1
     end
 
-    if not (if v3.Instance.Transparency < 1 or v3.Instance.Name:lower() == "catchbox" then true elseif v3.Instance.Name:lower() == "touchdetect" then true else false) then
-        return nil, false
+    if p11 then
+        print("DIDN'T HIT ANYTHING")
     end
 
-    local v5 = (v2 - 2 * v2:Dot(v3.Normal) * v3.Normal) * p2.LinearVelocity.VectorVelocity.magnitude
+    return nil, false
+end
+function t1.Quadratic(_, p13, p14, p15)
+    local v41 = math.pow(p14, 2)
+    local v42 = math.sqrt(v41 - 4 * p13 * p15)
+    local v43 = math.pow(p14, 2)
+    local v44 = math.sqrt(v43 - 4 * p13 * p15)
 
-    if not p4 then
-        return v5
+    return (math.max((-p14 + v42) / (2 * p13), (-p14 - v44) / (2 * p13)))
+end
+function t1.GetVelocityForPass(_, p17, p18, p19)
+    local n1 = p19 * t1.Settings.TimeScale
+
+    return (p18 - t1.Settings.GravityVectorConstant * n1 ^ 2 / 2 - p17) / n1
+end
+function t1.GetPositionFromTime(_, p21, p22, p23)
+    local n1 = p21 * t1.Settings.TimeScale
+
+    return CFrame.new(t1.Settings.GravityVectorConstant * n1 ^ 2 / 2 + p22 * n1 + p23)
+end
+function t1.GetSpotAtTime(_, p25, p26, p27, p28)
+    local n1 = p25 * t1.Settings.TimeScale
+
+    return CFrame.new(t1.Settings.GravityVectorConstant * n1 ^ 2 / 2 + (p26 - p27).unit * p28 * n1 + p27)
+end
+function t1.GetTimeToDestination(_, p30, p31, p32)
+    return t1:Quadratic(t1.Settings.Gravity / 2, p30.Y, p31.Y - p32) / t1.Settings.TimeScale
+end
+function t1.FindStartingVelocity(_, p34, p35, p36, p37, p38, p39)
+    local n1 = 1
+    local n2 = 1
+
+    if p38 then
+        local v74 = math.floor((p35 - p34).Magnitude / 3 / 25 + 0.5)
+
+        n2 = math.max(0, v74)
+        n1 = 0
     end
 
-    print("BOUNCE")
-
-    return v5
-end
-function t.Quadratic(p1, p2, p3, p4) --[[ Quadratic | Line: 124 ]]
-    return math.max((-p3 + math.sqrt(math.pow(p3, 2) - 4 * p2 * p4)) / (2 * p2), (-p3 - math.sqrt(math.pow(p3, 2) - 4 * p2 * p4)) / (2 * p2))
-end
-function t.GetVelocityForPass(p1, p2, p3, p4) --[[ GetVelocityForPass | Line: 135 | Upvalues: t (copy) ]]
-    local v1 = p4 * t.Settings.TimeScale
-
-    return (p3 - t.Settings.GravityVectorConstant * v1 ^ 2 / 2 - p2) / v1
-end
-function t.GetPositionFromTime(p1, p2, p3, p4) --[[ GetPositionFromTime | Line: 141 | Upvalues: t (copy) ]]
-    local v1 = p2 * t.Settings.TimeScale
-
-    return CFrame.new(t.Settings.GravityVectorConstant * v1 ^ 2 / 2 + p3 * v1 + p4)
-end
-function t.GetSpotAtTime(p1, p2, p3, p4, p5) --[[ GetSpotAtTime | Line: 147 | Upvalues: t (copy) ]]
-    local v1 = p2 * t.Settings.TimeScale
-
-    return CFrame.new(t.Settings.GravityVectorConstant * v1 ^ 2 / 2 + (p3 - p4).unit * p5 * v1 + p4)
-end
-function t.GetTimeToDestination(p1, p2, p3, p4) --[[ GetTimeToDestination | Line: 154 | Upvalues: t (copy) ]]
-    return t:Quadratic(t.Settings.Gravity / 2, p2.Y, p3.Y - p4) / t.Settings.TimeScale
-end
-function t.FindStartingVelocity(p1, p2, p3, p4, p5, p6, p7) --[[ FindStartingVelocity | Line: 160 | Upvalues: t (copy) ]]
-    local v1, v2
-
-    if p6 then
-        v1, v2 = 0, math.max(0, (math.floor((p3 - p2).Magnitude / 3 / 25 + 0.5)))
-    else
-        v1 = 1
-        v2 = 1
-    end
-
-    local v6 = Vector3.new(p4.X, 0, p4.Z)
-    local v7 = math.random(v1, v2)
-    local MinHeightToArcRatio = t.Settings.MinHeightToArcRatio
+    local vector3 = Vector3.new(p36.X, 0, p36.Z)
+    local v76 = math.random(n1, n2)
+    local v77 = t1.Settings.MinHeightToArcRatio
     local t2 = {}
-    local accuracyoffset = 0
+    local n3 = 0
 
-    if p5 < 50 then
-        MinHeightToArcRatio = 3.5
-    elseif p5 < 60 then
-        MinHeightToArcRatio = 2.5
-    elseif p5 < 70 then
-        MinHeightToArcRatio = 1.25
+    local function v80(p40)
+        local vector32 = Vector3.new(0, t1.Settings.Gravity, 0)
+        local v163 = vector3 ~= Vector3.new() and vector3.unit or Vector3.new()
+
+        return (p35 + v163 * v76 + vector3 * p40 - vector32 * p40 ^ 2 / 2 - p34) / p40, v76
     end
 
-    local v8 = p5 * t.Settings.MaximumPowerCoefficient
+    if p37 < 50 then
+        v77 = 3.5
+    elseif p37 < 60 then
+        v77 = 2.5
+    elseif p37 < 70 then
+        v77 = 1.25
+    end
 
-    for i = 1, t.Settings.MaxTimeInAir / 0.01 do
-        local v9
-        local v10 = Vector3.new(0, t.Settings.Gravity, 0)
+    local n4 = p37 * t1.Settings.MaximumPowerCoefficient
 
-        v9 = if v6 == Vector3.new() then Vector3.new() else v6.unit or Vector3.new()
+    for _ = 1, t1.Settings.MaxTimeInAir / 0.01 do
+        local n5 = v77
+        local vector33 = Vector3.new(0, t1.Settings.Gravity, 0)
+        local v85 = vector3 ~= Vector3.new() and vector3.unit or Vector3.new()
+        local n6 = (p35 + v85 * v76 + vector3 * n5 - vector33 * n5 ^ 2 / 2 - p34) / n5
 
-        local v11 = MinHeightToArcRatio
-        local v12 = (p3 + v9 * v7 + v6 * v11 - v10 * v11 ^ 2 / 2 - p2) / v11
-        local magnitude = v12.magnitude
+        n3 = v76
 
-        MinHeightToArcRatio = MinHeightToArcRatio + 0.01
+        local v87 = n6.magnitude
 
-        if math.floor(magnitude) <= t.Settings.MaxPower * t.Settings.MaximumPowerCoefficient then
+        v77 += 0.01
+
+        if math.floor(v87) <= t1.Settings.MaxPower * t1.Settings.MaximumPowerCoefficient then
             table.insert(t2, {
-                SortPower = magnitude,
-                Power = magnitude,
-                InitialVelocity = v12,
-                ExpectedTime = MinHeightToArcRatio
+                SortPower = v87,
+                Power = v87,
+                InitialVelocity = n6,
+                ExpectedTime = v77
             })
-            accuracyoffset = v7
-
-            continue
         end
-
-        accuracyoffset = v7
     end
 
-    table.sort(t2, function(p1, p2) --[[ Line: 208 | Upvalues: v8 (ref) ]]
-        if v8 - p1.SortPower == v8 - p2.SortPower then
-            return p1.ExpectedTime < p2.ExpectedTime
+    table.sort(t2, function(p41, p42)
+        if n4 - p41.SortPower == n4 - p42.SortPower then
+            return p41.ExpectedTime < p42.ExpectedTime
         end
 
-        local v3 = math.abs(v8 - p1.SortPower)
+        local v166 = math.abs(n4 - p41.SortPower)
+        local v167 = math.abs(n4 - p42.SortPower)
 
-        return v3 < math.abs(v8 - p2.SortPower)
+        return v166 < v167
     end)
 
-    local InitialVelocity = t2[1].InitialVelocity
-    local ExpectedTime = t2[1].ExpectedTime
-    local Power = t2[1].Power
-    local calculatedtime = t:GetTimeToDestination(InitialVelocity, p2, p3.Y)
+    local v88 = t2[1].InitialVelocity
+    local v89 = t1:GetTimeToDestination(v88, p34, p35.Y)
 
-    if p7 then
+    if p39 then
         print("Samples:", #t2)
-        print("Aim:", InitialVelocity)
-        print("Power:", InitialVelocity.magnitude)
-        print("Display Power:", InitialVelocity.magnitude * (1 / t.Settings.MaximumPowerCoefficient))
-        print("Accuracy Offset:", accuracyoffset)
-        print("Calculated Time:", calculatedtime)
+        print("Aim:", v88)
+        print("Power:", v88.magnitude)
+        print("Display Power:", v88.magnitude * (1 / t1.Settings.MaximumPowerCoefficient))
+        print("Accuracy Offset:", n3)
+        print("Calculated Time:", v89)
         print()
     end
 
     return {
-        Time = calculatedtime,
-        Aim = InitialVelocity,
-        Power = InitialVelocity.magnitude,
-        DisplayPower = InitialVelocity.magnitude * (1 / t.Settings.MaximumPowerCoefficient),
-        SpawnPos = p2,
-        Target = p2 + InitialVelocity.unit,
-        Accuracy = accuracyoffset
+        Time = v89,
+        Aim = v88,
+        Power = v88.magnitude,
+        DisplayPower = v88.magnitude * (1 / t1.Settings.MaximumPowerCoefficient),
+        SpawnPos = p34,
+        Target = p34 + v88.unit,
+        Accuracy = n3
     }
 end
-function t.GetLandingSpot(p1, p2, p3, p4, p5) --[[ GetLandingSpot | Line: 243 | Upvalues: t (copy) ]]
-    return p1:GetSpotAtTime(t:GetTimeToDestination((p2 - p3).unit * p4, p3, p5), p2, p3, p4)
-end
-function t.ToField(p1, p2, p3) --[[ ToField | Line: 254 ]]
-    return p2.GameInstance.Value.Replicated.Center.CFrame:toObjectSpace(CFrame.new(p3))
-end
-function t.ScrimmageVector(p1, p2) --[[ ScrimmageVector | Line: 260 ]]
-    return p1:ToField(p2, p2.GameInstance.Value.Replicated.ScrimmageLine.Scrimmage.Position)
-end
-function t.FirstDownVector(p1, p2) --[[ FirstDownVector | Line: 265 ]]
-    return p1:ToField(p2, p2.GameInstance.Value.Replicated.FirstDownLine.FirstDown.Position)
-end
-function t.CenterVector(p1, p2) --[[ CenterVector | Line: 270 ]]
-    return p1:ToField(p2, p2.GameInstance.Value.Replicated.Center.Position)
-end
-function t.CalculateAngle(p1, p2, p3, p4) --[[ CalculateAngle | Line: 275 ]]
-    local v1 = p2 - p4
-    local v2 = p3 - p4
+function t1.GetLandingSpot(p43, p44, p45, p46, p47)
+    local v95 = t1:GetTimeToDestination((p44 - p45).unit * p46, p45, p47)
 
-    return math.atan2(v1.x * v2.z - v1.z * v2.x, v1.x * v2.x + v1.z * v2.z)
+    return p43:GetSpotAtTime(v95, p44, p45, p46)
 end
-function t.OutOfBounds(p1, p2, p3, p4, p5) --[[ OutOfBounds | Line: 284 ]]
-    local FieldDimensions = p2.FieldSettings.FieldDimensions
+function t1.ToField(_, p49, p50)
+    return p49.GameInstance.Value.Replicated.Center.CFrame:toObjectSpace(CFrame.new(p50))
+end
+function t1.ScrimmageVector(p51, p52)
+    return p51:ToField(p52, p52.GameInstance.Value.Replicated.ScrimmageLine.Scrimmage.Position)
+end
+function t1.FirstDownVector(p53, p54)
+    return p53:ToField(p54, p54.GameInstance.Value.Replicated.FirstDownLine.FirstDown.Position)
+end
+function t1.CenterVector(p55, p56)
+    return p55:ToField(p56, p56.GameInstance.Value.Replicated.Center.Position)
+end
+function t1.CalculateAngle(_, p58, p59, p60)
+    local n1 = p58 - p60
+    local n2 = p59 - p60
 
-    return if p3 then if p4.Z >= FieldDimensions.LeftOOB.Value + (p5 or 0) or (p4.Z <= FieldDimensions.RightOOB.Value - (p5 or 0) or p4.X >= FieldDimensions.SouthTDOOB.Value + (p5 or 0)) then true else p4.X <= FieldDimensions.NorthTDOOB.Value - (p5 or 0) else p3
+    return (math.atan2(n1.x * n2.z - n1.z * n2.x, n1.x * n2.x + n1.z * n2.z))
 end
-function t.HasBecomeRunner(p1, p2, p3, p4) --[[ HasBecomeRunner | Line: 294 ]]
-    return p2 and (if p4.X <= p1:ScrimmageVector(p3).X and p3.GameStatus.NorthScorer.Value == p3.GameStatus.Offense.Value then true elseif p4.X >= p1:ScrimmageVector(p3).X then p3.GameStatus.SouthScorer.Value == p3.GameStatus.Offense.Value else false)
-end
-function t.Touchdown(p1, p2, p3, p4) --[[ Touchdown | Line: 304 ]]
-    return p2 and (if p4.X <= p3.FieldSettings.FieldDimensions.SouthTDOOB.Value and (p4.X > p3.FieldSettings.FieldDimensions.SouthTD.Value and p3.GameStatus.SouthScorer.Value == p3.GameStatus.Offense.Value) then true elseif p4.X >= p3.FieldSettings.FieldDimensions.NorthTDOOB.Value and p4.X < p3.FieldSettings.FieldDimensions.NorthTD.Value then p3.GameStatus.NorthScorer.Value == p3.GameStatus.Offense.Value else false)
-end
-function t.LeftEndzone(p1, p2, p3, p4) --[[ LeftEndzone | Line: 315 ]]
-    return if p2 then if p4.X > p3.FieldSettings.FieldDimensions.NorthTD.Value then p4.X < p3.FieldSettings.FieldDimensions.SouthTD.Value else false else p2
-end
-function t.Rushing(p1, p2, p3) --[[ Rushing | Line: 322 ]]
-    return if p2.X >= p1:ScrimmageVector(p3).X + 25 and p3.GameStatus.NorthScorer.Value == p3.GameStatus.Offense.Value then true elseif p2.X <= p1:ScrimmageVector(p3).X - 25 then p3.GameStatus.SouthScorer.Value == p3.GameStatus.Offense.Value else false
-end
-function t.Safety(p1, p2, p3, p4) --[[ Safety | Line: 332 ]]
-    local v1
+function t1.OutOfBounds(_, p62, p63, p64, p65)
+    local v116 = p62.FieldSettings.FieldDimensions
+    local v117 = p63
 
-    if p2 then
-        if p3.GameStatus.LeftEndzone.Value then
-            v1 = if p4.X >= p3.FieldSettings.FieldDimensions.SouthTD.Value and p3.GameStatus.NorthScorer.Value == p3.GameStatus.Offense.Value or (p4.X <= p3.FieldSettings.FieldDimensions.NorthTD.Value and p3.GameStatus.SouthScorer.Value == p3.GameStatus.Offense.Value or p4.X >= p3.FieldSettings.FieldDimensions.SouthTDOOB.Value and p3.GameStatus.NorthScorer.Value == p3.GameStatus.Offense.Value) then true elseif p4.X <= p3.FieldSettings.FieldDimensions.NorthTDOOB.Value then p3.GameStatus.SouthScorer.Value == p3.GameStatus.Offense.Value else false
+    if v117 then
+        v117 = true
+
+        if p64.Z < v116.LeftOOB.Value + (p65 or 0) then
+            v117 = true
+
+            if p64.Z > v116.RightOOB.Value - (p65 or 0) then
+                v117 = true
+
+                if p64.X < v116.SouthTDOOB.Value + (p65 or 0) then
+                    v117 = p64.X <= v116.NorthTDOOB.Value - (p65 or 0)
+                end
+            end
+        end
+    end
+
+    return v117
+end
+function t1.HasBecomeRunner(p66, p67, p68, p69)
+    local v122
+    local v123
+    local v124
+    local v125
+    local v126
+
+    v122 = p67
+
+    if v122 then
+        v123 = p69.X
+        v124 = p66:ScrimmageVector(p68)
+
+        if v123 <= v124.X then
+            v122 = true
+
+            if p68.GameStatus.NorthScorer.Value == p68.GameStatus.Offense.Value then
+            else
+                v122 = false
+                v125 = p69.X
+                v126 = p66:ScrimmageVector(p68)
+
+                if v125 >= v126.X then
+                    v122 = p68.GameStatus.SouthScorer.Value == p68.GameStatus.Offense.Value
+                end
+            end
         else
-            v1 = p3.GameStatus.IsLateralPlay.Value
+            v122 = false
+            v125 = p69.X
+            v126 = p66:ScrimmageVector(p68)
 
-            if v1 then
-                v1 = if p4.X >= p3.FieldSettings.FieldDimensions.SouthTD.Value and p3.GameStatus.NorthScorer.Value == p3.GameStatus.Offense.Value or (p4.X <= p3.FieldSettings.FieldDimensions.NorthTD.Value and p3.GameStatus.SouthScorer.Value == p3.GameStatus.Offense.Value or p4.X >= p3.FieldSettings.FieldDimensions.SouthTDOOB.Value and p3.GameStatus.NorthScorer.Value == p3.GameStatus.Offense.Value) then true elseif p4.X <= p3.FieldSettings.FieldDimensions.NorthTDOOB.Value then p3.GameStatus.SouthScorer.Value == p3.GameStatus.Offense.Value else false
+            if v125 >= v126.X then
+                v122 = p68.GameStatus.SouthScorer.Value == p68.GameStatus.Offense.Value
+            end
+        end
+
+        return v122
+    else
+        return v122
+    end
+end
+function t1.Touchdown(_, p71, p72, p73)
+    local v131 = p71
+
+    if v131 then
+        if p73.X <= p72.FieldSettings.FieldDimensions.SouthTDOOB.Value and p73.X > p72.FieldSettings.FieldDimensions.SouthTD.Value then
+            v131 = true
+
+            if p72.GameStatus.SouthScorer.Value ~= p72.GameStatus.Offense.Value then
+                v131 = false
+
+                if p73.X >= p72.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                    v131 = false
+
+                    if p73.X < p72.FieldSettings.FieldDimensions.NorthTD.Value then
+                        v131 = p72.GameStatus.NorthScorer.Value == p72.GameStatus.Offense.Value
+                    end
+                end
+            end
+        else
+            v131 = false
+
+            if p73.X >= p72.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                v131 = false
+
+                if p73.X < p72.FieldSettings.FieldDimensions.NorthTD.Value then
+                    v131 = p72.GameStatus.NorthScorer.Value == p72.GameStatus.Offense.Value
+                end
+            end
+        end
+    end
+
+    return v131
+end
+function t1.LeftEndzone(_, p75, p76, p77)
+    local v136 = p75
+
+    if v136 then
+        v136 = false
+
+        if p77.X > p76.FieldSettings.FieldDimensions.NorthTD.Value then
+            v136 = p77.X < p76.FieldSettings.FieldDimensions.SouthTD.Value
+        end
+    end
+
+    return v136
+end
+function t1.Rushing(p78, p79, p80)
+    local v140
+    local v141
+    local u142
+    local v143
+    local v144
+
+    v140 = p79.X
+    v141 = p78:ScrimmageVector(p80)
+
+    if v140 >= v141.X + 25 then
+        u142 = true
+
+        if p80.GameStatus.NorthScorer.Value == p80.GameStatus.Offense.Value then
+        else
+            u142 = false
+            v143 = p79.X
+            v144 = p78:ScrimmageVector(p80)
+
+            if v143 <= v144.X - 25 then
+                u142 = p80.GameStatus.SouthScorer.Value == p80.GameStatus.Offense.Value
             end
         end
     else
-        v1 = p2
+        u142 = false
+        v143 = p79.X
+        v144 = p78:ScrimmageVector(p80)
+
+        if v143 <= v144.X - 25 then
+            u142 = p80.GameStatus.SouthScorer.Value == p80.GameStatus.Offense.Value
+        end
     end
 
-    return v1
+    return u142
 end
-function t.EligibleToBlock(p1, p2, p3, p4) --[[ EligibleToBlock | Line: 341 ]]
-    local YardsToStuds = p3.FieldSettings.FieldDimensions.YardsToStuds.Value
+function t1.Safety(_, p82, p83, p84)
+    local v149 = p82
 
-    if not p3.GameStatus.Hiked.Value or p2 then
-        return false
+    if v149 then
+        if not p83.GameStatus.LeftEndzone.Value then
+            v149 = p83.GameStatus.IsLateralPlay.Value
+
+            if v149 then
+                if p84.X >= p83.FieldSettings.FieldDimensions.SouthTD.Value then
+                    v149 = true
+
+                    if p83.GameStatus.NorthScorer.Value ~= p83.GameStatus.Offense.Value then
+                        if p84.X <= p83.FieldSettings.FieldDimensions.NorthTD.Value then
+                            v149 = true
+
+                            if p83.GameStatus.SouthScorer.Value ~= p83.GameStatus.Offense.Value then
+                                if p84.X >= p83.FieldSettings.FieldDimensions.SouthTDOOB.Value then
+                                    v149 = true
+
+                                    if p83.GameStatus.NorthScorer.Value ~= p83.GameStatus.Offense.Value then
+                                        v149 = false
+
+                                        if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                                            v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                                        end
+                                    end
+                                else
+                                    v149 = false
+
+                                    if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                                        v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                                    end
+                                end
+                            end
+                        elseif p84.X >= p83.FieldSettings.FieldDimensions.SouthTDOOB.Value then
+                            v149 = true
+
+                            if p83.GameStatus.NorthScorer.Value ~= p83.GameStatus.Offense.Value then
+                                v149 = false
+
+                                if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                                    v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                                end
+                            end
+                        else
+                            v149 = false
+
+                            if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                                v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                            end
+                        end
+                    end
+                elseif p84.X <= p83.FieldSettings.FieldDimensions.NorthTD.Value then
+                    v149 = true
+
+                    if p83.GameStatus.SouthScorer.Value ~= p83.GameStatus.Offense.Value then
+                        if p84.X >= p83.FieldSettings.FieldDimensions.SouthTDOOB.Value then
+                            v149 = true
+
+                            if p83.GameStatus.NorthScorer.Value ~= p83.GameStatus.Offense.Value then
+                                v149 = false
+
+                                if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                                    v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                                end
+                            end
+                        else
+                            v149 = false
+
+                            if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                                v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                            end
+                        end
+                    end
+                elseif p84.X >= p83.FieldSettings.FieldDimensions.SouthTDOOB.Value then
+                    v149 = true
+
+                    if p83.GameStatus.NorthScorer.Value ~= p83.GameStatus.Offense.Value then
+                        v149 = false
+
+                        if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                            v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                        end
+                    end
+                else
+                    v149 = false
+
+                    if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                        v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                    end
+                end
+            end
+        elseif p84.X >= p83.FieldSettings.FieldDimensions.SouthTD.Value then
+            v149 = true
+
+            if p83.GameStatus.NorthScorer.Value ~= p83.GameStatus.Offense.Value then
+                if p84.X <= p83.FieldSettings.FieldDimensions.NorthTD.Value then
+                    v149 = true
+
+                    if p83.GameStatus.SouthScorer.Value ~= p83.GameStatus.Offense.Value then
+                        if p84.X >= p83.FieldSettings.FieldDimensions.SouthTDOOB.Value then
+                            v149 = true
+
+                            if p83.GameStatus.NorthScorer.Value ~= p83.GameStatus.Offense.Value then
+                                v149 = false
+
+                                if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                                    v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                                end
+                            end
+                        else
+                            v149 = false
+
+                            if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                                v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                            end
+                        end
+                    end
+                elseif p84.X >= p83.FieldSettings.FieldDimensions.SouthTDOOB.Value then
+                    v149 = true
+
+                    if p83.GameStatus.NorthScorer.Value ~= p83.GameStatus.Offense.Value then
+                        v149 = false
+
+                        if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                            v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                        end
+                    end
+                else
+                    v149 = false
+
+                    if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                        v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                    end
+                end
+            end
+        elseif p84.X <= p83.FieldSettings.FieldDimensions.NorthTD.Value then
+            v149 = true
+
+            if p83.GameStatus.SouthScorer.Value ~= p83.GameStatus.Offense.Value then
+                if p84.X >= p83.FieldSettings.FieldDimensions.SouthTDOOB.Value then
+                    v149 = true
+
+                    if p83.GameStatus.NorthScorer.Value ~= p83.GameStatus.Offense.Value then
+                        v149 = false
+
+                        if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                            v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                        end
+                    end
+                else
+                    v149 = false
+
+                    if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                        v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                    end
+                end
+            end
+        elseif p84.X >= p83.FieldSettings.FieldDimensions.SouthTDOOB.Value then
+            v149 = true
+
+            if p83.GameStatus.NorthScorer.Value ~= p83.GameStatus.Offense.Value then
+                v149 = false
+
+                if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                    v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+                end
+            end
+        else
+            v149 = false
+
+            if p84.X <= p83.FieldSettings.FieldDimensions.NorthTDOOB.Value then
+                v149 = p83.GameStatus.SouthScorer.Value == p83.GameStatus.Offense.Value
+            end
+        end
     end
 
-    if p3.GameStatus.FieldGoalType.Value ~= "Fake" and ({
-        Punt = true,
-        FieldGoal = true
-    })[p3.ActiveState.Value] then
-        return true
-    end
+    return v149
+end
+function t1.EligibleToBlock(p85, p86, p87, p88)
+    local YardsToStudsValue = p87.FieldSettings.FieldDimensions.YardsToStuds.Value
+    local t3 = { Kickoff = true, Onside = true, SafetyPunt = true }
+    local t4 = { Punt = true, FieldGoal = true }
 
-    if ({
-        Kickoff = true,
-        Onside = true,
-        SafetyPunt = true
-    })[p3.ActiveState.Value] then
-        return true
-    end
-
-    if p3.ActiveState.Value == "TURK_Active" then
-        return true
-    end
-
-    if not (if p3.ActiveState.Value == "NormalPlay" or (p3.ActiveState.Value == "TwoPoint" or (p3.ActiveState.Value == "FieldGoal" or (p3.ActiveState.Value == "Punt" or (p3.ActiveState.Value == "PICK_Active" or (p3.ActiveState.Value == "FLAG_Active" or p3.ActiveState.Value == "PKMA_Active"))))) then true elseif p3.ActiveState.Value == "FLAG_PointAfter" then true else false) or p3.GameStatus.BallInAir.Value then
-        return false
-    end
-
-    if not p3.GameStatus.ThrowEligible.Value then
-        return true
-    end
-
-    if p3.GameStatus.Offense.Value == p3.GameStatus.NorthScorer.Value then
-        local v3 = math.min(p1:ScrimmageVector(p3).X / YardsToStuds + 50, 5)
-
-        if p1:ScrimmageVector(p3).X - YardsToStuds * v3 < p4.X then
+    if p87.GameStatus.Hiked.Value and not p86 then
+        if p87.GameStatus.FieldGoalType.Value ~= "Fake" and t4[p87.ActiveState.Value] or t3[p87.ActiveState.Value] then
             return true
         end
-    else
-        if p3.GameStatus.Offense.Value ~= p3.GameStatus.SouthScorer.Value then
+
+        if p87.ActiveState.Value == "TURK_Active" then
+            return true
+        end
+
+        local u157 = true
+
+        if p87.ActiveState.Value ~= "NormalPlay" then
+            u157 = true
+
+            if p87.ActiveState.Value ~= "TwoPoint" then
+                u157 = true
+
+                if p87.ActiveState.Value ~= "FieldGoal" then
+                    u157 = true
+
+                    if p87.ActiveState.Value ~= "Punt" then
+                        u157 = true
+
+                        if p87.ActiveState.Value ~= "PICK_Active" then
+                            u157 = true
+
+                            if p87.ActiveState.Value ~= "FLAG_Active" then
+                                u157 = true
+
+                                if p87.ActiveState.Value ~= "PKMA_Active" then
+                                    u157 = p87.ActiveState.Value == "FLAG_PointAfter"
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        if not u157 or p87.GameStatus.BallInAir.Value then
             return false
         end
 
-        math.min(50 - p1:ScrimmageVector(p3).X / YardsToStuds, 5)
-
-        if p1:ScrimmageVector(p3).X + YardsToStuds * 5 > p4.X then
+        if not p87.GameStatus.ThrowEligible.Value then
             return true
         end
+
+        if p87.GameStatus.Offense.Value == p87.GameStatus.NorthScorer.Value then
+            local v158 = p85:ScrimmageVector(p87)
+            local v159 = math.min(v158.X / YardsToStudsValue + 50, 5)
+
+            if p85:ScrimmageVector(p87).X - YardsToStudsValue * v159 < p88.X then
+                return true
+            end
+        elseif p87.GameStatus.Offense.Value == p87.GameStatus.SouthScorer.Value then
+            local v160 = p85:ScrimmageVector(p87)
+
+            math.min(50 - v160.X / YardsToStudsValue, 5)
+
+            if p85:ScrimmageVector(p87).X + YardsToStudsValue * 5 > p88.X then
+                return true
+            end
+        end
+
+        return false
     end
 
     return false
 end
 
-return t
+return t1

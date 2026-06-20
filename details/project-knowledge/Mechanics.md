@@ -1,6 +1,10 @@
--- Script Path: game:GetService("ReplicatedStorage").Assets.Modules.Client.Mechanics
+-- Script Path: game:GetChildren()[117]:GetChildren()[12]:GetChildren()[3]:GetChildren()[2]:GetChildren()[1]
+-- Took 0.07s to decompile.
+-- Executor: YuBX (2.0.0.0-YB)
 
-local t = {
+-- Decompiled using ByteFall
+-- discord.gg/bytefall
+local t1 = {
     Variables = nil,
     DEF_CARRIER = "Receiver",
     DEF_QUARTERBACK = "Quarterback",
@@ -13,184 +17,181 @@ local t = {
     ThumbstickAngle = nil
 }
 
-t.BallEquipType = t.DEF_NOBALL
-t.ThrowKeysPressed = {
-    [Enum.KeyCode.ButtonR2] = {
-        Count = 0,
-        Name = "R2",
-        Events = {}
-    },
-    [Enum.KeyCode.One] = {
-        Count = 0,
-        Name = "1",
-        Events = {}
-    },
-    [Enum.KeyCode.Two] = {
-        Count = 0,
-        Name = "2",
-        Events = {}
-    },
-    [Enum.KeyCode.Three] = {
-        Count = 0,
-        Name = "3",
-        Events = {}
-    },
-    [Enum.KeyCode.Four] = {
-        Count = 0,
-        Name = "4",
-        Events = {}
-    },
-    [Enum.KeyCode.Five] = {
-        Count = 0,
-        Name = "5",
-        Events = {}
-    },
-    [Enum.KeyCode.Six] = {
-        Count = 0,
-        Name = "6",
-        Events = {}
-    },
-    [Enum.KeyCode.Seven] = {
-        Count = 0,
-        Name = "7",
-        Events = {}
-    },
-    [Enum.KeyCode.Eight] = {
-        Count = 0,
-        Name = "8",
-        Events = {}
-    },
-    [Enum.KeyCode.Nine] = {
-        Count = 0,
-        Name = "9",
-        Events = {}
-    },
-    [Enum.KeyCode.Zero] = {
-        Count = 0,
-        Name = "0",
-        Events = {}
-    },
-    [Enum.KeyCode.KeypadOne] = {
-        Count = 0,
-        Name = "1",
-        Events = {}
-    },
-    [Enum.KeyCode.KeypadTwo] = {
-        Count = 0,
-        Name = "2",
-        Events = {}
-    },
-    [Enum.KeyCode.KeypadThree] = {
-        Count = 0,
-        Name = "3",
-        Events = {}
-    },
-    [Enum.KeyCode.KeypadFour] = {
-        Count = 0,
-        Name = "4",
-        Events = {}
-    },
-    [Enum.KeyCode.KeypadFive] = {
-        Count = 0,
-        Name = "5",
-        Events = {}
-    },
-    [Enum.KeyCode.KeypadSix] = {
-        Count = 0,
-        Name = "6",
-        Events = {}
-    },
-    [Enum.KeyCode.KeypadSeven] = {
-        Count = 0,
-        Name = "7",
-        Events = {}
-    },
-    [Enum.KeyCode.KeypadEight] = {
-        Count = 0,
-        Name = "8",
-        Events = {}
-    },
-    [Enum.KeyCode.KeypadNine] = {
-        Count = 0,
-        Name = "9",
-        Events = {}
-    },
-    [Enum.KeyCode.KeypadZero] = {
-        Count = 0,
-        Name = "0",
-        Events = {}
-    }
+t1.BallEquipType = t1.DEF_NOBALL
+
+local t2 = {}
+
+t2[Enum.KeyCode.ButtonR2] = {
+    Count = 0,
+    Name = "R2",
+    Events = {}
 }
-t.MostRecentThrowPlayer = nil
-t.MostRecentThrowNumber = 1
-t.KeysPressed = {}
-t.HitStickColor = ColorSequence.new({
+t2[Enum.KeyCode.One] = {
+    Count = 0,
+    Name = "1",
+    Events = {}
+}
+t2[Enum.KeyCode.Two] = {
+    Count = 0,
+    Name = "2",
+    Events = {}
+}
+t2[Enum.KeyCode.Three] = {
+    Count = 0,
+    Name = "3",
+    Events = {}
+}
+t2[Enum.KeyCode.Four] = {
+    Count = 0,
+    Name = "4",
+    Events = {}
+}
+t2[Enum.KeyCode.Five] = {
+    Count = 0,
+    Name = "5",
+    Events = {}
+}
+t2[Enum.KeyCode.Six] = {
+    Count = 0,
+    Name = "6",
+    Events = {}
+}
+t2[Enum.KeyCode.Seven] = {
+    Count = 0,
+    Name = "7",
+    Events = {}
+}
+t2[Enum.KeyCode.Eight] = {
+    Count = 0,
+    Name = "8",
+    Events = {}
+}
+t2[Enum.KeyCode.Nine] = {
+    Count = 0,
+    Name = "9",
+    Events = {}
+}
+t2[Enum.KeyCode.Zero] = {
+    Count = 0,
+    Name = "0",
+    Events = {}
+}
+t2[Enum.KeyCode.KeypadOne] = {
+    Count = 0,
+    Name = "1",
+    Events = {}
+}
+t2[Enum.KeyCode.KeypadTwo] = {
+    Count = 0,
+    Name = "2",
+    Events = {}
+}
+t2[Enum.KeyCode.KeypadThree] = {
+    Count = 0,
+    Name = "3",
+    Events = {}
+}
+t2[Enum.KeyCode.KeypadFour] = {
+    Count = 0,
+    Name = "4",
+    Events = {}
+}
+t2[Enum.KeyCode.KeypadFive] = {
+    Count = 0,
+    Name = "5",
+    Events = {}
+}
+t2[Enum.KeyCode.KeypadSix] = {
+    Count = 0,
+    Name = "6",
+    Events = {}
+}
+t2[Enum.KeyCode.KeypadSeven] = {
+    Count = 0,
+    Name = "7",
+    Events = {}
+}
+t2[Enum.KeyCode.KeypadEight] = {
+    Count = 0,
+    Name = "8",
+    Events = {}
+}
+t2[Enum.KeyCode.KeypadNine] = {
+    Count = 0,
+    Name = "9",
+    Events = {}
+}
+t2[Enum.KeyCode.KeypadZero] = {
+    Count = 0,
+    Name = "0",
+    Events = {}
+}
+t1.ThrowKeysPressed = t2
+t1.MostRecentThrowPlayer = nil
+t1.MostRecentThrowNumber = 1
+t1.KeysPressed = {}
+t1.HitStickColor = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 170, 0)),
     ColorSequenceKeypoint.new(0.499, Color3.fromRGB(255, 170, 0)),
     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(70, 70, 70)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(70, 70, 70))
 })
-t.TruckingColor = ColorSequence.new({
+t1.TruckingColor = ColorSequence.new({
     ColorSequenceKeypoint.new(0, Color3.fromRGB(170, 0, 0)),
     ColorSequenceKeypoint.new(0.499, Color3.fromRGB(170, 0, 0)),
     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(70, 70, 70)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(70, 70, 70))
 })
-t.SprintStatus = false
-t.StaminaActive = false
-t.TruckingStatus = false
-t.HitStickStatus = false
-t.THROW_INDICATOR = false
-t.BallEquipped = false
-t.HandoffActive = false
-t.SpinDebounce = true
-t.PumpDebounce = true
-t.JumpDebounce = true
-t.PlayerCanDive = true
-t.PlayerDiving = false
-t.PlayerIsJumping = false
-t.ThrowDebounce = false
-t.ShiftLockEnabled = false
-t.CFrameAnimationMove = false
-t.MovementChanged = false
-t.Directional = {
-    Forward = false,
-    Left = false,
-    Right = false,
-    Backward = false
-}
-t.ActiveAnimations = {}
-t.ActiveTeamAnimations = {}
-t.SyncedAnimations = {}
-t.Footballs = {}
-t.Fingers = {}
-t.BallVector = Vector3.new()
-t.PlayerVector = Vector3.new()
-t.CamVector = Vector3.new()
-t.CenVector = Vector3.new()
-t.RootVector = Vector3.new()
-t.CarrierVector = Vector3.new()
-t.LiveControlType = "None"
-t.Reset = 0
-t.DirectionBeam = {}
-t.Alignment = Instance.new("AlignOrientation")
-t.Alignment.RigidityEnabled = true
-t.Alignment.ReactionTorqueEnabled = true
-t.AlignAttachment = Instance.new("Attachment")
-t.Alignment.Attachment0 = t.AlignAttachment
-t.Alignment.Mode = Enum.OrientationAlignmentMode.OneAttachment
-t.GyroActive = false
-t.LastAimingPosition = nil
-t.Stamina = 100
-t.SprintDepletePerSecondRate = 10
-t.SprintRegenPerSecondRate = 10
-t.TruckingCost = 50
-t.HitStickCost = 50
-t.BallPower = 100
-t.BallPowerTier = 3
-t.BallPowerTiers = { 65, 85, 100 }
-t.KeyTimer = 0.2
-t.WalkSpeedFactors = {
+t1.SprintStatus = false
+t1.StaminaActive = false
+t1.TruckingStatus = false
+t1.HitStickStatus = false
+t1.THROW_INDICATOR = false
+t1.BallEquipped = false
+t1.HandoffActive = false
+t1.SpinDebounce = true
+t1.PumpDebounce = true
+t1.JumpDebounce = true
+t1.PlayerCanDive = true
+t1.PlayerDiving = false
+t1.PlayerIsJumping = false
+t1.ThrowDebounce = false
+t1.ShiftLockEnabled = false
+t1.CFrameAnimationMove = false
+t1.MovementChanged = false
+t1.Directional = { Forward = false, Left = false, Right = false, Backward = false }
+t1.ActiveAnimations = {}
+t1.ActiveTeamAnimations = {}
+t1.SyncedAnimations = {}
+t1.Footballs = {}
+t1.Fingers = {}
+t1.BallVector = Vector3.new()
+t1.PlayerVector = Vector3.new()
+t1.CamVector = Vector3.new()
+t1.CenVector = Vector3.new()
+t1.RootVector = Vector3.new()
+t1.CarrierVector = Vector3.new()
+t1.LiveControlType = "None"
+t1.Reset = 0
+t1.DirectionBeam = {}
+t1.Alignment = Instance.new("AlignOrientation")
+t1.Alignment.RigidityEnabled = true
+t1.Alignment.ReactionTorqueEnabled = true
+t1.AlignAttachment = Instance.new("Attachment")
+t1.Alignment.Attachment0 = t1.AlignAttachment
+t1.Alignment.Mode = Enum.OrientationAlignmentMode.OneAttachment
+t1.GyroActive = false
+t1.LastAimingPosition = nil
+t1.Stamina = 100
+t1.SprintDepletePerSecondRate = 10
+t1.SprintRegenPerSecondRate = 10
+t1.TruckingCost = 50
+t1.HitStickCost = 50
+t1.BallPower = 100
+t1.BallPowerTier = 3
+t1.BallPowerTiers = { 65, 85, 100 }
+t1.KeyTimer = 0.2
+t1.WalkSpeedFactors = {
     Normal = 18,
     Bike = 0,
     GolfCart = 0,
@@ -199,23 +200,26 @@ t.WalkSpeedFactors = {
     Server = 0,
     Trucking = 0
 }
-t.OffsetBump = 0.3
-function t.new(p1, p2) --[[ new | Line: 122 | Upvalues: t (copy) ]]
-    t.Variables = p1
+t1.OffsetBump = 0.3
 
-    for k, v in pairs((require(script[p2]))) do
-        local Modules = script.Modules
+function t1.new(p1, p2)
+    t1.Variables = p1
 
-        for k2, v2 in pairs(v) do
-            Modules = Modules[v2]
+    local v5 = require(script[p2])
+
+    for _, v in pairs(v5) do
+        local v8 = script.Modules
+
+        for _, v2 in pairs(v) do
+            v8 = v8[v2]
         end
 
-        for k2, v2 in pairs(require(Modules)) do
-            t[k2] = v2
+        for k, v3 in pairs(require(v8)) do
+            t1[k] = v3
         end
     end
 
-    return t
+    return t1
 end
 
-return t
+return t1

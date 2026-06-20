@@ -1,6 +1,6 @@
 # Constants index
 
-This tracks current live `page-1/qb-aim/logic.lua` constants plus game-source constants confirmed by markdown source.
+This tracks current live `features/qb-aim/logic.lua` constants plus game-source constants confirmed by markdown source.
 
 ## Game-source football constants
 

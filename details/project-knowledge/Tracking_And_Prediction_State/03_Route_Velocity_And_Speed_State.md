@@ -1,6 +1,6 @@
 # Route velocity and speed state
 
-This page reflects the restored `page-1/qb-aim/logic.lua` route velocity path.
+This page reflects the restored `features/qb-aim/logic.lua` route velocity path.
 
 ## Route speed
 

@@ -1,6 +1,6 @@
 # Function index
 
-Current live `page-1/qb-aim/logic.lua` function map after restoring the pre-Catch-Ahead QB aim version.
+Current live `features/qb-aim/logic.lua` function map after restoring the pre-Catch-Ahead QB aim version.
 
 ## Shared helpers
 

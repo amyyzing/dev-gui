@@ -1,204 +1,206 @@
--- Script Path: game:GetService("ReplicatedStorage").Assets.Modules.Client.Mechanics.Modules.General.MECH_ControlsCatchHikeThrow
+-- Script Path: game:GetChildren()[117]:GetChildren()[12]:GetChildren()[3]:GetChildren()[2]:GetChildren()[1]:GetChildren()[6]:GetChildren()[1]:GetChildren()[26]
+-- Took 0.09s to decompile.
+-- Executor: YuBX (2.0.0.0-YB)
 
-local t = {}
-local v1 = nil
+-- Decompiled using ByteFall
+-- discord.gg/bytefall
+local u1 = nil
 
-local function _getCachedAutoCatchingAbTest(p1) --[[ _getCachedAutoCatchingAbTest | Line: 10 | Upvalues: v1 (ref) ]]
-    if v1 ~= nil then
-        return v1
+local function _getCachedAutoCatchingAbTest(p1)
+    if u1 == nil then
+        local v4, v5 = p1.Variables.ABTest.GetExperimentVariables("uf-auto-catching"):await()
+
+        if v4 and v5 ~= nil then
+            u1 = v5
+        end
     end
 
-    local v12, v2 = p1.Variables.ABTest.GetExperimentVariables("uf-auto-catching"):await()
-
-    if not v12 or v2 == nil then
-        return v1
-    end
-
-    v1 = v2
-
-    return v2
+    return u1
 end
 
-function t.CatchHikeThrow(p1) --[[ CatchHikeThrow | Line: 22 ]]
-    if p1:FilterAction("CatchHikeThrow") == false then
-        return
-    end
-
-    local v1 = p1.Variables.CurrentGameSettings or p1.Variables.CurrentMiniSettings
-    local Hiking = v1.MechanicsUsed.Hiking.Value
-    local Catching = v1.MechanicsUsed.Catching.Value
-
-    if not v1 then
-        return
-    end
-
-    local v2 = if p1.Variables.InputType == "Controller" and (p1:CheckAutoThrowEnabled() and p1:GetClosestReceiverNumber() ~= nil) then false else true
-    local v3 = p1.Variables.GlobalVariables:PlayerIsQuarterback(p1.Variables.LP, v1)
-
-    if p1.BallEquipped and (p1.BallEquipType == p1.DEF_QUARTERBACK and (v1.GameStatus.Hiked.Value and (v3 and (v2 and v1.MechanicsUsed.Throwing.Value)))) then
-        if p1.Variables.Functions.MutationsMode:MutationModeCheck() and p1:IsPlayerStunnedByMutation() then
+return {
+    CatchHikeThrow = function(p2)
+        if p2:FilterAction("CatchHikeThrow") == false then
             return
         end
 
-        p1:FootballThrow()
-    else
-        if not p1.BallEquipped and (not v1.GameStatus.Hiked.Value and (v3 and Hiking)) then
-            p1:Hike()
+        local v7 = p2.Variables.CurrentGameSettings or p2.Variables.CurrentMiniSettings
+        local HikingValue = v7.MechanicsUsed.Hiking.Value
+        local CatchingValue = v7.MechanicsUsed.Catching.Value
+        local ThrowingValue = v7.MechanicsUsed.Throwing.Value
+
+        if v7 then
+            local u11 = true
+
+            if p2.Variables.InputType == "Controller" and p2:CheckAutoThrowEnabled() and p2:GetClosestReceiverNumber() ~= nil then
+                u11 = false
+            end
+
+            local v12 = p2.Variables.GlobalVariables:PlayerIsQuarterback(p2.Variables.LP, v7)
+
+            if p2.BallEquipped and p2.BallEquipType == p2.DEF_QUARTERBACK and v7.GameStatus.Hiked.Value and v12 and u11 and ThrowingValue then
+                if p2.Variables.Functions.MutationsMode:MutationModeCheck() and p2:IsPlayerStunnedByMutation() then
+                    return
+                end
+
+                p2:FootballThrow()
+            elseif not p2.BallEquipped and not v7.GameStatus.Hiked.Value and v12 and HikingValue then
+                p2:Hike()
+            elseif v7.GameStatus.Hiked.Value and p2.Variables.LP.Character and CatchingValue then
+                if p2.Variables.Functions.MutationsMode:MutationModeCheck() and p2:IsPlayerStunnedByMutation() then
+                    return
+                end
+
+                p2:Catching()
+
+                return
+            end
 
             return
         end
-
-        if not (v1.GameStatus.Hiked.Value and (p1.Variables.LP.Character and Catching)) then
+    end,
+    Catching = function(p3)
+        if p3:FilterAction("Catching") == false then
             return
-        end
+        end;
 
-        if p1.Variables.Functions.MutationsMode:MutationModeCheck() and p1:IsPlayerStunnedByMutation() then
-            return
-        end
+        (p3.Variables.CurrentGameSettings or p3.Variables.CurrentMiniSettings).ReEvent:FireServer("Mechanics", "Catching", true)
+    end,
+    CatchingLoop = function(p4)
+        local v15 = p4.Variables.CurrentGameSettings or p4.Variables.CurrentMiniSettings
 
-        p1:Catching()
-    end
-end
-function t.Catching(p1) --[[ Catching | Line: 62 ]]
-    if p1:FilterAction("Catching") == false then
-        return
-    end
+        if v15 and p4.Variables.GlobalVariables:PlayerIsInGame(v15, p4.Variables.LP) then
+            for v16, v17 in p4.Variables.GlobalVariables.ReplicatedFolders, nil, nil do
+                local v18 = p4.Variables.GlobalVariables
+                local v19 = tostring(v16)
+                local v20 = v18:GetPlayer(v19)
 
-    (p1.Variables.CurrentGameSettings or p1.Variables.CurrentMiniSettings).ReEvent:FireServer("Mechanics", "Catching", true)
-end
-function t.CatchingLoop(p1) --[[ CatchingLoop | Line: 70 | Upvalues: v1 (ref) ]]
-    local v12 = p1.Variables.CurrentGameSettings or p1.Variables.CurrentMiniSettings
+                if v20 then
+                    local Character = v20.Character
 
-    if v12 and p1.Variables.GlobalVariables:PlayerIsInGame(v12, p1.Variables.LP) then
-        for v2, v3 in p1.Variables.GlobalVariables.ReplicatedFolders do
-            local v4 = p1.Variables.GlobalVariables:GetPlayer((tostring(v2)))
+                    if Character ~= nil and Character.PrimaryPart and p4.Variables.GlobalVariables:PlayerIsInGame(v15, v20) and Character:FindFirstChild("Humanoid") and Character.Humanoid.Health > 0 then
+                        local v22 = nil
+                        local v23 = nil
+                        local n1 = math.huge
 
-            if v4 then
-                local Character = v4.Character
+                        for v25, v26 in p4.Variables.GFunctions.Footballs, nil, nil do
+                            if v25 and v25.Parent and v26.GameID == v15.Name and n1 > (v25.Position - Character.PrimaryPart.Position).Magnitude then
+                                v22 = v25
+                                n1 = (v25.Position - Character.PrimaryPart.Position).Magnitude
 
-                if Character ~= nil and (Character.PrimaryPart and (p1.Variables.GlobalVariables:PlayerIsInGame(v12, v4) and (Character:FindFirstChild("Humanoid") and Character.Humanoid.Health > 0))) then
-                    local v5 = (1 / 0)
-                    local v6 = nil
-                    local v7 = nil
-
-                    for v8, v9 in p1.Variables.GFunctions.Footballs do
-                        if v8 and (v8.Parent and (v9.GameID == v12.Name and (v8.Position - Character.PrimaryPart.Position).Magnitude < v5)) then
-                            v5 = (v8.Position - Character.PrimaryPart.Position).Magnitude
-
-                            if v8.Parent == Character then
-                                v6 = v8
-                                v7 = v8
-
-                                continue
-                            end
-
-                            v6 = v8
-                        end
-                    end
-
-                    if v6 and v12.GameStatus.Hiked.Value then
-                        local v10 = p1.Variables.GlobalVariables:PlayerHasBall(v12, v4, v7)
-
-                        if v1 == nil then
-                            local v11, v122 = p1.Variables.ABTest.GetExperimentVariables("uf-auto-catching"):await()
-
-                            if v11 and v122 ~= nil then
-                                v1 = v122
+                                if Character == v25.Parent then
+                                    v23 = v25
+                                end
                             end
                         end
 
-                        local v13 = v1
-                        local PrivateServer = game.ReplicatedStorage.Settings.PrivateServer.Value
+                        if v22 and v15.GameStatus.Hiked.Value then
+                            local v27 = p4.Variables.GlobalVariables:PlayerHasBall(v15, v20, v23)
 
-                        if (p1.Variables.InputType == "Mobile" or (if v13 == nil then false else v13.enabled and (if p1.Variables.Functions.PlayerData:GetInstallDate() >= v13["install-cohort-date"].UnixTimestamp then not PrivateServer else false))) and (v4 == p1.Variables.LP and (not v10 and (Character.PrimaryPart.LocalCatchTracker.Value ~= 1 and (v6.LinearVelocity.Enabled and (v6.Position - Character.PrimaryPart.Position).Magnitude < 15)))) then
-                            p1:Catching()
-                        end
+                            if u1 == nil then
+                                local v28, v29 = p4.Variables.ABTest.GetExperimentVariables("uf-auto-catching"):await()
 
-                        local TackleBox = v4.Replicated.TackleBox.Value
+                                if v28 and v29 ~= nil then
+                                    u1 = v29
+                                end
+                            end
 
-                        if TackleBox and (TackleBox.Parent and (v4 ~= p1.Variables.LP or p1.BallEquipType ~= p1.DEF_QUARTERBACK)) then
-                            if TackleBox.Catching.Value and not v10 then
-                                if v12.GameStatus.OneHandedCatch.Value == p1.Variables.GlobalVariables.OneHandedCatchValues.gameState.Unavailable then
-                                    p1.Variables.Arms:CatchingArms(Character, v6.Position)
+                            local v30 = u1
+                            local PrivateServerValue = game.ReplicatedStorage.Settings.PrivateServer.Value
+                            local u32 = false
+
+                            if v30 ~= nil then
+                                u32 = v30.enabled
+
+                                if u32 then
+                                    u32 = false
+
+                                    if p4.Variables.Functions.PlayerData:GetInstallDate() >= v30["install-cohort-date"].UnixTimestamp then
+                                        u32 = not PrivateServerValue
+                                    end
+                                end
+                            end
+
+                            if (p4.Variables.InputType == "Mobile" or u32) and v20 == p4.Variables.LP and not v27 and Character.PrimaryPart.LocalCatchTracker.Value ~= 1 and not not v22.LinearVelocity.Enabled and (v22.Position - Character.PrimaryPart.Position).Magnitude < 15 then
+                                p4:Catching()
+                            end
+
+                            local TackleBoxValue = v20.Replicated.TackleBox.Value
+
+                            if TackleBoxValue and TackleBoxValue.Parent and (v20 ~= p4.Variables.LP or p4.BallEquipType ~= p4.DEF_QUARTERBACK) then
+                                if not TackleBoxValue.Catching.Value or v27 then
+                                    if v27 and v15.GameStatus.CanPop.Value then
+                                        continue
+                                    end
+                                elseif v15.GameStatus.OneHandedCatch.Value == p4.Variables.GlobalVariables.OneHandedCatchValues.gameState.Unavailable then
+                                    p4.Variables.Arms:CatchingArms(Character, v22.Position)
                                     Character.PrimaryPart.LocalCatchTracker.Value = 1
 
                                     continue
-                                end
+                                else
+                                    local v34 = p4.Variables.FootballMath:ToField(v15, Character.PrimaryPart.Position)
+                                    local u35 = v34.X < v15.FieldSettings.FieldDimensions.NorthTD.Value
+                                    local u36 = v34.X > v15.FieldSettings.FieldDimensions.SouthTD.Value
+                                    local u37 = false
 
-                                local v15 = p1.Variables.FootballMath:ToField(v12, Character.PrimaryPart.Position)
-                                local v16 = if v15.X < v12.FieldSettings.FieldDimensions.NorthTD.Value then true else false
-                                local v17 = if v15.X > v12.FieldSettings.FieldDimensions.SouthTD.Value then true else false
-                                local v18 = false
+                                    if u35 or u36 then
+                                        if v15.GameStatus.NorthScorer.Value == v15.GameStatus.Offense.Value and u35 then
+                                            u37 = true
+                                        end
 
-                                if v16 or v17 then
-                                    if v12.GameStatus.NorthScorer.Value == v12.GameStatus.Offense.Value and v16 then
-                                        v18 = true
+                                        if v15.GameStatus.SouthScorer.Value == v15.GameStatus.Offense.Value and u36 then
+                                            u37 = true
+                                        end
                                     end
 
-                                    if v12.GameStatus.SouthScorer.Value == v12.GameStatus.Offense.Value and v17 then
-                                        v18 = true
-                                    end
-                                end
+                                    if not u37 or not p4.Variables.GlobalVariables:PlayerIsOnOffense(v15, v20) or v20 ~= p4.Variables.LP then
+                                        p4.Variables.Arms:CatchingArms(Character, v22.Position)
+                                        Character.PrimaryPart.LocalCatchTracker.Value = 1
 
-                                if v18 and (p1.Variables.GlobalVariables:PlayerIsOnOffense(v12, v4) and v4 == p1.Variables.LP) then
-                                    if v12.GameInstance.Value.Replicated.Hitboxes[v4.Name].OneHandedCatching.Value then
-                                        p1.Variables.Arms:NormalArms(Character)
+                                        continue
+                                    elseif not v15.GameInstance.Value.Replicated.Hitboxes[v20.Name].OneHandedCatching.Value then
+                                        p4.Variables.Arms:OneHandedCatchArms(Character, v22.Position)
+                                        Character.PrimaryPart.LocalCatchTracker.Value = 2
+
+                                        continue
+                                    else
+                                        p4.Variables.Arms:NormalArms(Character)
                                         Character.PrimaryPart.LocalCatchTracker.Value = 0
 
                                         continue
                                     end
-
-                                    p1.Variables.Arms:OneHandedCatchArms(Character, v6.Position)
-                                    Character.PrimaryPart.LocalCatchTracker.Value = 2
-
-                                    continue
                                 end
-
-                                p1.Variables.Arms:CatchingArms(Character, v6.Position)
-                                Character.PrimaryPart.LocalCatchTracker.Value = 1
-
-                                continue
                             end
+                        end
 
-                            if not (v10 and v12.GameStatus.CanPop.Value) and (Character and (Character.PrimaryPart:FindFirstChild("LocalCatchTracker") and Character.PrimaryPart.LocalCatchTracker.Value ~= 0)) then
-                                p1.Variables.Arms:NormalArms(Character)
-                                Character.PrimaryPart.LocalCatchTracker.Value = 0
-                            end
-                        elseif Character and (Character.PrimaryPart:FindFirstChild("LocalCatchTracker") and Character.PrimaryPart.LocalCatchTracker.Value ~= 0) then
-                            p1.Variables.Arms:NormalArms(Character)
+                        if Character and Character.PrimaryPart:FindFirstChild("LocalCatchTracker") and Character.PrimaryPart.LocalCatchTracker.Value ~= 0 then
+                            p4.Variables.Arms:NormalArms(Character)
                             Character.PrimaryPart.LocalCatchTracker.Value = 0
                         end
-                    elseif Character and (Character.PrimaryPart:FindFirstChild("LocalCatchTracker") and Character.PrimaryPart.LocalCatchTracker.Value ~= 0) then
-                        p1.Variables.Arms:NormalArms(Character)
-                        Character.PrimaryPart.LocalCatchTracker.Value = 0
                     end
                 end
             end
-        end
-    else
-        if not (p1.Variables.LP.Character and p1.Variables.LP.Character.PrimaryPart) then
-            return
-        end
+        elseif p4.Variables.LP.Character and p4.Variables.LP.Character.PrimaryPart then
+            for k, _ in pairs(p4.Variables.GlobalVariables.ReplicatedFolders) do
+                local v40 = p4.Variables.GlobalVariables
+                local v41 = tostring(k)
+                local v42 = v40:GetPlayer(v41)
 
-        for k, v in pairs(p1.Variables.GlobalVariables.ReplicatedFolders) do
-            local v19 = p1.Variables.GlobalVariables:GetPlayer((tostring(k)))
-
-            if v19 and (v19.Character and (v19.Character.PrimaryPart and v19.Character.PrimaryPart.LocalCatchTracker.Value ~= 0)) then
-                p1.Variables.Arms:NormalArms(v19.Character)
-                v19.Character.PrimaryPart.LocalCatchTracker.Value = 0
+                if v42 and v42.Character and v42.Character.PrimaryPart and v42.Character.PrimaryPart.LocalCatchTracker.Value ~= 0 then
+                    p4.Variables.Arms:NormalArms(v42.Character)
+                    v42.Character.PrimaryPart.LocalCatchTracker.Value = 0
+                end
             end
         end
+    end,
+    Hike = function(p5)
+        local v44 = p5.Variables.CurrentGameSettings or p5.Variables.CurrentMiniSettings
+
+        if v44 and p5.Variables.GlobalVariables:PlayerCanHike(v44) and not p5.HandoffActive and p5.Variables.GlobalVariables:PlayerIsQuarterback(p5.Variables.LP, v44) then
+            p5.Variables.Functions.Input:XboxFocus(nil)
+            v44.ReEvent:FireServer("Mechanics", "Hiked")
+
+            return true
+        end
     end
-end
-function t.Hike(p1) --[[ Hike | Line: 174 ]]
-    local v1 = p1.Variables.CurrentGameSettings or p1.Variables.CurrentMiniSettings
-
-    if v1 and (p1.Variables.GlobalVariables:PlayerCanHike(v1) and (not p1.HandoffActive and p1.Variables.GlobalVariables:PlayerIsQuarterback(p1.Variables.LP, v1))) then
-        p1.Variables.Functions.Input:XboxFocus(nil)
-        v1.ReEvent:FireServer("Mechanics", "Hiked")
-
-        return true
-    end
-end
-
-return t
+}

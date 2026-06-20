@@ -1,38 +1,40 @@
--- Script Path: game:GetService("ReplicatedStorage").Assets.Modules.Client.Mechanics.Modules.General.MECH_ControlsBallControl
+-- Script Path: game:GetChildren()[117]:GetChildren()[12]:GetChildren()[3]:GetChildren()[2]:GetChildren()[1]:GetChildren()[6]:GetChildren()[1]:GetChildren()[31]
+-- Took 0.08s to decompile.
+-- Executor: YuBX (2.0.0.0-YB)
 
+-- Decompiled using ByteFall
+-- discord.gg/bytefall
 return {
-    BallControlFilter = function(p1) --[[ BallControlFilter | Line: 12 ]]
-        local v1 = p1.Variables.CurrentGameSettings or p1.Variables.CurrentMiniSettings
+    BallControlFilter = function(p1)
+        local v2 = p1.Variables.CurrentGameSettings or p1.Variables.CurrentMiniSettings
 
-        if not p1.Variables.GlobalVariables:PlayerIsPlaying(v1, p1.Variables.LP) then
+        if not p1.Variables.GlobalVariables:PlayerIsPlaying(v2, p1.Variables.LP) then
             return false
         end
 
-        local v2 = false
+        local u3 = false
 
-        for k, v in pairs(p1.Variables.GFunctions.Footballs) do
+        for k, _ in pairs(p1.Variables.GFunctions.Footballs) do
             if k and k.Parent == p1.Variables.LP.Character then
-                v2 = true
+                u3 = true
             end
         end
 
-        if v1.ActiveState.Value == "TURK_Active" then
-            return v2
+        if v2.ActiveState.Value == "TURK_Active" then
+            return u3
         end
 
-        return not v2
+        return not u3
     end,
-    BallControl = function(p1) --[[ BallControl | Line: 33 ]]
-        if p1:FilterAction("BallControl") == false then
+    BallControl = function(p2)
+        if p2:FilterAction("BallControl") == false then
             return
         end
 
-        local v1 = p1.Variables.CurrentGameSettings or p1.Variables.CurrentMiniSettings
+        local v7 = p2.Variables.CurrentGameSettings or p2.Variables.CurrentMiniSettings
 
-        if not v1 then
-            return
+        if v7 then
+            v7.ReEvent:FireServer("Mechanics", "BallControl", "SpawnBall")
         end
-
-        v1.ReEvent:FireServer("Mechanics", "BallControl", "SpawnBall")
     end
 }

@@ -1,5 +1,8 @@
--- Script Path: game:GetService("ReplicatedStorage").Assets.Modules.Client.Mechanics.Modules.General.MECH_Animations
+-- Script Path: game:GetChildren()[117]:GetChildren()[12]:GetChildren()[3]:GetChildren()[2]:GetChildren()[1]:GetChildren()[6]:GetChildren()[1]:GetChildren()[3]
+-- Took 0.78s to decompile.
+-- Executor: YuBX (2.0.0.0-YB)
 
+-- https://lua.expert/
 return {
     MoveAnimation = function(p1, p2, p3, p4, p5) --[[ MoveAnimation | Line: 10 ]]
         if not p1:LoadAnimation(p2) or p1.CFrameAnimationMove then
