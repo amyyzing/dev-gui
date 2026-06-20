@@ -596,8 +596,8 @@ MODULE_GLOBAL_NAMES={
 	DesignThemeSakura="DesignThemeSakura",
 	GuiFusion="FusionModule"
 }
-STARTUP_MODULE_NAMES={"CoreScope","CoreSignal","DiagnosticsLogger","CoreScheduler","CorePlayerCache","CoreBallTracker","StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura","GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimMath","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds","StrokeColourLogic","StrokeColour","HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor","PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord","DataSave"}
-OPTIONAL_MODULE_NAMES={}
+STARTUP_MODULE_NAMES={"CoreScope","CoreSignal","CoreScheduler","StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura","GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimMath","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","DataSave"}
+OPTIONAL_MODULE_NAMES={"DiagnosticsLogger","CorePlayerCache","CoreBallTracker"}
 MAP_RELOAD_NAMES={"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds"}
 CUSTOMIZE_RELOAD_NAMES={"StrokeColourLogic","StrokeColour"}
 PAGE2_RELOAD_NAMES={"HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor"}
@@ -853,7 +853,7 @@ function playLoaderKeyframes(sequence,asynchronous)
 	end
 end
 
-LOADER_PAGE_BUILD_NAMES={"maps","customize","page2","settings","server"}
+LOADER_PAGE_BUILD_NAMES={}
 LOADER_TOTAL=#STARTUP_MODULE_PATHS+#LOADER_PAGE_BUILD_NAMES+4
 
 loaderCurrent=0
