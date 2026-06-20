@@ -22,6 +22,15 @@ This project should move toward a hybrid structure: shared infrastructure for li
 6. Migrate complex features: ESP, game params, and QB Aim last.
 7. Remove compatibility code only after all pages and features use the new contracts.
 
+## Current Runtime Contracts
+
+- `core/scope.lua` owns cleanup for connections, instances, functions, nested scopes, destroyable tables, cancellable delayed callbacks, and arbitrary cleanup tasks. `destroy()` is idempotent; `cancelAll()` is an alias for cleanup without marking the scope destroyed.
+- `core/scheduler.lua` is the preferred owner for repeated `RenderStepped`, `Heartbeat`, interval, and delayed jobs. Jobs are named, cancellable, pausable, and expose timing stats through `stats()`, `jobStats(name)`, and `resetStats()`.
+- `diagnostics/logger.lua` provides a small scoped logger with levels and bounded history. Runtime code exposes it through `RuntimeServices.Logger`.
+- `runtime/loader-part-1.lua` exposes shared services through `RuntimeServices`: `Janitor`, `Scheduler`, `StateStore`, `ThemeStore`, `Logger`, `PlayerCache`, and `BallTracker`.
+
+New feature code should depend on these contracts instead of adding feature-local connection arrays, direct repeated `RunService` loops, or ad hoc logging.
+
 ## Feature Shape
 
 Feature modules should avoid receiving one giant `ctx`. Use narrow dependencies:

@@ -10,6 +10,8 @@ assert(Scope, "CoreScope must load before CoreScheduler")
 local Scheduler = {}
 Scheduler.__index = Scheduler
 
+local EMPTY_STATS = {}
+
 local function sortJobs(jobs)
 	table.sort(jobs, function(a, b)
 		if a.priority == b.priority then
@@ -20,9 +22,10 @@ local function sortJobs(jobs)
 	end)
 end
 
-local function createHandle(cancel)
+local function createHandle(job, cancel)
 	local handle = {
 		_cancelled = false,
+		_job = job,
 	}
 
 	function handle:cancel()
@@ -32,6 +35,20 @@ local function createHandle(cancel)
 
 		self._cancelled = true
 		cancel()
+	end
+
+	function handle:setEnabled(enabled)
+		if self._job then
+			self._job.enabled = enabled ~= false
+		end
+	end
+
+	function handle:pause()
+		self:setEnabled(false)
+	end
+
+	function handle:resume()
+		self:setEnabled(true)
 	end
 
 	function handle:Cancel()
@@ -49,6 +66,32 @@ local function createHandle(cancel)
 	return handle
 end
 
+local function updateStats(job, startedAt)
+	local duration = os.clock() - startedAt
+	job.lastDuration = duration
+	job.totalDuration = (job.totalDuration or 0) + duration
+	job.callCount = (job.callCount or 0) + 1
+
+	if duration > (job.maxDuration or 0) then
+		job.maxDuration = duration
+	end
+end
+
+local function copyStats(job, kind)
+	local calls = job.callCount or 0
+	return {
+		name = job.name,
+		kind = kind,
+		priority = job.priority or 0,
+		interval = job.interval,
+		enabled = job.enabled ~= false and not job.cancelled,
+		calls = calls,
+		last = job.lastDuration or 0,
+		average = calls > 0 and ((job.totalDuration or 0) / calls) or 0,
+		max = job.maxDuration or 0,
+	}
+end
+
 function Scheduler.new(runService, scope)
 	local self = setmetatable({
 		_runService = runService or game:GetService("RunService"),
@@ -58,6 +101,7 @@ function Scheduler.new(runService, scope)
 		_heartbeatJobs = {},
 		_renderConnection = nil,
 		_heartbeatConnection = nil,
+		_delayId = 0,
 	}, Scheduler)
 
 	if scope then
@@ -86,16 +130,20 @@ function Scheduler:_runJobs(jobs, dt)
 	end
 
 	for _, job in ipairs(jobs) do
-		if not job.cancelled then
+		if not job.cancelled and job.enabled ~= false then
 			if job.interval then
 				job.elapsed = job.elapsed + dt
 				if job.elapsed >= job.interval then
 					local elapsed = job.elapsed
 					job.elapsed = 0
+					local startedAt = os.clock()
 					job.callback(elapsed)
+					updateStats(job, startedAt)
 				end
 			else
+				local startedAt = os.clock()
 				job.callback(dt)
+				updateStats(job, startedAt)
 			end
 		end
 	end
@@ -134,13 +182,18 @@ function Scheduler:_addJob(jobs, ensure, name, priority, callback, ownerScope, i
 		interval = interval,
 		elapsed = 0,
 		cancelled = false,
+		enabled = true,
+		callCount = 0,
+		totalDuration = 0,
+		lastDuration = 0,
+		maxDuration = 0,
 	}
 
 	jobs[#jobs + 1] = job
 	sortJobs(jobs)
 	ensure(self)
 
-	local handle = createHandle(function()
+	local handle = createHandle(job, function()
 		job.cancelled = true
 		self:_removeJob(jobs, name)
 	end)
@@ -164,11 +217,25 @@ function Scheduler:every(name, interval, callback, ownerScope)
 	return self:_addJob(self._heartbeatJobs, self._ensureHeartbeat, name, 0, callback, ownerScope, interval)
 end
 
-function Scheduler:delay(seconds, callback, ownerScope)
+function Scheduler:delay(nameOrSeconds, secondsOrCallback, callbackOrScope, maybeOwnerScope)
+	local name = nil
+	local seconds = nameOrSeconds
+	local callback = secondsOrCallback
+	local ownerScope = callbackOrScope
+
+	if type(nameOrSeconds) == "string" then
+		name = nameOrSeconds
+		seconds = secondsOrCallback
+		callback = callbackOrScope
+		ownerScope = maybeOwnerScope
+	end
+
 	local handle
 	local elapsed = 0
+	self._delayId = self._delayId + 1
+	local jobName = name or ("delay:" .. tostring(self._delayId))
 
-	handle = self:onHeartbeat("delay:" .. tostring(callback), 0, function(dt)
+	handle = self:onHeartbeat(jobName, 0, function(dt)
 		elapsed = elapsed + dt
 		if elapsed >= seconds then
 			handle:cancel()
@@ -181,6 +248,58 @@ end
 
 function Scheduler:jobCount()
 	return #self._renderJobs + #self._heartbeatJobs
+end
+
+function Scheduler:stats()
+	local result = {}
+
+	for _, job in ipairs(self._renderJobs) do
+		result[#result + 1] = copyStats(job, "RenderStepped")
+	end
+
+	for _, job in ipairs(self._heartbeatJobs) do
+		result[#result + 1] = copyStats(job, "Heartbeat")
+	end
+
+	table.sort(result, function(a, b)
+		if a.kind == b.kind then
+			return a.name < b.name
+		end
+
+		return a.kind < b.kind
+	end)
+
+	return result
+end
+
+function Scheduler:jobStats(name)
+	for _, job in ipairs(self._renderJobs) do
+		if job.name == name then
+			return copyStats(job, "RenderStepped")
+		end
+	end
+
+	for _, job in ipairs(self._heartbeatJobs) do
+		if job.name == name then
+			return copyStats(job, "Heartbeat")
+		end
+	end
+
+	return EMPTY_STATS
+end
+
+function Scheduler:resetStats()
+	local function reset(jobs)
+		for _, job in ipairs(jobs) do
+			job.callCount = 0
+			job.totalDuration = 0
+			job.lastDuration = 0
+			job.maxDuration = 0
+		end
+	end
+
+	reset(self._renderJobs)
+	reset(self._heartbeatJobs)
 end
 
 function Scheduler:destroy()
