@@ -19,7 +19,7 @@
       "type": "process",
       "command": "${workspaceFolder}\\.tools\\luau\\luau-compile.exe",
       "args": [
-        "${workspaceFolder}\\page-1\\qb-aim\\logic.lua"
+        "${workspaceFolder}\\features\\qb-aim\\logic.lua"
       ],
       "problemMatcher": []
     }
