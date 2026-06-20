@@ -64,6 +64,9 @@ local DEFENDER_SETTINGS={
 local TRACK_SETTINGS={
 	ReceiverInterval=0.05,
 }
+local POSSESSION_RESEED_SETTLE_TIME=0.12
+local MOVE_DIRECTION_EPSILON=0.05
+local MOVING_CONFIRM_SAMPLES=2
 local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
 local PREVIEW_MISSING_BALL_GRACE=0.2
@@ -142,6 +145,26 @@ local function root(character)
 	end
 
 	return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")
+end
+
+local function rootMoveDirection(rootPart)
+	local character=rootPart and rootPart.Parent
+	local humanoid=character and character:FindFirstChildOfClass("Humanoid")
+	local direction=humanoid and humanoid.MoveDirection or Vector3.zero
+	return flat(direction)
+end
+
+local function rootHasMoveInput(rootPart)
+	return rootMoveDirection(rootPart).Magnitude>MOVE_DIRECTION_EPSILON
+end
+
+local function movementAwareRootVelocity(rootPart)
+	local velocity=rootPart and rootPart.AssemblyLinearVelocity or Vector3.zero
+	if rootPart and not rootHasMoveInput(rootPart) then
+		return Vector3.new(0,velocity.Y,0)
+	end
+
+	return velocity
 end
 
 local function routeSpeed(speed)
@@ -594,6 +617,8 @@ function QBAim.new(ctx,parent)
 	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,beamDefaultColor=nil,orig=nil,p1=nil,p2=nil,p3=nil,ballMissingSince=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
+	local lastHeldBall=nil
+	local possessionSettleUntil=0
 	local throwInProgress=false
 	local lastThrowAt=-math.huge
 	local highlightedCharacter=nil
@@ -963,16 +988,13 @@ function QBAim.new(ctx,parent)
 		highlight.OutlineColor=style.outline
 	end
 
-	local function ensureReceiverData(player,receiverRoot)
-		if receiverData[player] or not receiverRoot then
-			return receiverData[player]
-		end
-
-		local now=os.clock()
-		receiverData[player]={
+	local function seedReceiverData(player,receiverRoot,now)
+		if not(player and receiverRoot) then return nil end
+		now=now or os.clock()
+		local data={
 			pos=receiverRoot.Position,
-			vel=receiverRoot.AssemblyLinearVelocity or Vector3.zero,
-			rawVel=receiverRoot.AssemblyLinearVelocity or Vector3.zero,
+			vel=Vector3.zero,
+			rawVel=Vector3.zero,
 			accel=Vector3.zero,
 			confidence=PREDICTOR_CONFIDENCE_MIN,
 			lastSeen=now,
@@ -982,10 +1004,55 @@ function QBAim.new(ctx,parent)
 			sdir=nil,
 			sspeed=0,
 			stime=0,
+			movingSamples=0,
+			seededAt=now,
 			src="seeded",
 		}
 
-		return receiverData[player]
+		receiverData[player]=data
+		return data
+	end
+
+	local function ensureReceiverData(player,receiverRoot)
+		if receiverData[player] or not receiverRoot then
+			return receiverData[player]
+		end
+
+		return seedReceiverData(player,receiverRoot)
+	end
+
+	local function reseedReceiverTracking(now)
+		now=now or os.clock()
+		for _,player in ipairs(Players:GetPlayers()) do
+			if player~=LP and player.Character then
+				local receiverRoot=root(player.Character)
+				if receiverRoot then
+					seedReceiverData(player,receiverRoot,now)
+				end
+			end
+		end
+
+		receiverTrackElapsed=TRACK_SETTINGS.ReceiverInterval
+	end
+
+	local function noteHeldBallState(ball,now)
+		now=now or os.clock()
+		if not ball then
+			lastHeldBall=nil
+			return
+		end
+
+		if ball==lastHeldBall then
+			return
+		end
+
+		lastHeldBall=ball
+		possessionSettleUntil=now+POSSESSION_RESEED_SETTLE_TIME
+		selectedRouteLock=nil
+		previewFrozen=false
+		preview.ballMissingSince=nil
+		preview.last=0
+		reseedReceiverTracking(now)
 	end
 
 	local function configuredBinding(getterName,fallback)
@@ -1219,16 +1286,18 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function currentReceiverRawVelocity(data,receiverRoot,fallbackVelocity)
+		local now=os.clock()
 		local assembly=receiverRoot and receiverRoot.AssemblyLinearVelocity or nil
 		local assemblyXZ=assembly and flat(assembly) or Vector3.zero
 		local rawXZ=flat((data and data.rawVel) or fallbackVelocity or Vector3.zero)
 		local storedXZ=flat((data and data.vel) or Vector3.zero)
+		local canTrustAssembly=receiverRoot and rootHasMoveInput(receiverRoot) and now>=possessionSettleUntil
 
 		-- AssemblyLinearVelocity is preferred when it is clearly moving; otherwise use the
 		-- immediate position-delta velocity from the heartbeat tracker. No route-shape basis.
 		local velocity=Vector3.zero
 		local source="none"
-		if assemblyXZ.Magnitude>=CLEAN_MOVING_SPEED_MIN then
+		if canTrustAssembly and assemblyXZ.Magnitude>=CLEAN_MOVING_SPEED_MIN then
 			velocity=assemblyXZ
 			source="assembly"
 		elseif rawXZ.Magnitude>=CLEAN_MOVING_SPEED_MIN then
@@ -1408,7 +1477,7 @@ function QBAim.new(ctx,parent)
 			yReleaseOffset=xzReleaseOffset
 		end
 
-		local rootVelocity=qbRoot.AssemblyLinearVelocity
+		local rootVelocity=movementAwareRootVelocity(qbRoot)
 		local fallbackPosition=ball and ball.Position or qbRoot.Position
 		local c2Pos=c2Position()
 		local useC2=false
@@ -1768,10 +1837,6 @@ function QBAim.new(ctx,parent)
 		return getModeKey(ctx)=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
 	end
 
-	local function hasHeldBallForPreview()
-		return getHeldBall()~=nil
-	end
-
 	local function throwBlocked()
 		return throwInProgress or os.clock()-lastThrowAt<THROW_INPUT_COOLDOWN
 	end
@@ -1844,7 +1909,7 @@ function QBAim.new(ctx,parent)
 			targetVelocity=targetVelocity,
 			shape=shape,
 			ballPower=ballPower or currentBallPower(),
-			qbVelocity=qbRoot.AssemblyLinearVelocity,
+			qbVelocity=movementAwareRootVelocity(qbRoot),
 			qbReleaseOffset=releaseOffset,
 			receiverReleaseOffset=receiverReleaseOffset,
 			predictorState=predictorState,
@@ -1961,6 +2026,7 @@ function QBAim.new(ctx,parent)
 			clearPreviewForMissingBall("No ball held")
 			return
 		end
+		noteHeldBallState(heldBall,os.clock())
 
 		local modeKey=getModeKey(ctx)
 		local power=modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
@@ -2276,15 +2342,33 @@ function QBAim.new(ctx,parent)
 					local data=receiverData[player]
 
 					if not data then
-						data={pos=receiverRoot.Position,vel=Vector3.zero,rawVel=Vector3.zero,accel=Vector3.zero,confidence=PREDICTOR_CONFIDENCE_MIN,lastSeen=now,t=now,vh={},ph={},sdir=nil,sspeed=0,stime=0,src="none"}
-						receiverData[player]=data
+						data=seedReceiverData(player,receiverRoot,now)
 					end
 
 					local sampleDt=math.min(now-data.t,0.1)
 					if sampleDt>0 then
 						local positionVelocity=(receiverRoot.Position-data.pos)/sampleDt
 						local assemblyVelocity=receiverRoot.AssemblyLinearVelocity or Vector3.zero
-						local chosenVelocity=flat(assemblyVelocity).Magnitude>=CLEAN_MOVING_SPEED_MIN and assemblyVelocity or positionVelocity
+						local positionMoving=flat(positionVelocity).Magnitude>=CLEAN_MOVING_SPEED_MIN
+						local assemblyMoving=flat(assemblyVelocity).Magnitude>=CLEAN_MOVING_SPEED_MIN
+						local chosenVelocity=Vector3.zero
+
+						if positionMoving then
+							chosenVelocity=positionVelocity
+						elseif rootHasMoveInput(receiverRoot) and assemblyMoving and now>=possessionSettleUntil then
+							chosenVelocity=assemblyVelocity
+						end
+
+						if flat(chosenVelocity).Magnitude>=CLEAN_MOVING_SPEED_MIN then
+							data.movingSamples=(data.movingSamples or 0)+1
+						else
+							data.movingSamples=0
+						end
+
+						if (data.movingSamples or 0)<MOVING_CONFIRM_SAMPLES then
+							chosenVelocity=Vector3.zero
+						end
+
 						local previousRawVelocity=data.rawVel or Vector3.zero
 						local rawAcceleration=(chosenVelocity-previousRawVelocity)/sampleDt
 
@@ -2315,6 +2399,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		local now=os.clock()
+		local heldBall=nil
 		if FREEZE_PREVIEW_WHILE_BALL_RELEASED then
 			if previewFrozen then
 				if now-previewFreezeStarted<PREVIEW_POST_THROW_FREEZE_MIN then
@@ -2323,17 +2408,20 @@ function QBAim.new(ctx,parent)
 				previewFrozen=false
 			end
 
-			local holdingBall=hasHeldBallForPreview()
+			heldBall=getHeldBall()
+			local holdingBall=heldBall~=nil
 			if not holdingBall then
 				preview.ballMissingSince=preview.ballMissingSince or now
 				if now-preview.ballMissingSince<PREVIEW_MISSING_BALL_GRACE then
 					return
 				end
 
+				noteHeldBallState(nil,now)
 				clearPreviewForMissingBall()
 				return
 			end
 
+			noteHeldBallState(heldBall,now)
 			preview.ballMissingSince=nil
 		end
 
@@ -2351,7 +2439,7 @@ function QBAim.new(ctx,parent)
 
 		local previewQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local previewWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
-		local plan=buildPlan(trackedReceiver,nil,previewQBOffset,nil,previewWROffset)
+		local plan=buildPlan(trackedReceiver,nil,previewQBOffset,heldBall,previewWROffset)
 		if plan then
 			previewPlan(plan)
 		end
