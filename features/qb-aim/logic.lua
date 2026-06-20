@@ -639,6 +639,10 @@ function QBAim.new(ctx,parent)
 	local buildSlider=ctx.buildSlider
 	local state=ctx.State or {}
 	local mathCore=ctx.Page1QBAimMathModule or QBAimMathModule
+	local services=ctx.Services or {}
+	local playerCache=services.PlayerCache or ctx.PlayerCache
+	local ballTracker=services.BallTracker or ctx.BallTracker
+	local scheduler=ctx.Scheduler or services.Scheduler
 	local api={}
 	local enabled=false
 	local trackedReceiver=nil
@@ -690,6 +694,7 @@ function QBAim.new(ctx,parent)
 	local QB_Y_DRIFT_MIN=0.00
 	local QB_Y_DRIFT_MAX=0.35
 	local updateTargetHighlight=function() end
+	local schedulerJobs={}
 
 	if not mathCore then
 		error("Page1QBAimMathModule missing")
@@ -736,6 +741,15 @@ function QBAim.new(ctx,parent)
 		return conn
 	end
 
+	local function addSchedulerJob(kind,id,interval,fn)
+		if scheduler and type(scheduler.Register)=="function" and scheduler.Register(kind,id,interval,fn) then
+			table.insert(schedulerJobs,{kind=kind,id=id})
+			return true
+		end
+
+		return false
+	end
+
 	local function changed()
 		if ctx.onChanged then
 			pcall(ctx.onChanged,state)
@@ -744,6 +758,48 @@ function QBAim.new(ctx,parent)
 
 	local function isAlive()
 		return sectionFrame==nil or sectionFrame.Parent~=nil
+	end
+
+	local function currentPlayers()
+		if playerCache and type(playerCache.getPlayers)=="function" then
+			return playerCache:getPlayers()
+		end
+
+		return Players:GetPlayers()
+	end
+
+	local function characterOf(player)
+		if playerCache and type(playerCache.getCharacter)=="function" then
+			return playerCache:getCharacter(player)
+		end
+
+		return player and player.Character or nil
+	end
+
+	local function rootOfPlayer(player)
+		if playerCache and type(playerCache.getRoot)=="function" then
+			return playerCache:getRoot(player)
+		end
+
+		return player and player.Character and root(player.Character) or nil
+	end
+
+	local function teamOf(player)
+		if playerCache and type(playerCache.getTeamId)=="function" then
+			local teamID=playerCache:getTeamId(player)
+			if teamID then return teamID end
+		end
+
+		return getPlayerTeamID(player)
+	end
+
+	local function currentHeldBall()
+		if ballTracker and type(ballTracker.getHeldBall)=="function" then
+			local ball=ballTracker:getHeldBall(LP,35)
+			if ball then return ball end
+		end
+
+		return getHeldBall()
 	end
 
 	local function isAvailable()
@@ -982,8 +1038,8 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function clearTargetHighlights()
-		for _,player in ipairs(Players:GetPlayers()) do
-			local character=player.Character
+		for _,player in ipairs(currentPlayers()) do
+			local character=characterOf(player)
 			if character then
 				destroyQBAimHighlight(character)
 			end
@@ -993,7 +1049,7 @@ function QBAim.new(ctx,parent)
 	end
 
 	updateTargetHighlight=function()
-		local character=enabled and state.qbAimTargetHighlight~=false and trackedReceiver and trackedReceiver.Character or nil
+		local character=enabled and state.qbAimTargetHighlight~=false and trackedReceiver and characterOf(trackedReceiver) or nil
 		if not(character and canTargetReceiver(trackedReceiver)) then
 			if highlightedCharacter then
 				destroyQBAimHighlight(highlightedCharacter)
@@ -1054,9 +1110,9 @@ function QBAim.new(ctx,parent)
 
 	local function reseedReceiverTracking(now)
 		now=now or os.clock()
-		for _,player in ipairs(Players:GetPlayers()) do
-			if player~=LP and player.Character then
-				local receiverRoot=root(player.Character)
+		for _,player in ipairs(currentPlayers()) do
+			if player~=LP then
+				local receiverRoot=rootOfPlayer(player)
 				if receiverRoot then
 					seedReceiverData(player,receiverRoot,now)
 				end
@@ -1419,7 +1475,7 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function lockRoute(receiver)
-		local receiverRoot=receiver.Character and root(receiver.Character)
+		local receiverRoot=rootOfPlayer(receiver)
 		local data=receiverData[receiver]
 		if not(receiverRoot and data) then return nil end
 
@@ -1428,8 +1484,8 @@ function QBAim.new(ctx,parent)
 			return nil
 		end
 
-		local ball=getHeldBall()
-		local characterRoot=LP.Character and root(LP.Character)
+		local ball=currentHeldBall()
+		local characterRoot=rootOfPlayer(LP)
 		local qbPosition=(ball and ball.Position) or (characterRoot and characterRoot.Position) or receiverRoot.Position
 		local routeVelocity=velocity.Unit*MAX_RUN_SPEED
 
@@ -1737,13 +1793,12 @@ function QBAim.new(ctx,parent)
 
 	local function collectArcDefenderRoots(receiver)
 		local roots={}
-		local localTeam=getPlayerTeamID(LP)
+		local localTeam=teamOf(LP)
 
-		for _,player in ipairs(Players:GetPlayers()) do
-			local playerTeam=getPlayerTeamID(player)
+		for _,player in ipairs(currentPlayers()) do
+			local playerTeam=teamOf(player)
 			if player~=receiver and player~=LP and isValidGameTeamID(playerTeam) and isValidGameTeamID(localTeam) and playerTeam~=localTeam then
-				local character=Workspace:FindFirstChild(player.Name) or player.Character
-				local defenderRoot=root(character)
+				local defenderRoot=rootOfPlayer(player)
 				if defenderRoot then
 					roots[#roots+1]=defenderRoot
 				end
@@ -1877,7 +1932,7 @@ function QBAim.new(ctx,parent)
 		local detachedSince=nil
 
 		while os.clock()<deadline do
-			if not getHeldBall() then
+			if not currentHeldBall() then
 				detachedSince=detachedSince or os.clock()
 				if os.clock()-detachedSince>=THROW_RELEASE_CONFIRM_STABLE_TIME then
 					return true
@@ -1918,9 +1973,9 @@ function QBAim.new(ctx,parent)
 		end
 
 		local character=LP.Character
-		local qbRoot=root(character)
-		local ball=releaseBall or getHeldBall()
-		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
+		local qbRoot=rootOfPlayer(LP) or root(character)
+		local ball=releaseBall or currentHeldBall()
+		local receiverRoot=rootOfPlayer(receiver)
 		local data=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
 
 		if not(qbRoot and ball and receiverRoot and data) then
@@ -2052,7 +2107,7 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		local heldBall=getHeldBall()
+		local heldBall=currentHeldBall()
 		if not heldBall then
 			clearPreviewForMissingBall("No ball held")
 			return
@@ -2061,7 +2116,7 @@ function QBAim.new(ctx,parent)
 
 		local modeKey=getModeKey(ctx)
 		local power=modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
-		local receiverRoot=receiver and receiver.Character and root(receiver.Character)
+		local receiverRoot=rootOfPlayer(receiver)
 		if not receiverRoot then
 			setStatus("No receiver locked")
 			return
@@ -2145,8 +2200,8 @@ function QBAim.new(ctx,parent)
 		local best=nil
 		local bestDistance=math.huge
 
-		for _,player in ipairs(Players:GetPlayers()) do
-			local receiverRoot=player~=LP and player.Character and root(player.Character)
+		for _,player in ipairs(currentPlayers()) do
+			local receiverRoot=player~=LP and rootOfPlayer(player)
 			if receiverRoot and camera and canTargetReceiver(player) then
 				local screenPoint,onScreen=camera:WorldToViewportPoint(receiverRoot.Position)
 				if onScreen then
@@ -2160,7 +2215,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		if best then
-			ensureReceiverData(best,best.Character and root(best.Character))
+			ensureReceiverData(best,rootOfPlayer(best))
 			trackedReceiver=best
 			selectedRouteLock=lockRoute(best)
 			previewFrozen=false
@@ -2188,7 +2243,7 @@ function QBAim.new(ctx,parent)
 
 		syncControls()
 
-		if enabled and not getHeldBall() then
+		if enabled and not currentHeldBall() then
 			setStatus("Waiting for ball")
 		end
 	end
@@ -2270,6 +2325,13 @@ function QBAim.new(ctx,parent)
 	end
 
 	function api.Destroy()
+		if scheduler and type(scheduler.Unregister)=="function" then
+			for _,job in ipairs(schedulerJobs) do
+				scheduler.Unregister(job.kind,job.id)
+			end
+		end
+		table.clear(schedulerJobs)
+
 		for _,conn in ipairs(connections) do
 			safeDisconnect(conn)
 		end
@@ -2357,7 +2419,7 @@ function QBAim.new(ctx,parent)
 	updateQBYDriftVisuals()
 	updateQBDriftVisuals()
 
-	addConnection(RunService.Heartbeat:Connect(function(dt)
+	local function receiverTrackStep(dt)
 		if not(enabled and isAvailable()) then return end
 		if not isAlive() then return end
 
@@ -2366,9 +2428,9 @@ function QBAim.new(ctx,parent)
 		receiverTrackElapsed=0
 
 		local now=os.clock()
-		for _,player in ipairs(Players:GetPlayers()) do
-			if player~=LP and player.Character then
-				local receiverRoot=root(player.Character)
+		for _,player in ipairs(currentPlayers()) do
+			if player~=LP then
+				local receiverRoot=rootOfPlayer(player)
 				if receiverRoot then
 					local data=receiverData[player]
 
@@ -2419,9 +2481,13 @@ function QBAim.new(ctx,parent)
 				end
 			end
 		end
-	end))
+	end
 
-	addConnection(RunService.RenderStepped:Connect(function()
+	if not addSchedulerJob("Heartbeat","QBAimReceiverTrack",TRACK_SETTINGS.ReceiverInterval,receiverTrackStep) then
+		addConnection(RunService.Heartbeat:Connect(receiverTrackStep))
+	end
+
+	local function previewStep()
 		if not(enabled and isAvailable()) then
 			if highlightedCharacter then
 				clearTargetHighlights()
@@ -2439,7 +2505,7 @@ function QBAim.new(ctx,parent)
 				previewFrozen=false
 			end
 
-			heldBall=getHeldBall()
+			heldBall=currentHeldBall()
 			local holdingBall=heldBall~=nil
 			if not holdingBall then
 				preview.ballMissingSince=preview.ballMissingSince or now
@@ -2474,7 +2540,11 @@ function QBAim.new(ctx,parent)
 		if plan then
 			previewPlan(plan)
 		end
-	end))
+	end
+
+	if not addSchedulerJob("RenderStepped","QBAimPreview",0,previewStep) then
+		addConnection(RunService.RenderStepped:Connect(previewStep))
+	end
 
 	local function handleQBAimInput(input)
 		if not isAvailable() then return false end
@@ -2500,7 +2570,7 @@ function QBAim.new(ctx,parent)
 			return true
 		end
 
-		if not getHeldBall() then
+		if not currentHeldBall() then
 			clearPreviewForMissingBall("No ball held")
 			return true
 		end

@@ -158,6 +158,9 @@ function ESP.new(ctx,parent)
 	local THEME=ctx.THEME
 	local UI_STYLE=ctx.UI_STYLE
 	local scheduler=ctx.Scheduler
+	local services=ctx.Services or {}
+	local playerCache=services.PlayerCache or ctx.PlayerCache
+	local ballTracker=services.BallTracker or ctx.BallTracker
 	local api={}
 	local sectionBody=nil
 	local sectionFrame=nil
@@ -172,10 +175,35 @@ function ESP.new(ctx,parent)
 
 	local DefenseModule=ctx.ESPDefenseModule
 	local OffenseModule=ctx.ESPOffenseModule
+	local function currentPlayers()
+		if playerCache and type(playerCache.getPlayers)=="function" then
+			return playerCache:getPlayers()
+		end
+
+		return Players:GetPlayers()
+	end
+
+	local function trackedFootball(player)
+		if ballTracker and type(ballTracker.getFootballPartFromPlayer)=="function" then
+			local football=ballTracker:getFootballPartFromPlayer(player,35)
+			if football then return football end
+		end
+
+		return getFootballPartFromPlayer(player)
+	end
+
+	local function trackedTeamID(player)
+		if playerCache and type(playerCache.getTeamId)=="function" then
+			local teamID=playerCache:getTeamId(player)
+			if teamID then return teamID end
+		end
+
+		return getPlayerTeamID(player)
+	end
 
 	if DefenseModule and DefenseModule.new then
 		local ok,result=pcall(function()
-			return DefenseModule.new({THEME=THEME,UI_STYLE=UI_STYLE,State=state,safeDisconnect=safeDisconnect,Scheduler=scheduler})
+			return DefenseModule.new({THEME=THEME,UI_STYLE=UI_STYLE,State=state,safeDisconnect=safeDisconnect,Scheduler=scheduler,Services=services,PlayerCache=playerCache,BallTracker=ballTracker})
 		end)
 		defenseApi=ok and result or makeNoop()
 	else
@@ -184,7 +212,7 @@ function ESP.new(ctx,parent)
 
 	if OffenseModule and OffenseModule.new then
 		local ok,result=pcall(function()
-			return OffenseModule.new({THEME=THEME,UI_STYLE=UI_STYLE,State=state,safeDisconnect=safeDisconnect,Scheduler=scheduler})
+			return OffenseModule.new({THEME=THEME,UI_STYLE=UI_STYLE,State=state,safeDisconnect=safeDisconnect,Scheduler=scheduler,Services=services,PlayerCache=playerCache,BallTracker=ballTracker})
 		end)
 		offenseApi=ok and result or makeNoop()
 	else
@@ -200,7 +228,7 @@ function ESP.new(ctx,parent)
 	end
 
 	local function isDefensePossession()
-		local myTeam=getPlayerTeamID(me)
+		local myTeam=trackedTeamID(me)
 		local offenseTeam=getGameplayOffenseTeam()
 
 		if not isValidGameTeamID(myTeam) or not isValidGameTeamID(offenseTeam) then
@@ -211,14 +239,14 @@ function ESP.new(ctx,parent)
 	end
 
 	local function getPossessionMode()
-		if getFootballPartFromPlayer(me) then
+		if trackedFootball(me) then
 			return"offense"
 		end
 
-		local myTeam=getPlayerTeamID(me)
-		for _,player in ipairs(Players:GetPlayers()) do
-			if player~=me and getFootballPartFromPlayer(player) then
-				local theirTeam=getPlayerTeamID(player)
+		local myTeam=trackedTeamID(me)
+		for _,player in ipairs(currentPlayers()) do
+			if player~=me and trackedFootball(player) then
+				local theirTeam=trackedTeamID(player)
 				if isValidGameTeamID(myTeam) and isValidGameTeamID(theirTeam) then
 					return theirTeam==myTeam and"offense"or"defense"
 				end

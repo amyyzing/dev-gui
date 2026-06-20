@@ -425,33 +425,62 @@ local function destroyOwnedHighlight(character)
 	end
 end
 
-local function clearOwnedHighlights()
-	for _,player in ipairs(Players:GetPlayers()) do
-		local character=getLiveCharacter(player)
-		if character then
-			destroyOwnedHighlight(character)
-		end
-	end
-end
-
 function ESPDefense.new(ctx)
 	local THEME=ctx.THEME
 	local safeDisconnect=ctx.safeDisconnect
 	local scheduler=ctx.Scheduler
+	local services=ctx.Services or {}
+	local playerCache=services.PlayerCache or ctx.PlayerCache
+	local ballTracker=services.BallTracker or ctx.BallTracker
 	local api={}
 	local heartbeatConn=nil
 	local heartbeatElapsed=0
 	local running=false
 	local schedulerJobId="ESPDefense"
+	local function currentPlayers()
+		if playerCache and type(playerCache.getPlayers)=="function" then
+			return playerCache:getPlayers()
+		end
+
+		return Players:GetPlayers()
+	end
+
+	local function cachedCharacter(player)
+		if playerCache and type(playerCache.getCharacter)=="function" then
+			return playerCache:getCharacter(player)
+		end
+
+		return getLiveCharacter(player)
+	end
+
+	local function trackedCarrierData(players)
+		if ballTracker and type(ballTracker.getCarrier)=="function" then
+			local carrier=ballTracker:getCarrier(players)
+			if carrier and shouldHighlightPlayer(carrier.player) then
+				return carrier
+			end
+		end
+
+		return findBallCarrierData(players)
+	end
+
+	local function clearHighlights()
+		for _,player in ipairs(currentPlayers()) do
+			local character=cachedCharacter(player)
+			if character then
+				destroyOwnedHighlight(character)
+			end
+		end
+	end
 
 	local function rebuild()
 		if not running then
-			clearOwnedHighlights()
+			clearHighlights()
 			return
 		end
 
-		local players=Players:GetPlayers()
-		local carrierData=findBallCarrierData(players)
+		local players=currentPlayers()
+		local carrierData=trackedCarrierData(players)
 		local defenderRoots=collectDefenderRoots(players)
 		local blue=THEME.BLUE or Color3.fromRGB(70,140,255)
 		local red=THEME.RED or Color3.fromRGB(210,70,70)
@@ -459,7 +488,7 @@ function ESPDefense.new(ctx)
 
 		for _,player in ipairs(players) do
 			if player~=me then
-				local character=getLiveCharacter(player)
+				local character=cachedCharacter(player)
 				if character then
 					if shouldHighlightPlayer(player) then
 						if carrierData and player==carrierData.player then
@@ -511,7 +540,7 @@ function ESPDefense.new(ctx)
 		end
 		safeDisconnect(heartbeatConn)
 		heartbeatConn=nil
-		clearOwnedHighlights()
+		clearHighlights()
 	end
 
 	function api.Refresh()

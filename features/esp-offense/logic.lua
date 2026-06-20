@@ -193,10 +193,6 @@ local function getFootballPartFromPlayer(player)
 	return findFootballPart(character:FindFirstChild("GAMEOBJECTS"),rootPart,35)
 end
 
-local function hasFootball(player)
-	return getFootballPartFromPlayer(player)~=nil
-end
-
 local function shouldHighlightReceiver(player)
 	return player and player~=me and isSameTeam(player,me)
 end
@@ -402,38 +398,73 @@ local function destroyOwnedHighlight(character)
 	end
 end
 
-local function clearOwnedHighlights()
-	for _,player in ipairs(Players:GetPlayers()) do
-		local character=getLiveCharacter(player)
-		if character then
-			destroyOwnedHighlight(character)
-		end
-	end
-end
-
 function ESPOffense.new(ctx)
 	local THEME=ctx.THEME
 	local safeDisconnect=ctx.safeDisconnect
 	local scheduler=ctx.Scheduler
+	local services=ctx.Services or {}
+	local playerCache=services.PlayerCache or ctx.PlayerCache
+	local ballTracker=services.BallTracker or ctx.BallTracker
 	local api={}
 	local heartbeatConn=nil
 	local heartbeatElapsed=0
 	local running=false
 	local schedulerJobId="ESPOffense"
+	local function currentPlayers()
+		if playerCache and type(playerCache.getPlayers)=="function" then
+			return playerCache:getPlayers()
+		end
+
+		return Players:GetPlayers()
+	end
+
+	local function cachedCharacter(player)
+		if playerCache and type(playerCache.getCharacter)=="function" then
+			return playerCache:getCharacter(player)
+		end
+
+		return getLiveCharacter(player)
+	end
+
+	local function cachedRoot(player)
+		if playerCache and type(playerCache.getRoot)=="function" then
+			return playerCache:getRoot(player)
+		end
+
+		return getPlayerRoot(player)
+	end
+
+	local function trackedFootball(player)
+		if ballTracker and type(ballTracker.getFootballPartFromPlayer)=="function" then
+			local football=ballTracker:getFootballPartFromPlayer(player,35)
+			if football then return football end
+		end
+
+		return getFootballPartFromPlayer(player)
+	end
+
+	local function clearHighlights()
+		for _,player in ipairs(currentPlayers()) do
+			local character=cachedCharacter(player)
+			if character then
+				destroyOwnedHighlight(character)
+			end
+		end
+	end
 
 	local function rebuild()
 		if not running then
-			clearOwnedHighlights()
+			clearHighlights()
 			return
 		end
 
-		local qbRoot=getPlayerRoot(me)
-		if not(qbRoot and hasFootball(me)) then
-			clearOwnedHighlights()
+		local qbRoot=cachedRoot(me)
+		if not(qbRoot and trackedFootball(me)) then
+			clearHighlights()
 			return
 		end
 
-		local players=Players:GetPlayers()
+		local players=currentPlayers()
 		local catchY=getConfiguredThrowY(ctx)
 		local origin=getThrowOrigin(qbRoot,nil,catchY)
 		local defenderRoots=collectDefenderRoots(players)
@@ -442,7 +473,7 @@ function ESPOffense.new(ctx)
 
 		for _,player in ipairs(players) do
 			if player~=me then
-				local character=getLiveCharacter(player)
+				local character=cachedCharacter(player)
 				if character then
 					if shouldHighlightReceiver(player) then
 						if hasActiveQBAimHighlight(character) then
@@ -490,7 +521,7 @@ function ESPOffense.new(ctx)
 		end
 		safeDisconnect(heartbeatConn)
 		heartbeatConn=nil
-		clearOwnedHighlights()
+		clearHighlights()
 	end
 
 	function api.Refresh()

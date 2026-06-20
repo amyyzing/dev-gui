@@ -321,7 +321,9 @@ end}
 RuntimeScheduler={Register=function() return false end,SetEnabled=function() end,Unregister=function() end,Count=function() return 0 end}
 RuntimeStateStore={dirty=false,Get=function(_,_,default) return default end,Set=function(_,_,value) return value end}
 RuntimeThemeStore={Apply=function() end,RefreshObject=function() end}
-RuntimeServices={Janitor=RuntimeJanitor,Scheduler=RuntimeScheduler,StateStore=RuntimeStateStore,ThemeStore=RuntimeThemeStore}
+RuntimePlayerCache={getPlayers=function() return Players:GetPlayers() end,getCharacter=function(_,player) return player and (Workspace:FindFirstChild(player.Name) or player.Character) or nil end,getRoot=function(self,player) local character=self:getCharacter(player) return character and (character.PrimaryPart or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")) or nil end,getTeamId=function(_,player) local replicated=player and player:FindFirstChild("Replicated") local teamValue=replicated and replicated:FindFirstChild("TeamID") local ok,value=pcall(function() return teamValue and teamValue.Value end) return ok and value and tostring(value) or nil end}
+RuntimeBallTracker={getHeldBall=function() return nil end,getFootballPartFromPlayer=function() return nil end,getCarrier=function() return nil end}
+RuntimeServices={Janitor=RuntimeJanitor,Scheduler=RuntimeScheduler,StateStore=RuntimeStateStore,ThemeStore=RuntimeThemeStore,PlayerCache=RuntimePlayerCache,BallTracker=RuntimeBallTracker}
 
 function fmtNumber(n, decimals)
 	decimals=decimals or 2
@@ -509,6 +511,8 @@ MODULE_PATHS={
 	CoreScope="core/scope.lua",
 	CoreSignal="core/signal.lua",
 	CoreScheduler="core/scheduler.lua",
+	CorePlayerCache="core/player-cache.lua",
+	CoreBallTracker="core/ball-tracker.lua",
 	StateStore="state/store.lua",
 	DesignTokens="design/tokens.lua",
 	DesignThemeResolver="design/resolver.lua",
@@ -568,6 +572,8 @@ MODULE_GLOBAL_NAMES={
 	CoreScope="CoreScope",
 	CoreSignal="CoreSignal",
 	CoreScheduler="CoreScheduler",
+	CorePlayerCache="CorePlayerCache",
+	CoreBallTracker="CoreBallTracker",
 	StateStore="StateStore",
 	DesignTokens="DesignTokens",
 	DesignThemeResolver="DesignThemeResolver",
@@ -579,7 +585,7 @@ MODULE_GLOBAL_NAMES={
 	DesignThemeSakura="DesignThemeSakura",
 	GuiFusion="FusionModule"
 }
-STARTUP_MODULE_NAMES={"CoreScope","CoreSignal","CoreScheduler","StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura","GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimMath","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds","StrokeColourLogic","StrokeColour","HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor","PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord","DataSave"}
+STARTUP_MODULE_NAMES={"CoreScope","CoreSignal","CoreScheduler","CorePlayerCache","CoreBallTracker","StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura","GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimMath","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds","StrokeColourLogic","StrokeColour","HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor","PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord","DataSave"}
 OPTIONAL_MODULE_NAMES={}
 MAP_RELOAD_NAMES={"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds"}
 CUSTOMIZE_RELOAD_NAMES={"StrokeColourLogic","StrokeColour"}
@@ -1402,6 +1408,14 @@ function installRuntimeArchitecture()
 		end
 	end
 
+	if CorePlayerCache and CorePlayerCache.new then
+		RuntimePlayerCache=CorePlayerCache.new(Players,Workspace,RUNTIME_ROOT_SCOPE)
+	end
+
+	if CoreBallTracker and CoreBallTracker.new then
+		RuntimeBallTracker=CoreBallTracker.new(Players,Workspace,RuntimePlayerCache,RUNTIME_ROOT_SCOPE)
+	end
+
 	if StateStore and StateStore.new then
 		local store=StateStore.new()
 		RuntimeStateStore={dirty=false,Store=store}
@@ -1475,7 +1489,9 @@ function installRuntimeArchitecture()
 		Janitor=RuntimeJanitor,
 		Scheduler=RuntimeScheduler,
 		StateStore=RuntimeStateStore,
-		ThemeStore=RuntimeThemeStore
+		ThemeStore=RuntimeThemeStore,
+		PlayerCache=RuntimePlayerCache,
+		BallTracker=RuntimeBallTracker
 	}
 end
 
