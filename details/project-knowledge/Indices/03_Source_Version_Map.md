@@ -2,10 +2,13 @@
 
 | File | Bytes | SHA-256 prefix | Notes |
 |---|---:|---|---|
-| `features/qb-aim/logic.lua` | 79003 | `3de2728aaec8fbb4` | Current live repo source with semantic fixed server-origin constants, separate Server XZ/Y lead, stricter C2-Y validation, zero static offset hooks, and optional read-only origin diagnostics. |
-| `data-save/data-save.lua` | 38996 | `f370b1a8854c4673` | Runtime persistence source; saves semantic Server XZ/Y lead fields and restores with legacy drift fallback. |
-| `Patches/QBAim_Fixed_Server_Origin_Compensation.md` | 7565 | `d11500d3dcfe76cd` | Reviewed implementation guide for fixed server-origin compensation; helper removed after direct runtime implementation. |
-| `Indices/01_Constants_Index.md` | 4661 | `409a8f0824219c0d` | Current constants summary for fixed server-origin compensation. |
+| `features/qb-aim/logic.lua` | 84180 | `3f5e34d3ca0ba22c` | Current live repo source with fire-frame rebase/fresh solve, smaller server-origin lead defaults, Jump Y Lead, Server Y Offset, scaled receiver route speed, and optional read-only origin diagnostics. |
+| `data-save/data-save.lua` | 39017 | `76667f16f374a166` | Runtime persistence source; saves canonical Server XZ Lead, Jump Y Lead, and Server Y Offset fields while restoring legacy drift aliases. |
+| `runtime/loader-part-1.lua` | 69476 | `b53f6346a4c4847e` | Runtime bootstrap defaults with smaller QB server-origin lead, Server Y Offset state, and non-blocking optional service loading. |
+| `runtime/loader-part-2.lua` | 14632 | `3aa8ae08b4a8a694` | Page 1 default state with smaller QB server-origin lead and Server Y Offset state. |
+| `runtime/loader-part-5.lua` | 13587 | `80c5b05bf8c27989` | Data-save bridge including Server Y Offset setter. |
+| `Patches/QBAim_Fixed_Server_Origin_Compensation.md` | 8530 | `c37670c1c14d0b29` | Reviewed implementation guide for fixed server-origin compensation, updated for fire-frame rebase and canonical Y offset settings. |
+| `Indices/01_Constants_Index.md` | 5021 | `c5cc736250e64c8f` | Current constants summary for fixed server-origin compensation. |
 | `Runtime_Flow/04_Local_Arc_Rig_Center_C1_C2_C3.md` | 2100 | `bbbbc13d9e3c2569` | Current C2/C1/C3 runtime-flow note for C2-Y-only release reference. |
 | `FootballMath.md` | 22430 | `1536b0751ae8321b` | Decompiled game-source markdown; confirms gravity, power coefficient, pass velocity, and beam math. |
 | `Mechanics.md` | 5049 | `94609a84d5a01bd6` | Decompiled game-source markdown; confirms mechanics state, ball power defaults, and module load shape. |

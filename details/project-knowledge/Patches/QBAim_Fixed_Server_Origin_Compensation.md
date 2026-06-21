@@ -23,18 +23,20 @@ For this project, a fixed correction is preferable because it is deterministic, 
 
 ## Fixed model
 
-Use two independent timing values:
+Use two independent timing values plus one fixed vertical offset:
 
 ```text
-Server XZ Lead = horizontal server-position estimate
-Server Y Lead  = vertical server-position estimate
+Server XZ Lead  = horizontal server-position estimate
+Jump Y Lead     = airborne vertical timing estimate
+Server Y Offset = fixed standing/release-height offset
 ```
 
 Recommended starting values:
 
 ```text
-Server XZ Lead = 0.15 seconds
-Server Y Lead  = 0.15 seconds
+Server XZ Lead  = 0.06 seconds
+Jump Y Lead     = 0.08 seconds
+Server Y Offset = 0.00 studs
 ```
 
 The predicted release origin is:
@@ -47,8 +49,8 @@ predictedXZ = baseXZ + QB horizontal velocity * ServerXZLead
 
 predictedY =
     baseY
-    + QB vertical velocity * ServerYLead
-    - 0.5 * playerGravity * ServerYLead^2
+    + airborne(QB vertical velocity * JumpYLead - 0.5 * playerGravity * JumpYLead^2)
+    + ServerYOffset
 ```
 
 The key details are:
@@ -56,8 +58,8 @@ The key details are:
 1. C2 is used only as a Y reference.
 2. C2 XZ is not combined with horizontal drift.
 3. Horizontal drift uses actual assembly velocity, not keyboard-state detection.
-4. XZ and Y lead values are independently configurable.
-5. The same predicted origin is used by both preview and throw solving.
+4. XZ lead, airborne Y lead, and fixed Y offset are independently configurable.
+5. Preview locks receiver intent, then the fire-frame throw rebases or re-solves from the current predicted origin.
 6. No ping reading, feedback learning, or automatic calibration is used.
 
 ## Why C2 should only provide Y
@@ -90,21 +92,23 @@ Persist these semantic fields:
 
 ```text
 qbAim.serverOriginLeadXZ = Server XZ Lead
-qbAim.serverOriginLeadY  = Server Y Lead
+qbAim.serverOriginLeadY  = Jump Y Lead
+qbAim.serverOriginYOffset = Server Y Offset
 ```
 
 Keep the older internal state names temporarily for compatibility:
 
 ```text
 qbAimQBDrift  -> Server XZ Lead
-qbAimQBYDrift -> Server Y Lead
+qbAimQBYDrift -> Jump Y Lead
 ```
 
 The UI labels should make their real meanings clear:
 
 ```text
 Server XZ Lead
-Server Y Lead
+Jump Y Lead
+Server Y Offset
 ```
 
 When loading older settings:
@@ -115,19 +119,23 @@ if serverOriginLeadXZ is absent:
 
 if serverOriginLeadY is absent:
     read serverYLead or copy the loaded XZ lead
+
+if serverOriginYOffset is absent:
+    read serverYOffset or use 0
 ```
 
 This preserves existing users' tuning.
 
 ## Preview/throw consistency
 
-Both preview and locked throw plans must call the same origin function with the same fixed XZ and Y lead settings.
+The preview plan is built at keypress to keep the UI responsive and lock receiver intent. The actual remote target is corrected at the fire frame.
 
 Correct:
 
 ```text
-preview origin = fixed server-origin prediction
-throw origin   = fixed server-origin prediction
+keypress preview = fixed server-origin prediction + WR animation-window prediction
+fire-frame throw = current fixed server-origin prediction
+fire-frame path  = safe rebase to locked C1, or fresh solve if rebase speed error is too high
 ```
 
 Incorrect:
@@ -135,9 +143,10 @@ Incorrect:
 ```text
 preview origin = live C2
 throw origin   = football + drift
+throw target   = old keypress plan after the QB moved through the animation wait
 ```
 
-The preview can still be frozen when the throw begins. The important part is that the frozen plan and outgoing `Target` were produced from the same predicted origin.
+The preview can still be frozen when the throw begins. The important part is that the outgoing `Target` is produced from the origin that exists at remote-fire time, not only from the origin that existed at keypress.
 
 ## Suggested testing matrix
 
@@ -162,9 +171,10 @@ Tune in this order:
 
 ```text
 1. Server XZ Lead
-2. Server Y Lead
-3. Lead Adjust
-4. Peak Height
+2. Jump Y Lead
+3. Server Y Offset
+4. Lead Adjust
+5. Peak Height
 ```
 
 Do not tune receiver lead to compensate for a release-origin error.
@@ -174,8 +184,9 @@ Do not tune receiver lead to compensate for a release-origin error.
 A practical fixed range is:
 
 ```text
-Server XZ Lead: 0.12–0.18
-Server Y Lead:  0.10–0.18
+Server XZ Lead: 0.03-0.08
+Jump Y Lead:    0.03-0.10
+Server Y Offset: usually near 0
 ```
 
 If forward and backward movement errors have opposite signs, the time estimate is wrong.
@@ -206,7 +217,7 @@ Error XZ: horizontal distance between them
 Error Y: vertical difference
 ```
 
-It should log evidence only. It should not auto-calibrate `Server XZ Lead` or `Server Y Lead`.
+It should log evidence only. It should not auto-calibrate `Server XZ Lead`, `Jump Y Lead`, or `Server Y Offset`.
 
 ## What this does not solve
 
@@ -239,6 +250,7 @@ Then run the normal loader/module validation and test with:
 ```text
 Lead Adjust   = current preferred value
 Peak Height   = 14
-Server XZ Lead = 0.15
-Server Y Lead  = 0.15
+Server XZ Lead  = 0.06
+Jump Y Lead     = 0.08
+Server Y Offset = 0
 ```

@@ -710,10 +710,9 @@ function DataSave.new(ctx)
 				targetHighlight=getValue(ctx,"qbAimTargetHighlight",true),
 				leadDelay=getValue(ctx,"qbAimLeadDelay",0.38),
 				peakHeight=getValue(ctx,"qbAimPeakHeight",14.00),
-				serverOriginLeadXZ=getValue(ctx,"qbAimQBDrift",0.15),
-				serverOriginLeadY=getValue(ctx,"qbAimQBYDrift",getValue(ctx,"qbAimQBDrift",0.15)),
-				serverXZLead=getValue(ctx,"qbAimQBDrift",0.15),
-				serverYLead=getValue(ctx,"qbAimQBYDrift",getValue(ctx,"qbAimQBDrift",0.15)),
+				serverOriginLeadXZ=getValue(ctx,"qbAimQBDrift",0.06),
+				serverOriginLeadY=getValue(ctx,"qbAimQBYDrift",0.08),
+				serverOriginYOffset=getValue(ctx,"qbAimServerYOffset",0),
 			},
 
 			testing={
@@ -835,8 +834,9 @@ function DataSave.new(ctx)
 		if savedXZLead==nil then savedXZLead=legacyDrift end
 		local savedYLead=qbAim.serverOriginLeadY or qbAim.serverYLead
 		if savedYLead==nil then savedYLead=savedXZLead end
-		applyClamped(ctx,"setQBAimQBDrift","qbAimQBDrift",savedXZLead,0,0.25,0.15)
-		applyClamped(ctx,"setQBAimQBYDrift","qbAimQBYDrift",savedYLead,0,0.35,0.15)
+		applyClamped(ctx,"setQBAimQBDrift","qbAimQBDrift",savedXZLead,0,0.25,0.06)
+		applyClamped(ctx,"setQBAimQBYDrift","qbAimQBYDrift",savedYLead,0,0.35,0.08)
+		applyClamped(ctx,"setQBAimServerYOffset","qbAimServerYOffset",qbAim.serverOriginYOffset or qbAim.serverYOffset,-4,4,0)
 
 		local testing=settings.testing or {}
 		applyBoolean(ctx,"setTestingState","testingEnabled",testing.enabled)

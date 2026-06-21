@@ -65,8 +65,9 @@ qbAimSafeArc=true
 qbAimTargetHighlight=true
 qbAimLeadDelay=0.38
 qbAimPeakHeight=14.00
-qbAimQBDrift=0.15
-qbAimQBYDrift=0.15
+qbAimQBDrift=0.06
+qbAimQBYDrift=0.08
+qbAimServerYOffset=0
 
 DEFAULT_PRESETS={{key=Enum.KeyCode.Unknown, size=Vector3.new(0.1, 0.1, 0.1)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.7, 5.8, 1.65)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(3.1, 5.8, 1.70)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.52, 5.4, 1.41)}}
 
@@ -1303,6 +1304,10 @@ if not batchLoaded then
 end
 
 for _,name in ipairs(STARTUP_MODULE_NAMES) do
+	loadRemoteModuleStepByName(name)
+end
+
+for _,name in ipairs(OPTIONAL_MODULE_NAMES) do
 	loadRemoteModuleStepByName(name)
 end
 
