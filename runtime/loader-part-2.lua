@@ -319,9 +319,8 @@ PAGE1_DEFAULTS={
 	qbAimTargetHighlight=true,
 	qbAimLeadDelay=0.38,
 	qbAimPeakHeight=14.00,
-	qbAimQBDrift=0.06,
-	qbAimQBYDrift=0.08,
-	qbAimServerYOffset=0,
+	qbAimQBDrift=0.15,
+	qbAimQBYDrift=0.15,
 	testingEnabled=false,
 }
 

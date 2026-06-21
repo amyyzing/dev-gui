@@ -40,8 +40,8 @@ local QB_Y_RISE_FACTOR=0
 local QB_Y_FALL_FACTOR=0
 local QB_Y_MAX_CORRECTION=4.25
 local C2_GROUND_FALLBACK_MARGIN=2.50
-local C2_MAX_Y_ABOVE_ROOT=8.00
-local C2_MAX_Y_BELOW_ROOT=3.00
+local C2_MAX_ABOVE_BALL=8.00
+local C2_MAX_Y_DELTA=10.00
 local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
 local QB_RELEASE_EXTRAPOLATE_VERTICAL=true
 local QB_SERVER_HORIZONTAL_DEADZONE=0.75
@@ -98,21 +98,15 @@ local THROW_RELEASE_CONFIRM_STABLE_TIME=0.08
 -- Fixed server-origin prediction. These values are intentionally not auto-tuned.
 -- XZ estimates where the server will see the moving QB when it creates SpawnPos.
 -- Y remains separate because release height and jump motion have different error behavior.
-local QB_SERVER_ORIGIN_LEAD_XZ=0.06
-local QB_SERVER_ORIGIN_LEAD_Y=0.08
-local QB_SERVER_ORIGIN_Y_OFFSET_MAX=6.00
-local QB_SERVER_Y_OFFSET=0.00
-local QB_SERVER_FORWARD_OFFSET=0.00
-local QB_SERVER_SIDE_OFFSET=0.00
-local QB_ORIGIN_DIAGNOSTICS=false
-local FIRE_REBASE_SPEED_TOLERANCE=2.00
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0.15
+local QB_RELEASE_VERTICAL_DRIFT_TIME=0.15
+local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 local WR_RELEASE_PREDICT_TIME=THROW_ANIMATION_RELEASE_WAIT
 -- Key model:
 --   1. Keypress computes one locked plan.
---   2. Server origin is predicted from ball/root XZ plus physical QB velocity.
---   3. C2 is used only for release height, after a bounded Y validation.
---   4. WR is predicted through the full animation release window.
---   5. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
+--   2. C2/QB origin drifts by the same time on X, Y, and Z.
+--   3. WR is predicted through the full animation release window.
+--   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
 local PLAY_THROW_LOCAL_FALLBACK=false
 local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
 local ESP_HIGHLIGHT_NAME="MyESPHighlight"
@@ -143,10 +137,6 @@ local function clampMagnitude(v,maxMagnitude)
 	end
 
 	return v
-end
-
-local function distXZ(a,b)
-	return flat(a-b).Magnitude
 end
 
 local function root(character)
@@ -216,16 +206,14 @@ local function movementAwareRootVelocity(rootPart)
 end
 
 local function routeSpeed(speed)
+	-- Clean math rebuild: receivers are modeled as either stopped or moving at route speed.
+	-- This removes partial-speed formula drift and keeps the prediction equation simple.
 	local clamped=math.clamp(speed or 0,0,MAX_RUN_SPEED)
 	if clamped<CLEAN_MOVING_SPEED_MIN then
 		return 0
 	end
 
-	if clamped>=18.5 then
-		return MAX_RUN_SPEED
-	end
-
-	return math.min(clamped*1.08,MAX_RUN_SPEED)
+	return MAX_RUN_SPEED
 end
 
 local function getModeKey(ctx)
@@ -704,7 +692,6 @@ function QBAim.new(ctx,parent)
 	local qbYDriftFrame=nil
 	local qbYDriftBox=nil
 	local qbYDriftSliderControl=nil
-	local qbYOffsetControls={}
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
 	local PEAK_HEIGHT_MIN=8.00
@@ -713,8 +700,6 @@ function QBAim.new(ctx,parent)
 	local QB_DRIFT_MAX=0.25
 	local QB_Y_DRIFT_MIN=0.00
 	local QB_Y_DRIFT_MAX=0.35
-	local QB_Y_OFFSET_MIN=-4.00
-	local QB_Y_OFFSET_MAX=4.00
 	local updateTargetHighlight=function() end
 	local schedulerJobs={}
 
@@ -747,26 +732,20 @@ function QBAim.new(ctx,parent)
 	end
 
 	if state.qbAimQBDrift==nil then
-		state.qbAimQBDrift=QB_SERVER_ORIGIN_LEAD_XZ
+		state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
 	end
 
 	if state.qbAimQBYDrift==nil then
-		state.qbAimQBYDrift=QB_SERVER_ORIGIN_LEAD_Y
-	end
-
-	if state.qbAimServerYOffset==nil then
-		state.qbAimServerYOffset=QB_SERVER_Y_OFFSET
+		state.qbAimQBYDrift=tonumber(state.qbAimQBDrift) or QB_RELEASE_VERTICAL_DRIFT_TIME
 	end
 
 	WR_LEAD_DELAY=math.clamp(tonumber(state.qbAimLeadDelay) or WR_LEAD_DELAY,LEAD_DELAY_MIN,LEAD_DELAY_MAX)
 	WR_MAX_Y=math.clamp(tonumber(state.qbAimPeakHeight) or WR_MAX_Y,PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX)
-	QB_SERVER_ORIGIN_LEAD_XZ=math.clamp(tonumber(state.qbAimQBDrift) or QB_SERVER_ORIGIN_LEAD_XZ,QB_DRIFT_MIN,QB_DRIFT_MAX)
-	QB_SERVER_ORIGIN_LEAD_Y=math.clamp(tonumber(state.qbAimQBYDrift) or QB_SERVER_ORIGIN_LEAD_Y,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
-	QB_SERVER_Y_OFFSET=math.clamp(tonumber(state.qbAimServerYOffset) or QB_SERVER_Y_OFFSET,QB_Y_OFFSET_MIN,QB_Y_OFFSET_MAX)
+	QB_RELEASE_ORIGIN_DRIFT_TIME=math.clamp(tonumber(state.qbAimQBDrift) or QB_RELEASE_ORIGIN_DRIFT_TIME,QB_DRIFT_MIN,QB_DRIFT_MAX)
+	QB_RELEASE_VERTICAL_DRIFT_TIME=math.clamp(tonumber(state.qbAimQBYDrift) or QB_RELEASE_VERTICAL_DRIFT_TIME,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
 	state.qbAimPeakHeight=WR_MAX_Y
-	state.qbAimQBDrift=QB_SERVER_ORIGIN_LEAD_XZ
-	state.qbAimQBYDrift=QB_SERVER_ORIGIN_LEAD_Y
-	state.qbAimServerYOffset=QB_SERVER_Y_OFFSET
+	state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
+	state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
 	local function addConnection(conn)
 		table.insert(connections,conn)
 		return conn
@@ -895,31 +874,21 @@ function QBAim.new(ctx,parent)
 
 	local function updateQBDriftVisuals()
 		if qbDriftSliderControl then
-			qbDriftSliderControl.set(QB_SERVER_ORIGIN_LEAD_XZ)
+			qbDriftSliderControl.set(QB_RELEASE_ORIGIN_DRIFT_TIME)
 		end
 
 		if qbDriftBox then
-			qbDriftBox.Text=string.format("%.2f",QB_SERVER_ORIGIN_LEAD_XZ)
+			qbDriftBox.Text=string.format("%.2f",QB_RELEASE_ORIGIN_DRIFT_TIME)
 		end
 	end
 
 	local function updateQBYDriftVisuals()
 		if qbYDriftSliderControl then
-			qbYDriftSliderControl.set(QB_SERVER_ORIGIN_LEAD_Y)
+			qbYDriftSliderControl.set(QB_RELEASE_VERTICAL_DRIFT_TIME)
 		end
 
 		if qbYDriftBox then
-			qbYDriftBox.Text=string.format("%.2f",QB_SERVER_ORIGIN_LEAD_Y)
-		end
-	end
-
-	local function updateQBYOffsetVisuals()
-		if qbYOffsetControls.sliderControl then
-			qbYOffsetControls.sliderControl.set(QB_SERVER_Y_OFFSET)
-		end
-
-		if qbYOffsetControls.box then
-			qbYOffsetControls.box.Text=string.format("%.2f",QB_SERVER_Y_OFFSET)
+			qbYDriftBox.Text=string.format("%.2f",QB_RELEASE_VERTICAL_DRIFT_TIME)
 		end
 	end
 
@@ -947,8 +916,8 @@ function QBAim.new(ctx,parent)
 			return false
 		end
 
-		QB_SERVER_ORIGIN_LEAD_XZ=math.clamp(numberValue,QB_DRIFT_MIN,QB_DRIFT_MAX)
-		state.qbAimQBDrift=QB_SERVER_ORIGIN_LEAD_XZ
+		QB_RELEASE_ORIGIN_DRIFT_TIME=math.clamp(numberValue,QB_DRIFT_MIN,QB_DRIFT_MAX)
+		state.qbAimQBDrift=QB_RELEASE_ORIGIN_DRIFT_TIME
 		updateQBDriftVisuals()
 		if showStatus then
 			changed()
@@ -963,25 +932,9 @@ function QBAim.new(ctx,parent)
 			return false
 		end
 
-		QB_SERVER_ORIGIN_LEAD_Y=math.clamp(numberValue,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
-		state.qbAimQBYDrift=QB_SERVER_ORIGIN_LEAD_Y
+		QB_RELEASE_VERTICAL_DRIFT_TIME=math.clamp(numberValue,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
+		state.qbAimQBYDrift=QB_RELEASE_VERTICAL_DRIFT_TIME
 		updateQBYDriftVisuals()
-		if showStatus then
-			changed()
-		end
-		return true
-	end
-
-	local function setQBYOffset(value,showStatus)
-		local numberValue=tonumber(value)
-		if not numberValue then
-			updateQBYOffsetVisuals()
-			return false
-		end
-
-		QB_SERVER_Y_OFFSET=math.clamp(numberValue,QB_Y_OFFSET_MIN,QB_Y_OFFSET_MAX)
-		state.qbAimServerYOffset=QB_SERVER_Y_OFFSET
-		updateQBYOffsetVisuals()
 		if showStatus then
 			changed()
 		end
@@ -1269,7 +1222,6 @@ function QBAim.new(ctx,parent)
 		updatePeakHeightVisuals()
 		updateQBDriftVisuals()
 		updateQBYDriftVisuals()
-		updateQBYOffsetVisuals()
 		setTargetText()
 
 		if not isAvailable() then
@@ -1473,7 +1425,7 @@ function QBAim.new(ctx,parent)
 		local rawVelocity,source,rawSpeed=currentReceiverRawVelocity(data,receiverRoot,fallbackVelocity)
 		local routeVelocity=Vector3.zero
 		if rawVelocity.Magnitude>=CLEAN_MOVING_SPEED_MIN then
-			routeVelocity=rawVelocity.Unit*routeSpeed(rawSpeed or rawVelocity.Magnitude)
+			routeVelocity=rawVelocity.Unit*MAX_RUN_SPEED
 		end
 
 		local acceleration=clampMagnitude(flat(data and data.accel or Vector3.zero),PREDICTOR_ACCEL_MAX)
@@ -1507,14 +1459,13 @@ function QBAim.new(ctx,parent)
 		end
 
 		local direction=velocity.Unit
-		local speed=routeSpeed(velocity.Magnitude)
 		if data then
 			data.sdir=direction
-			data.sspeed=speed
+			data.sspeed=MAX_RUN_SPEED
 			data.stime=os.clock()
 			data.src=source
 		end
-		return direction,speed,source
+		return direction,MAX_RUN_SPEED,source
 	end
 
 	local function movementShape(origin,position,velocity)
@@ -1554,14 +1505,13 @@ function QBAim.new(ctx,parent)
 		local ball=currentHeldBall()
 		local characterRoot=rootOfPlayer(LP)
 		local qbPosition=(ball and ball.Position) or (characterRoot and characterRoot.Position) or receiverRoot.Position
-		local speed=routeSpeed(velocity.Magnitude)
-		local routeVelocity=velocity.Unit*speed
+		local routeVelocity=velocity.Unit*MAX_RUN_SPEED
 
 		return{
 			player=receiver,
 			createdAt=os.clock(),
 			routeDir=routeVelocity.Unit,
-			routeSpeed=speed,
+			routeSpeed=MAX_RUN_SPEED,
 			routeVelocity=routeVelocity,
 			stableSource=source,
 			shape=movementShape(qbPosition,receiverRoot.Position,routeVelocity),
@@ -1578,6 +1528,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		-- H locks receiver identity only. Direction always uses the current raw vector.
+		velocity=velocity.Unit*MAX_RUN_SPEED
 		state.routeVelocity=velocity
 		return velocity,movementShape(originPosition,receiverRoot.Position,velocity),state
 	end
@@ -1626,21 +1577,21 @@ function QBAim.new(ctx,parent)
 	local function origin(qbRoot,ball,xzReleaseOffset,yReleaseOffset)
 		xzReleaseOffset=xzReleaseOffset or 0
 		if yReleaseOffset==nil then
-			yReleaseOffset=QB_SERVER_ORIGIN_LEAD_Y
+			yReleaseOffset=QB_RELEASE_VERTICAL_DRIFT_TIME
 		end
 
 		local rootVelocity=movementAwareRootVelocity(qbRoot)
 		local fallbackPosition=ball and ball.Position or qbRoot.Position
-		local rootPosition=qbRoot.Position
 		local c2Pos=c2Position()
 		local y=fallbackPosition.Y
 
 		if c2Pos then
-			local rootY=rootPosition.Y
+			local rootY=qbRoot.Position.Y
 			local ballY=ball and ball.Position.Y or rootY
-			local lowerBound=math.min(rootY,ballY)-math.max(C2_MAX_Y_BELOW_ROOT,C2_GROUND_FALLBACK_MARGIN)
-			local upperBound=rootY+C2_MAX_Y_ABOVE_ROOT
-			local yValid=c2Pos.Y>=lowerBound and c2Pos.Y<=upperBound
+			local yDelta=math.min(math.abs(c2Pos.Y-rootY),math.abs(c2Pos.Y-ballY))
+			local yValid=yDelta<=C2_MAX_Y_DELTA
+				and c2Pos.Y>=math.min(rootY,ballY)-C2_GROUND_FALLBACK_MARGIN
+				and c2Pos.Y<=math.max(rootY,ballY)+C2_MAX_ABOVE_BALL
 
 			if yValid then
 				-- C2 belongs to the local preview rig. Keep its useful release height,
@@ -1655,26 +1606,16 @@ function QBAim.new(ctx,parent)
 			dz=rootVelocity.Z*xzReleaseOffset
 		end
 
-		if QB_SERVER_FORWARD_OFFSET~=0 or QB_SERVER_SIDE_OFFSET~=0 then
-			local forward=flat(qbRoot.CFrame.LookVector)
-			local right=flat(qbRoot.CFrame.RightVector)
-			forward=unit(forward,Vector3.new(0,0,-1))
-			right=unit(right,Vector3.new(1,0,0))
-			local staticOffset=forward*QB_SERVER_FORWARD_OFFSET+right*QB_SERVER_SIDE_OFFSET
-			dx=dx+staticOffset.X
-			dz=dz+staticOffset.Z
-		end
-
 		if QB_RELEASE_EXTRAPOLATE_VERTICAL and yReleaseOffset>0 then
 			local verticalVelocity=releaseVerticalVelocity(qbRoot,ball)
-			local airborne=math.abs(verticalVelocity)>=QB_AIRBORNE_VY_EPSILON or rootPosition.Y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON
+			local airborne=math.abs(verticalVelocity)>=QB_AIRBORNE_VY_EPSILON or qbRoot.Position.Y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON
 			if airborne then
 				local yOffset=verticalVelocity*yReleaseOffset-0.5*PLAYER_G*yReleaseOffset*yReleaseOffset
-				y=y+math.clamp(yOffset,-QB_SERVER_ORIGIN_Y_OFFSET_MAX,QB_SERVER_ORIGIN_Y_OFFSET_MAX)
+				y=y+math.clamp(yOffset,-QB_RELEASE_VERTICAL_DRIFT_MAX,QB_RELEASE_VERTICAL_DRIFT_MAX)
 			end
 		end
 
-		return Vector3.new(fallbackPosition.X+dx,y+QB_SERVER_Y_OFFSET+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),fallbackPosition.Z+dz)
+		return Vector3.new(fallbackPosition.X+dx,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),fallbackPosition.Z+dz)
 	end
 
 	local function ensureC1Marker()
@@ -2065,7 +2006,7 @@ function QBAim.new(ctx,parent)
 
 		releaseOffset=releaseOffset or 0
 		receiverReleaseOffset=receiverReleaseOffset==nil and releaseOffset or receiverReleaseOffset
-		yReleaseOffset=yReleaseOffset==nil and QB_SERVER_ORIGIN_LEAD_Y or yReleaseOffset
+		yReleaseOffset=yReleaseOffset==nil and QB_RELEASE_VERTICAL_DRIFT_TIME or yReleaseOffset
 		local originPosition=origin(qbRoot,ball,releaseOffset,yReleaseOffset)
 		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
@@ -2104,95 +2045,11 @@ function QBAim.new(ctx,parent)
 		}),ball
 	end
 
-	local function landingFrom(originPosition,velocity)
-		local discriminant=velocity.Y*velocity.Y+2*BALL_G*originPosition.Y
-		if discriminant<0 then
-			return nil,nil
-		end
-
-		local rootTerm=math.sqrt(discriminant)
-		local time=(velocity.Y+rootTerm)/BALL_G
-		if time<0 then
-			time=(-velocity.Y+rootTerm)/BALL_G
-		end
-
-		return originPosition+velocity*time+0.5*G*time*time,time
-	end
-
-	local function copyPlan(plan)
-		local out={}
-		for key,value in pairs(plan or {}) do
-			out[key]=value
-		end
-		return out
-	end
-
-	local function rebasePlanAtFire(oldPlan,currentOrigin,qbRoot)
-		if not(oldPlan and currentOrigin and oldPlan.time and oldPlan.target) then
-			return nil
-		end
-
-		local time=oldPlan.time
-		if time<=0 then
-			return nil
-		end
-
-		local ballSpeed=oldPlan.speed or MODEL_BALL_SPEED
-		local inheritedVelocity=flat(qbRoot and movementAwareRootVelocity(qbRoot) or Vector3.zero)*QB_INHERITANCE
-		local requiredVelocity=(oldPlan.target-currentOrigin-inheritedVelocity*time-0.5*G*time*time)/time
-		local requiredSpeed=requiredVelocity.Magnitude
-		if requiredSpeed<=1e-6 then
-			return nil
-		end
-
-		local speedError=math.abs(requiredSpeed-ballSpeed)
-		if speedError>FIRE_REBASE_SPEED_TOLERANCE then
-			return nil
-		end
-
-		local direction=requiredVelocity.Unit
-		local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
-		if angle<GLOBAL_MIN_ANGLE or angle>GLOBAL_MAX_ANGLE then
-			return nil
-		end
-
-		local throwVelocity=direction*ballSpeed
-		local worldVelocity=throwVelocity+inheritedVelocity
-		local catchPosition=currentOrigin+worldVelocity*time+0.5*G*time*time
-		local landingPosition,landingTime=landingFrom(currentOrigin,worldVelocity)
-		local targetMiss=(catchPosition-oldPlan.target).Magnitude
-		local plan=copyPlan(oldPlan)
-
-		plan.origin=currentOrigin
-		plan.requiredVelocity=requiredVelocity
-		plan.requiredSpeed=requiredSpeed
-		plan.direction=direction
-		plan.throwVelocity=throwVelocity
-		plan.worldVelocity=worldVelocity
-		plan.velocity=worldVelocity
-		plan.aimPoint=currentOrigin+direction*AIM_SCALE
-		plan.angleDeg=angle
-		plan.preferredAngle=angle
-		plan.speedError=speedError
-		plan.totalErr=targetMiss
-		plan.targetMiss=targetMiss
-		plan.missEstimate=targetMiss
-		plan.ballAtCatch=catchPosition
-		plan.verticalVelocityAtCatch=worldVelocity.Y+G.Y*time
-		plan.landing=landingPosition
-		plan.landingTime=landingTime
-		plan.flatDistNow=distXZ(currentOrigin,oldPlan.target)
-		plan.fireFrameRebased=true
-		plan.fireFrameSpeedError=speedError
-		plan.leadInfo=nil
-
-		return plan
-	end
-
 	local function buildReleasePlan(receiver,ballPower,releaseBall,lockedPlan)
 		-- Target-latch / delayed-remote solver.
 		-- The preview arc locks at keypress, but the remote appears shortly before release.
-		-- Keep receiver intent locked, then rebase/re-solve from the fire-frame origin.
+		-- Keep the keypress plan frozen during animation, then send that same world Target.
+		-- Do not recompute from the future QB point and do not fire immediately.
 		if THROW_TARGET_FIRE_IMMEDIATELY then
 			if lockedPlan then
 				previewPlan(lockedPlan)
@@ -2201,7 +2058,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		if THROW_ANIMATION_RELEASE_WAIT<=0 then
-			return lockedPlan or buildPlan(receiver,ballPower,QB_SERVER_ORIGIN_LEAD_XZ,releaseBall,0,QB_SERVER_ORIGIN_LEAD_Y)
+			return lockedPlan or buildPlan(receiver,ballPower,0,releaseBall)
 		end
 
 		local endAt=os.clock()+THROW_ANIMATION_RELEASE_WAIT
@@ -2210,7 +2067,7 @@ function QBAim.new(ctx,parent)
 		while os.clock()<fireAt do
 			if THROW_TARGET_LOCK_PREVIEW_LIVE then
 				local remaining=math.max(endAt-os.clock(),0)
-				local livePlan=buildPlan(receiver,ballPower,QB_SERVER_ORIGIN_LEAD_XZ,releaseBall,remaining,QB_SERVER_ORIGIN_LEAD_Y)
+				local livePlan=buildPlan(receiver,ballPower,remaining,releaseBall,remaining)
 				if livePlan then
 					previewPlan(livePlan)
 				end
@@ -2221,77 +2078,7 @@ function QBAim.new(ctx,parent)
 			RunService.Heartbeat:Wait()
 		end
 
-		local character=LP.Character
-		local qbRoot=rootOfPlayer(LP) or root(character)
-		local fireBall=currentHeldBall() or releaseBall
-		local currentOrigin=(qbRoot and fireBall) and origin(qbRoot,fireBall,QB_SERVER_ORIGIN_LEAD_XZ,QB_SERVER_ORIGIN_LEAD_Y) or nil
-		local rebasedPlan=rebasePlanAtFire(lockedPlan,currentOrigin,qbRoot)
-		if rebasedPlan then
-			return rebasedPlan,fireBall
-		end
-
-		return buildPlan(receiver,ballPower,QB_SERVER_ORIGIN_LEAD_XZ,fireBall,0,QB_SERVER_ORIGIN_LEAD_Y)
-	end
-
-	local function noteOriginDiagnostic(plan,phase,spawnPos)
-		if not QB_ORIGIN_DIAGNOSTICS then return end
-		if not(plan and plan.origin) then return end
-
-		local diagnostic={
-			time=os.clock(),
-			phase=phase,
-			predictedOrigin=plan.origin,
-			target=plan.target,
-			aimPoint=plan.aimPoint,
-			serverSpawnPos=spawnPos,
-		}
-
-		if spawnPos then
-			local delta=spawnPos-plan.origin
-			diagnostic.errorXZ=flat(delta).Magnitude
-			diagnostic.errorY=delta.Y
-			warn(string.format(
-				"QB origin diagnostic [%s]: errorXZ=%.2f, errorY=%.2f",
-				tostring(phase),
-				diagnostic.errorXZ,
-				diagnostic.errorY
-			))
-		end
-
-		QBAim._lastOriginDiagnostic=diagnostic
-	end
-
-	local function noteUpdateFootballDiagnostic(...)
-		if not QB_ORIGIN_DIAGNOSTICS then return end
-		local last=QBAim._lastOriginDiagnostic
-		if not(last and last.predictedOrigin) then return end
-
-		for _,arg in ipairs({...}) do
-			if type(arg)=="table" and typeof(arg.SpawnPos)=="Vector3" then
-				local delta=arg.SpawnPos-last.predictedOrigin
-				local diagnostic={
-					time=os.clock(),
-					phase=arg.LaunchTime and "server-spawn" or "update-football",
-					predictedOrigin=last.predictedOrigin,
-					target=last.target,
-					aimPoint=last.aimPoint,
-					serverSpawnPos=arg.SpawnPos,
-					errorXZ=flat(delta).Magnitude,
-					errorY=delta.Y,
-					power=arg.Power,
-					launchTime=arg.LaunchTime,
-				}
-
-				QBAim._lastOriginDiagnostic=diagnostic
-				warn(string.format(
-					"QB origin diagnostic [%s]: errorXZ=%.2f, errorY=%.2f",
-					diagnostic.phase,
-					diagnostic.errorXZ,
-					diagnostic.errorY
-				))
-				return
-			end
-		end
+		return lockedPlan,releaseBall
 	end
 
 	local function fireGameplayThrow(plan)
@@ -2300,7 +2087,6 @@ function QBAim.new(ctx,parent)
 			return false,"Gameplay ReEvent missing"
 		end
 
-		noteOriginDiagnostic(plan,"gameplay-fire")
 		reEvent:FireServer("Mechanics","ThrowBall",{
 			Target=plan.aimPoint,
 			AutoThrow=false,
@@ -2318,7 +2104,6 @@ function QBAim.new(ctx,parent)
 			return false,"Squads MiniGames ReEvent missing"
 		end
 
-		noteOriginDiagnostic(plan,"squads-fire")
 		reEvent:FireServer("Mechanics","ThrowBall",{
 			Target=plan.aimPoint,
 			AutoThrow=false,
@@ -2362,10 +2147,10 @@ function QBAim.new(ctx,parent)
 
 		-- Lock one plan at keypress. Keep animation-to-fire timing at 0.2666s,
 		-- but do not use that whole value to move C2/origin. The QB/ball release
-		-- origin gets a small server-origin lead; the WR prediction uses the full
+		-- origin gets a small measured drift; the WR prediction uses the full
 		-- animation window.
-		local lockedQBOffset=QB_SERVER_ORIGIN_LEAD_XZ+THROW_TARGET_LOCK_EXTRA_DELAY
-		local lockedQBYOffset=QB_SERVER_ORIGIN_LEAD_Y+THROW_TARGET_LOCK_EXTRA_DELAY
+		local lockedQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		local lockedQBYOffset=QB_RELEASE_VERTICAL_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local lockedWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		throwInProgress=true
 
@@ -2397,7 +2182,6 @@ function QBAim.new(ctx,parent)
 			return
 		end
 
-		previewPlan(plan)
 		if planCanBeDefended(plan,receiver) then
 			previewPlan(plan)
 			releaseThrowLock()
@@ -2554,15 +2338,10 @@ function QBAim.new(ctx,parent)
 		setQBYDrift(value,fire~=false)
 	end
 
-	function api.SetQBYOffset(value,fire)
-		setQBYOffset(value,fire~=false)
-	end
-
 	function api.Refresh()
 		syncControls()
 		updateQBDriftVisuals()
 		updateQBYDriftVisuals()
-		updateQBYOffsetVisuals()
 	end
 
 	function api.Reset()
@@ -2634,14 +2413,11 @@ function QBAim.new(ctx,parent)
 		peakHeightSliderControl=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
 			api.SetPeakHeight(value,true)
 		end)
-		qbDriftSliderControl=buildSlider(sectionBody,"Server XZ Lead",QB_DRIFT_MIN,QB_DRIFT_MAX,QB_SERVER_ORIGIN_LEAD_XZ,2,function(value)
+		qbDriftSliderControl=buildSlider(sectionBody,"Server XZ Lead",QB_DRIFT_MIN,QB_DRIFT_MAX,QB_RELEASE_ORIGIN_DRIFT_TIME,2,function(value)
 			api.SetQBDrift(value,true)
 		end)
-		qbYDriftSliderControl=buildSlider(sectionBody,"Jump Y Lead",QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX,QB_SERVER_ORIGIN_LEAD_Y,2,function(value)
+		qbYDriftSliderControl=buildSlider(sectionBody,"Server Y Lead",QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX,QB_RELEASE_VERTICAL_DRIFT_TIME,2,function(value)
 			api.SetQBYDrift(value,true)
-		end)
-		qbYOffsetControls.sliderControl=buildSlider(sectionBody,"Server Y Offset",QB_Y_OFFSET_MIN,QB_Y_OFFSET_MAX,QB_SERVER_Y_OFFSET,2,function(value)
-			api.SetQBYOffset(value,true)
 		end)
 	else
 		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
@@ -2657,22 +2433,16 @@ function QBAim.new(ctx,parent)
 			setPeakHeight(peakHeightBox.Text,true)
 		end))
 		qbDriftFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
-		qbDriftBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",QB_SERVER_ORIGIN_LEAD_XZ),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},qbDriftFrame)
+		qbDriftBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",QB_RELEASE_ORIGIN_DRIFT_TIME),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},qbDriftFrame)
 		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="Server XZ Lead",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbDriftFrame)
 		addConnection(qbDriftBox.FocusLost:Connect(function()
 			setQBDrift(qbDriftBox.Text,true)
 		end))
 		qbYDriftFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
-		qbYDriftBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",QB_SERVER_ORIGIN_LEAD_Y),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},qbYDriftFrame)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="Jump Y Lead",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbYDriftFrame)
+		qbYDriftBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",QB_RELEASE_VERTICAL_DRIFT_TIME),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},qbYDriftFrame)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="Server Y Lead",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbYDriftFrame)
 		addConnection(qbYDriftBox.FocusLost:Connect(function()
 			setQBYDrift(qbYDriftBox.Text,true)
-		end))
-		qbYOffsetControls.frame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
-		qbYOffsetControls.box=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",QB_SERVER_Y_OFFSET),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},qbYOffsetControls.frame)
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-80,0,24),Text="Server Y Offset",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},qbYOffsetControls.frame)
-		addConnection(qbYOffsetControls.box.FocusLost:Connect(function()
-			setQBYOffset(qbYOffsetControls.box.Text,true)
 		end))
 	end
 
@@ -2680,7 +2450,6 @@ function QBAim.new(ctx,parent)
 	updatePeakHeightVisuals()
 	updateQBDriftVisuals()
 	updateQBYDriftVisuals()
-	updateQBYOffsetVisuals()
 	updateQBDriftVisuals()
 
 	local function receiverTrackStep(dt)
@@ -2798,8 +2567,8 @@ function QBAim.new(ctx,parent)
 		if now-preview.last<ARC_SETTINGS.UpdateInterval then return end
 		preview.last=now
 
-		local previewQBOffset=QB_SERVER_ORIGIN_LEAD_XZ+THROW_TARGET_LOCK_EXTRA_DELAY
-		local previewQBYOffset=QB_SERVER_ORIGIN_LEAD_Y+THROW_TARGET_LOCK_EXTRA_DELAY
+		local previewQBOffset=QB_RELEASE_ORIGIN_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
+		local previewQBYOffset=QB_RELEASE_VERTICAL_DRIFT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local previewWROffset=WR_RELEASE_PREDICT_TIME+THROW_TARGET_LOCK_EXTRA_DELAY
 		local plan=buildPlan(trackedReceiver,nil,previewQBOffset,heldBall,previewWROffset,previewQBYOffset)
 		if plan then
@@ -2855,23 +2624,6 @@ function QBAim.new(ctx,parent)
 		if processed then return end
 		handleQBAimInput(input)
 	end))
-
-	if QB_ORIGIN_DIAGNOSTICS then
-		local rootReEvent=ReplicatedStorage:FindFirstChild("ReEvent")
-		if rootReEvent and rootReEvent:IsA("RemoteEvent") then
-			addConnection(rootReEvent.OnClientEvent:Connect(noteUpdateFootballDiagnostic))
-		end
-
-		local gameReEvent=getGameReEvent()
-		if gameReEvent and gameReEvent~=rootReEvent then
-			addConnection(gameReEvent.OnClientEvent:Connect(noteUpdateFootballDiagnostic))
-		end
-
-		local squadsReEvent=getSquadsReEvent()
-		if squadsReEvent and squadsReEvent~=rootReEvent and squadsReEvent~=gameReEvent then
-			addConnection(squadsReEvent.OnClientEvent:Connect(noteUpdateFootballDiagnostic))
-		end
-	end
 
 	cleanupC3InfoGui()
 	clearTargetHighlights()

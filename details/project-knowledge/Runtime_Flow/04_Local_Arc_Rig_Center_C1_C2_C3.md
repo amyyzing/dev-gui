@@ -17,7 +17,7 @@ originalCenter()
 
 | Attachment | Current restored role |
 |---|---|
-| `C2` | Original `Center.C2.Y` is used as release-height reference after bounded Y validation. Cloned `C2` is visual-only. |
+| `C2` | Original `Center.C2.Y` is used as release-height reference if near the ball. Cloned `C2` is visual-only. |
 | `C1` | Catch/intercept marker for preview. Created on the clone if missing. |
 | `C3` | Preview beam endpoint, currently placed at the same catch point as C1. |
 | `Beam` | Preview curve wired as cloned `C2 -> C3`. |
@@ -35,17 +35,13 @@ local function c2Y()
 end
 ```
 
-`origin()` starts from ball/root XZ and only replaces Y with original `C2.Y` when it stays within the root-relative bounds:
+`origin()` starts from ball/root position and only replaces Y with `c2Y()` when it is near the ball:
 
 ```lua
-local lowerBound = math.min(rootY, ballY) - math.max(C2_MAX_Y_BELOW_ROOT, C2_GROUND_FALLBACK_MARGIN)
-local upperBound = rootY + C2_MAX_Y_ABOVE_ROOT
-if c2Pos.Y >= lowerBound and c2Pos.Y <= upperBound then
-    y = c2Pos.Y
+if centerY and centerY >= baseY - C2_GROUND_FALLBACK_MARGIN and centerY <= baseY + C2_MAX_ABOVE_BALL then
+    y = centerY
 end
 ```
-
-The live solver does not use original or cloned `C2.X/Z` as launch authority. Horizontal server-origin prediction comes from ball/root XZ plus physical QB velocity times `Server XZ Lead`.
 
 ## Preview clone rule
 

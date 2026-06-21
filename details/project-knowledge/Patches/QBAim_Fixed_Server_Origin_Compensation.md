@@ -23,20 +23,18 @@ For this project, a fixed correction is preferable because it is deterministic, 
 
 ## Fixed model
 
-Use two independent timing values plus one fixed vertical offset:
+Use two independent timing values:
 
 ```text
-Server XZ Lead  = horizontal server-position estimate
-Jump Y Lead     = airborne vertical timing estimate
-Server Y Offset = fixed standing/release-height offset
+Server XZ Lead = horizontal server-position estimate
+Server Y Lead  = vertical server-position estimate
 ```
 
 Recommended starting values:
 
 ```text
-Server XZ Lead  = 0.06 seconds
-Jump Y Lead     = 0.08 seconds
-Server Y Offset = 0.00 studs
+Server XZ Lead = 0.15 seconds
+Server Y Lead  = 0.15 seconds
 ```
 
 The predicted release origin is:
@@ -49,8 +47,8 @@ predictedXZ = baseXZ + QB horizontal velocity * ServerXZLead
 
 predictedY =
     baseY
-    + airborne(QB vertical velocity * JumpYLead - 0.5 * playerGravity * JumpYLead^2)
-    + ServerYOffset
+    + QB vertical velocity * ServerYLead
+    - 0.5 * playerGravity * ServerYLead^2
 ```
 
 The key details are:
@@ -58,8 +56,8 @@ The key details are:
 1. C2 is used only as a Y reference.
 2. C2 XZ is not combined with horizontal drift.
 3. Horizontal drift uses actual assembly velocity, not keyboard-state detection.
-4. XZ lead, airborne Y lead, and fixed Y offset are independently configurable.
-5. Preview locks receiver intent, then the fire-frame throw rebases or re-solves from the current predicted origin.
+4. XZ and Y lead values are independently configurable.
+5. The same predicted origin is used by both preview and throw solving.
 6. No ping reading, feedback learning, or automatic calibration is used.
 
 ## Why C2 should only provide Y
@@ -88,54 +86,38 @@ Horizontal speed cap = 24 studs/s
 
 ## Settings and persistence
 
-Persist these semantic fields:
+Persist these two fields:
 
 ```text
-qbAim.serverOriginLeadXZ = Server XZ Lead
-qbAim.serverOriginLeadY  = Jump Y Lead
-qbAim.serverOriginYOffset = Server Y Offset
+qbAimQBDrift  = Server XZ Lead
+qbAimQBYDrift = Server Y Lead
 ```
 
-Keep the older internal state names temporarily for compatibility:
-
-```text
-qbAimQBDrift  -> Server XZ Lead
-qbAimQBYDrift -> Jump Y Lead
-```
-
-The UI labels should make their real meanings clear:
+Keep the old names temporarily for compatibility. The UI labels should make their real meanings clear:
 
 ```text
 Server XZ Lead
-Jump Y Lead
-Server Y Offset
+Server Y Lead
 ```
 
 When loading older settings:
 
 ```text
-if serverOriginLeadXZ is absent:
-    read serverXZLead, qbDrift, or xyzDrift
-
-if serverOriginLeadY is absent:
-    read serverYLead or copy the loaded XZ lead
-
-if serverOriginYOffset is absent:
-    read serverYOffset or use 0
+if Server Y Lead is absent:
+    copy the saved old QB drift value
 ```
 
 This preserves existing users' tuning.
 
 ## Preview/throw consistency
 
-The preview plan is built at keypress to keep the UI responsive and lock receiver intent. The actual remote target is corrected at the fire frame.
+Both preview and locked throw plans must call the same origin function with the same fixed XZ and Y lead settings.
 
 Correct:
 
 ```text
-keypress preview = fixed server-origin prediction + WR animation-window prediction
-fire-frame throw = current fixed server-origin prediction
-fire-frame path  = safe rebase to locked C1, or fresh solve if rebase speed error is too high
+preview origin = fixed server-origin prediction
+throw origin   = fixed server-origin prediction
 ```
 
 Incorrect:
@@ -143,10 +125,9 @@ Incorrect:
 ```text
 preview origin = live C2
 throw origin   = football + drift
-throw target   = old keypress plan after the QB moved through the animation wait
 ```
 
-The preview can still be frozen when the throw begins. The important part is that the outgoing `Target` is produced from the origin that exists at remote-fire time, not only from the origin that existed at keypress.
+The preview can still be frozen when the throw begins. The important part is that the frozen plan and outgoing `Target` were produced from the same predicted origin.
 
 ## Suggested testing matrix
 
@@ -171,10 +152,9 @@ Tune in this order:
 
 ```text
 1. Server XZ Lead
-2. Jump Y Lead
-3. Server Y Offset
-4. Lead Adjust
-5. Peak Height
+2. Server Y Lead
+3. Lead Adjust
+4. Peak Height
 ```
 
 Do not tune receiver lead to compensate for a release-origin error.
@@ -184,9 +164,8 @@ Do not tune receiver lead to compensate for a release-origin error.
 A practical fixed range is:
 
 ```text
-Server XZ Lead: 0.03-0.08
-Jump Y Lead:    0.03-0.10
-Server Y Offset: usually near 0
+Server XZ Lead: 0.12–0.18
+Server Y Lead:  0.10–0.18
 ```
 
 If forward and backward movement errors have opposite signs, the time estimate is wrong.
@@ -195,7 +174,7 @@ If both directions have the same world-space sideways bias, that suggests a stat
 
 ## Optional static offsets
 
-The runtime includes these hooks at zero by default. If repeated tests show a consistent bias independent of movement direction, adjust them only after timing is stable:
+Do not add these by default. If repeated tests show a consistent bias independent of movement direction, add:
 
 ```text
 Server Forward Offset
@@ -203,21 +182,6 @@ Server Side Offset
 ```
 
 Those should be aim-relative or character-relative constants and should remain fixed. They should never be learned automatically.
-
-## Optional read-only diagnostics
-
-The runtime includes a disabled-by-default diagnostic flag. When enabled in source, it records the predicted origin used for the outgoing throw and compares it with incoming `UpdateFootball` payloads that expose `SpawnPos`.
-
-This is intentionally read-only:
-
-```text
-Predicted origin: client-side solver origin
-Server SpawnPos: incoming UpdateFootball SpawnPos
-Error XZ: horizontal distance between them
-Error Y: vertical difference
-```
-
-It should log evidence only. It should not auto-calibrate `Server XZ Lead`, `Jump Y Lead`, or `Server Y Offset`.
 
 ## What this does not solve
 
@@ -232,25 +196,40 @@ This model cannot guarantee exact alignment during:
 
 That is acceptable. The purpose is stable near-alignment under ordinary conditions.
 
-## Implementation status
+## Applying the implementation
 
-The runtime implementation is applied directly in the project files. There is no separate patch helper to run; verify the live files instead.
+A strict source-editing helper is included at:
 
-From the repository root, inspect the diff:
+```text
+details/project-knowledge/Patches/apply_qb_aim_fixed_server_origin.py
+```
+
+From the repository root, validate the expected source contexts:
+
+```bash
+python details/project-knowledge/Patches/apply_qb_aim_fixed_server_origin.py --check
+```
+
+Apply the implementation:
+
+```bash
+python details/project-knowledge/Patches/apply_qb_aim_fixed_server_origin.py --apply
+```
+
+Then inspect the diff:
 
 ```bash
 git diff --check
 git diff -- features/qb-aim/logic.lua runtime/loader-part-1.lua runtime/loader-part-2.lua runtime/loader-part-5.lua data-save/data-save.lua
 ```
 
-The old strict helper was removed after the runtime files were updated directly, because exact source replacements became stale once the implementation used semantic server-origin names.
+The helper stops instead of guessing if the current source no longer matches the reviewed revision.
 
 Then run the normal loader/module validation and test with:
 
 ```text
 Lead Adjust   = current preferred value
 Peak Height   = 14
-Server XZ Lead  = 0.06
-Jump Y Lead     = 0.08
-Server Y Offset = 0
+Server XZ Lead = 0.15
+Server Y Lead  = 0.15
 ```

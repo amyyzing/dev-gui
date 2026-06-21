@@ -77,32 +77,22 @@ local QB_Y_RISE_FACTOR=0
 local QB_Y_FALL_FACTOR=0
 local QB_Y_MAX_CORRECTION=4.25
 local C2_GROUND_FALLBACK_MARGIN=2.50
-local C2_MAX_Y_ABOVE_ROOT=8.00
-local C2_MAX_Y_BELOW_ROOT=3.00
+local C2_MAX_ABOVE_BALL=8.00
+local C2_MAX_Y_DELTA=10.00
 local QB_RELEASE_EXTRAPOLATE_HORIZONTAL=true
 local QB_RELEASE_EXTRAPOLATE_VERTICAL=true
 local QB_SERVER_HORIZONTAL_DEADZONE=0.75
 local QB_SERVER_HORIZONTAL_SPEED_MAX=24
-local QB_SERVER_ORIGIN_LEAD_XZ=0.06
-local QB_SERVER_ORIGIN_LEAD_Y=0.08
-local QB_SERVER_ORIGIN_Y_OFFSET_MAX=6.00
-local QB_SERVER_Y_OFFSET=0.00
-local QB_SERVER_FORWARD_OFFSET=0.00
-local QB_SERVER_SIDE_OFFSET=0.00
-local QB_ORIGIN_DIAGNOSTICS=false
-local FIRE_REBASE_SPEED_TOLERANCE=2.00
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0.15
+local QB_RELEASE_VERTICAL_DRIFT_TIME=0.15
+local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 ```
 
 - The runtime uses held ball/root XZ as the base origin.
 - Original game `Center.C2.Y` is used only as a Y reference after independent Y validation.
 - C2 X/Z is not mixed with server-origin drift.
-- `Server XZ Lead` persists through `state.qbAimQBDrift`, defaulting to `0.06` and clamped from `0.00` to `0.25`.
-- `Jump Y Lead` persists through `state.qbAimQBYDrift`, defaulting to `0.08` and clamped from `0.00` to `0.35`.
-- `Server Y Offset` persists through `state.qbAimServerYOffset`, defaulting to `0` and clamped from `-4.00` to `4.00`.
-- New saves write semantic `qbAim.serverOriginLeadXZ`, `qbAim.serverOriginLeadY`, and `qbAim.serverOriginYOffset` fields while reading older `serverXZLead/serverYLead/serverYOffset` and drift fields.
-- Static forward/side offset hooks exist at zero; they do not affect default math.
-- Origin diagnostics are disabled by default and are read-only when enabled.
-- Throw fire-frame logic rebases to the locked C1 when speed error is within `2.00`; otherwise it builds a fresh fire-frame plan.
+- `Server XZ Lead` persists through `state.qbAimQBDrift`, defaulting to `0.15` and clamped from `0.00` to `0.25`.
+- `Server Y Lead` persists through `state.qbAimQBYDrift`, defaulting to `0.15` and clamped from `0.00` to `0.35`.
 - Horizontal release extrapolation uses actual QB assembly velocity with dead zone and speed cap, not local key-state detection.
 
 ## Fixed-speed intercept solver

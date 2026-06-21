@@ -220,7 +220,6 @@ local DATA_SAVE_STATE_SETTERS={
 	setQBAimPeakHeight={"qbAimPeakHeight",false,"QBAim","SetPeakHeight",true},
 	setQBAimQBDrift={"qbAimQBDrift",false,"QBAim","SetQBDrift",true},
 	setQBAimQBYDrift={"qbAimQBYDrift",false,"QBAim","SetQBYDrift",true},
-	setQBAimServerYOffset={"qbAimServerYOffset",false,"QBAim","SetQBYOffset",true},
 	setTestingState={"testingEnabled",true,"Testing","SetTestingState",true},
 }
 
