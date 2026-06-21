@@ -2,10 +2,11 @@
 
 | File | Bytes | SHA-256 prefix | Notes |
 |---|---:|---|---|
-| `features/qb-aim/logic.lua` | 76242 | `e61fd5661097a35b` | Current live repo source with fixed server-origin compensation, separate Server XZ/Y lead, and C2 used only for Y. |
-| `data-save/data-save.lua` | 38796 | `d82f4c9af349703c` | Runtime persistence source; saves and restores fixed Server XZ/Y lead with legacy drift fallback. |
-| `Patches/QBAim_Fixed_Server_Origin_Compensation.md` | 6898 | `a923099dcb8dcd64` | Reviewed implementation guide for fixed server-origin compensation. |
-| `Patches/apply_qb_aim_fixed_server_origin.py` | 20011 | `2cacb3428dee21af` | Strict idempotent apply/check helper for the fixed server-origin compensation patch. |
+| `features/qb-aim/logic.lua` | 79003 | `3de2728aaec8fbb4` | Current live repo source with semantic fixed server-origin constants, separate Server XZ/Y lead, stricter C2-Y validation, zero static offset hooks, and optional read-only origin diagnostics. |
+| `data-save/data-save.lua` | 38996 | `f370b1a8854c4673` | Runtime persistence source; saves semantic Server XZ/Y lead fields and restores with legacy drift fallback. |
+| `Patches/QBAim_Fixed_Server_Origin_Compensation.md` | 7565 | `d11500d3dcfe76cd` | Reviewed implementation guide for fixed server-origin compensation; helper removed after direct runtime implementation. |
+| `Indices/01_Constants_Index.md` | 4661 | `409a8f0824219c0d` | Current constants summary for fixed server-origin compensation. |
+| `Runtime_Flow/04_Local_Arc_Rig_Center_C1_C2_C3.md` | 2100 | `bbbbc13d9e3c2569` | Current C2/C1/C3 runtime-flow note for C2-Y-only release reference. |
 | `FootballMath.md` | 22430 | `1536b0751ae8321b` | Decompiled game-source markdown; confirms gravity, power coefficient, pass velocity, and beam math. |
 | `Mechanics.md` | 5049 | `94609a84d5a01bd6` | Decompiled game-source markdown; confirms mechanics state, ball power defaults, and module load shape. |
 | `MECH_ControlsQuarterback.md` | 27693 | `0d70c717ca36af8c` | Decompiled game-source markdown; confirms FootballThrow animation wait and ThrowBall payload. |

@@ -86,14 +86,21 @@ Horizontal speed cap = 24 studs/s
 
 ## Settings and persistence
 
-Persist these two fields:
+Persist these semantic fields:
 
 ```text
-qbAimQBDrift  = Server XZ Lead
-qbAimQBYDrift = Server Y Lead
+qbAim.serverOriginLeadXZ = Server XZ Lead
+qbAim.serverOriginLeadY  = Server Y Lead
 ```
 
-Keep the old names temporarily for compatibility. The UI labels should make their real meanings clear:
+Keep the older internal state names temporarily for compatibility:
+
+```text
+qbAimQBDrift  -> Server XZ Lead
+qbAimQBYDrift -> Server Y Lead
+```
+
+The UI labels should make their real meanings clear:
 
 ```text
 Server XZ Lead
@@ -103,8 +110,11 @@ Server Y Lead
 When loading older settings:
 
 ```text
-if Server Y Lead is absent:
-    copy the saved old QB drift value
+if serverOriginLeadXZ is absent:
+    read serverXZLead, qbDrift, or xyzDrift
+
+if serverOriginLeadY is absent:
+    read serverYLead or copy the loaded XZ lead
 ```
 
 This preserves existing users' tuning.
@@ -174,7 +184,7 @@ If both directions have the same world-space sideways bias, that suggests a stat
 
 ## Optional static offsets
 
-Do not add these by default. If repeated tests show a consistent bias independent of movement direction, add:
+The runtime includes these hooks at zero by default. If repeated tests show a consistent bias independent of movement direction, adjust them only after timing is stable:
 
 ```text
 Server Forward Offset
@@ -182,6 +192,21 @@ Server Side Offset
 ```
 
 Those should be aim-relative or character-relative constants and should remain fixed. They should never be learned automatically.
+
+## Optional read-only diagnostics
+
+The runtime includes a disabled-by-default diagnostic flag. When enabled in source, it records the predicted origin used for the outgoing throw and compares it with incoming `UpdateFootball` payloads that expose `SpawnPos`.
+
+This is intentionally read-only:
+
+```text
+Predicted origin: client-side solver origin
+Server SpawnPos: incoming UpdateFootball SpawnPos
+Error XZ: horizontal distance between them
+Error Y: vertical difference
+```
+
+It should log evidence only. It should not auto-calibrate `Server XZ Lead` or `Server Y Lead`.
 
 ## What this does not solve
 
@@ -196,34 +221,18 @@ This model cannot guarantee exact alignment during:
 
 That is acceptable. The purpose is stable near-alignment under ordinary conditions.
 
-## Applying the implementation
+## Implementation status
 
-A strict source-editing helper is included at:
+The runtime implementation is applied directly in the project files. There is no separate patch helper to run; verify the live files instead.
 
-```text
-details/project-knowledge/Patches/apply_qb_aim_fixed_server_origin.py
-```
-
-From the repository root, validate the expected source contexts:
-
-```bash
-python details/project-knowledge/Patches/apply_qb_aim_fixed_server_origin.py --check
-```
-
-Apply the implementation:
-
-```bash
-python details/project-knowledge/Patches/apply_qb_aim_fixed_server_origin.py --apply
-```
-
-Then inspect the diff:
+From the repository root, inspect the diff:
 
 ```bash
 git diff --check
 git diff -- features/qb-aim/logic.lua runtime/loader-part-1.lua runtime/loader-part-2.lua runtime/loader-part-5.lua data-save/data-save.lua
 ```
 
-The helper stops instead of guessing if the current source no longer matches the reviewed revision.
+The old strict helper was removed after the runtime files were updated directly, because exact source replacements became stale once the implementation used semantic server-origin names.
 
 Then run the normal loader/module validation and test with:
 
