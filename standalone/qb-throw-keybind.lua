@@ -1,8 +1,8 @@
 -- Standalone QB throw keybind + passive throw-pipeline logger.
 -- No loader/API/module fetch and no custom throw remote payload.
 -- Pressing the bound key sends the same native left-click input the game uses.
--- The logger records incoming/outgoing remotes, local snapshots, and best-effort
--- connection/decompiler details without blocking or changing remote args.
+-- The logger records incoming remotes, local snapshots, and best-effort
+-- connection/decompiler details. It does not hook or intercept outgoing remotes.
 
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
@@ -14,7 +14,7 @@ local CoreGui=game:GetService("CoreGui")
 
 local LP=Players.LocalPlayer
 local RUNTIME_KEY="StandaloneQBThrowKeybindGui"
-local LOGGER_KEY=RUNTIME_KEY.."RemoteHook"
+local OLD_LOGGER_KEY=RUNTIME_KEY.."RemoteHook"
 local CLICK_COOLDOWN=0.18
 local LOG_LIMIT=900
 local TABLE_ENTRY_LIMIT=60
@@ -46,7 +46,6 @@ local lastClickAt=-math.huge
 local statusLabel=nil
 local keyButton=nil
 local logCountLabel=nil
-local loggerState=nil
 
 local VirtualInputManager=nil
 pcall(function()
@@ -54,12 +53,11 @@ pcall(function()
 end)
 
 if type(runtimeOwner)=="table" then
-	loggerState=rawget(runtimeOwner,LOGGER_KEY)
-	if type(loggerState)~="table" then
-		loggerState={}
-		rawset(runtimeOwner,LOGGER_KEY,loggerState)
+	local oldLogger=rawget(runtimeOwner,OLD_LOGGER_KEY)
+	if type(oldLogger)=="table" then
+		oldLogger.activeSession=nil
+		oldLogger.emit=nil
 	end
-	loggerState.activeSession=sessionId
 end
 
 local function connect(signal,fn)
@@ -298,75 +296,6 @@ local function shouldLogRemote(remote,args)
 		or text:find("game",1,true)
 end
 
-local function emitOutgoingRemote(source,method,remote,args)
-	if not shouldLogRemote(remote,args) then return end
-	addLog("outgoing_remote",{
-		source=source,
-		method=method,
-		remote=serializeValue(remote,0,{}),
-		args=serializeArgs(args or {}),
-		snapshot=snapshotLocalState("outgoing "..tostring(method)),
-	})
-end
-
-local function installOutgoingHooks()
-	if not loggerState then
-		addLog("outgoing_hook_unavailable",{reason="No global runtime table"})
-		return
-	end
-
-	loggerState.activeSession=sessionId
-	loggerState.emit=function(source,method,remote,args)
-		if loggerState.activeSession~=sessionId then return end
-		emitOutgoingRemote(source,method,remote,args or {})
-	end
-
-	local installed={}
-	local failed={}
-
-	if loggerState.namecallHooked then
-		installed[#installed+1]="namecall_existing"
-	elseif type(hookmetamethod)=="function" and type(getnamecallmethod)=="function" then
-		local wrap=(type(newcclosure)=="function" and newcclosure) or function(fn)
-			return fn
-		end
-		local oldNamecall
-		local ok,err=pcall(function()
-			oldNamecall=hookmetamethod(game,"__namecall",wrap(function(self,...)
-				local method=getnamecallmethod()
-				if (method=="FireServer" or method=="InvokeServer") and typeof(self)=="Instance" and (self:IsA("RemoteEvent") or self:IsA("RemoteFunction")) then
-					local state=type(runtimeOwner)=="table" and rawget(runtimeOwner,LOGGER_KEY) or nil
-					local emit=type(state)=="table" and state.emit or nil
-					if type(emit)=="function" then
-						local args={...}
-						pcall(emit,"namecall",method,self,args)
-					end
-				end
-				return oldNamecall(self,...)
-			end))
-		end)
-
-		if ok then
-			loggerState.namecallHooked=true
-			loggerState.oldNamecall=oldNamecall
-			installed[#installed+1]="namecall"
-		else
-			failed[#failed+1]={hook="namecall",error=tostring(err)}
-		end
-	else
-		failed[#failed+1]={
-			hook="namecall",
-			hookmetamethod=type(hookmetamethod),
-			getnamecallmethod=type(getnamecallmethod),
-		}
-	end
-
-	addLog("outgoing_hook_ready",{
-		installed=installed,
-		failed=failed,
-	})
-end
-
 local function bindIncomingRemote(remote)
 	if typeof(remote)~="Instance" or not remote:IsA("RemoteEvent") then return end
 	if boundRemotes[remote] then return end
@@ -569,9 +498,6 @@ local function exportLogs()
 			jobId=game.JobId,
 			clock=os.clock(),
 			capabilities={
-				hookmetamethod=type(hookmetamethod),
-				getnamecallmethod=type(getnamecallmethod),
-				newcclosure=type(newcclosure),
 				getconnections=type(getconnections),
 				decompile=type(decompile),
 				bytefall=type(bytefall),
@@ -975,10 +901,6 @@ local function buildGui()
 	api={
 		Destroy=function()
 			disconnectAll()
-			if loggerState and loggerState.activeSession==sessionId then
-				loggerState.activeSession=nil
-				loggerState.emit=nil
-			end
 			if screenGui then
 				screenGui:Destroy()
 				screenGui=nil
@@ -1044,9 +966,6 @@ end
 addLog("session_started",{
 	snapshot=snapshotLocalState("start"),
 	capabilities={
-		hookmetamethod=type(hookmetamethod),
-		getnamecallmethod=type(getnamecallmethod),
-		newcclosure=type(newcclosure),
 		getconnections=type(getconnections),
 		decompile=type(decompile),
 		bytefall=type(bytefall),
@@ -1056,6 +975,6 @@ addLog("session_started",{
 		virtualInputManager=VirtualInputManager~=nil,
 	},
 })
-installOutgoingHooks()
+addLog("outgoing_hook_disabled",{reason="No outgoing hooks are installed by this safe logger version"})
 bindIncomingRemotes()
 setStatus("Ready - key is "..bindingToLabel(currentBinding)..". Throw, then COPY LOG.",Color3.fromRGB(170,255,190))
