@@ -31,6 +31,15 @@ local DT=0.02
 local AIM_SCALE=1000
 local MAX_TARGET_SPEED=90
 local REFRESH_INTERVAL=0.12
+local GAUNTLET_TARGET_PATHS={
+	{score=5,name="5",path={"Throw5_1","RotateModel","Throw1","TouchDetect"}},
+	{score=5,name="5",path={"SideToSide","Throw5_1","RotateModel","Throw1","TouchDetect"}},
+	{score=4,name="4-1",path={"SideToSide","Throw4_1","RotateModel","Throw1","TouchDetect"}},
+	{score=4,name="4-2",path={"SideToSide","Throw4_2","RotateModel","Throw1","TouchDetect"}},
+	{score=3,name="3",path={"Stationary","Throw3","Throw4","TouchDetect"}},
+	{score=3,name="3",path={"Stationary","Throw3_1","Throw4","TouchDetect"}},
+	{score=3,name="3",path={"Stationary","Throw3_2","Throw4","TouchDetect"}},
+}
 
 local runtimeOwner=(type(getgenv)=="function" and getgenv()) or _G
 if type(runtimeOwner)=="table" then
@@ -244,9 +253,18 @@ local function touchDetectPart(instance)
 	return instance:FindFirstChildWhichIsA("BasePart",true)
 end
 
+local function findByPath(root,segments)
+	local cursor=root
+	for _,name in ipairs(segments) do
+		if not cursor then return nil end
+		cursor=cursor:FindFirstChild(name)
+	end
+	return cursor
+end
+
 local function targetLabelText(target)
 	if not target then return "Target: none" end
-	return string.format("Target: %dpt  %s",target.score,target.part.Name)
+	return string.format("Target: %dpt  %s",target.score,target.name or target.part.Name)
 end
 
 local function updateTargetText()
@@ -293,26 +311,39 @@ local function refreshTargets(force)
 		return activeTargets
 	end
 
+	local function addTarget(touch,score,name,seen)
+		local part=touchDetectPart(touch)
+		if not part or seen[part] then
+			return
+		end
+		local canHit=canHitValue(touch) or canHitValue(part)
+		if not(canHit and canHit.Value) then
+			return
+		end
+		seen[part]=true
+		activeTargets[#activeTargets+1]={
+			part=part,
+			score=score,
+			name=name,
+			canHit=canHit,
+			velocity=targetVelocity(part),
+			workspaceGame=workspaceGame,
+		}
+	end
+
 	local seen={}
+	for _,entry in ipairs(GAUNTLET_TARGET_PATHS) do
+		local touch=findByPath(base,entry.path)
+		if touch then
+			addTarget(touch,entry.score,entry.name,seen)
+		end
+	end
+
 	for _,descendant in ipairs(base:GetDescendants()) do
 		if descendant.Name=="TouchDetect" then
-			local part=touchDetectPart(descendant)
-			if part and not seen[part] then
-				seen[part]=true
-				local canHit=canHitValue(descendant) or canHitValue(part)
-				if canHit and canHit.Value then
-					local score=targetScore(descendant)
-					if score>0 then
-						local target={
-							part=part,
-							score=score,
-							canHit=canHit,
-							velocity=targetVelocity(part),
-							workspaceGame=workspaceGame,
-						}
-						activeTargets[#activeTargets+1]=target
-					end
-				end
+			local score=targetScore(descendant)
+			if score>0 then
+				addTarget(descendant,score,nil,seen)
 			end
 		end
 	end
