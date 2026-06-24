@@ -1,21 +1,16 @@
 -- Standalone QB throw keybind GUI.
--- No loader/API/module fetch. This only lets you bind a key/button that fires
--- the game's normal ThrowBall remote toward your current mouse position.
+-- No loader/API/module fetch and no custom throw remote payload.
+-- Pressing the bound key sends the same native left-click input the game uses,
+-- so the game keeps control of power, target, animation timing, and release state.
 
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
 local TweenService=game:GetService("TweenService")
-local Workspace=game:GetService("Workspace")
-local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local CoreGui=game:GetService("CoreGui")
 
 local LP=Players.LocalPlayer
-local REMOTE_DISPLAY_POWER=100
-local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
-local THROW_ANIMATION_SPEED=1.35
-local THROW_ANIMATION_RELEASE_WAIT=0.26666666666666666
-local THROW_INPUT_COOLDOWN=0.85
 local RUNTIME_KEY="StandaloneQBThrowKeybindGui"
+local CLICK_COOLDOWN=0.18
 
 local runtimeOwner=(type(getgenv)=="function" and getgenv()) or _G
 if type(runtimeOwner)=="table" then
@@ -31,10 +26,14 @@ local connections={}
 local screenGui=nil
 local currentBinding=Enum.KeyCode.T
 local capturing=false
-local throwInProgress=false
-local lastThrowAt=-math.huge
+local lastClickAt=-math.huge
 local statusLabel=nil
 local keyButton=nil
+
+local VirtualInputManager=nil
+pcall(function()
+	VirtualInputManager=game:GetService("VirtualInputManager")
+end)
 
 local function connect(signal,fn)
 	local conn=signal:Connect(fn)
@@ -49,6 +48,24 @@ local function disconnectAll()
 		end)
 	end
 	table.clear(connections)
+end
+
+local function new(className,props,parent)
+	local obj=Instance.new(className)
+	for key,value in pairs(props or {}) do
+		obj[key]=value
+	end
+	obj.Parent=parent
+	return obj
+end
+
+local function setStatus(text,color)
+	if statusLabel then
+		statusLabel.Text=tostring(text or "")
+		if color then
+			statusLabel.TextColor3=color
+		end
+	end
 end
 
 local function keyCodeToLabel(key)
@@ -124,306 +141,61 @@ local function bindingMatches(input,binding)
 	return incoming~=nil and incoming==binding
 end
 
-local function setStatus(text,color)
-	if statusLabel then
-		statusLabel.Text=tostring(text or "")
-		if color then
-			statusLabel.TextColor3=color
-		end
-	end
-end
-
-local function root(character)
-	if not character then return nil end
-	return character:FindFirstChild("HumanoidRootPart")
-		or character:FindFirstChild("UpperTorso")
-		or character:FindFirstChild("Torso")
-		or character.PrimaryPart
-end
-
-local function getHeldBall()
-	local character=Workspace:FindFirstChild(LP.Name) or LP.Character
-	local characterRoot=root(character)
-	if not(character and characterRoot) then return nil end
-
-	local function looksLikeFootball(inst,container)
-		while inst and inst~=container do
-			if tostring(inst.Name):lower():find("football",1,true) then
-				return true
-			end
-			inst=inst.Parent
-		end
-
-		return false
+local function sendNativeClick()
+	if os.clock()-lastClickAt<CLICK_COOLDOWN then
+		return false,"Click cooldown"
 	end
 
-	local function findBallPart(container,maxDistance)
-		if not container then return nil end
+	lastClickAt=os.clock()
 
-		local direct=container:FindFirstChild("Football")
-		if direct then
-			if direct:IsA("BasePart") and (direct.Position-characterRoot.Position).Magnitude<=maxDistance then
-				return direct
-			end
-
-			if direct:IsA("Model") or direct:IsA("Folder") or direct:IsA("Tool") then
-				for _,descendant in ipairs(direct:GetDescendants()) do
-					if descendant:IsA("BasePart") and (descendant.Position-characterRoot.Position).Magnitude<=maxDistance then
-						return descendant
-					end
-				end
-			end
-		end
-
-		for _,descendant in ipairs(container:GetDescendants()) do
-			if descendant:IsA("BasePart") and looksLikeFootball(descendant,container) and (descendant.Position-characterRoot.Position).Magnitude<=maxDistance then
-				return descendant
-			end
-		end
-
-		return nil
-	end
-
-	return findBallPart(character,35) or findBallPart(character:FindFirstChild("GAMEOBJECTS"),35)
-end
-
-local function firstModelOrFolder(container)
-	if not container then return nil end
-
-	for _,child in ipairs(container:GetChildren()) do
-		if child:IsA("Model") or child:IsA("Folder") then
-			return child
-		end
-	end
-
-	return nil
-end
-
-local function getModeKey()
-	local miniGames=Workspace:FindFirstChild("MiniGames")
-	local miniCount=miniGames and #miniGames:GetChildren() or 0
-	if miniCount>1 then return "mode2" end
-	if miniCount==1 then return "mode3" end
-
-	local games=Workspace:FindFirstChild("Games")
-	if games and #games:GetChildren()>0 then return "mode1" end
-
-	local replicatedMiniGames=ReplicatedStorage:FindFirstChild("MiniGames")
-	local replicatedMiniCount=replicatedMiniGames and #replicatedMiniGames:GetChildren() or 0
-	if replicatedMiniCount>1 then return "mode2" end
-	if replicatedMiniCount==1 then return "mode3" end
-
-	local replicatedGames=ReplicatedStorage:FindFirstChild("Games")
-	if replicatedGames and #replicatedGames:GetChildren()>0 then return "mode1" end
-
-	return "mode1"
-end
-
-local function getGameReEvent()
-	local games=Workspace:FindFirstChild("Games")
-	if games then
-		for _,gameFolder in ipairs(games:GetChildren()) do
-			local replicated=gameFolder:FindFirstChild("Replicated")
-			local playersFolder=replicated and replicated:FindFirstChild("Players")
-			local reEvent=gameFolder:FindFirstChild("ReEvent") or (replicated and replicated:FindFirstChild("ReEvent"))
-
-			if playersFolder and playersFolder:FindFirstChild(LP.Name) and reEvent and reEvent:IsA("RemoteEvent") then
-				return reEvent
-			end
-		end
-	end
-
-	local replicatedGames=ReplicatedStorage:FindFirstChild("Games")
-	if replicatedGames then
-		for _,gameFolder in ipairs(replicatedGames:GetChildren()) do
-			local replicated=gameFolder:FindFirstChild("Replicated")
-			local reEvent=gameFolder:FindFirstChild("ReEvent") or (replicated and replicated:FindFirstChild("ReEvent"))
-			if reEvent and reEvent:IsA("RemoteEvent") then
-				return reEvent
-			end
-		end
-	end
-
-	return nil
-end
-
-local function getSquadsReEvent()
-	local containers={}
-	local function add(container)
-		if container then
-			containers[#containers+1]=container
-		end
-	end
-
-	add(ReplicatedStorage:FindFirstChild("MiniGames"))
-	add(Workspace:FindFirstChild("MiniGames"))
-	add((Workspace:FindFirstChild("Games") or nil) and Workspace.Games:FindFirstChild("MiniGames"))
-	add((ReplicatedStorage:FindFirstChild("Games") or nil) and ReplicatedStorage.Games:FindFirstChild("MiniGames"))
-
-	for _,container in ipairs(containers) do
-		local miniGame=firstModelOrFolder(container)
-		local reEvent=miniGame and miniGame:FindFirstChild("ReEvent")
-		if reEvent and reEvent:IsA("RemoteEvent") then
-			return reEvent
-		end
-	end
-
-	return nil
-end
-
-local function getThrowRemote()
-	local modeKey=getModeKey()
-	if modeKey=="mode1" then
-		return getGameReEvent(),"Gameplay"
-	elseif modeKey=="mode3" then
-		return getSquadsReEvent(),"Squads"
-	end
-
-	return nil,"Unsupported mode"
-end
-
-local function getGlobalMechanics()
-	local globals=(type(getgenv)=="function" and getgenv()) or _G or {}
-	if type(globals)=="table" then
-		local mechanics=rawget(globals,"Mechanics")
-		if type(mechanics)=="table" and type(mechanics.PlayAnimation)=="function" then
-			return mechanics
-		end
-
-		local variables=rawget(globals,"Variables")
-		if type(variables)=="table" and type(variables.Mechanics)=="table" and type(variables.Mechanics.PlayAnimation)=="function" then
-			return variables.Mechanics
-		end
-	end
-
-	return nil
-end
-
-local function findThrowAnimation()
-	local containers={
-		ReplicatedStorage,
-		LP:FindFirstChild("PlayerScripts"),
-		LP.Character,
-	}
-
-	for _,container in ipairs(containers) do
-		local animation=container and container:FindFirstChild(THROW_ANIMATION_NAME,true)
-		if animation and animation:IsA("Animation") and animation.AnimationId~="" then
-			return animation
-		end
-	end
-
-	return nil
-end
-
-local function playLocalThrowAnimation()
-	local character=LP.Character or Workspace:FindFirstChild(LP.Name)
-	local humanoid=character and character:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return false end
-
-	local animation=findThrowAnimation()
-	if not animation then return false end
-
-	local animator=humanoid:FindFirstChildOfClass("Animator")
-	if not animator then
-		animator=Instance.new("Animator")
-		animator.Parent=humanoid
-	end
-
-	local ok,track=pcall(function()
-		return animator:LoadAnimation(animation)
-	end)
-	if not(ok and track) then return false end
-
-	pcall(function()
-		track.Priority=Enum.AnimationPriority.Action
-	end)
-	track:Play(0.05,1,THROW_ANIMATION_SPEED)
-	return true
-end
-
-local function playThrowAnimation()
-	if not getHeldBall() then return false end
-
-	local mechanics=getGlobalMechanics()
-	if mechanics then
-		local ok=pcall(function()
-			mechanics:PlayAnimation(THROW_ANIMATION_NAME,THROW_ANIMATION_SPEED)
-		end)
-		if ok then return true end
-	end
-
-	return playLocalThrowAnimation()
-end
-
-local function mouseTarget()
-	local mouse=LP:GetMouse()
-	if mouse and mouse.Hit then
-		return mouse.Hit.Position
-	end
-
-	local camera=Workspace.CurrentCamera
-	if camera then
-		return camera.CFrame.Position+camera.CFrame.LookVector*1000
-	end
-
-	return nil
-end
-
-local function throwAtMouse()
-	if throwInProgress or os.clock()-lastThrowAt<THROW_INPUT_COOLDOWN then
-		setStatus("Throw already in progress",Color3.fromRGB(255,185,85))
-		return
-	end
-
-	if not getHeldBall() then
-		setStatus("No ball held",Color3.fromRGB(255,105,105))
-		return
-	end
-
-	local target=mouseTarget()
-	if not target then
-		setStatus("No mouse target",Color3.fromRGB(255,105,105))
-		return
-	end
-
-	local reEvent,modeText=getThrowRemote()
-	if not reEvent then
-		setStatus(modeText=="Unsupported mode" and "Park mode unsupported" or "Throw remote missing",Color3.fromRGB(255,105,105))
-		return
-	end
-
-	throwInProgress=true
-	setStatus("Release queued...",Color3.fromRGB(255,225,160))
-	playThrowAnimation()
-
-	task.delay(THROW_ANIMATION_RELEASE_WAIT,function()
-		local ok,err=pcall(function()
-			reEvent:FireServer("Mechanics","ThrowBall",{
-				Target=target,
-				AutoThrow=false,
-				Power=REMOTE_DISPLAY_POWER,
-			})
-		end)
-
-		throwInProgress=false
-		lastThrowAt=os.clock()
-
+	if type(mouse1click)=="function" then
+		local ok,err=pcall(mouse1click)
 		if ok then
-			setStatus(modeText.." throw sent",Color3.fromRGB(120,255,170))
-		else
-			setStatus("Throw failed: "..tostring(err),Color3.fromRGB(255,105,105))
+			return true,"mouse1click"
 		end
-	end)
+		return false,tostring(err)
+	end
+
+	if type(mouse1press)=="function" and type(mouse1release)=="function" then
+		local ok,err=pcall(function()
+			mouse1press()
+			task.wait()
+			mouse1release()
+		end)
+		if ok then
+			return true,"mouse1press"
+		end
+		return false,tostring(err)
+	end
+
+	if VirtualInputManager then
+		local pos=UIS:GetMouseLocation()
+		local ok,err=pcall(function()
+			VirtualInputManager:SendMouseButtonEvent(pos.X,pos.Y,0,true,game,0)
+			task.wait()
+			VirtualInputManager:SendMouseButtonEvent(pos.X,pos.Y,0,false,game,0)
+		end)
+		if ok then
+			return true,"VirtualInputManager"
+		end
+		return false,tostring(err)
+	end
+
+	return false,"No native click method available"
 end
 
-local function new(class,props,parent)
-	local obj=Instance.new(class)
-	for key,value in pairs(props or {}) do
-		obj[key]=value
+local function triggerThrowInput()
+	if currentBinding=="MouseButton1" then
+		setStatus("LMB already uses the game's throw input",Color3.fromRGB(255,225,160))
+		return
 	end
-	obj.Parent=parent
-	return obj
+
+	local ok,method=sendNativeClick()
+	if ok then
+		setStatus("Native throw input sent: "..method,Color3.fromRGB(150,255,180))
+	else
+		setStatus("Input failed: "..method,Color3.fromRGB(255,105,105))
+	end
 end
 
 local function buildGui()
@@ -441,9 +213,8 @@ local function buildGui()
 	end)
 
 	local panel=new("Frame",{
-		AnchorPoint=Vector2.new(0,0),
 		Position=UDim2.fromOffset(80,180),
-		Size=UDim2.fromOffset(320,170),
+		Size=UDim2.fromOffset(330,164),
 		BackgroundColor3=Color3.fromRGB(14,14,14),
 		BorderSizePixel=0,
 		Active=true,
@@ -469,12 +240,14 @@ local function buildGui()
 	new("TextLabel",{
 		BackgroundTransparency=1,
 		Position=UDim2.fromOffset(14,34),
-		Size=UDim2.new(1,-28,0,18),
+		Size=UDim2.new(1,-28,0,34),
 		Font=Enum.Font.Gotham,
-		Text="No aim lock. Fires toward current mouse position.",
+		Text="Sends the game's normal click throw. Power and target stay native.",
 		TextColor3=Color3.fromRGB(165,165,165),
 		TextSize=11,
+		TextWrapped=true,
 		TextXAlignment=Enum.TextXAlignment.Left,
+		TextYAlignment=Enum.TextYAlignment.Top,
 	},panel)
 
 	local close=new("TextButton",{
@@ -492,7 +265,7 @@ local function buildGui()
 
 	new("TextLabel",{
 		BackgroundTransparency=1,
-		Position=UDim2.fromOffset(14,68),
+		Position=UDim2.fromOffset(14,76),
 		Size=UDim2.fromOffset(120,20),
 		Font=Enum.Font.GothamMedium,
 		Text="Throw key",
@@ -502,8 +275,8 @@ local function buildGui()
 	},panel)
 
 	keyButton=new("TextButton",{
-		Position=UDim2.fromOffset(138,64),
-		Size=UDim2.fromOffset(166,30),
+		Position=UDim2.fromOffset(138,72),
+		Size=UDim2.fromOffset(176,30),
 		BackgroundColor3=Color3.fromRGB(30,30,30),
 		BorderSizePixel=0,
 		Font=Enum.Font.GothamBold,
@@ -514,12 +287,12 @@ local function buildGui()
 	},panel)
 
 	local throwButton=new("TextButton",{
-		Position=UDim2.fromOffset(14,106),
+		Position=UDim2.fromOffset(14,116),
 		Size=UDim2.fromOffset(140,32),
 		BackgroundColor3=Color3.fromRGB(38,38,38),
 		BorderSizePixel=0,
 		Font=Enum.Font.GothamBold,
-		Text="THROW NOW",
+		Text="SEND CLICK",
 		TextColor3=Color3.fromRGB(238,238,238),
 		TextSize=12,
 		AutoButtonColor=false,
@@ -527,8 +300,8 @@ local function buildGui()
 
 	statusLabel=new("TextLabel",{
 		BackgroundTransparency=1,
-		Position=UDim2.fromOffset(164,106),
-		Size=UDim2.new(1,-178,0,32),
+		Position=UDim2.fromOffset(164,112),
+		Size=UDim2.new(1,-178,0,40),
 		Font=Enum.Font.Gotham,
 		Text="Ready",
 		TextColor3=Color3.fromRGB(170,255,190),
@@ -586,7 +359,7 @@ local function buildGui()
 	end)
 
 	connect(throwButton.Activated,function()
-		throwAtMouse()
+		triggerThrowInput()
 	end)
 
 	local api
@@ -645,7 +418,7 @@ connect(UIS.InputBegan,function(input,processed)
 	end
 
 	if bindingMatches(input,currentBinding) then
-		throwAtMouse()
+		triggerThrowInput()
 	end
 end)
 
