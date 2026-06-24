@@ -243,23 +243,74 @@ local function getGameReEvent()
 	return nil
 end
 
-local function currentGameCenterY()
+local function firstChildFolder(parent)
+	if not parent then
+		return nil
+	end
+	for _,child in ipairs(parent:GetChildren()) do
+		if child:IsA("Folder") or child:IsA("Model") then
+			return child
+		end
+	end
+	return nil
+end
+
+local function currentWorkspaceGameFolder()
 	local gameId=getGameId()
-	local workspaceGames=Workspace:FindFirstChild("Games")
-	local workspaceMinis=Workspace:FindFirstChild("MiniGames")
-	local folders={}
-	if workspaceGames then folders[#folders+1]=workspaceGames end
-	if workspaceMinis then folders[#folders+1]=workspaceMinis end
-	for _,rootFolder in ipairs(folders) do
-		local gameFolder=gameId and rootFolder:FindFirstChild(gameId)
-		if not gameFolder then
-			gameFolder=rootFolder:FindFirstChildWhichIsA("Folder")
+	local roots={
+		Workspace:FindFirstChild("MiniGames"),
+		Workspace:FindFirstChild("Games"),
+	}
+	for _,root in ipairs(roots) do
+		local direct=root and gameId and root:FindFirstChild(gameId)
+		if direct then
+			return direct
 		end
-		local replicated=gameFolder and gameFolder:FindFirstChild("Replicated")
-		local center=replicated and replicated:FindFirstChild("Center")
-		if center and center:IsA("BasePart") then
-			return center.CFrame.Y+0.5
+	end
+
+	local miniGames=Workspace:FindFirstChild("MiniGames")
+	if miniGames and #miniGames:GetChildren()==1 then
+		return firstChildFolder(miniGames)
+	end
+	return firstChildFolder(Workspace:FindFirstChild("Games")) or firstChildFolder(miniGames)
+end
+
+local function instanceWorldCFrame(instance)
+	if not instance then
+		return nil
+	end
+	if instance:IsA("Attachment") then
+		local ok,cf=pcall(function()
+			return instance.WorldCFrame
+		end)
+		if ok and typeof(cf)=="CFrame" then
+			return cf
 		end
+		local parent=instance.Parent
+		if parent and parent:IsA("BasePart") then
+			return parent.CFrame*instance.CFrame
+		end
+	elseif instance:IsA("BasePart") then
+		return instance.CFrame
+	end
+	return nil
+end
+
+local function currentC2Position()
+	local gameFolder=currentWorkspaceGameFolder()
+	local localFolder=gameFolder and gameFolder:FindFirstChild("Local")
+	local center=localFolder and localFolder:FindFirstChild("Center")
+	local c2=center and center:FindFirstChild("C2",true)
+	local cf=instanceWorldCFrame(c2)
+	return cf and cf.Position
+end
+
+local function currentGameCenterY()
+	local gameFolder=currentWorkspaceGameFolder()
+	local replicated=gameFolder and gameFolder:FindFirstChild("Replicated")
+	local center=replicated and replicated:FindFirstChild("Center")
+	if center and center:IsA("BasePart") then
+		return center.CFrame.Y+0.5
 	end
 	return 0.5
 end
@@ -302,6 +353,10 @@ local function landingAtY(origin,velocity,y)
 end
 
 local function releaseOrigin(qbRoot,heldBall)
+	local c2Position=currentC2Position()
+	if c2Position then
+		return c2Position
+	end
 	if heldBall and heldBall:IsA("BasePart") then
 		return heldBall.Position
 	end
