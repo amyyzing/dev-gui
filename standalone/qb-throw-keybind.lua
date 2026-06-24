@@ -484,6 +484,7 @@ local function handlePracticeEvent(action,...)
 			stopBallDetection()
 			updateTargetText()
 			clearPreview()
+			setStatus("Waiting for live practice controls",Color3.fromRGB(255,160,90))
 		end
 		return
 	end
@@ -710,10 +711,6 @@ end
 local function throwAtBestTarget()
 	updateConfig()
 	bindPracticeEvent()
-	if not practiceControlsEnabled then
-		setStatus("Practice controls disabled",Color3.fromRGB(255,160,90))
-		return
-	end
 	refreshTargets(true)
 	if not currentTarget then
 		setStatus("No active CanHit target",Color3.fromRGB(255,120,120))
