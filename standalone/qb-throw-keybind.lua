@@ -32,6 +32,7 @@ local MAX_TARGET_SPEED=90
 local REFRESH_INTERVAL=0.12
 local PREVIEW_UPDATE_INTERVAL=1/30
 local TARGET_VELOCITY_DAMPING=0.62
+local HIT_SPAM_INTERVAL=0.08
 local GAUNTLET_TARGET_PATHS={
 	{score=5,name="5",path={"Throw5_1","RotateModel","Throw1","TouchDetect"}},
 	{score=5,name="5",path={"SideToSide","Throw5_1","RotateModel","Throw1","TouchDetect"}},
@@ -85,9 +86,9 @@ local previewParts=nil
 local hitboxEnabled=false
 local originalHitboxes={}
 local hitboxButton=nil
-local forceCanHitEnabled=false
-local originalCanHitValues={}
-local forceCanHitButton=nil
+local hitSpamEnabled=false
+local hitSpamButton=nil
+local hitStats={overlaps=0,sent=0,canHitTrue=0,canHitFalse=0}
 
 local function connect(signal,fn)
 	local conn=signal:Connect(fn)
@@ -284,46 +285,16 @@ local function findByPath(root,segments)
 	return cursor
 end
 
-local function restoreCanHitValues()
-	for value,original in pairs(originalCanHitValues) do
-		if value and value.Parent then
-			pcall(function()
-				value.Value=original
-			end)
-		end
-	end
-	originalCanHitValues={}
+local function resetHitStats()
+	hitStats={overlaps=0,sent=0,canHitTrue=0,canHitFalse=0}
 end
 
-local function forceCanHitValue(value)
-	if not forceCanHitEnabled or not value or not value:IsA("BoolValue") then
-		return
-	end
-	if originalCanHitValues[value]==nil then
-		originalCanHitValues[value]=value.Value
-	end
-	value.Value=true
+local function hitStatsText()
+	return string.format("Overlap %d | Sent %d | CanHit T/F %d/%d",hitStats.overlaps,hitStats.sent,hitStats.canHitTrue,hitStats.canHitFalse)
 end
 
-local function forceCanHitForTouch(touch)
-	forceCanHitValue(canHitValue(touch))
-end
-
-local function forceCanHitsInBase(base)
-	if not forceCanHitEnabled or not base then
-		return
-	end
-	for _,entry in ipairs(GAUNTLET_TARGET_PATHS) do
-		local touch=findByPath(base,entry.path)
-		if touch then
-			forceCanHitForTouch(touch)
-		end
-	end
-	for _,descendant in ipairs(base:GetDescendants()) do
-		if descendant.Name=="TouchDetect" then
-			forceCanHitForTouch(descendant)
-		end
-	end
+local function updateHitStatsStatus()
+	setStatus(hitStatsText(),hitSpamEnabled and Color3.fromRGB(255,190,100) or Color3.fromRGB(190,190,190))
 end
 
 local function targetLabelText(target)
@@ -419,25 +390,22 @@ local function setHitboxEnabled(enabled)
 	setStatus(hitboxEnabled and "2x gauntlet hitboxes enabled" or "2x gauntlet hitboxes disabled",hitboxEnabled and Color3.fromRGB(115,240,170) or Color3.fromRGB(190,190,190))
 end
 
-local function refreshForceCanHitButton()
-	if forceCanHitButton then
-		forceCanHitButton.Text=forceCanHitEnabled and "Force CanHit: ON" or "Force CanHit: OFF"
-		forceCanHitButton.BackgroundColor3=forceCanHitEnabled and Color3.fromRGB(110,70,30) or Color3.fromRGB(32,32,32)
+local function refreshHitSpamButton()
+	if hitSpamButton then
+		hitSpamButton.Text=hitSpamEnabled and "Hit Spam Test: ON" or "Hit Spam Test: OFF"
+		hitSpamButton.BackgroundColor3=hitSpamEnabled and Color3.fromRGB(110,70,30) or Color3.fromRGB(32,32,32)
 	end
 end
 
-local function setForceCanHitEnabled(enabled)
-	forceCanHitEnabled=enabled==true
-	if not forceCanHitEnabled then
-		restoreCanHitValues()
+local function setHitSpamEnabled(enabled)
+	hitSpamEnabled=enabled==true
+	resetHitStats()
+	refreshHitSpamButton()
+	if hitSpamEnabled then
+		setStatus("Hit spam test armed; throw a ball.",Color3.fromRGB(255,190,100))
 	else
-		local workspaceGame=findPracticeWorkspace()
-		local base=workspaceGame and workspaceGame:FindFirstChild("Replicated")
-		base=base and base:FindFirstChild("QuarterbackGauntlet")
-		forceCanHitsInBase(base)
+		setStatus("Hit spam test disabled",Color3.fromRGB(190,190,190))
 	end
-	refreshForceCanHitButton()
-	setStatus(forceCanHitEnabled and "CanHit forced on for testing" or "CanHit values restored",forceCanHitEnabled and Color3.fromRGB(255,190,100) or Color3.fromRGB(190,190,190))
 end
 
 local function refreshTargets(force)
@@ -456,7 +424,6 @@ local function refreshTargets(force)
 		updateTargetText()
 		return activeTargets
 	end
-	forceCanHitsInBase(base)
 
 	local function addTarget(touch,score,name,seen)
 		local part=touchDetectPart(touch)
@@ -571,23 +538,46 @@ local function startBallDetection(event,ball)
 	params.FilterDescendantsInstances=CollectionService:GetTagged("FootballCanHit")
 
 	local hit=false
+	local lastSent={}
 	ballHitConn=RunService.Heartbeat:Connect(function()
 		if hit or not ball or not ball.Parent then
 			stopBallDetection()
 			return
 		end
 
+		local sawOverlap=false
+		local now=os.clock()
 		for _,part in ipairs(Workspace:GetPartBoundsInRadius(ball.Position,radius,params)) do
 			local canHit=part.Parent and part.Parent:FindFirstChild("CanHit")
-			if part.Name=="TouchDetect" and canHit and canHit:IsA("BoolValue") and canHit.Value then
-				hit=true
-				pcall(function()
-					event:FireServer("Mechanics","QBGauntletClientHit",part)
-				end)
-				setStatus("Gauntlet hit confirmed",Color3.fromRGB(115,240,170))
-				stopBallDetection()
-				return
+			if part.Name=="TouchDetect" then
+				sawOverlap=true
+				hitStats.overlaps=hitStats.overlaps+1
+				local canHitReady=canHit and canHit:IsA("BoolValue") and canHit.Value
+				if canHitReady then
+					hitStats.canHitTrue=hitStats.canHitTrue+1
+				else
+					hitStats.canHitFalse=hitStats.canHitFalse+1
+				end
+				if hitSpamEnabled or canHitReady then
+					local last=lastSent[part] or 0
+					if not hitSpamEnabled or now-last>=HIT_SPAM_INTERVAL then
+						lastSent[part]=now
+						hitStats.sent=hitStats.sent+1
+						pcall(function()
+							event:FireServer("Mechanics","QBGauntletClientHit",part)
+						end)
+						updateHitStatsStatus()
+						if not hitSpamEnabled then
+							hit=true
+							stopBallDetection()
+							return
+						end
+					end
+				end
 			end
+		end
+		if sawOverlap and hitSpamEnabled then
+			updateHitStatsStatus()
 		end
 	end)
 	connections[#connections+1]=ballHitConn
@@ -955,8 +945,8 @@ local function buildGui()
 		refreshTargets(true)
 	end)
 
-	forceCanHitButton=makeButton(body,"Force CanHit: OFF",function()
-		setForceCanHitEnabled(not forceCanHitEnabled)
+	hitSpamButton=makeButton(body,"Hit Spam Test: OFF",function()
+		setHitSpamEnabled(not hitSpamEnabled)
 		refreshTargets(true)
 	end)
 
@@ -983,7 +973,6 @@ end
 local function destroy()
 	stopBallDetection()
 	restoreHitboxes()
-	restoreCanHitValues()
 	disconnectAll()
 	clearPreview()
 	if targetHighlight then
@@ -1004,12 +993,6 @@ bindPracticeEvent()
 
 connect(RunService.RenderStepped,function()
 	bindPracticeEvent()
-	if forceCanHitEnabled then
-		local workspaceGame=findPracticeWorkspace()
-		local base=workspaceGame and workspaceGame:FindFirstChild("Replicated")
-		base=base and base:FindFirstChild("QuarterbackGauntlet")
-		forceCanHitsInBase(base)
-	end
 	refreshTargets(false)
 	if hitboxEnabled then
 		for _,target in ipairs(activeTargets) do
@@ -1023,5 +1006,5 @@ if type(runtimeOwner)=="table" then
 end
 
 refreshHitboxButton()
-refreshForceCanHitButton()
+refreshHitSpamButton()
 setStatus("Ready. Toggle testing helpers when needed.")
