@@ -33,6 +33,8 @@ local REFRESH_INTERVAL=0.12
 local PREVIEW_UPDATE_INTERVAL=1/30
 local TARGET_VELOCITY_DAMPING=0.62
 local HIT_SPAM_INTERVAL=0.08
+local HIT_RETRY_WINDOW=0.55
+local HIT_NEAR_MARGIN=1.5
 local GAUNTLET_TARGET_PATHS={
 	{score=5,name="5",path={"Throw5_1","RotateModel","Throw1","TouchDetect"}},
 	{score=5,name="5",path={"SideToSide","Throw5_1","RotateModel","Throw1","TouchDetect"}},
@@ -89,7 +91,7 @@ local originalHitboxes={}
 local hitboxButton=nil
 local hitSpamEnabled=false
 local hitSpamButton=nil
-local hitStats={overlaps=0,sent=0,canHitTrue=0,canHitFalse=0}
+local hitStats={overlaps=0,sent=0,canHitTrue=0,canHitFalse=0,near=0}
 
 local function connect(signal,fn)
 	local conn=signal:Connect(fn)
@@ -287,7 +289,7 @@ local function findByPath(root,segments)
 end
 
 local function resetHitStats()
-	hitStats={overlaps=0,sent=0,canHitTrue=0,canHitFalse=0}
+	hitStats={overlaps=0,sent=0,canHitTrue=0,canHitFalse=0,near=0}
 end
 
 local function updateHitStatsStatus()
@@ -361,7 +363,7 @@ local function closestTaggedTouch(position,tagged)
 	return best,bestDist,bestTagged
 end
 
-local function updateProbe(ball,overlapCount,closest,closestDist,closestTagged,canHitReady)
+local function updateProbe(ball,overlapCount,closest,closestDist,closestTagged,canHitReady,windowOpen)
 	local ballFound=ball and ball.Parent and ball:IsA("BasePart")
 	local sizeText="n/a"
 	local posText="n/a"
@@ -371,13 +373,14 @@ local function updateProbe(ball,overlapCount,closest,closestDist,closestTagged,c
 	end
 	local distText=closestDist and string.format("%.1f",closestDist) or "n/a"
 	setProbe(string.format(
-		"Ball %s  Size %s  Sent %s\nPos %s\nFrame ov %s  Near %s\nTotal ov %s  T/F %s/%s\nTagged %s  CanHit %s",
+		"Ball %s  Size %s  Sent %s\nPos %s\nFrame ov %s  Near %s  Win %s\nTotal ov %s  T/F %s/%s\nTagged %s  CanHit %s",
 		yesNo(ballFound),
 		sizeText,
 		compactNumber(hitStats.sent),
 		posText,
 		compactNumber(overlapCount or 0),
 		distText,
+		yesNo(windowOpen),
 		compactNumber(hitStats.overlaps),
 		compactNumber(hitStats.canHitTrue),
 		compactNumber(hitStats.canHitFalse),
@@ -483,7 +486,7 @@ end
 
 local function refreshHitSpamButton()
 	if hitSpamButton then
-		hitSpamButton.Text=hitSpamEnabled and "Hit Spam Test: ON" or "Hit Spam Test: OFF"
+		hitSpamButton.Text=hitSpamEnabled and "Hit Window Retry: ON" or "Hit Window Retry: OFF"
 		hitSpamButton.BackgroundColor3=hitSpamEnabled and Color3.fromRGB(110,70,30) or Color3.fromRGB(32,32,32)
 	end
 end
@@ -493,9 +496,9 @@ local function setHitSpamEnabled(enabled)
 	resetHitStats()
 	refreshHitSpamButton()
 	if hitSpamEnabled then
-		setStatus("Hit spam test armed; throw a ball.",Color3.fromRGB(255,190,100))
+		setStatus("Hit retry armed; waits for CanHit.",Color3.fromRGB(255,190,100))
 	else
-		setStatus("Hit spam test disabled",Color3.fromRGB(190,190,190))
+		setStatus("Hit retry disabled",Color3.fromRGB(190,190,190))
 	end
 end
 
@@ -619,7 +622,7 @@ end
 local function startBallDetection(event,ball)
 	stopBallDetection()
 	if not event or not ball or not ball.Parent or not ball:IsA("BasePart") then
-		updateProbe(nil,0,nil,nil,nil,nil)
+		updateProbe(nil,0,nil,nil,nil,nil,false)
 		return
 	end
 
@@ -631,9 +634,11 @@ local function startBallDetection(event,ball)
 
 	local hit=false
 	local lastSent={}
+	local firstNearAt=nil
+	local lastNearAt=nil
 	ballHitConn=RunService.Heartbeat:Connect(function()
 		if hit or not ball or not ball.Parent then
-			updateProbe(nil,0,nil,nil,nil,nil)
+			updateProbe(nil,0,nil,nil,nil,nil,false)
 			stopBallDetection()
 			return
 		end
@@ -646,6 +651,26 @@ local function startBallDetection(event,ball)
 		local sawOverlap=false
 		local overlapCount=0
 		local now=os.clock()
+		local nearWindow=closestDist and closestDist<=radius+HIT_NEAR_MARGIN
+		local sentThisFrame=false
+
+		local function fireHit(part,stopAfterSend)
+			local last=lastSent[part] or 0
+			if hitSpamEnabled and now-last<HIT_SPAM_INTERVAL then
+				return false
+			end
+			lastSent[part]=now
+			hitStats.sent=hitStats.sent+1
+			pcall(function()
+				event:FireServer("Mechanics","QBGauntletClientHit",part)
+			end)
+			updateHitStatsStatus()
+			if stopAfterSend then
+				hit=true
+			end
+			return true
+		end
+
 		for _,part in ipairs(parts) do
 			if part.Name=="TouchDetect" then
 				sawOverlap=true
@@ -657,27 +682,36 @@ local function startBallDetection(event,ball)
 				else
 					hitStats.canHitFalse=hitStats.canHitFalse+1
 				end
-				if hitSpamEnabled or canHitReady then
-					local last=lastSent[part] or 0
-					if not hitSpamEnabled or now-last>=HIT_SPAM_INTERVAL then
-						lastSent[part]=now
-						hitStats.sent=hitStats.sent+1
-						pcall(function()
-							event:FireServer("Mechanics","QBGauntletClientHit",part)
-						end)
-						updateHitStatsStatus()
-						updateProbe(ball,overlapCount,closest,closestDist,closestTagged,closestCanHit)
-						if not hitSpamEnabled then
-							hit=true
-							stopBallDetection()
-							return
-						end
+				if canHitReady and not sentThisFrame then
+					sentThisFrame=fireHit(part,not hitSpamEnabled) or sentThisFrame
+					updateProbe(ball,overlapCount,closest,closestDist,closestTagged,closestCanHit,nearWindow)
+					if hit then
+						stopBallDetection()
+						return
 					end
 				end
 			end
 		end
-		updateProbe(ball,overlapCount,closest,closestDist,closestTagged,closestCanHit)
-		if sawOverlap and hitSpamEnabled then
+
+		if nearWindow then
+			firstNearAt=firstNearAt or now
+			lastNearAt=now
+			hitStats.near=hitStats.near+1
+		end
+
+		if hitSpamEnabled and not sentThisFrame and nearWindow and closest and closestCanHit then
+			sentThisFrame=fireHit(closest,false) or sentThisFrame
+		end
+
+		updateProbe(ball,overlapCount,closest,closestDist,closestTagged,closestCanHit,nearWindow)
+		if sentThisFrame then
+			updateHitStatsStatus()
+		elseif sawOverlap and not closestCanHit then
+			setStatus("Overlap seen; waiting for CanHit.",Color3.fromRGB(255,190,100))
+		elseif firstNearAt and lastNearAt and now-lastNearAt>HIT_RETRY_WINDOW then
+			setStatus("Hit window passed.",Color3.fromRGB(190,190,190))
+			stopBallDetection()
+		elseif sawOverlap and hitSpamEnabled then
 			updateHitStatsStatus()
 		end
 	end)
@@ -1046,7 +1080,7 @@ local function buildGui()
 		refreshTargets(true)
 	end)
 
-	hitSpamButton=makeButton(body,"Hit Spam Test: OFF",function()
+	hitSpamButton=makeButton(body,"Hit Window Retry: OFF",function()
 		setHitSpamEnabled(not hitSpamEnabled)
 		refreshTargets(true)
 	end)
@@ -1068,7 +1102,7 @@ local function buildGui()
 		BackgroundColor3=Color3.fromRGB(20,20,20),
 		BorderSizePixel=0,
 		Size=UDim2.new(1,0,0,92),
-		Text="Ball n/a  Size n/a  Sent 0\nPos n/a\nFrame ov 0  Near n/a\nTotal ov 0  T/F 0/0\nTagged n/a  CanHit n/a",
+		Text="Ball n/a  Size n/a  Sent 0\nPos n/a\nFrame ov 0  Near n/a  Win N\nTotal ov 0  T/F 0/0\nTagged n/a  CanHit n/a",
 		Font=Enum.Font.Gotham,
 		TextSize=10,
 		TextColor3=Color3.fromRGB(205,205,205),
