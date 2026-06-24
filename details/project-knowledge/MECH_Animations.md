@@ -1,3 +1,18 @@
+# MECH Animations
+
+## Release-Relevant Notes
+
+- A second ByteFall/Potassium dump of this module was reviewed on 2026-06-24 and matches the same animation utility layer already captured here.
+- This module loads/caches animation tracks and handles directional QB hold animations, but it does not contain the football release calculation.
+- It preloads `UF_QuarterbackThrow` and `UF_QuarterbackThrowRunning`, which are the useful animation names for QB throw diagnostics.
+- There are no `GetMarkerReachedSignal`, keyframe marker, `Stopped`, release callback, `UpdateFootball`, `ThrowBall`, or football launch remote calls in this module.
+- The only direct remotes here are animation-related: `StartSyncAnimation` and `AnimationDisplayRequest`.
+- `MoveAnimation` can apply a planar `LinearVelocity` during CFrame animation movement, but the QB throw release point/timing is likely controlled in the catch/hike/throw or quarterback control modules instead.
+- `UpdateMovement` changes QB directional animation based on movement keys while the ball is equipped, so it can affect character pose/torso visuals, but this file does not prove that pose is used as the launch origin.
+- Cross-reference: `MECH_ControlsQuarterback.md` contains the direct throw path: `FootballThrow` plays `UF_QuarterbackThrow` at speed `1.35`, waits `0.26666666666666666`, samples `PlayerMouse` with `ScreenPointToRay`, then fires `ReEvent("Mechanics", "ThrowBall", { Target = ..., Power = ... })`.
+
+Practical takeaway: this helps identify the throw animation names and confirms the release logic is elsewhere.
+
 -- Script Path: game:GetChildren()[117]:GetChildren()[12]:GetChildren()[3]:GetChildren()[2]:GetChildren()[1]:GetChildren()[6]:GetChildren()[1]:GetChildren()[3]
 -- Took 0.78s to decompile.
 -- Executor: YuBX (2.0.0.0-YB)
