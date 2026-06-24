@@ -488,6 +488,34 @@ local function beamCFrame(point,velocity,fallback)
 	return CFrame.lookAt(point,point+dir)
 end
 
+local function beamDirection(velocity,origin,time)
+	if not(velocity and origin and time and time>0) then
+		return nil
+	end
+
+	local endPoint=0.5*G*time*time+velocity*time+origin
+	local c1=endPoint-(G*time*time+velocity*time)/3
+	local c0=(0.125*G*time*time+0.5*velocity*time+origin-0.125*(origin+endPoint))/0.375-c1
+	local tangent0=c0-origin
+	local tangent1=c1-endPoint
+	local chord=origin-endPoint
+	if tangent0.Magnitude<1e-6 or tangent1.Magnitude<1e-6 or chord.Magnitude<1e-6 then
+		return nil
+	end
+
+	local x0=safeUnit(tangent0,velocity)
+	local zLine=safeUnit(chord,Vector3.new(0,0,-1))
+	local y0=safeUnit(x0:Cross(zLine),Vector3.new(0,1,0))
+	local x1=safeUnit(tangent1,velocity+G*time)
+	local y1=safeUnit(x1:Cross(zLine),y0)
+	local z0=safeUnit(y0:Cross(x0),Vector3.new(0,0,1))
+	local curve0=tangent0.Magnitude
+	local curve1=-tangent1.Magnitude
+	local cf0=CFrame.new(origin.X,origin.Y,origin.Z,x0.X,y0.X,z0.X,x0.Y,y0.Y,z0.Y,x0.Z,y0.Z,z0.Z)
+	local cf1=CFrame.new(endPoint.X,endPoint.Y,endPoint.Z,x1.X,y1.X,z0.X,x1.Y,y1.Y,z0.Y,x1.Z,y1.Z,z0.Z)
+	return curve0,curve1,cf0,cf1,endPoint
+end
+
 local function updatePreview(plan)
 	if not plan then
 		clearPreview()
@@ -495,15 +523,16 @@ local function updatePreview(plan)
 	end
 	local parts=ensurePreview()
 	if not parts then return end
-	local endPoint=plan.landing or plan.target
 	local previewTime=plan.landingTime or plan.time
 	local endVelocity=plan.velocity+G*previewTime
+	local curve0,curve1,c2,c3,endPoint=beamDirection(plan.velocity,plan.origin,previewTime)
+	endPoint=endPoint or plan.landing or plan.target
 
-	parts.p0.CFrame=beamCFrame(plan.origin,plan.velocity)
-	parts.p1.CFrame=beamCFrame(endPoint,endVelocity,plan.velocity)
+	parts.p0.CFrame=c2 or beamCFrame(plan.origin,plan.velocity)
+	parts.p1.CFrame=c3 or beamCFrame(endPoint,endVelocity,plan.velocity)
 	parts.catch.CFrame=CFrame.new(plan.target)
-	parts.beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-400,400)
-	parts.beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-400,400)
+	parts.beam.CurveSize0=math.clamp(curve0 or plan.velocity.Magnitude*previewTime/3,-400,400)
+	parts.beam.CurveSize1=math.clamp(curve1 or -endVelocity.Magnitude*previewTime/3,-400,400)
 	parts.beam.Enabled=true
 end
 
