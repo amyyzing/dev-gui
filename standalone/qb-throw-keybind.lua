@@ -32,7 +32,6 @@ local DT=0.02
 local SPEED_TOLERANCE=1.25
 local CATCH_TOLERANCE=2.0
 local AIM_SCALE=1000
-local TARGET_REFINE_STEPS=5
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
 local VALID_TEAM_IDS={HomeTeam=true,AwayTeam=true}
@@ -70,6 +69,7 @@ local displayPower=DEFAULT_DISPLAY_POWER
 local catchY=DEFAULT_PEAK_Y
 local leadDelay=DEFAULT_LEAD_DELAY
 local lastPlan=nil
+local previewFrozen=false
 local screenGui=nil
 local statusLabel=nil
 local targetLabel=nil
@@ -280,12 +280,6 @@ local function receiverVelocity(player)
 	return clampMagnitude(velocity,MAX_RUN_SPEED)
 end
 
-local function gameArcOrigin(rootPosition,aimPoint)
-	local look=safeUnit(aimPoint,Vector3.new(0,0,-1))
-	local cf=CFrame.lookAt(rootPosition,rootPosition+look)
-	return (cf*CFrame.new(1,1.5,0)).Position
-end
-
 local function landingAtY(origin,velocity,y)
 	local a=0.5*G.Y
 	local b=velocity.Y
@@ -307,28 +301,14 @@ local function landingAtY(origin,velocity,y)
 	return origin+velocity*time+0.5*G*time*time,time
 end
 
-local function simulateGameTarget(rootPosition,targetArg,ballSpeed,time,catchPoint,landingY)
-	local origin=gameArcOrigin(rootPosition,targetArg)
-	local direction=targetArg-origin
-	if direction.Magnitude<1e-6 then
-		return nil
+local function releaseOrigin(qbRoot,heldBall)
+	if heldBall and heldBall:IsA("BasePart") then
+		return heldBall.Position
 	end
-	local velocity=direction.Unit*ballSpeed
-	local hit=origin+velocity*time+0.5*G*time*time
-	local landing,landingTime=landingAtY(origin,velocity,landingY)
-	return {
-		origin=origin,
-		targetArg=targetArg,
-		velocity=velocity,
-		direction=velocity.Unit,
-		hit=hit,
-		landing=landing,
-		landingTime=landingTime,
-		miss=(hit-catchPoint).Magnitude,
-	}
+	return qbRoot.Position+Vector3.new(0,1.5,0)
 end
 
-local function solveInputTarget(receiver,rootPosition,receiverRoot,power)
+local function solveFromReleaseOrigin(receiver,origin,receiverRoot,power)
 	local wrVel=receiverVelocity(receiver)
 	local ballSpeed=math.clamp(power or displayPower,30,100)*POWER_COEFFICIENT
 	local receiverPosition=receiverRoot.Position
@@ -338,45 +318,33 @@ local function solveInputTarget(receiver,rootPosition,receiverRoot,power)
 	for time=MIN_T,MAX_T,DT do
 		local targetXZ=receiverPosition+wrVel*(time+leadDelay)
 		local target=Vector3.new(targetXZ.X,catchY,targetXZ.Z)
-		local targetArg=target
-		local speedError=math.huge
-		local missEstimate=math.huge
-		local angle=nil
-
-		for _=1,TARGET_REFINE_STEPS do
-			local origin=gameArcOrigin(rootPosition,targetArg)
-			local needed=(target-origin-0.5*G*time*time)/time
-			local speed=needed.Magnitude
-			if speed<=1e-6 then
-				targetArg=nil
-				break
-			end
-			speedError=math.abs(speed-ballSpeed)
-			missEstimate=speedError*time
+		local needed=(target-origin-0.5*G*time*time)/time
+		local speed=needed.Magnitude
+		if speed>1e-6 then
+			local speedError=math.abs(speed-ballSpeed)
+			local missEstimate=speedError*time
 			local direction=needed.Unit
-			angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
-			targetArg=origin+direction*AIM_SCALE
-		end
-
-		if targetArg and angle and angle>=-5 and angle<=55 then
-			local sim=simulateGameTarget(rootPosition,targetArg,ballSpeed,time,target,landingY)
-			local valid=sim and (sim.miss<=CATCH_TOLERANCE or speedError<=SPEED_TOLERANCE or missEstimate<=CATCH_TOLERANCE)
-			if valid then
-				local score=sim.miss+missEstimate*0.35+time*0.05
+			local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
+			if angle>=-5 and angle<=55 and (speedError<=SPEED_TOLERANCE or missEstimate<=CATCH_TOLERANCE) then
+				local velocity=direction*ballSpeed
+				local hit=origin+velocity*time+0.5*G*time*time
+				local gameMiss=(hit-target).Magnitude
+				local landing,landingTime=landingAtY(origin,velocity,landingY)
+				local score=gameMiss+missEstimate*0.25+time*0.05
 				if not best or score<best.score then
 					best={
 						score=score,
-						origin=sim.origin,
+						origin=origin,
 						target=target,
 						time=time,
-						velocity=sim.velocity,
-						direction=sim.direction,
-						aimPoint=sim.targetArg,
+						velocity=velocity,
+						direction=direction,
+						aimPoint=origin+direction*AIM_SCALE,
 						speedError=speedError,
 						missEstimate=missEstimate,
-						gameMiss=sim.miss,
-						landing=sim.landing,
-						landingTime=sim.landingTime,
+						gameMiss=gameMiss,
+						landing=landing,
+						landingTime=landingTime,
 						power=power or displayPower,
 						receiverVelocity=wrVel,
 					}
@@ -398,7 +366,7 @@ local function buildPlan(receiver,power)
 		return nil
 	end
 
-	return solveInputTarget(receiver,qbRoot.Position,receiverRoot,power)
+	return solveFromReleaseOrigin(receiver,releaseOrigin(qbRoot,currentHeldBall()),receiverRoot,power)
 end
 
 local function findNearestReceiverToMouse()
@@ -647,6 +615,7 @@ local function attemptAimAssistThrow()
 	end
 
 	throwing=true
+	previewFrozen=false
 	lastPlan=plan
 	updatePreview(plan)
 	playThrowAnimation()
@@ -657,6 +626,7 @@ local function attemptAimAssistThrow()
 		if finalPlan then
 			lastPlan=finalPlan
 			updatePreview(finalPlan)
+			previewFrozen=true
 			local ok,err=fireThrow(finalPlan)
 			if ok then
 				setStatus("Aim throw sent: "..receiver.Name,Color3.fromRGB(115,240,170))
@@ -911,12 +881,17 @@ connect(RunService.RenderStepped,function()
 		ensureHighlight()
 	end
 
-	if selectedReceiver and not throwing then
+	local heldBall=currentHeldBall()
+	if heldBall and not throwing then
+		previewFrozen=false
+	end
+
+	if selectedReceiver and heldBall and not throwing then
 		local plan=buildPlan(selectedReceiver,displayPower)
 		lastPlan=plan
 		updatePreview(plan)
 		ensureHighlight()
-	elseif not selectedReceiver and not throwing then
+	elseif (not selectedReceiver or (not heldBall and not previewFrozen)) and not throwing then
 		clearPreview()
 	end
 end)
