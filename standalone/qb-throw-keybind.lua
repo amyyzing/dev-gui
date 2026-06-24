@@ -85,6 +85,9 @@ local previewParts=nil
 local hitboxEnabled=false
 local originalHitboxes={}
 local hitboxButton=nil
+local forceCanHitEnabled=false
+local originalCanHitValues={}
+local forceCanHitButton=nil
 
 local function connect(signal,fn)
 	local conn=signal:Connect(fn)
@@ -281,6 +284,48 @@ local function findByPath(root,segments)
 	return cursor
 end
 
+local function restoreCanHitValues()
+	for value,original in pairs(originalCanHitValues) do
+		if value and value.Parent then
+			pcall(function()
+				value.Value=original
+			end)
+		end
+	end
+	originalCanHitValues={}
+end
+
+local function forceCanHitValue(value)
+	if not forceCanHitEnabled or not value or not value:IsA("BoolValue") then
+		return
+	end
+	if originalCanHitValues[value]==nil then
+		originalCanHitValues[value]=value.Value
+	end
+	value.Value=true
+end
+
+local function forceCanHitForTouch(touch)
+	forceCanHitValue(canHitValue(touch))
+end
+
+local function forceCanHitsInBase(base)
+	if not forceCanHitEnabled or not base then
+		return
+	end
+	for _,entry in ipairs(GAUNTLET_TARGET_PATHS) do
+		local touch=findByPath(base,entry.path)
+		if touch then
+			forceCanHitForTouch(touch)
+		end
+	end
+	for _,descendant in ipairs(base:GetDescendants()) do
+		if descendant.Name=="TouchDetect" then
+			forceCanHitForTouch(descendant)
+		end
+	end
+end
+
 local function targetLabelText(target)
 	if not target then return "Target: none" end
 	return string.format("Target: %dpt  %s",target.score,target.name or target.part.Name)
@@ -374,6 +419,27 @@ local function setHitboxEnabled(enabled)
 	setStatus(hitboxEnabled and "2x gauntlet hitboxes enabled" or "2x gauntlet hitboxes disabled",hitboxEnabled and Color3.fromRGB(115,240,170) or Color3.fromRGB(190,190,190))
 end
 
+local function refreshForceCanHitButton()
+	if forceCanHitButton then
+		forceCanHitButton.Text=forceCanHitEnabled and "Force CanHit: ON" or "Force CanHit: OFF"
+		forceCanHitButton.BackgroundColor3=forceCanHitEnabled and Color3.fromRGB(110,70,30) or Color3.fromRGB(32,32,32)
+	end
+end
+
+local function setForceCanHitEnabled(enabled)
+	forceCanHitEnabled=enabled==true
+	if not forceCanHitEnabled then
+		restoreCanHitValues()
+	else
+		local workspaceGame=findPracticeWorkspace()
+		local base=workspaceGame and workspaceGame:FindFirstChild("Replicated")
+		base=base and base:FindFirstChild("QuarterbackGauntlet")
+		forceCanHitsInBase(base)
+	end
+	refreshForceCanHitButton()
+	setStatus(forceCanHitEnabled and "CanHit forced on for testing" or "CanHit values restored",forceCanHitEnabled and Color3.fromRGB(255,190,100) or Color3.fromRGB(190,190,190))
+end
+
 local function refreshTargets(force)
 	local now=os.clock()
 	if not force and now-lastRefresh<REFRESH_INTERVAL then
@@ -390,6 +456,7 @@ local function refreshTargets(force)
 		updateTargetText()
 		return activeTargets
 	end
+	forceCanHitsInBase(base)
 
 	local function addTarget(touch,score,name,seen)
 		local part=touchDetectPart(touch)
@@ -848,7 +915,7 @@ local function buildGui()
 		BackgroundColor3=Color3.fromRGB(12,12,12),
 		BorderSizePixel=0,
 		Position=UDim2.new(0,80,0,180),
-		Size=UDim2.new(0,240,0,126),
+		Size=UDim2.new(0,240,0,162),
 		Active=true,
 		Draggable=true,
 	},screenGui)
@@ -888,6 +955,11 @@ local function buildGui()
 		refreshTargets(true)
 	end)
 
+	forceCanHitButton=makeButton(body,"Force CanHit: OFF",function()
+		setForceCanHitEnabled(not forceCanHitEnabled)
+		refreshTargets(true)
+	end)
+
 	statusLabel=new("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,34),
@@ -911,6 +983,7 @@ end
 local function destroy()
 	stopBallDetection()
 	restoreHitboxes()
+	restoreCanHitValues()
 	disconnectAll()
 	clearPreview()
 	if targetHighlight then
@@ -931,6 +1004,12 @@ bindPracticeEvent()
 
 connect(RunService.RenderStepped,function()
 	bindPracticeEvent()
+	if forceCanHitEnabled then
+		local workspaceGame=findPracticeWorkspace()
+		local base=workspaceGame and workspaceGame:FindFirstChild("Replicated")
+		base=base and base:FindFirstChild("QuarterbackGauntlet")
+		forceCanHitsInBase(base)
+	end
 	refreshTargets(false)
 	if hitboxEnabled then
 		for _,target in ipairs(activeTargets) do
@@ -944,4 +1023,5 @@ if type(runtimeOwner)=="table" then
 end
 
 refreshHitboxButton()
-setStatus("Ready. Toggle 2x hitboxes when needed.")
+refreshForceCanHitButton()
+setStatus("Ready. Toggle testing helpers when needed.")
