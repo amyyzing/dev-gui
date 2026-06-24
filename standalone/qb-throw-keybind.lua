@@ -22,8 +22,8 @@ local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local POWER_COEFFICIENT=0.95
 local DEFAULT_DISPLAY_POWER=100
-local DEFAULT_PEAK_Y=14
-local DEFAULT_LEAD_DELAY=0.38
+local DEFAULT_PEAK_Y=14.2
+local DEFAULT_LEAD_DELAY=0
 local RELEASE_WAIT=0.26666666666666666
 local MAX_RUN_SPEED=21
 local MIN_T=0.35
@@ -32,6 +32,7 @@ local DT=0.02
 local SPEED_TOLERANCE=1.25
 local CATCH_TOLERANCE=2.0
 local AIM_SCALE=1000
+local TARGET_REFINE_STEPS=5
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
 local THROW_ANIMATION_SPEED=1.35
 local VALID_TEAM_IDS={HomeTeam=true,AwayTeam=true}
@@ -306,39 +307,76 @@ local function landingAtY(origin,velocity,y)
 	return origin+velocity*time+0.5*G*time*time,time
 end
 
-local function solveWithOrigin(receiver,origin,receiverRoot,power)
+local function simulateGameTarget(rootPosition,targetArg,ballSpeed,time,catchPoint,landingY)
+	local origin=gameArcOrigin(rootPosition,targetArg)
+	local direction=targetArg-origin
+	if direction.Magnitude<1e-6 then
+		return nil
+	end
+	local velocity=direction.Unit*ballSpeed
+	local hit=origin+velocity*time+0.5*G*time*time
+	local landing,landingTime=landingAtY(origin,velocity,landingY)
+	return {
+		origin=origin,
+		targetArg=targetArg,
+		velocity=velocity,
+		direction=velocity.Unit,
+		hit=hit,
+		landing=landing,
+		landingTime=landingTime,
+		miss=(hit-catchPoint).Magnitude,
+	}
+end
+
+local function solveInputTarget(receiver,rootPosition,receiverRoot,power)
 	local wrVel=receiverVelocity(receiver)
 	local ballSpeed=math.clamp(power or displayPower,30,100)*POWER_COEFFICIENT
 	local receiverPosition=receiverRoot.Position
+	local landingY=currentGameCenterY()
 	local best=nil
 
 	for time=MIN_T,MAX_T,DT do
 		local targetXZ=receiverPosition+wrVel*(time+leadDelay)
 		local target=Vector3.new(targetXZ.X,catchY,targetXZ.Z)
-		local needed=(target-origin-0.5*G*time*time)/time
-		local speed=needed.Magnitude
-		if speed>1e-6 then
-			local speedError=math.abs(speed-ballSpeed)
-			local missEstimate=speedError*time
+		local targetArg=target
+		local speedError=math.huge
+		local missEstimate=math.huge
+		local angle=nil
+
+		for _=1,TARGET_REFINE_STEPS do
+			local origin=gameArcOrigin(rootPosition,targetArg)
+			local needed=(target-origin-0.5*G*time*time)/time
+			local speed=needed.Magnitude
+			if speed<=1e-6 then
+				targetArg=nil
+				break
+			end
+			speedError=math.abs(speed-ballSpeed)
+			missEstimate=speedError*time
 			local direction=needed.Unit
-			local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
-			if angle>=-5 and angle<=55 and (speedError<=SPEED_TOLERANCE or missEstimate<=CATCH_TOLERANCE) then
-				local velocity=direction*ballSpeed
-				local landing,landingTime=landingAtY(origin,velocity,currentGameCenterY())
-				local score=missEstimate+time*0.05
+			angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
+			targetArg=origin+direction*AIM_SCALE
+		end
+
+		if targetArg and angle and angle>=-5 and angle<=55 then
+			local sim=simulateGameTarget(rootPosition,targetArg,ballSpeed,time,target,landingY)
+			local valid=sim and (sim.miss<=CATCH_TOLERANCE or speedError<=SPEED_TOLERANCE or missEstimate<=CATCH_TOLERANCE)
+			if valid then
+				local score=sim.miss+missEstimate*0.35+time*0.05
 				if not best or score<best.score then
 					best={
 						score=score,
-						origin=origin,
+						origin=sim.origin,
 						target=target,
 						time=time,
-						velocity=velocity,
-						direction=direction,
-						aimPoint=origin+direction*AIM_SCALE,
+						velocity=sim.velocity,
+						direction=sim.direction,
+						aimPoint=sim.targetArg,
 						speedError=speedError,
 						missEstimate=missEstimate,
-						landing=landing,
-						landingTime=landingTime,
+						gameMiss=sim.miss,
+						landing=sim.landing,
+						landingTime=sim.landingTime,
 						power=power or displayPower,
 						receiverVelocity=wrVel,
 					}
@@ -360,20 +398,7 @@ local function buildPlan(receiver,power)
 		return nil
 	end
 
-	local roughTarget=Vector3.new(receiverRoot.Position.X,catchY,receiverRoot.Position.Z)
-	local origin=gameArcOrigin(qbRoot.Position,roughTarget)
-	local plan=solveWithOrigin(receiver,origin,receiverRoot,power)
-	for _=1,2 do
-		if not plan then
-			break
-		end
-		origin=gameArcOrigin(qbRoot.Position,plan.aimPoint)
-		local refined=solveWithOrigin(receiver,origin,receiverRoot,power)
-		if refined then
-			plan=refined
-		end
-	end
-	return plan
+	return solveInputTarget(receiver,qbRoot.Position,receiverRoot,power)
 end
 
 local function findNearestReceiverToMouse()
