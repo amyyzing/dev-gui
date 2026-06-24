@@ -69,6 +69,9 @@ local targetHistory={}
 local currentTarget=nil
 local cachedPlan=nil
 local lastPreviewUpdate=0
+local cachedPracticeBall=nil
+local practiceControlsEnabled=true
+local boundPracticeEvent=nil
 
 local screenGui=nil
 local statusLabel=nil
@@ -132,6 +135,13 @@ local function rootOfLocalPlayer()
 end
 
 local function heldFootball()
+	if cachedPracticeBall and typeof(cachedPracticeBall)=="Instance" then
+		if cachedPracticeBall:IsA("BasePart") then
+			return cachedPracticeBall
+		end
+		local part=cachedPracticeBall:FindFirstChildWhichIsA("BasePart",true)
+		if part then return part end
+	end
 	local character=LP.Character or Workspace:FindFirstChild(LP.Name)
 	if not character then return nil end
 	for _,child in ipairs(character:GetChildren()) do
@@ -414,6 +424,55 @@ local function clearPreview()
 	end
 end
 
+local function notePracticeBall(ball)
+	if typeof(ball)=="Instance" then
+		cachedPracticeBall=ball
+	end
+end
+
+local function handlePracticeEvent(action,...)
+	if action=="ToggleControls" then
+		local enabled=...
+		practiceControlsEnabled=enabled~=false
+		if practiceControlsEnabled then
+			refreshTargets(true)
+		else
+			currentTarget=nil
+			cachedPlan=nil
+			updateTargetText()
+			clearPreview()
+		end
+		return
+	end
+	if action=="UpdateLiveControls" then
+		refreshTargets(true)
+		cachedPlan=nil
+		return
+	end
+	if action=="Mechanics" then
+		local method,ball=...
+		if method=="UpdateBall" or method=="EquipFootball" then
+			notePracticeBall(ball)
+			refreshTargets(true)
+			cachedPlan=nil
+		end
+	end
+end
+
+local function bindPracticeEvent()
+	if boundPracticeEvent and boundPracticeEvent.Parent then
+		return
+	end
+	local event=findPracticeRemote(findPracticeWorkspace())
+	if not event or event==boundPracticeEvent then
+		return
+	end
+	boundPracticeEvent=event
+	connect(event.OnClientEvent,function(action,...)
+		handlePracticeEvent(action,...)
+	end)
+end
+
 local function ensurePreview()
 	if previewFolder and previewFolder.Parent then
 		return previewParts
@@ -614,6 +673,11 @@ end
 
 local function throwAtBestTarget()
 	updateConfig()
+	bindPracticeEvent()
+	if not practiceControlsEnabled then
+		setStatus("Practice controls disabled",Color3.fromRGB(255,160,90))
+		return
+	end
 	refreshTargets(true)
 	if not currentTarget then
 		setStatus("No active CanHit target",Color3.fromRGB(255,120,120))
@@ -793,6 +857,7 @@ local function destroy()
 end
 
 buildGui()
+bindPracticeEvent()
 
 connect(UIS.InputBegan,function(input,processed)
 	if capturing then
@@ -811,6 +876,15 @@ connect(UIS.InputBegan,function(input,processed)
 end)
 
 connect(RunService.RenderStepped,function()
+	bindPracticeEvent()
+	if not practiceControlsEnabled then
+		currentTarget=nil
+		cachedPlan=nil
+		clearPreview()
+		ensureHighlight()
+		updateTargetText()
+		return
+	end
 	refreshTargets(false)
 	ensureHighlight()
 	if currentTarget then
