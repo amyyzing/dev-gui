@@ -361,47 +361,6 @@ local function installOutgoingHooks()
 		}
 	end
 
-	if loggerState.directHooked then
-		installed[#installed+1]="direct_existing"
-	elseif type(hookfunction)=="function" then
-		local directTargets={
-			{className="RemoteEvent",method="FireServer"},
-			{className="RemoteFunction",method="InvokeServer"},
-		}
-		for _,target in ipairs(directTargets) do
-			local ok,err=pcall(function()
-				local probe=Instance.new(target.className)
-				local original=probe[target.method]
-				if type(original)~="function" then
-					error(target.className.."."..target.method.." is not hookable")
-				end
-				local originalFn=original
-				local wrapped
-				wrapped=hookfunction(original,function(self,...)
-					if typeof(self)=="Instance" then
-						local state=type(runtimeOwner)=="table" and rawget(runtimeOwner,LOGGER_KEY) or nil
-						local emit=type(state)=="table" and state.emit or nil
-						if type(emit)=="function" then
-							local args={...}
-							pcall(emit,"direct",target.method,self,args)
-						end
-					end
-					return (type(wrapped)=="function" and wrapped or originalFn)(self,...)
-				end)
-				probe:Destroy()
-			end)
-
-			if ok then
-				installed[#installed+1]="direct_"..target.method
-			else
-				failed[#failed+1]={hook="direct_"..target.method,error=tostring(err)}
-			end
-		end
-		loggerState.directHooked=true
-	else
-		failed[#failed+1]={hook="direct",hookfunction=type(hookfunction)}
-	end
-
 	addLog("outgoing_hook_ready",{
 		installed=installed,
 		failed=failed,
@@ -612,7 +571,6 @@ local function exportLogs()
 			capabilities={
 				hookmetamethod=type(hookmetamethod),
 				getnamecallmethod=type(getnamecallmethod),
-				hookfunction=type(hookfunction),
 				newcclosure=type(newcclosure),
 				getconnections=type(getconnections),
 				decompile=type(decompile),
@@ -1088,7 +1046,6 @@ addLog("session_started",{
 	capabilities={
 		hookmetamethod=type(hookmetamethod),
 		getnamecallmethod=type(getnamecallmethod),
-		hookfunction=type(hookfunction),
 		newcclosure=type(newcclosure),
 		getconnections=type(getconnections),
 		decompile=type(decompile),
