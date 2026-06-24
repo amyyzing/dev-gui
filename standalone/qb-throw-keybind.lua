@@ -21,6 +21,9 @@ local POWER_COEFFICIENT=0.95
 local DEFAULT_DISPLAY_POWER=100
 local DEFAULT_PEAK_Y=14.2
 local DEFAULT_LEAD_DELAY=0.35
+local DEFAULT_SERVER_ARRIVAL_LEAD=0
+local USE_PING_ARRIVAL_LEAD=true
+local MAX_SERVER_ARRIVAL_LEAD=0.35
 local RELEASE_WAIT=0.26666666666666666
 local THROW_ANIMATION_SPEED=1.35
 local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
@@ -71,6 +74,7 @@ local previewFrozen=false
 local displayPower=DEFAULT_DISPLAY_POWER
 local catchY=DEFAULT_PEAK_Y
 local leadDelay=DEFAULT_LEAD_DELAY
+local serverArrivalLead=DEFAULT_SERVER_ARRIVAL_LEAD
 local lastPlan=nil
 
 local cache={
@@ -91,6 +95,7 @@ local teamButton=nil
 local powerBox=nil
 local peakBox=nil
 local leadBox=nil
+local arrivalBox=nil
 local previewFolder=nil
 local previewParts=nil
 local targetHighlight=nil
@@ -340,6 +345,23 @@ local function releasePositionFromSnapshot(snapshot)
 	return snapshot.c2Pos or snapshot.ballPos or (snapshot.qbPos and snapshot.qbPos+Vector3.new(0,1.5,0))
 end
 
+local function estimatedOneWayLatency()
+	if not USE_PING_ARRIVAL_LEAD then
+		return serverArrivalLead
+	end
+	local ok,ping=pcall(function()
+		return LP:GetNetworkPing()
+	end)
+	if not ok or type(ping)~="number" then
+		return serverArrivalLead
+	end
+	local estimated=ping*0.5
+	if serverArrivalLead>0 then
+		estimated=serverArrivalLead
+	end
+	return math.clamp(estimated,0,MAX_SERVER_ARRIVAL_LEAD)
+end
+
 local function makeSnapshot(receiver,forceRefs)
 	local qbRoot=rootOf(LP)
 	local wrRoot=rootOf(receiver)
@@ -402,8 +424,53 @@ local function latestSnapshot()
 	return snapshots[snapshotHead]
 end
 
+local function previousSnapshot()
+	if snapshotCount<2 then return nil end
+	local index=snapshotHead-1
+	if index<1 then index=SNAPSHOT_LIMIT end
+	return snapshots[index]
+end
+
 local function sampleFrame(receiver,forceRefs)
 	return pushSnapshot(makeSnapshot(receiver,forceRefs))
+end
+
+local function velocityBetween(current,previous,key)
+	if not(current and previous and current[key] and previous[key]) then
+		return nil
+	end
+	local dt=current.t-previous.t
+	if dt<=0 or dt>0.25 then
+		return nil
+	end
+	return (current[key]-previous[key])/dt
+end
+
+local function projectedSnapshot(snapshot,lead)
+	if not snapshot or not lead or lead<=0 then
+		return snapshot
+	end
+	lead=math.clamp(lead,0,MAX_SERVER_ARRIVAL_LEAD)
+	local previous=previousSnapshot()
+	local qbVel=snapshot.qbVel or Vector3.zero
+	local wrVel=snapshot.wrVel or Vector3.zero
+	local c2Vel=velocityBetween(snapshot,previous,"c2Pos")
+	local ballVel=velocityBetween(snapshot,previous,"ballPos")
+	local projected={}
+	for key,value in pairs(snapshot) do
+		projected[key]=value
+	end
+	projected.t=snapshot.t+lead
+	projected.qbPos=snapshot.qbPos+qbVel*lead
+	projected.wrPos=snapshot.wrPos+flat(wrVel)*lead
+	if snapshot.c2Pos then
+		projected.c2Pos=snapshot.c2Pos+clampMagnitude(c2Vel or qbVel,80)*lead
+	end
+	if snapshot.ballPos then
+		projected.ballPos=snapshot.ballPos+clampMagnitude(ballVel or qbVel,80)*lead
+	end
+	projected.releasePos=releasePositionFromSnapshot(projected)
+	return projected
 end
 
 local function landingAtY(origin,velocity,y)
@@ -482,7 +549,7 @@ local function buildPlan(receiver,power,forceRefs)
 		return nil
 	end
 	local snapshot=sampleFrame(receiver,forceRefs)
-	return solveSnapshot(snapshot,power)
+	return solveSnapshot(projectedSnapshot(snapshot,estimatedOneWayLatency()),power)
 end
 
 local function findNearestReceiverToMouse()
@@ -730,7 +797,7 @@ local function attemptAimAssistThrow()
 
 	task.delay(RELEASE_WAIT,function()
 		local snapshot=sampleFrame(receiver,true) or latestSnapshot()
-		local finalPlan=solveSnapshot(snapshot,displayPower) or lastPlan
+		local finalPlan=solveSnapshot(projectedSnapshot(snapshot,estimatedOneWayLatency()),displayPower) or lastPlan
 		if finalPlan then
 			lastPlan=finalPlan
 			updatePreview(finalPlan)
@@ -765,6 +832,12 @@ local function updateConfigFromBoxes()
 	if lead then
 		leadDelay=math.clamp(lead,0,1)
 		if leadBox then leadBox.Text=string.format("%.2f",leadDelay):gsub("0+$",""):gsub("%.$","") end
+	end
+	local arrival=tonumber(arrivalBox and arrivalBox.Text)
+	if arrival then
+		serverArrivalLead=math.clamp(arrival,0,MAX_SERVER_ARRIVAL_LEAD)
+		USE_PING_ARRIVAL_LEAD=serverArrivalLead<=0
+		if arrivalBox then arrivalBox.Text=string.format("%.3f",serverArrivalLead):gsub("0+$",""):gsub("%.$","") end
 	end
 end
 
@@ -831,7 +904,7 @@ local function buildGui()
 		BackgroundColor3=Color3.fromRGB(12,12,12),
 		BorderSizePixel=0,
 		Position=UDim2.new(0,80,0,180),
-		Size=UDim2.new(0,250,0,282),
+		Size=UDim2.new(0,250,0,322),
 		Active=true,
 		Draggable=true,
 	},screenGui)
@@ -904,6 +977,7 @@ local function buildGui()
 	powerBox=makeTextBox(body,"Display Power",displayPower,function() updateConfigFromBoxes() end)
 	peakBox=makeTextBox(body,"Peak Height",catchY,function() updateConfigFromBoxes() end)
 	leadBox=makeTextBox(body,"Lead Delay",leadDelay,function() updateConfigFromBoxes() end)
+	arrivalBox=makeTextBox(body,"Arrival Lead",serverArrivalLead,function() updateConfigFromBoxes() end)
 
 	statusLabel=new("TextLabel",{
 		BackgroundTransparency=1,
@@ -986,7 +1060,7 @@ connect(RunService.RenderStepped,function()
 	local snapshot=sampleFrame(selectedReceiver,false)
 	if heldBall and not throwing then
 		previewFrozen=false
-		local plan=solveSnapshot(snapshot,displayPower)
+		local plan=solveSnapshot(projectedSnapshot(snapshot,estimatedOneWayLatency()),displayPower)
 		lastPlan=plan
 		updatePreview(plan)
 	elseif not heldBall and not previewFrozen and not throwing then
