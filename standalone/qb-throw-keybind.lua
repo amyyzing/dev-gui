@@ -1,7 +1,7 @@
 -- Standalone QB aim-assist throw tester.
--- No loader, no API module fetch, no remote logger, and no native click emulation.
--- Press the bound key to play the throw animation, wait for the game's release
--- window, solve an aim point for the selected receiver, and fire Mechanics/ThrowBall.
+-- This is intentionally independent from the main loader/API. It keeps a small
+-- frame tracker for the selected receiver so the throw solver reads one coherent
+-- QB/C2/WR snapshot instead of mixing values from different frames.
 
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
@@ -13,43 +13,41 @@ local TweenService=game:GetService("TweenService")
 
 local LP=Players.LocalPlayer
 local RUNTIME_KEY="StandaloneQBThrowKeybindGui"
-local LEGACY_RUNTIME_KEYS={
-	"StandaloneQBAimAssist",
-	RUNTIME_KEY.."RemoteHook",
-}
+local LEGACY_RUNTIME_KEYS={"StandaloneQBAimAssist",RUNTIME_KEY.."RemoteHook"}
 
 local BALL_G=28
 local G=Vector3.new(0,-BALL_G,0)
 local POWER_COEFFICIENT=0.95
 local DEFAULT_DISPLAY_POWER=100
 local DEFAULT_PEAK_Y=14.2
-local DEFAULT_LEAD_DELAY=0
+local DEFAULT_LEAD_DELAY=0.35
 local RELEASE_WAIT=0.26666666666666666
+local THROW_ANIMATION_SPEED=1.35
+local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
+
 local MAX_RUN_SPEED=21
+local VELOCITY_DEADZONE=1.25
 local MIN_T=0.35
 local MAX_T=6
 local DT=0.02
 local SPEED_TOLERANCE=1.25
-local CATCH_TOLERANCE=2.0
+local CATCH_TOLERANCE=2
 local AIM_SCALE=1000
-local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
-local THROW_ANIMATION_SPEED=1.35
+local SNAPSHOT_LIMIT=180
+local REFRESH_GAME_REFS=0.5
+local REFRESH_BALL_REFS=0.12
 local VALID_TEAM_IDS={HomeTeam=true,AwayTeam=true}
 
 local runtimeOwner=(type(getgenv)=="function" and getgenv()) or _G
 if type(runtimeOwner)=="table" then
 	local old=rawget(runtimeOwner,RUNTIME_KEY)
 	if old and type(old.Destroy)=="function" then
-		pcall(function()
-			old:Destroy()
-		end)
+		pcall(function() old:Destroy() end)
 	end
 	for _,key in ipairs(LEGACY_RUNTIME_KEYS) do
 		local legacy=rawget(runtimeOwner,key)
 		if legacy and type(legacy.Destroy)=="function" then
-			pcall(function()
-				legacy:Destroy()
-			end)
+			pcall(function() legacy:Destroy() end)
 		elseif type(legacy)=="table" then
 			legacy.activeSession=nil
 			legacy.emit=nil
@@ -59,17 +57,32 @@ if type(runtimeOwner)=="table" then
 end
 
 local connections={}
+local snapshots={}
+local snapshotHead=0
+local snapshotCount=0
+
 local currentBinding=Enum.KeyCode.T
 local lockBinding=Enum.KeyCode.H
 local teamFilter=true
 local capturing=false
 local selectedReceiver=nil
 local throwing=false
+local previewFrozen=false
 local displayPower=DEFAULT_DISPLAY_POWER
 local catchY=DEFAULT_PEAK_Y
 local leadDelay=DEFAULT_LEAD_DELAY
 local lastPlan=nil
-local previewFrozen=false
+
+local cache={
+	lastGameScan=0,
+	gameFolder=nil,
+	localCenter=nil,
+	c2=nil,
+	replicatedCenter=nil,
+	lastBallScan=0,
+	heldBall=nil,
+}
+
 local screenGui=nil
 local statusLabel=nil
 local targetLabel=nil
@@ -90,9 +103,7 @@ end
 
 local function disconnectAll()
 	for _,conn in ipairs(connections) do
-		pcall(function()
-			conn:Disconnect()
-		end)
+		pcall(function() conn:Disconnect() end)
 	end
 	connections={}
 end
@@ -104,30 +115,6 @@ local function new(className,props,parent)
 	end
 	obj.Parent=parent
 	return obj
-end
-
-local function setStatus(text,color)
-	if statusLabel then
-		statusLabel.Text=tostring(text or "")
-		statusLabel.TextColor3=color or Color3.fromRGB(190,190,190)
-	end
-end
-
-local function setTargetText()
-	if targetLabel then
-		if selectedReceiver then
-			targetLabel.Text="Target: "..selectedReceiver.Name
-		else
-			targetLabel.Text="Target: none"
-		end
-	end
-end
-
-local function bindingToText(binding)
-	if not binding or binding==Enum.KeyCode.Unknown then
-		return "None"
-	end
-	return tostring(binding):gsub("Enum.KeyCode%.","")
 end
 
 local function flat(v)
@@ -148,6 +135,25 @@ local function clampMagnitude(v,maxMagnitude)
 	return v
 end
 
+local function bindingToText(binding)
+	if not binding or binding==Enum.KeyCode.Unknown then
+		return "None"
+	end
+	return tostring(binding):gsub("Enum.KeyCode%.","")
+end
+
+local function setStatus(text,color)
+	if statusLabel then
+		statusLabel.Text=tostring(text or "")
+		statusLabel.TextColor3=color or Color3.fromRGB(190,190,190)
+	end
+end
+
+local function setTargetText()
+	if not targetLabel then return end
+	targetLabel.Text=selectedReceiver and ("Target: "..selectedReceiver.Name) or "Target: none"
+end
+
 local function rootOf(player)
 	local character=player and (player.Character or Workspace:FindFirstChild(player.Name))
 	return character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
@@ -161,24 +167,13 @@ end
 local function getTeamId(player)
 	local replicated=player and player:FindFirstChild("Replicated")
 	local teamValue=replicated and replicated:FindFirstChild("TeamID")
-	if not teamValue then
-		return nil
-	end
-	local ok,value=pcall(function()
-		return teamValue.Value
-	end)
-	if ok then
-		return tostring(value)
-	end
-	return nil
+	if not teamValue then return nil end
+	local ok,value=pcall(function() return teamValue.Value end)
+	return ok and tostring(value) or nil
 end
 
 local function canTarget(player)
-	if not player or player==LP then
-		return false
-	end
-	local root=rootOf(player)
-	if not root then
+	if not player or player==LP or not rootOf(player) then
 		return false
 	end
 	if not teamFilter then
@@ -192,61 +187,18 @@ local function canTarget(player)
 	return localTeam==playerTeam
 end
 
-local function currentHeldBall()
-	local character=LP.Character or Workspace:FindFirstChild(LP.Name)
-	if not character then
-		return nil
-	end
-	for _,descendant in ipairs(character:GetDescendants()) do
-		if descendant:IsA("BasePart") and descendant.Name:lower():find("football") then
-			return descendant
-		end
-	end
-	for _,child in ipairs(character:GetChildren()) do
-		if child.Name:lower():find("football") then
-			if child:IsA("BasePart") then
-				return child
-			end
-			local part=child:FindFirstChildWhichIsA("BasePart",true)
-			if part then
-				return part
-			end
-		end
-	end
-	return nil
-end
-
 local function getGameId()
 	local replicated=LP:FindFirstChild("Replicated")
 	local gameId=replicated and replicated:FindFirstChild("GameID")
-	local ok,value=pcall(function()
-		return gameId and gameId.Value
-	end)
+	local ok,value=pcall(function() return gameId and gameId.Value end)
 	if ok and value and tostring(value)~="" then
 		return tostring(value)
 	end
 	return nil
 end
 
-local function getGameReEvent()
-	local gameId=getGameId()
-	local games=ReplicatedStorage:FindFirstChild("Games")
-	local gameFolder=games and gameId and games:FindFirstChild(gameId)
-	local gameEvent=gameFolder and gameFolder:FindFirstChild("ReEvent")
-	if gameEvent and gameEvent:IsA("RemoteEvent") then
-		return gameEvent
-	end
-	local direct=ReplicatedStorage:FindFirstChild("ReEvent")
-	if direct and direct:IsA("RemoteEvent") then
-		return direct
-	end
-	return nil
-end
-
 local function firstChildFolder(parent)
-	if not parent then
-		return nil
-	end
+	if not parent then return nil end
 	for _,child in ipairs(parent:GetChildren()) do
 		if child:IsA("Folder") or child:IsA("Model") then
 			return child
@@ -255,19 +207,15 @@ local function firstChildFolder(parent)
 	return nil
 end
 
-local function currentWorkspaceGameFolder()
+local function findWorkspaceGameFolder()
 	local gameId=getGameId()
-	local roots={
-		Workspace:FindFirstChild("MiniGames"),
-		Workspace:FindFirstChild("Games"),
-	}
+	local roots={Workspace:FindFirstChild("MiniGames"),Workspace:FindFirstChild("Games")}
 	for _,root in ipairs(roots) do
 		local direct=root and gameId and root:FindFirstChild(gameId)
 		if direct then
 			return direct
 		end
 	end
-
 	local miniGames=Workspace:FindFirstChild("MiniGames")
 	if miniGames and #miniGames:GetChildren()==1 then
 		return firstChildFolder(miniGames)
@@ -275,14 +223,24 @@ local function currentWorkspaceGameFolder()
 	return firstChildFolder(Workspace:FindFirstChild("Games")) or firstChildFolder(miniGames)
 end
 
-local function instanceWorldCFrame(instance)
-	if not instance then
-		return nil
+local function refreshGameRefs(force)
+	local now=os.clock()
+	if not force and cache.gameFolder and now-cache.lastGameScan<REFRESH_GAME_REFS then
+		return
 	end
+	cache.lastGameScan=now
+	cache.gameFolder=findWorkspaceGameFolder()
+	local localFolder=cache.gameFolder and cache.gameFolder:FindFirstChild("Local")
+	local replicated=cache.gameFolder and cache.gameFolder:FindFirstChild("Replicated")
+	cache.localCenter=localFolder and localFolder:FindFirstChild("Center")
+	cache.c2=cache.localCenter and cache.localCenter:FindFirstChild("C2",true)
+	cache.replicatedCenter=replicated and replicated:FindFirstChild("Center")
+end
+
+local function instanceWorldCFrame(instance)
+	if not instance then return nil end
 	if instance:IsA("Attachment") then
-		local ok,cf=pcall(function()
-			return instance.WorldCFrame
-		end)
+		local ok,cf=pcall(function() return instance.WorldCFrame end)
 		if ok and typeof(cf)=="CFrame" then
 			return cf
 		end
@@ -296,39 +254,156 @@ local function instanceWorldCFrame(instance)
 	return nil
 end
 
-local function currentC2Position()
-	local gameFolder=currentWorkspaceGameFolder()
-	local localFolder=gameFolder and gameFolder:FindFirstChild("Local")
-	local center=localFolder and localFolder:FindFirstChild("Center")
-	local c2=center and center:FindFirstChild("C2",true)
-	local cf=instanceWorldCFrame(c2)
+local function currentC2Position(force)
+	refreshGameRefs(force)
+	local cf=instanceWorldCFrame(cache.c2)
 	return cf and cf.Position
 end
 
-local function currentGameCenterY()
-	local gameFolder=currentWorkspaceGameFolder()
-	local replicated=gameFolder and gameFolder:FindFirstChild("Replicated")
-	local center=replicated and replicated:FindFirstChild("Center")
+local function currentGameCenterY(force)
+	refreshGameRefs(force)
+	local center=cache.replicatedCenter
 	if center and center:IsA("BasePart") then
 		return center.CFrame.Y+0.5
 	end
 	return 0.5
 end
 
-local function receiverVelocity(player)
-	local root=rootOf(player)
-	if not root then
+local function currentHeldBall(force)
+	local character=LP.Character or Workspace:FindFirstChild(LP.Name)
+	local now=os.clock()
+	if not character then
+		cache.heldBall=nil
+		return nil
+	end
+	if not force and cache.heldBall and cache.heldBall.Parent and cache.heldBall:IsDescendantOf(character) then
+		return cache.heldBall
+	end
+	if not force and now-cache.lastBallScan<REFRESH_BALL_REFS then
+		return cache.heldBall
+	end
+	cache.lastBallScan=now
+	cache.heldBall=nil
+	for _,child in ipairs(character:GetChildren()) do
+		if child.Name:lower():find("football") then
+			if child:IsA("BasePart") then
+				cache.heldBall=child
+				return child
+			end
+			local part=child:FindFirstChildWhichIsA("BasePart",true)
+			if part then
+				cache.heldBall=part
+				return part
+			end
+		end
+	end
+	for _,descendant in ipairs(character:GetDescendants()) do
+		if descendant:IsA("BasePart") and descendant.Name:lower():find("football") then
+			cache.heldBall=descendant
+			return descendant
+		end
+	end
+	return nil
+end
+
+local function getGameReEvent()
+	local function valid(event)
+		return event and event:IsA("RemoteEvent") and event
+	end
+	refreshGameRefs(false)
+	local gameId=getGameId()
+	local workspaceEvent=cache.gameFolder and (valid(cache.gameFolder:FindFirstChild("ReEvent")) or valid((cache.gameFolder:FindFirstChild("Replicated") or nil) and cache.gameFolder.Replicated:FindFirstChild("ReEvent")))
+	if workspaceEvent then
+		return workspaceEvent
+	end
+	local games=ReplicatedStorage:FindFirstChild("Games")
+	local gameFolder=games and gameId and games:FindFirstChild(gameId)
+	local gameEvent=gameFolder and (valid(gameFolder:FindFirstChild("ReEvent")) or valid((gameFolder:FindFirstChild("Replicated") or nil) and gameFolder.Replicated:FindFirstChild("ReEvent")))
+	if gameEvent then
+		return gameEvent
+	end
+	return valid(ReplicatedStorage:FindFirstChild("ReEvent"))
+end
+
+local function receiverVelocityFromSnapshot(snapshot)
+	local velocity=flat(snapshot.wrVel or Vector3.zero)
+	if velocity.Magnitude<VELOCITY_DEADZONE then
 		return Vector3.zero
 	end
-	local velocity=flat(root.AssemblyLinearVelocity or Vector3.zero)
-	local humanoid=humanoidOf(player)
-	if humanoid and humanoid.MoveDirection.Magnitude<0.05 and velocity.Magnitude<MAX_RUN_SPEED*0.35 then
-		return Vector3.zero
-	end
-	if velocity.Magnitude<1.25 then
+	if not snapshot.wrMoving and velocity.Magnitude<MAX_RUN_SPEED*0.35 then
 		return Vector3.zero
 	end
 	return clampMagnitude(velocity,MAX_RUN_SPEED)
+end
+
+local function releasePositionFromSnapshot(snapshot)
+	return snapshot.c2Pos or snapshot.ballPos or (snapshot.qbPos and snapshot.qbPos+Vector3.new(0,1.5,0))
+end
+
+local function makeSnapshot(receiver,forceRefs)
+	local qbRoot=rootOf(LP)
+	local wrRoot=rootOf(receiver)
+	if not qbRoot or not wrRoot then
+		return nil
+	end
+	local qbHumanoid=humanoidOf(LP)
+	local wrHumanoid=humanoidOf(receiver)
+	local heldBall=currentHeldBall(forceRefs)
+	local c2Pos=currentC2Position(forceRefs)
+	local serverTime=nil
+	pcall(function()
+		serverTime=Workspace:GetServerTimeNow()
+	end)
+	local wrVel=wrRoot.AssemblyLinearVelocity or Vector3.zero
+	local qbVel=qbRoot.AssemblyLinearVelocity or Vector3.zero
+	local wrMoving=flat(wrVel).Magnitude>=VELOCITY_DEADZONE
+	if wrHumanoid and wrHumanoid.MoveDirection.Magnitude>=0.05 then
+		wrMoving=true
+	end
+	local airborne=false
+	if qbHumanoid then
+		local state=qbHumanoid:GetState()
+		airborne=qbHumanoid.FloorMaterial==Enum.Material.Air or state==Enum.HumanoidStateType.Jumping or state==Enum.HumanoidStateType.Freefall
+	end
+	local snapshot={
+		t=os.clock(),
+		serverTime=serverTime,
+		qbRoot=qbRoot,
+		wrRoot=wrRoot,
+		heldBall=heldBall,
+		qbPos=qbRoot.Position,
+		qbVel=qbVel,
+		qbLook=qbRoot.CFrame.LookVector,
+		qbRight=qbRoot.CFrame.RightVector,
+		qbAirborne=airborne,
+		wrPos=wrRoot.Position,
+		wrVel=wrVel,
+		wrMoving=wrMoving,
+		c2Pos=c2Pos,
+		ballPos=heldBall and heldBall.Position,
+		landingY=currentGameCenterY(false),
+	}
+	snapshot.releasePos=releasePositionFromSnapshot(snapshot)
+	return snapshot
+end
+
+local function pushSnapshot(snapshot)
+	if not snapshot then return nil end
+	snapshotHead=snapshotHead%SNAPSHOT_LIMIT+1
+	snapshots[snapshotHead]=snapshot
+	if snapshotCount<SNAPSHOT_LIMIT then
+		snapshotCount=snapshotCount+1
+	end
+	return snapshot
+end
+
+local function latestSnapshot()
+	if snapshotCount<=0 then return nil end
+	return snapshots[snapshotHead]
+end
+
+local function sampleFrame(receiver,forceRefs)
+	return pushSnapshot(makeSnapshot(receiver,forceRefs))
 end
 
 local function landingAtY(origin,velocity,y)
@@ -352,76 +427,62 @@ local function landingAtY(origin,velocity,y)
 	return origin+velocity*time+0.5*G*time*time,time
 end
 
-local function releaseOrigin(qbRoot,heldBall)
-	local c2Position=currentC2Position()
-	if c2Position then
-		return c2Position
+local function solveSnapshot(snapshot,power)
+	if not snapshot or not snapshot.releasePos or not snapshot.wrPos then
+		return nil
 	end
-	if heldBall and heldBall:IsA("BasePart") then
-		return heldBall.Position
-	end
-	return qbRoot.Position+Vector3.new(0,1.5,0)
-end
-
-local function solveFromReleaseOrigin(receiver,origin,receiverRoot,power)
-	local wrVel=receiverVelocity(receiver)
+	local origin=snapshot.releasePos
+	local wrVel=receiverVelocityFromSnapshot(snapshot)
 	local ballSpeed=math.clamp(power or displayPower,30,100)*POWER_COEFFICIENT
-	local receiverPosition=receiverRoot.Position
-	local landingY=currentGameCenterY()
 	local best=nil
-
 	for time=MIN_T,MAX_T,DT do
-		local targetXZ=receiverPosition+wrVel*(time+leadDelay)
+		local targetXZ=snapshot.wrPos+wrVel*(time+leadDelay)
 		local target=Vector3.new(targetXZ.X,catchY,targetXZ.Z)
 		local needed=(target-origin-0.5*G*time*time)/time
 		local speed=needed.Magnitude
 		if speed>1e-6 then
 			local speedError=math.abs(speed-ballSpeed)
 			local missEstimate=speedError*time
-			local direction=needed.Unit
-			local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
-			if angle>=-5 and angle<=55 and (speedError<=SPEED_TOLERANCE or missEstimate<=CATCH_TOLERANCE) then
-				local velocity=direction*ballSpeed
-				local hit=origin+velocity*time+0.5*G*time*time
-				local gameMiss=(hit-target).Magnitude
-				local landing,landingTime=landingAtY(origin,velocity,landingY)
-				local score=gameMiss+missEstimate*0.25+time*0.05
-				if not best or score<best.score then
-					best={
-						score=score,
-						origin=origin,
-						target=target,
-						time=time,
-						velocity=velocity,
-						direction=direction,
-						aimPoint=origin+direction*AIM_SCALE,
-						speedError=speedError,
-						missEstimate=missEstimate,
-						gameMiss=gameMiss,
-						landing=landing,
-						landingTime=landingTime,
-						power=power or displayPower,
-						receiverVelocity=wrVel,
-					}
+			if speedError<=SPEED_TOLERANCE or missEstimate<=CATCH_TOLERANCE then
+				local direction=needed.Unit
+				local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
+				if angle>=-5 and angle<=55 then
+					local velocity=direction*ballSpeed
+					local hit=origin+velocity*time+0.5*G*time*time
+					local gameMiss=(hit-target).Magnitude
+					local landing,landingTime=landingAtY(origin,velocity,snapshot.landingY or currentGameCenterY(false))
+					local score=gameMiss+missEstimate*0.25+time*0.05
+					if not best or score<best.score then
+						best={
+							score=score,
+							origin=origin,
+							target=target,
+							time=time,
+							velocity=velocity,
+							direction=direction,
+							aimPoint=origin+direction*AIM_SCALE,
+							speedError=speedError,
+							missEstimate=missEstimate,
+							gameMiss=gameMiss,
+							landing=landing,
+							landingTime=landingTime,
+							power=power or displayPower,
+							snapshot=snapshot,
+						}
+					end
 				end
 			end
 		end
 	end
-
 	return best
 end
 
-local function buildPlan(receiver,power)
+local function buildPlan(receiver,power,forceRefs)
 	if not canTarget(receiver) then
 		return nil
 	end
-	local qbRoot=rootOf(LP)
-	local receiverRoot=rootOf(receiver)
-	if not qbRoot or not receiverRoot then
-		return nil
-	end
-
-	return solveFromReleaseOrigin(receiver,releaseOrigin(qbRoot,currentHeldBall()),receiverRoot,power)
+	local snapshot=sampleFrame(receiver,forceRefs)
+	return solveSnapshot(snapshot,power)
 end
 
 local function findNearestReceiverToMouse()
@@ -430,7 +491,6 @@ local function findNearestReceiverToMouse()
 	if not camera or not mouse then
 		return nil
 	end
-
 	local best=nil
 	local bestDistance=math.huge
 	for _,player in ipairs(Players:GetPlayers()) do
@@ -484,7 +544,6 @@ local function ensurePreview()
 	if previewFolder and previewFolder.Parent then
 		return previewParts
 	end
-
 	clearPreview()
 	previewFolder=Instance.new("Folder")
 	previewFolder.Name="StandaloneQBAimPreview"
@@ -526,7 +585,6 @@ local function ensurePreview()
 		NumberSequenceKeypoint.new(1,0.6),
 	})
 	beam.Parent=previewFolder
-
 	previewParts={p0=p0,a0=a0,p1=p1,a1=a1,catch=catch,beam=beam}
 	return previewParts
 end
@@ -540,7 +598,6 @@ local function beamDirection(velocity,origin,time)
 	if not(velocity and origin and time and time>0) then
 		return nil
 	end
-
 	local endPoint=0.5*G*time*time+velocity*time+origin
 	local c1=endPoint-(G*time*time+velocity*time)/3
 	local c0=(0.125*G*time*time+0.5*velocity*time+origin-0.125*(origin+endPoint))/0.375-c1
@@ -550,7 +607,6 @@ local function beamDirection(velocity,origin,time)
 	if tangent0.Magnitude<1e-6 or tangent1.Magnitude<1e-6 or chord.Magnitude<1e-6 then
 		return nil
 	end
-
 	local x0=safeUnit(tangent0,velocity)
 	local zLine=safeUnit(chord,Vector3.new(0,0,-1))
 	local y0=safeUnit(x0:Cross(zLine),Vector3.new(0,1,0))
@@ -575,7 +631,6 @@ local function updatePreview(plan)
 	local endVelocity=plan.velocity+G*previewTime
 	local curve0,curve1,c2,c3,endPoint=beamDirection(plan.velocity,plan.origin,previewTime)
 	endPoint=endPoint or plan.landing or plan.target
-
 	parts.p0.CFrame=c2 or beamCFrame(plan.origin,plan.velocity)
 	parts.p1.CFrame=c3 or beamCFrame(endPoint,endVelocity,plan.velocity)
 	parts.catch.CFrame=CFrame.new(plan.target)
@@ -588,6 +643,9 @@ local function lockNearestReceiver()
 	local receiver=findNearestReceiverToMouse()
 	if receiver then
 		selectedReceiver=receiver
+		snapshotHead=0
+		snapshotCount=0
+		snapshots={}
 		setTargetText()
 		ensureHighlight()
 		setStatus("Locked "..receiver.Name,Color3.fromRGB(115,240,170))
@@ -624,9 +682,7 @@ local function playThrowAnimation()
 	if not ok or not track then
 		return false
 	end
-	pcall(function()
-		track.Priority=Enum.AnimationPriority.Action
-	end)
+	pcall(function() track.Priority=Enum.AnimationPriority.Action end)
 	track:Play(0.05,1,THROW_ANIMATION_SPEED)
 	return true
 end
@@ -649,21 +705,17 @@ local function attemptAimAssistThrow()
 		setStatus("Throw already in progress",Color3.fromRGB(255,200,120))
 		return
 	end
-
 	local receiver=selectedReceiver
 	if not canTarget(receiver) then
 		receiver=lockNearestReceiver()
 	end
-	if not receiver then
-		return
-	end
-
-	if not currentHeldBall() then
+	if not receiver then return end
+	if not currentHeldBall(true) then
 		setStatus("No football held",Color3.fromRGB(255,120,120))
 		return
 	end
 
-	local plan=buildPlan(receiver,displayPower)
+	local plan=buildPlan(receiver,displayPower,true)
 	if not plan then
 		setStatus("No aim solution",Color3.fromRGB(255,120,120))
 		return
@@ -677,7 +729,8 @@ local function attemptAimAssistThrow()
 	setStatus("Throwing to "..receiver.Name.." ...",Color3.fromRGB(120,210,255))
 
 	task.delay(RELEASE_WAIT,function()
-		local finalPlan=buildPlan(receiver,displayPower) or lastPlan
+		local snapshot=sampleFrame(receiver,true) or latestSnapshot()
+		local finalPlan=solveSnapshot(snapshot,displayPower) or lastPlan
 		if finalPlan then
 			lastPlan=finalPlan
 			updatePreview(finalPlan)
@@ -716,13 +769,9 @@ local function updateConfigFromBoxes()
 end
 
 local function makeTextBox(parent,label,value,callback)
-	local row=new("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,34),
-	},parent)
+	local row=new("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,34)},parent)
 	new("TextLabel",{
 		BackgroundTransparency=1,
-		Position=UDim2.new(0,0,0,0),
 		Size=UDim2.new(1,-72,1,0),
 		Text=label,
 		Font=Enum.Font.Gotham,
@@ -742,9 +791,7 @@ local function makeTextBox(parent,label,value,callback)
 		ClearTextOnFocus=false,
 	},row)
 	new("UIStroke",{Color=Color3.fromRGB(70,70,70),Thickness=1},box)
-	connect(box.FocusLost,function()
-		callback(box)
-	end)
+	connect(box.FocusLost,function() callback(box) end)
 	return box
 end
 
@@ -775,9 +822,7 @@ local function buildGui()
 	screenGui.Name=RUNTIME_KEY
 	screenGui.ResetOnSpawn=false
 	screenGui.IgnoreGuiInset=true
-	pcall(function()
-		screenGui.Parent=CoreGui
-	end)
+	pcall(function() screenGui.Parent=CoreGui end)
 	if not screenGui.Parent then
 		screenGui.Parent=LP:WaitForChild("PlayerGui")
 	end
@@ -843,6 +888,7 @@ local function buildGui()
 		selectedReceiver=nil
 		setTargetText()
 		ensureHighlight()
+		clearPreview()
 		setStatus("Team filter "..(teamFilter and "on" or "off"))
 	end)
 
@@ -855,15 +901,9 @@ local function buildGui()
 		attemptAimAssistThrow()
 	end)
 
-	powerBox=makeTextBox(body,"Display Power",displayPower,function()
-		updateConfigFromBoxes()
-	end)
-	peakBox=makeTextBox(body,"Peak Height",catchY,function()
-		updateConfigFromBoxes()
-	end)
-	leadBox=makeTextBox(body,"Lead Delay",leadDelay,function()
-		updateConfigFromBoxes()
-	end)
+	powerBox=makeTextBox(body,"Display Power",displayPower,function() updateConfigFromBoxes() end)
+	peakBox=makeTextBox(body,"Peak Height",catchY,function() updateConfigFromBoxes() end)
+	leadBox=makeTextBox(body,"Lead Delay",leadDelay,function() updateConfigFromBoxes() end)
 
 	statusLabel=new("TextLabel",{
 		BackgroundTransparency=1,
@@ -896,6 +936,9 @@ local function destroy()
 		screenGui:Destroy()
 		screenGui=nil
 	end
+	snapshots={}
+	snapshotHead=0
+	snapshotCount=0
 	if type(runtimeOwner)=="table" and rawget(runtimeOwner,RUNTIME_KEY) then
 		rawset(runtimeOwner,RUNTIME_KEY,nil)
 	end
@@ -913,16 +956,11 @@ connect(UIS.InputBegan,function(input,processed)
 		end
 		return
 	end
-
-	if processed then
-		return
-	end
-
+	if processed then return end
 	if input.UserInputType==Enum.UserInputType.Keyboard and input.KeyCode==lockBinding then
 		lockNearestReceiver()
 		return
 	end
-
 	if input.UserInputType==Enum.UserInputType.Keyboard and input.KeyCode==currentBinding then
 		updateConfigFromBoxes()
 		attemptAimAssistThrow()
@@ -934,19 +972,24 @@ connect(RunService.RenderStepped,function()
 		selectedReceiver=nil
 		setTargetText()
 		ensureHighlight()
+		clearPreview()
+		return
 	end
 
-	local heldBall=currentHeldBall()
+	if not selectedReceiver then
+		if not throwing then clearPreview() end
+		return
+	end
+
+	ensureHighlight()
+	local heldBall=currentHeldBall(false)
+	local snapshot=sampleFrame(selectedReceiver,false)
 	if heldBall and not throwing then
 		previewFrozen=false
-	end
-
-	if selectedReceiver and heldBall and not throwing then
-		local plan=buildPlan(selectedReceiver,displayPower)
+		local plan=solveSnapshot(snapshot,displayPower)
 		lastPlan=plan
 		updatePreview(plan)
-		ensureHighlight()
-	elseif (not selectedReceiver or (not heldBall and not previewFrozen)) and not throwing then
+	elseif not heldBall and not previewFrozen and not throwing then
 		clearPreview()
 	end
 end)
