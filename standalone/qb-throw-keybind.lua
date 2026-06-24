@@ -1,6 +1,5 @@
--- Standalone Practice / Quarterback Gauntlet throw assist.
--- Press T to throw at the highest-value active gauntlet target.
--- Active targets are TouchDetect parts with an adjacent BoolValue named CanHit.
+-- Standalone Practice / Quarterback Gauntlet hitbox toggle.
+-- Toggle locally expands gauntlet TouchDetect hitboxes for easier overlap.
 
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
@@ -24,6 +23,7 @@ local G=Vector3.new(0,-BALL_G,0)
 local POWER_COEFFICIENT=0.95
 local DEFAULT_POWER=100
 local DEFAULT_TARGET_LEAD=0
+local HITBOX_SCALE=2
 local MIN_T=0.25
 local MAX_T=5
 local DT=0.02
@@ -82,6 +82,9 @@ local leadBox=nil
 local targetHighlight=nil
 local previewFolder=nil
 local previewParts=nil
+local hitboxEnabled=false
+local originalHitboxes={}
+local hitboxButton=nil
 
 local function connect(signal,fn)
 	local conn=signal:Connect(fn)
@@ -315,6 +318,62 @@ local function targetStillActive(target)
 	return target and target.part and target.part.Parent and target.canHit and target.canHit.Value
 end
 
+local function restoreHitboxes()
+	for part,original in pairs(originalHitboxes) do
+		if part and part.Parent then
+			pcall(function()
+				part.Size=original.Size
+				part.Transparency=original.Transparency
+				part.CanCollide=original.CanCollide
+				part.CanTouch=original.CanTouch
+				part.CanQuery=original.CanQuery
+			end)
+		end
+	end
+	originalHitboxes={}
+end
+
+local function applyHitbox(part)
+	if not hitboxEnabled or not part or not part.Parent or not part:IsA("BasePart") then
+		return
+	end
+	if not originalHitboxes[part] then
+		originalHitboxes[part]={
+			Size=part.Size,
+			Transparency=part.Transparency,
+			CanCollide=part.CanCollide,
+			CanTouch=part.CanTouch,
+			CanQuery=part.CanQuery,
+		}
+	end
+	local original=originalHitboxes[part]
+	part.Size=original.Size*HITBOX_SCALE
+	part.CanCollide=false
+	part.CanTouch=true
+	part.CanQuery=true
+	part.Transparency=math.max(original.Transparency,0.55)
+end
+
+local function refreshHitboxButton()
+	if hitboxButton then
+		hitboxButton.Text=hitboxEnabled and "2x Hitbox: ON" or "2x Hitbox: OFF"
+		hitboxButton.BackgroundColor3=hitboxEnabled and Color3.fromRGB(30,110,70) or Color3.fromRGB(32,32,32)
+	end
+end
+
+local function setHitboxEnabled(enabled)
+	hitboxEnabled=enabled==true
+	if not hitboxEnabled then
+		restoreHitboxes()
+	else
+		for _,target in ipairs(activeTargets) do
+			applyHitbox(target.part)
+		end
+	end
+	refreshHitboxButton()
+	setStatus(hitboxEnabled and "2x gauntlet hitboxes enabled" or "2x gauntlet hitboxes disabled",hitboxEnabled and Color3.fromRGB(115,240,170) or Color3.fromRGB(190,190,190))
+end
+
 local function refreshTargets(force)
 	local now=os.clock()
 	if not force and now-lastRefresh<REFRESH_INTERVAL then
@@ -342,6 +401,7 @@ local function refreshTargets(force)
 			return
 		end
 		seen[part]=true
+		applyHitbox(part)
 		activeTargets[#activeTargets+1]={
 			part=part,
 			score=score,
@@ -478,13 +538,6 @@ local function handlePracticeEvent(action,...)
 		practiceControlsEnabled=enabled~=false
 		if practiceControlsEnabled then
 			refreshTargets(true)
-		else
-			currentTarget=nil
-			cachedPlan=nil
-			stopBallDetection()
-			updateTargetText()
-			clearPreview()
-			setStatus("Waiting for live practice controls",Color3.fromRGB(255,160,90))
 		end
 		return
 	end
@@ -795,7 +848,7 @@ local function buildGui()
 		BackgroundColor3=Color3.fromRGB(12,12,12),
 		BorderSizePixel=0,
 		Position=UDim2.new(0,80,0,180),
-		Size=UDim2.new(0,260,0,220),
+		Size=UDim2.new(0,240,0,126),
 		Active=true,
 		Draggable=true,
 	},screenGui)
@@ -805,7 +858,7 @@ local function buildGui()
 		BackgroundTransparency=1,
 		Position=UDim2.new(0,14,0,10),
 		Size=UDim2.new(1,-48,0,20),
-		Text="Practice Gauntlet",
+		Text="Practice Hitbox",
 		Font=Enum.Font.GothamBold,
 		TextSize=14,
 		TextColor3=Color3.fromRGB(245,245,245),
@@ -830,33 +883,15 @@ local function buildGui()
 	},frame)
 	new("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},body)
 
-	targetLabel=new("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,22),
-		Text="Target: none",
-		Font=Enum.Font.Gotham,
-		TextSize=12,
-		TextColor3=Color3.fromRGB(200,200,200),
-		TextXAlignment=Enum.TextXAlignment.Left,
-	},body)
-
-	keyButton=makeButton(body,"Throw Key: "..bindingToText(currentBinding),function()
-		capturing=true
-		keyButton.Text="Press a key..."
-		setStatus("Press a key for throw",Color3.fromRGB(120,210,255))
+	hitboxButton=makeButton(body,"2x Hitbox: OFF",function()
+		setHitboxEnabled(not hitboxEnabled)
+		refreshTargets(true)
 	end)
-
-	makeButton(body,"Throw Best Active Target",function()
-		throwAtBestTarget()
-	end)
-
-	powerBox=makeTextBox(body,"Power",power,function() updateConfig() end)
-	leadBox=makeTextBox(body,"Target Lead",targetLead,function() updateConfig() end)
 
 	statusLabel=new("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,34),
-		Text="T throws at highest active target.",
+		Text="Expands active gauntlet TouchDetect hitboxes.",
 		Font=Enum.Font.Gotham,
 		TextSize=12,
 		TextColor3=Color3.fromRGB(190,190,190),
@@ -875,6 +910,7 @@ end
 
 local function destroy()
 	stopBallDetection()
+	restoreHitboxes()
 	disconnectAll()
 	clearPreview()
 	if targetHighlight then
@@ -893,45 +929,13 @@ end
 buildGui()
 bindPracticeEvent()
 
-connect(UIS.InputBegan,function(input,processed)
-	if capturing then
-		if input.UserInputType==Enum.UserInputType.Keyboard and input.KeyCode~=Enum.KeyCode.Unknown then
-			currentBinding=input.KeyCode
-			capturing=false
-			keyButton.Text="Throw Key: "..bindingToText(currentBinding)
-			setStatus("Throw key set to "..bindingToText(currentBinding))
-		end
-		return
-	end
-	if processed then return end
-	if input.UserInputType==Enum.UserInputType.Keyboard and input.KeyCode==currentBinding then
-		throwAtBestTarget()
-	end
-end)
-
 connect(RunService.RenderStepped,function()
 	bindPracticeEvent()
-	if not practiceControlsEnabled then
-		currentTarget=nil
-		cachedPlan=nil
-		stopBallDetection()
-		clearPreview()
-		ensureHighlight()
-		updateTargetText()
-		return
-	end
 	refreshTargets(false)
-	ensureHighlight()
-	if currentTarget then
-		local now=os.clock()
-		if not cachedPlan or cachedPlan.targetPart~=currentTarget.part or now-lastPreviewUpdate>=PREVIEW_UPDATE_INTERVAL then
-			cachedPlan=solveThrow(currentTarget)
-			lastPreviewUpdate=now
+	if hitboxEnabled then
+		for _,target in ipairs(activeTargets) do
+			applyHitbox(target.part)
 		end
-		updatePreview(cachedPlan)
-	else
-		cachedPlan=nil
-		clearPreview()
 	end
 end)
 
@@ -939,4 +943,5 @@ if type(runtimeOwner)=="table" then
 	rawset(runtimeOwner,RUNTIME_KEY,{Destroy=destroy})
 end
 
-setStatus("Ready. T throws at highest active target.")
+refreshHitboxButton()
+setStatus("Ready. Toggle 2x hitboxes when needed.")
