@@ -1,27 +1,40 @@
--- Standalone QB throw keybind + passive throw-pipeline logger.
--- No loader/API/module fetch and no custom throw remote payload.
--- Pressing the bound key sends the same native left-click input the game uses.
--- The logger records incoming remotes, local snapshots, and best-effort
--- connection/decompiler details. It does not hook or intercept outgoing remotes.
+-- Standalone QB aim-assist throw tester.
+-- No loader, no API module fetch, no remote logger, and no native click emulation.
+-- Press the bound key to play the throw animation, wait for the game's release
+-- window, solve an aim point for the selected receiver, and fire Mechanics/ThrowBall.
 
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
-local TweenService=game:GetService("TweenService")
-local HttpService=game:GetService("HttpService")
+local RunService=game:GetService("RunService")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local Workspace=game:GetService("Workspace")
 local CoreGui=game:GetService("CoreGui")
+local TweenService=game:GetService("TweenService")
 
 local LP=Players.LocalPlayer
 local RUNTIME_KEY="StandaloneQBThrowKeybindGui"
-local OLD_LOGGER_KEY=RUNTIME_KEY.."RemoteHook"
-local CLICK_COOLDOWN=0.18
-local LOG_LIMIT=900
-local TABLE_ENTRY_LIMIT=60
-local STRING_LIMIT=3000
-local DECOMPILE_CHAR_LIMIT=18000
-local CONNECTION_CAPTURE_LIMIT=18
-local SCRIPT_CAPTURE_LIMIT=18
+local LEGACY_RUNTIME_KEYS={
+	"StandaloneQBAimAssist",
+	RUNTIME_KEY.."RemoteHook",
+}
+
+local BALL_G=28
+local G=Vector3.new(0,-BALL_G,0)
+local POWER_COEFFICIENT=0.95
+local DEFAULT_DISPLAY_POWER=100
+local DEFAULT_PEAK_Y=14
+local DEFAULT_LEAD_DELAY=0.38
+local RELEASE_WAIT=0.26666666666666666
+local MAX_RUN_SPEED=21
+local MIN_T=0.35
+local MAX_T=6
+local DT=0.02
+local SPEED_TOLERANCE=1.25
+local CATCH_TOLERANCE=2.0
+local AIM_SCALE=1000
+local THROW_ANIMATION_NAME="UF_QuarterbackThrow"
+local THROW_ANIMATION_SPEED=1.35
+local VALID_TEAM_IDS={HomeTeam=true,AwayTeam=true}
 
 local runtimeOwner=(type(getgenv)=="function" and getgenv()) or _G
 if type(runtimeOwner)=="table" then
@@ -31,34 +44,42 @@ if type(runtimeOwner)=="table" then
 			old:Destroy()
 		end)
 	end
-
-end
-
-local sessionId=tostring(os.time()).."-"..tostring(math.floor(os.clock()*1000))
-local connections={}
-local logs={}
-local logIndex=0
-local boundRemotes={}
-local screenGui=nil
-local currentBinding=Enum.KeyCode.T
-local capturing=false
-local lastClickAt=-math.huge
-local statusLabel=nil
-local keyButton=nil
-local logCountLabel=nil
-
-local VirtualInputManager=nil
-pcall(function()
-	VirtualInputManager=game:GetService("VirtualInputManager")
-end)
-
-if type(runtimeOwner)=="table" then
-	local oldLogger=rawget(runtimeOwner,OLD_LOGGER_KEY)
-	if type(oldLogger)=="table" then
-		oldLogger.activeSession=nil
-		oldLogger.emit=nil
+	for _,key in ipairs(LEGACY_RUNTIME_KEYS) do
+		local legacy=rawget(runtimeOwner,key)
+		if legacy and type(legacy.Destroy)=="function" then
+			pcall(function()
+				legacy:Destroy()
+			end)
+		elseif type(legacy)=="table" then
+			legacy.activeSession=nil
+			legacy.emit=nil
+		end
+		rawset(runtimeOwner,key,nil)
 	end
 end
+
+local connections={}
+local currentBinding=Enum.KeyCode.T
+local lockBinding=Enum.KeyCode.H
+local teamFilter=true
+local capturing=false
+local selectedReceiver=nil
+local throwing=false
+local displayPower=DEFAULT_DISPLAY_POWER
+local catchY=DEFAULT_PEAK_Y
+local leadDelay=DEFAULT_LEAD_DELAY
+local lastPlan=nil
+local screenGui=nil
+local statusLabel=nil
+local targetLabel=nil
+local keyButton=nil
+local teamButton=nil
+local powerBox=nil
+local peakBox=nil
+local leadBox=nil
+local previewFolder=nil
+local previewParts=nil
+local targetHighlight=nil
 
 local function connect(signal,fn)
 	local conn=signal:Connect(fn)
@@ -72,7 +93,7 @@ local function disconnectAll()
 			conn:Disconnect()
 		end)
 	end
-	table.clear(connections)
+	connections={}
 end
 
 local function new(className,props,parent)
@@ -87,894 +108,767 @@ end
 local function setStatus(text,color)
 	if statusLabel then
 		statusLabel.Text=tostring(text or "")
-		if color then
-			statusLabel.TextColor3=color
+		statusLabel.TextColor3=color or Color3.fromRGB(190,190,190)
+	end
+end
+
+local function setTargetText()
+	if targetLabel then
+		if selectedReceiver then
+			targetLabel.Text="Target: "..selectedReceiver.Name
+		else
+			targetLabel.Text="Target: none"
 		end
 	end
 end
 
-local function safeFullName(obj)
-	local ok,result=pcall(function()
-		return obj:GetFullName()
-	end)
-	if ok then
-		return result
+local function bindingToText(binding)
+	if not binding or binding==Enum.KeyCode.Unknown then
+		return "None"
 	end
-	return tostring(obj)
+	return tostring(binding):gsub("Enum.KeyCode%.","")
 end
 
-local function clampString(value,limit)
-	value=tostring(value)
-	limit=limit or STRING_LIMIT
-	if #value>limit then
-		return value:sub(1,limit).."...<truncated "..tostring(#value-limit).." chars>"
-	end
-	return value
+local function flat(v)
+	return Vector3.new(v.X,0,v.Z)
 end
 
-local function serializeValue(value,depth,seen)
-	depth=depth or 0
-	seen=seen or {}
-
-	local valueType=typeof(value)
-	if value==nil or valueType=="boolean" or valueType=="number" then
-		return value
+local function safeUnit(v,fallback)
+	if not v or v.Magnitude<1e-6 then
+		return fallback or Vector3.new(1,0,0)
 	end
-	if valueType=="string" then
-		return clampString(value)
-	end
-	if depth>=5 then
-		return {type=valueType,truncated=true,value=clampString(value,240)}
-	end
-	if valueType=="Vector2" then
-		return {type="Vector2",x=value.X,y=value.Y}
-	end
-	if valueType=="Vector3" then
-		return {type="Vector3",x=value.X,y=value.Y,z=value.Z}
-	end
-	if valueType=="Color3" then
-		return {type="Color3",r=value.R,g=value.G,b=value.B}
-	end
-	if valueType=="CFrame" then
-		local position=value.Position
-		local look=value.LookVector
-		return {
-			type="CFrame",
-			position={x=position.X,y=position.Y,z=position.Z},
-			lookVector={x=look.X,y=look.Y,z=look.Z},
-		}
-	end
-	if valueType=="EnumItem" then
-		return tostring(value)
-	end
-	if valueType=="Instance" then
-		local info={
-			type="Instance",
-			className=value.ClassName,
-			name=value.Name,
-			path=safeFullName(value),
-		}
-		pcall(function()
-			info.debugId=value:GetDebugId()
-		end)
-		if value:IsA("BasePart") then
-			info.position=serializeValue(value.Position,depth+1,seen)
-			info.cframe=serializeValue(value.CFrame,depth+1,seen)
-			info.velocity=serializeValue(value.AssemblyLinearVelocity,depth+1,seen)
-		end
-		return info
-	end
-	if valueType=="table" then
-		if seen[value] then
-			return {type="table",cycle=true}
-		end
-		seen[value]=true
-
-		local out={type="table",value={}}
-		local count=0
-		for key,item in pairs(value) do
-			count+=1
-			if count>TABLE_ENTRY_LIMIT then
-				out.truncated=true
-				out.truncatedAfter=TABLE_ENTRY_LIMIT
-				break
-			end
-			out.value[clampString(key,120)]=serializeValue(item,depth+1,seen)
-		end
-		seen[value]=nil
-		return out
-	end
-	if valueType=="function" then
-		local info={type="function",value=clampString(value,240)}
-		if debug and debug.info then
-			pcall(function()
-				info.source=debug.info(value,"s")
-				info.line=debug.info(value,"l")
-				info.name=debug.info(value,"n")
-			end)
-		end
-		return info
-	end
-
-	return {type=valueType,value=clampString(value,240)}
+	return v.Unit
 end
 
-local function serializeArgs(args)
-	local out={}
-	for index,arg in ipairs(args) do
-		out[index]=serializeValue(arg,0,{})
+local function clampMagnitude(v,maxMagnitude)
+	if v.Magnitude>maxMagnitude then
+		return v.Unit*maxMagnitude
 	end
-	return out
+	return v
 end
 
-local function snapshotLocalState(reason)
-	local mouse=LP:GetMouse()
-	local character=LP.Character or Workspace:FindFirstChild(LP.Name)
-	local root=character and character:FindFirstChild("HumanoidRootPart")
-	local humanoid=character and character:FindFirstChildOfClass("Humanoid")
-	local camera=Workspace.CurrentCamera
-	local snapshot={
-		reason=reason,
-		player=LP.Name,
-		clock=os.clock(),
-		binding=serializeValue(currentBinding,0,{}),
-	}
-
-	if root then
-		snapshot.root={
-			position=serializeValue(root.Position,0,{}),
-			cframe=serializeValue(root.CFrame,0,{}),
-			velocity=serializeValue(root.AssemblyLinearVelocity,0,{}),
-		}
-	end
-	if humanoid then
-		snapshot.humanoid={
-			state=tostring(humanoid:GetState()),
-			moveDirection=serializeValue(humanoid.MoveDirection,0,{}),
-			floorMaterial=tostring(humanoid.FloorMaterial),
-			jump=humanoid.Jump,
-			walkSpeed=humanoid.WalkSpeed,
-			jumpPower=humanoid.JumpPower,
-		}
-	end
-	if mouse and mouse.Hit then
-		snapshot.mouse={
-			hit=serializeValue(mouse.Hit,0,{}),
-			target=serializeValue(mouse.Target,0,{}),
-		}
-	end
-	if camera then
-		snapshot.camera={
-			cframe=serializeValue(camera.CFrame,0,{}),
-			focus=serializeValue(camera.Focus,0,{}),
-		}
-	end
-
-	return snapshot
+local function rootOf(player)
+	local character=player and (player.Character or Workspace:FindFirstChild(player.Name))
+	return character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
 end
 
-local function refreshLogCount()
-	if logCountLabel then
-		logCountLabel.Text="Logs: "..tostring(#logs)
-	end
+local function humanoidOf(player)
+	local character=player and (player.Character or Workspace:FindFirstChild(player.Name))
+	return character and character:FindFirstChildOfClass("Humanoid")
 end
 
-local function addLog(kind,data)
-	logIndex+=1
-	logs[#logs+1]={
-		i=logIndex,
-		session=sessionId,
-		t=os.clock(),
-		kind=kind,
-		data=data,
-	}
-	if #logs>LOG_LIMIT then
-		table.remove(logs,1)
-	end
-	refreshLogCount()
-end
-
-local function remoteText(remote,args)
-	local text=(safeFullName(remote).." "..remote.Name):lower()
-	for index=1,math.min(#args,4) do
-		local arg=args[index]
-		if type(arg)=="string" then
-			text=text.." "..arg:lower()
-		end
-	end
-	return text
-end
-
-local function shouldLogRemote(remote,args)
-	if typeof(remote)~="Instance" then return false end
-	local text=remoteText(remote,args or {})
-	return text:find("reevent",1,true)
-		or text:find("football",1,true)
-		or text:find("throw",1,true)
-		or text:find("mechanic",1,true)
-		or text:find("updateball",1,true)
-		or text:find("game",1,true)
-end
-
-local function bindIncomingRemote(remote)
-	if typeof(remote)~="Instance" or not remote:IsA("RemoteEvent") then return end
-	if boundRemotes[remote] then return end
-	if not shouldLogRemote(remote,{}) then return end
-
-	boundRemotes[remote]=true
-	addLog("incoming_remote_bound",{remote=serializeValue(remote,0,{})})
-
-	connect(remote.OnClientEvent,function(...)
-		local args={...}
-		if not shouldLogRemote(remote,args) then return end
-		addLog("incoming_remote",{
-			remote=serializeValue(remote,0,{}),
-			args=serializeArgs(args),
-			snapshot=snapshotLocalState("incoming OnClientEvent"),
-		})
-	end)
-end
-
-local function scanRemoteContainer(container)
-	if not container then return end
-	if container:IsA("RemoteEvent") then
-		bindIncomingRemote(container)
-		return
-	end
-	for _,descendant in ipairs(container:GetDescendants()) do
-		if descendant:IsA("RemoteEvent") then
-			bindIncomingRemote(descendant)
-		end
-	end
-end
-
-local function bindIncomingRemotes()
-	scanRemoteContainer(ReplicatedStorage:FindFirstChild("ReEvent"))
-	scanRemoteContainer(ReplicatedStorage:FindFirstChild("Games"))
-	scanRemoteContainer(ReplicatedStorage:FindFirstChild("MiniGames"))
-	scanRemoteContainer(Workspace:FindFirstChild("Games"))
-	scanRemoteContainer(Workspace:FindFirstChild("MiniGames"))
-
-	connect(ReplicatedStorage.DescendantAdded,function(descendant)
-		if descendant:IsA("RemoteEvent") then
-			task.defer(bindIncomingRemote,descendant)
-		end
-	end)
-	connect(Workspace.DescendantAdded,function(descendant)
-		if descendant:IsA("RemoteEvent") then
-			task.defer(bindIncomingRemote,descendant)
-		end
-	end)
-end
-
-local function tryDecompiler(name,fn,subject)
-	if type(fn)~="function" then
+local function getTeamId(player)
+	local replicated=player and player:FindFirstChild("Replicated")
+	local teamValue=replicated and replicated:FindFirstChild("TeamID")
+	if not teamValue then
 		return nil
 	end
-	local ok,result=pcall(fn,subject)
-	if not ok then
-		return {tool=name,ok=false,error=clampString(result,600)}
-	end
-	if type(result)=="string" then
-		return {tool=name,ok=true,text=clampString(result,DECOMPILE_CHAR_LIMIT)}
-	end
-	return {tool=name,ok=true,result=serializeValue(result,0,{})}
-end
-
-local function decompileSubject(subject)
-	local attempts={}
-	local result=tryDecompiler("decompile",decompile,subject)
-	if result then attempts[#attempts+1]=result end
-	result=tryDecompiler("bytefall",bytefall,subject)
-	if result then attempts[#attempts+1]=result end
-	result=tryDecompiler("getscriptbytecode",getscriptbytecode,subject)
-	if result then attempts[#attempts+1]=result end
-
-	if #attempts==0 then
-		return {available=false,reason="No decompile/bytefall/getscriptbytecode global available"}
-	end
-	return {available=true,attempts=attempts}
-end
-
-local function captureRemoteConnections()
-	local captured={}
-	local count=0
-
-	if type(getconnections)~="function" then
-		addLog("connection_capture_unavailable",{getconnections=type(getconnections)})
-		return
-	end
-
-	for remote in pairs(boundRemotes) do
-		if count>=CONNECTION_CAPTURE_LIMIT then break end
-		local ok,remoteConnections=pcall(getconnections,remote.OnClientEvent)
-		if ok and type(remoteConnections)=="table" then
-			for index,connection in ipairs(remoteConnections) do
-				if count>=CONNECTION_CAPTURE_LIMIT then break end
-				count+=1
-				local fn=connection.Function
-				captured[#captured+1]={
-					remote=serializeValue(remote,0,{}),
-					connectionIndex=index,
-					enabled=connection.Enabled,
-					functionInfo=serializeValue(fn,0,{}),
-					decompile=decompileSubject(fn),
-				}
-			end
-		else
-			captured[#captured+1]={
-				remote=serializeValue(remote,0,{}),
-				error=tostring(remoteConnections),
-			}
-		end
-	end
-
-	addLog("connection_capture",{
-		count=count,
-		limit=CONNECTION_CAPTURE_LIMIT,
-		items=captured,
-	})
-end
-
-local function scriptLooksRelevant(scriptObject)
-	local text=(safeFullName(scriptObject).." "..scriptObject.Name):lower()
-	local keywords={
-		"clientmain",
-		"mechanic",
-		"football",
-		"throw",
-		"input",
-		"bind",
-		"variable",
-		"mouse",
-		"reevent",
-		"animation",
-		"camera",
-	}
-
-	for _,keyword in ipairs(keywords) do
-		if text:find(keyword,1,true) then
-			return true
-		end
-	end
-
-	return false
-end
-
-local function captureScriptCandidates()
-	local roots={
-		LP:FindFirstChild("PlayerScripts"),
-		ReplicatedStorage:FindFirstChild("Assets"),
-		ReplicatedStorage:FindFirstChild("Games"),
-		ReplicatedStorage:FindFirstChild("MiniGames"),
-		ReplicatedStorage,
-	}
-	local seen={}
-	local captured={}
-	local count=0
-
-	for _,root in ipairs(roots) do
-		if count>=SCRIPT_CAPTURE_LIMIT then break end
-		if root and not seen[root] then
-			seen[root]=true
-			local candidates={}
-			if root:IsA("LocalScript") or root:IsA("ModuleScript") then
-				candidates[#candidates+1]=root
-			end
-			for _,descendant in ipairs(root:GetDescendants()) do
-				if count>=SCRIPT_CAPTURE_LIMIT then break end
-				if (descendant:IsA("LocalScript") or descendant:IsA("ModuleScript")) and not seen[descendant] then
-					seen[descendant]=true
-					if scriptLooksRelevant(descendant) then
-						candidates[#candidates+1]=descendant
-					end
-				end
-			end
-
-			for _,candidate in ipairs(candidates) do
-				if count>=SCRIPT_CAPTURE_LIMIT then break end
-				count+=1
-				captured[#captured+1]={
-					script=serializeValue(candidate,0,{}),
-					decompile=decompileSubject(candidate),
-				}
-			end
-		end
-	end
-
-	addLog("script_capture",{
-		count=count,
-		limit=SCRIPT_CAPTURE_LIMIT,
-		items=captured,
-	})
-end
-
-local function exportLogs()
-	local payload={
-		session={
-			id=sessionId,
-			player=LP.Name,
-			placeId=game.PlaceId,
-			jobId=game.JobId,
-			clock=os.clock(),
-			capabilities={
-				getconnections=type(getconnections),
-				decompile=type(decompile),
-				bytefall=type(bytefall),
-				getscriptbytecode=type(getscriptbytecode),
-				setclipboard=type(setclipboard),
-				writefile=type(writefile),
-				mouse1click=type(mouse1click),
-				mouse1press=type(mouse1press),
-				virtualInputManager=VirtualInputManager~=nil,
-			},
-		},
-		finalSnapshot=snapshotLocalState("export"),
-		logs=logs,
-	}
-
-	local ok,json=pcall(function()
-		return HttpService:JSONEncode(payload)
+	local ok,value=pcall(function()
+		return teamValue.Value
 	end)
-	if not ok then
-		return nil,tostring(json)
+	if ok then
+		return tostring(value)
 	end
-	return json,nil
-end
-
-local function copyOrWriteLogs()
-	addLog("manual_export_requested",{snapshot=snapshotLocalState("manual export")})
-	local json,err=exportLogs()
-	if not json then
-		setStatus("Export failed: "..err,Color3.fromRGB(255,105,105))
-		return
-	end
-
-	if type(setclipboard)=="function" then
-		local ok,clipErr=pcall(setclipboard,json)
-		if ok then
-			setStatus("Copied log JSON to clipboard",Color3.fromRGB(150,255,180))
-			return
-		end
-		addLog("clipboard_failed",{error=tostring(clipErr)})
-	end
-	if type(toclipboard)=="function" then
-		local ok,clipErr=pcall(toclipboard,json)
-		if ok then
-			setStatus("Copied log JSON to clipboard",Color3.fromRGB(150,255,180))
-			return
-		end
-		addLog("clipboard_failed",{error=tostring(clipErr)})
-	end
-	if type(writefile)=="function" then
-		local fileName="qb_throw_pipeline_log_"..sessionId..".json"
-		local ok,fileErr=pcall(writefile,fileName,json)
-		if ok then
-			setStatus("Wrote "..fileName,Color3.fromRGB(150,255,180))
-			return
-		end
-		addLog("writefile_failed",{error=tostring(fileErr)})
-	end
-
-	for startIndex=1,#json,3500 do
-		print(json:sub(startIndex,startIndex+3499))
-	end
-	setStatus("Printed log JSON in console chunks",Color3.fromRGB(255,225,160))
-end
-
-local function clearLogs()
-	table.clear(logs)
-	logIndex=0
-	addLog("log_cleared",{snapshot=snapshotLocalState("clear")})
-	setStatus("Log cleared",Color3.fromRGB(220,220,220))
-end
-
-local function keyCodeToLabel(key)
-	if key==nil or key==Enum.KeyCode.Unknown then
-		return "NIL"
-	end
-
-	local name=tostring(key):gsub("Enum.KeyCode%.","")
-	local short={
-		LeftControl="LCTRL",
-		RightControl="RCTRL",
-		LeftShift="LSHIFT",
-		RightShift="RSHIFT",
-		BackQuote="`",
-		Return="ENTER",
-		Space="SPACE",
-	}
-
-	return short[name] or string.upper(name)
-end
-
-local function bindingToLabel(binding)
-	if binding==nil or binding==Enum.KeyCode.Unknown then
-		return "NIL"
-	end
-
-	if type(binding)=="string" then
-		local map={
-			MouseButton1="LMB",
-			MouseButton2="RMB",
-			MouseButton3="MMB",
-			Touch="TOUCH",
-			Gamepad1="PAD1",
-			Gamepad2="PAD2",
-			Gamepad3="PAD3",
-			Gamepad4="PAD4",
-			Gamepad5="PAD5",
-			Gamepad6="PAD6",
-			Gamepad7="PAD7",
-			Gamepad8="PAD8",
-		}
-		return map[binding] or string.upper(binding)
-	end
-
-	return keyCodeToLabel(binding)
-end
-
-local function inputToBinding(input)
-	local key=input.KeyCode
-	if key and key~=Enum.KeyCode.Unknown then
-		return key
-	end
-
-	if input.UserInputType==Enum.UserInputType.MouseButton1 then return "MouseButton1" end
-	if input.UserInputType==Enum.UserInputType.MouseButton2 then return "MouseButton2" end
-	if input.UserInputType==Enum.UserInputType.MouseButton3 then return "MouseButton3" end
-	if input.UserInputType==Enum.UserInputType.Touch then return "Touch" end
-
-	local name=tostring(input.UserInputType):gsub("Enum.UserInputType%.","")
-	if name:match("^Gamepad") then
-		return name
-	end
-
 	return nil
 end
 
-local function bindingMatches(input,binding)
-	if binding==nil or binding==Enum.KeyCode.Unknown then
+local function canTarget(player)
+	if not player or player==LP then
 		return false
 	end
-
-	local incoming=inputToBinding(input)
-	return incoming~=nil and incoming==binding
+	local root=rootOf(player)
+	if not root then
+		return false
+	end
+	if not teamFilter then
+		return true
+	end
+	local localTeam=getTeamId(LP)
+	local playerTeam=getTeamId(player)
+	if not VALID_TEAM_IDS[localTeam] or not VALID_TEAM_IDS[playerTeam] then
+		return true
+	end
+	return localTeam==playerTeam
 end
 
-local function sendNativeClick()
-	if os.clock()-lastClickAt<CLICK_COOLDOWN then
-		return false,"Click cooldown"
+local function currentHeldBall()
+	local character=LP.Character or Workspace:FindFirstChild(LP.Name)
+	if not character then
+		return nil
 	end
-
-	lastClickAt=os.clock()
-
-	if type(mouse1click)=="function" then
-		local ok,err=pcall(mouse1click)
-		if ok then
-			return true,"mouse1click"
+	for _,descendant in ipairs(character:GetDescendants()) do
+		if descendant:IsA("BasePart") and descendant.Name:lower():find("football") then
+			return descendant
 		end
-		return false,tostring(err)
 	end
-
-	if type(mouse1press)=="function" and type(mouse1release)=="function" then
-		local ok,err=pcall(function()
-			mouse1press()
-			task.wait()
-			mouse1release()
-		end)
-		if ok then
-			return true,"mouse1press"
+	for _,child in ipairs(character:GetChildren()) do
+		if child.Name:lower():find("football") then
+			if child:IsA("BasePart") then
+				return child
+			end
+			local part=child:FindFirstChildWhichIsA("BasePart",true)
+			if part then
+				return part
+			end
 		end
-		return false,tostring(err)
 	end
-
-	if VirtualInputManager then
-		local pos=UIS:GetMouseLocation()
-		local ok,err=pcall(function()
-			VirtualInputManager:SendMouseButtonEvent(pos.X,pos.Y,0,true,game,0)
-			task.wait()
-			VirtualInputManager:SendMouseButtonEvent(pos.X,pos.Y,0,false,game,0)
-		end)
-		if ok then
-			return true,"VirtualInputManager"
-		end
-		return false,tostring(err)
-	end
-
-	return false,"No native click method available"
+	return nil
 end
 
-local function triggerThrowInput()
-	if currentBinding=="MouseButton1" then
-		setStatus("LMB already uses the game's throw input",Color3.fromRGB(255,225,160))
-		addLog("native_click_skipped",{reason="binding is MouseButton1",snapshot=snapshotLocalState("skip native click")})
+local function getGameId()
+	local replicated=LP:FindFirstChild("Replicated")
+	local gameId=replicated and replicated:FindFirstChild("GameID")
+	local ok,value=pcall(function()
+		return gameId and gameId.Value
+	end)
+	if ok and value and tostring(value)~="" then
+		return tostring(value)
+	end
+	return nil
+end
+
+local function getGameReEvent()
+	local gameId=getGameId()
+	local games=ReplicatedStorage:FindFirstChild("Games")
+	local gameFolder=games and gameId and games:FindFirstChild(gameId)
+	local gameEvent=gameFolder and gameFolder:FindFirstChild("ReEvent")
+	if gameEvent and gameEvent:IsA("RemoteEvent") then
+		return gameEvent
+	end
+	local direct=ReplicatedStorage:FindFirstChild("ReEvent")
+	if direct and direct:IsA("RemoteEvent") then
+		return direct
+	end
+	return nil
+end
+
+local function currentGameCenterY()
+	local gameId=getGameId()
+	local workspaceGames=Workspace:FindFirstChild("Games")
+	local workspaceMinis=Workspace:FindFirstChild("MiniGames")
+	local folders={}
+	if workspaceGames then folders[#folders+1]=workspaceGames end
+	if workspaceMinis then folders[#folders+1]=workspaceMinis end
+	for _,rootFolder in ipairs(folders) do
+		local gameFolder=gameId and rootFolder:FindFirstChild(gameId)
+		if not gameFolder then
+			gameFolder=rootFolder:FindFirstChildWhichIsA("Folder")
+		end
+		local replicated=gameFolder and gameFolder:FindFirstChild("Replicated")
+		local center=replicated and replicated:FindFirstChild("Center")
+		if center and center:IsA("BasePart") then
+			return center.CFrame.Y+0.5
+		end
+	end
+	return 0.5
+end
+
+local function receiverVelocity(player)
+	local root=rootOf(player)
+	if not root then
+		return Vector3.zero
+	end
+	local velocity=flat(root.AssemblyLinearVelocity or Vector3.zero)
+	local humanoid=humanoidOf(player)
+	if humanoid and humanoid.MoveDirection.Magnitude<0.05 and velocity.Magnitude<MAX_RUN_SPEED*0.35 then
+		return Vector3.zero
+	end
+	if velocity.Magnitude<1.25 then
+		return Vector3.zero
+	end
+	return clampMagnitude(velocity,MAX_RUN_SPEED)
+end
+
+local function gameArcOrigin(rootPosition,aimPoint)
+	local look=safeUnit(aimPoint,Vector3.new(0,0,-1))
+	local cf=CFrame.lookAt(rootPosition,rootPosition+look)
+	return (cf*CFrame.new(1,1.5,0)).Position
+end
+
+local function landingAtY(origin,velocity,y)
+	local a=0.5*G.Y
+	local b=velocity.Y
+	local c=origin.Y-y
+	local disc=b*b-4*a*c
+	if disc<0 then
+		return nil,nil
+	end
+	local root=math.sqrt(disc)
+	local t1=(-b+root)/(2*a)
+	local t2=(-b-root)/(2*a)
+	local time=math.max(t1,t2)
+	if time<=0 then
+		time=math.min(t1,t2)
+	end
+	if time<=0 then
+		return nil,nil
+	end
+	return origin+velocity*time+0.5*G*time*time,time
+end
+
+local function solveWithOrigin(receiver,origin,receiverRoot,power)
+	local wrVel=receiverVelocity(receiver)
+	local ballSpeed=math.clamp(power or displayPower,30,100)*POWER_COEFFICIENT
+	local receiverPosition=receiverRoot.Position
+	local best=nil
+
+	for time=MIN_T,MAX_T,DT do
+		local targetXZ=receiverPosition+wrVel*(time+leadDelay)
+		local target=Vector3.new(targetXZ.X,catchY,targetXZ.Z)
+		local needed=(target-origin-0.5*G*time*time)/time
+		local speed=needed.Magnitude
+		if speed>1e-6 then
+			local speedError=math.abs(speed-ballSpeed)
+			local missEstimate=speedError*time
+			local direction=needed.Unit
+			local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
+			if angle>=-5 and angle<=55 and (speedError<=SPEED_TOLERANCE or missEstimate<=CATCH_TOLERANCE) then
+				local velocity=direction*ballSpeed
+				local landing,landingTime=landingAtY(origin,velocity,currentGameCenterY())
+				local score=missEstimate+time*0.05
+				if not best or score<best.score then
+					best={
+						score=score,
+						origin=origin,
+						target=target,
+						time=time,
+						velocity=velocity,
+						direction=direction,
+						aimPoint=origin+direction*AIM_SCALE,
+						speedError=speedError,
+						missEstimate=missEstimate,
+						landing=landing,
+						landingTime=landingTime,
+						power=power or displayPower,
+						receiverVelocity=wrVel,
+					}
+				end
+			end
+		end
+	end
+
+	return best
+end
+
+local function buildPlan(receiver,power)
+	if not canTarget(receiver) then
+		return nil
+	end
+	local qbRoot=rootOf(LP)
+	local receiverRoot=rootOf(receiver)
+	if not qbRoot or not receiverRoot then
+		return nil
+	end
+
+	local roughTarget=Vector3.new(receiverRoot.Position.X,catchY,receiverRoot.Position.Z)
+	local origin=gameArcOrigin(qbRoot.Position,roughTarget)
+	local plan=solveWithOrigin(receiver,origin,receiverRoot,power)
+	for _=1,2 do
+		if not plan then
+			break
+		end
+		origin=gameArcOrigin(qbRoot.Position,plan.aimPoint)
+		local refined=solveWithOrigin(receiver,origin,receiverRoot,power)
+		if refined then
+			plan=refined
+		end
+	end
+	return plan
+end
+
+local function findNearestReceiverToMouse()
+	local camera=Workspace.CurrentCamera
+	local mouse=LP:GetMouse()
+	if not camera or not mouse then
+		return nil
+	end
+
+	local best=nil
+	local bestDistance=math.huge
+	for _,player in ipairs(Players:GetPlayers()) do
+		if canTarget(player) then
+			local root=rootOf(player)
+			local screenPoint,onScreen=camera:WorldToViewportPoint(root.Position)
+			if onScreen then
+				local distance=(Vector2.new(mouse.X,mouse.Y)-Vector2.new(screenPoint.X,screenPoint.Y)).Magnitude
+				if distance<bestDistance then
+					best=player
+					bestDistance=distance
+				end
+			end
+		end
+	end
+	return best
+end
+
+local function ensureHighlight()
+	if not selectedReceiver then
+		if targetHighlight then
+			targetHighlight:Destroy()
+			targetHighlight=nil
+		end
+		return
+	end
+	local character=selectedReceiver.Character
+	if not character then return end
+	if not targetHighlight or not targetHighlight.Parent then
+		targetHighlight=Instance.new("Highlight")
+		targetHighlight.Name="StandaloneQBAimTarget"
+		targetHighlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+		targetHighlight.FillColor=Color3.fromRGB(0,220,140)
+		targetHighlight.OutlineColor=Color3.fromRGB(120,255,205)
+		targetHighlight.FillTransparency=0.72
+		targetHighlight.OutlineTransparency=0
+	end
+	targetHighlight.Adornee=character
+	targetHighlight.Parent=character
+end
+
+local function clearPreview()
+	if previewFolder then
+		previewFolder:Destroy()
+		previewFolder=nil
+		previewParts=nil
+	end
+end
+
+local function ensurePreview()
+	if previewFolder and previewFolder.Parent then
+		return previewParts
+	end
+
+	clearPreview()
+	previewFolder=Instance.new("Folder")
+	previewFolder.Name="StandaloneQBAimPreview"
+	previewFolder.Parent=Workspace
+
+	local function marker(name,size,color,transparency)
+		local part=Instance.new("Part")
+		part.Name=name
+		part.Anchored=true
+		part.CanCollide=false
+		part.CanQuery=false
+		part.CanTouch=false
+		part.Size=Vector3.new(size,size,size)
+		part.Material=Enum.Material.Neon
+		part.Color=color
+		part.Transparency=transparency
+		part.Parent=previewFolder
+		local attachment=Instance.new("Attachment")
+		attachment.Name=name.."Attachment"
+		attachment.Parent=part
+		return part,attachment
+	end
+
+	local p0,a0=marker("Origin",0.18,Color3.fromRGB(255,255,255),1)
+	local p1,a1=marker("Landing",0.18,Color3.fromRGB(255,255,255),1)
+	local catch=marker("Catch",1.25,Color3.fromRGB(0,235,255),0.2)
+	local beam=Instance.new("Beam")
+	beam.Name="Arc"
+	beam.Attachment0=a0
+	beam.Attachment1=a1
+	beam.FaceCamera=false
+	beam.Width0=1.25
+	beam.Width1=1.25
+	beam.Segments=40
+	beam.Color=ColorSequence.new(Color3.fromRGB(255,255,255))
+	beam.Transparency=NumberSequence.new({
+		NumberSequenceKeypoint.new(0,0.05),
+		NumberSequenceKeypoint.new(0.9,0.05),
+		NumberSequenceKeypoint.new(1,0.6),
+	})
+	beam.Parent=previewFolder
+
+	previewParts={p0=p0,a0=a0,p1=p1,a1=a1,catch=catch,beam=beam}
+	return previewParts
+end
+
+local function beamCFrame(point,velocity,fallback)
+	local dir=safeUnit(velocity,fallback or Vector3.new(0,1,0))
+	return CFrame.lookAt(point,point+dir)
+end
+
+local function updatePreview(plan)
+	if not plan then
+		clearPreview()
+		return
+	end
+	local parts=ensurePreview()
+	if not parts then return end
+	local endPoint=plan.landing or plan.target
+	local previewTime=plan.landingTime or plan.time
+	local endVelocity=plan.velocity+G*previewTime
+
+	parts.p0.CFrame=beamCFrame(plan.origin,plan.velocity)
+	parts.p1.CFrame=beamCFrame(endPoint,endVelocity,plan.velocity)
+	parts.catch.CFrame=CFrame.new(plan.target)
+	parts.beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-400,400)
+	parts.beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-400,400)
+	parts.beam.Enabled=true
+end
+
+local function lockNearestReceiver()
+	local receiver=findNearestReceiverToMouse()
+	if receiver then
+		selectedReceiver=receiver
+		setTargetText()
+		ensureHighlight()
+		setStatus("Locked "..receiver.Name,Color3.fromRGB(115,240,170))
+	else
+		setStatus(teamFilter and "No teammate under cursor" or "No receiver under cursor",Color3.fromRGB(255,120,120))
+	end
+	return receiver
+end
+
+local function findThrowAnimation()
+	local containers={ReplicatedStorage,LP:FindFirstChild("PlayerScripts"),LP.Character}
+	for _,container in ipairs(containers) do
+		local animation=container and container:FindFirstChild(THROW_ANIMATION_NAME,true)
+		if animation and animation:IsA("Animation") and animation.AnimationId~="" then
+			return animation
+		end
+	end
+	return nil
+end
+
+local function playThrowAnimation()
+	local humanoid=humanoidOf(LP)
+	if not humanoid then return false end
+	local animation=findThrowAnimation()
+	if not animation then return false end
+	local animator=humanoid:FindFirstChildOfClass("Animator")
+	if not animator then
+		animator=Instance.new("Animator")
+		animator.Parent=humanoid
+	end
+	local ok,track=pcall(function()
+		return animator:LoadAnimation(animation)
+	end)
+	if not ok or not track then
+		return false
+	end
+	pcall(function()
+		track.Priority=Enum.AnimationPriority.Action
+	end)
+	track:Play(0.05,1,THROW_ANIMATION_SPEED)
+	return true
+end
+
+local function fireThrow(plan)
+	local reEvent=getGameReEvent()
+	if not reEvent then
+		return false,"ReEvent missing"
+	end
+	reEvent:FireServer("Mechanics","ThrowBall",{
+		Target=plan.aimPoint,
+		AutoThrow=false,
+		Power=math.clamp(plan.power or displayPower,30,100),
+	})
+	return true,nil
+end
+
+local function attemptAimAssistThrow()
+	if throwing then
+		setStatus("Throw already in progress",Color3.fromRGB(255,200,120))
 		return
 	end
 
-	addLog("native_click_request",{snapshot=snapshotLocalState("before native click")})
-	local ok,method=sendNativeClick()
-	addLog("native_click_result",{ok=ok,method=method,snapshot=snapshotLocalState("after native click")})
+	local receiver=selectedReceiver
+	if not canTarget(receiver) then
+		receiver=lockNearestReceiver()
+	end
+	if not receiver then
+		return
+	end
 
-	if ok then
-		setStatus("Native throw input sent: "..method,Color3.fromRGB(150,255,180))
-	else
-		setStatus("Input failed: "..method,Color3.fromRGB(255,105,105))
+	if not currentHeldBall() then
+		setStatus("No football held",Color3.fromRGB(255,120,120))
+		return
+	end
+
+	local plan=buildPlan(receiver,displayPower)
+	if not plan then
+		setStatus("No aim solution",Color3.fromRGB(255,120,120))
+		return
+	end
+
+	throwing=true
+	lastPlan=plan
+	updatePreview(plan)
+	playThrowAnimation()
+	setStatus("Throwing to "..receiver.Name.." ...",Color3.fromRGB(120,210,255))
+
+	task.delay(RELEASE_WAIT,function()
+		local finalPlan=buildPlan(receiver,displayPower) or lastPlan
+		if finalPlan then
+			lastPlan=finalPlan
+			updatePreview(finalPlan)
+			local ok,err=fireThrow(finalPlan)
+			if ok then
+				setStatus("Aim throw sent: "..receiver.Name,Color3.fromRGB(115,240,170))
+			else
+				setStatus(err or "Throw failed",Color3.fromRGB(255,120,120))
+			end
+		else
+			setStatus("No release solution",Color3.fromRGB(255,120,120))
+		end
+		task.delay(0.45,function()
+			throwing=false
+		end)
+	end)
+end
+
+local function updateConfigFromBoxes()
+	local power=tonumber(powerBox and powerBox.Text)
+	if power then
+		displayPower=math.clamp(power,30,100)
+		if powerBox then powerBox.Text=tostring(math.floor(displayPower+0.5)) end
+	end
+	local peak=tonumber(peakBox and peakBox.Text)
+	if peak then
+		catchY=math.clamp(peak,8,25)
+		if peakBox then peakBox.Text=string.format("%.2f",catchY):gsub("0+$",""):gsub("%.$","") end
+	end
+	local lead=tonumber(leadBox and leadBox.Text)
+	if lead then
+		leadDelay=math.clamp(lead,0,1)
+		if leadBox then leadBox.Text=string.format("%.2f",leadDelay):gsub("0+$",""):gsub("%.$","") end
 	end
 end
 
-local function makeButton(parent,text,x,y,w,h)
-	return new("TextButton",{
-		Position=UDim2.fromOffset(x,y),
-		Size=UDim2.fromOffset(w,h),
-		BackgroundColor3=Color3.fromRGB(38,38,38),
+local function makeTextBox(parent,label,value,callback)
+	local row=new("Frame",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,34),
+	},parent)
+	new("TextLabel",{
+		BackgroundTransparency=1,
+		Position=UDim2.new(0,0,0,0),
+		Size=UDim2.new(1,-72,1,0),
+		Text=label,
+		Font=Enum.Font.Gotham,
+		TextSize=12,
+		TextColor3=Color3.fromRGB(210,210,210),
+		TextXAlignment=Enum.TextXAlignment.Left,
+	},row)
+	local box=new("TextBox",{
+		BackgroundColor3=Color3.fromRGB(30,30,30),
 		BorderSizePixel=0,
-		Font=Enum.Font.GothamBold,
+		Position=UDim2.new(1,-66,0,5),
+		Size=UDim2.new(0,66,0,24),
+		Text=tostring(value),
+		Font=Enum.Font.Gotham,
+		TextSize=12,
+		TextColor3=Color3.fromRGB(245,245,245),
+		ClearTextOnFocus=false,
+	},row)
+	new("UIStroke",{Color=Color3.fromRGB(70,70,70),Thickness=1},box)
+	connect(box.FocusLost,function()
+		callback(box)
+	end)
+	return box
+end
+
+local function makeButton(parent,text,callback)
+	local button=new("TextButton",{
+		BackgroundColor3=Color3.fromRGB(32,32,32),
+		BorderSizePixel=0,
+		Size=UDim2.new(1,0,0,30),
 		Text=text,
-		TextColor3=Color3.fromRGB(238,238,238),
-		TextSize=11,
+		Font=Enum.Font.GothamBold,
+		TextSize=12,
+		TextColor3=Color3.fromRGB(235,235,235),
 		AutoButtonColor=false,
 	},parent)
+	new("UIStroke",{Color=Color3.fromRGB(70,70,70),Thickness=1},button)
+	connect(button.MouseEnter,function()
+		TweenService:Create(button,TweenInfo.new(0.12),{BackgroundColor3=Color3.fromRGB(42,42,42)}):Play()
+	end)
+	connect(button.MouseLeave,function()
+		TweenService:Create(button,TweenInfo.new(0.12),{BackgroundColor3=Color3.fromRGB(32,32,32)}):Play()
+	end)
+	connect(button.MouseButton1Click,callback)
+	return button
 end
 
 local function buildGui()
-	local parent=LP:FindFirstChildOfClass("PlayerGui") or LP:WaitForChild("PlayerGui",5) or CoreGui
-
-	screenGui=new("ScreenGui",{
-		Name="StandaloneQBThrowKeybind",
-		ResetOnSpawn=false,
-		IgnoreGuiInset=true,
-		ZIndexBehavior=Enum.ZIndexBehavior.Sibling,
-	},parent)
-
+	screenGui=Instance.new("ScreenGui")
+	screenGui.Name=RUNTIME_KEY
+	screenGui.ResetOnSpawn=false
+	screenGui.IgnoreGuiInset=true
 	pcall(function()
-		screenGui.DisplayOrder=999999
+		screenGui.Parent=CoreGui
 	end)
+	if not screenGui.Parent then
+		screenGui.Parent=LP:WaitForChild("PlayerGui")
+	end
 
-	local panel=new("Frame",{
-		Position=UDim2.fromOffset(80,180),
-		Size=UDim2.fromOffset(430,238),
-		BackgroundColor3=Color3.fromRGB(14,14,14),
+	local frame=new("Frame",{
+		BackgroundColor3=Color3.fromRGB(12,12,12),
 		BorderSizePixel=0,
+		Position=UDim2.new(0,80,0,180),
+		Size=UDim2.new(0,250,0,282),
 		Active=true,
+		Draggable=true,
 	},screenGui)
-
-	new("UIStroke",{
-		Color=Color3.fromRGB(185,185,185),
-		Transparency=0.35,
-		Thickness=1,
-	},panel)
-
-	local title=new("TextLabel",{
-		BackgroundTransparency=1,
-		Position=UDim2.fromOffset(14,12),
-		Size=UDim2.new(1,-58,0,20),
-		Font=Enum.Font.GothamBold,
-		Text="QB Throw Pipeline Logger",
-		TextColor3=Color3.fromRGB(238,238,238),
-		TextSize=14,
-		TextXAlignment=Enum.TextXAlignment.Left,
-	},panel)
+	new("UIStroke",{Color=Color3.fromRGB(100,100,100),Thickness=1},frame)
 
 	new("TextLabel",{
 		BackgroundTransparency=1,
-		Position=UDim2.fromOffset(14,34),
-		Size=UDim2.new(1,-28,0,34),
-		Font=Enum.Font.Gotham,
-		Text="Keybind sends native click. Logger records remotes and local snapshots.",
-		TextColor3=Color3.fromRGB(165,165,165),
-		TextSize=11,
-		TextWrapped=true,
+		Position=UDim2.new(0,14,0,10),
+		Size=UDim2.new(1,-48,0,20),
+		Text="Standalone QB Aim",
+		Font=Enum.Font.GothamBold,
+		TextSize=14,
+		TextColor3=Color3.fromRGB(245,245,245),
 		TextXAlignment=Enum.TextXAlignment.Left,
-		TextYAlignment=Enum.TextYAlignment.Top,
-	},panel)
+	},frame)
 
 	local close=new("TextButton",{
-		AnchorPoint=Vector2.new(1,0),
-		Position=UDim2.new(1,-10,0,10),
-		Size=UDim2.fromOffset(28,24),
-		BackgroundColor3=Color3.fromRGB(32,32,32),
+		BackgroundColor3=Color3.fromRGB(26,26,26),
 		BorderSizePixel=0,
-		Font=Enum.Font.GothamBold,
+		Position=UDim2.new(1,-34,0,8),
+		Size=UDim2.new(0,24,0,24),
 		Text="X",
-		TextColor3=Color3.fromRGB(238,238,238),
-		TextSize=12,
-		AutoButtonColor=false,
-	},panel)
-
-	new("TextLabel",{
-		BackgroundTransparency=1,
-		Position=UDim2.fromOffset(14,76),
-		Size=UDim2.fromOffset(120,20),
-		Font=Enum.Font.GothamMedium,
-		Text="Throw key",
-		TextColor3=Color3.fromRGB(225,225,225),
-		TextSize=12,
-		TextXAlignment=Enum.TextXAlignment.Left,
-	},panel)
-
-	keyButton=new("TextButton",{
-		Position=UDim2.fromOffset(138,72),
-		Size=UDim2.fromOffset(176,30),
-		BackgroundColor3=Color3.fromRGB(30,30,30),
-		BorderSizePixel=0,
 		Font=Enum.Font.GothamBold,
-		Text=bindingToLabel(currentBinding),
-		TextColor3=Color3.fromRGB(238,238,238),
 		TextSize=12,
-		AutoButtonColor=false,
-	},panel)
+		TextColor3=Color3.fromRGB(240,240,240),
+	},frame)
 
-	logCountLabel=new("TextLabel",{
+	local body=new("Frame",{
 		BackgroundTransparency=1,
-		Position=UDim2.fromOffset(324,76),
-		Size=UDim2.fromOffset(92,20),
-		Font=Enum.Font.Gotham,
-		Text="Logs: 0",
-		TextColor3=Color3.fromRGB(165,165,165),
-		TextSize=11,
-		TextXAlignment=Enum.TextXAlignment.Right,
-	},panel)
+		Position=UDim2.new(0,14,0,42),
+		Size=UDim2.new(1,-28,1,-52),
+	},frame)
+	new("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},body)
 
-	local sendButton=makeButton(panel,"SEND CLICK",14,116,120,30)
-	local copyButton=makeButton(panel,"COPY LOG",144,116,90,30)
-	local clearButton=makeButton(panel,"CLEAR",244,116,72,30)
-	local captureButton=makeButton(panel,"CAPTURE",326,116,90,30)
+	targetLabel=new("TextLabel",{
+		BackgroundTransparency=1,
+		Size=UDim2.new(1,0,0,20),
+		Text="Target: none",
+		Font=Enum.Font.Gotham,
+		TextSize=12,
+		TextColor3=Color3.fromRGB(200,200,200),
+		TextXAlignment=Enum.TextXAlignment.Left,
+	},body)
+
+	keyButton=makeButton(body,"Throw Key: "..bindingToText(currentBinding),function()
+		capturing=true
+		keyButton.Text="Press a key..."
+		setStatus("Press a key for throw",Color3.fromRGB(120,210,255))
+	end)
+
+	teamButton=makeButton(body,"Team Filter: ON",function()
+		teamFilter=not teamFilter
+		teamButton.Text="Team Filter: "..(teamFilter and "ON" or "OFF")
+		selectedReceiver=nil
+		setTargetText()
+		ensureHighlight()
+		setStatus("Team filter "..(teamFilter and "on" or "off"))
+	end)
+
+	makeButton(body,"Lock Receiver Under Mouse (H)",function()
+		lockNearestReceiver()
+	end)
+
+	makeButton(body,"Throw Aim Assist",function()
+		updateConfigFromBoxes()
+		attemptAimAssistThrow()
+	end)
+
+	powerBox=makeTextBox(body,"Display Power",displayPower,function()
+		updateConfigFromBoxes()
+	end)
+	peakBox=makeTextBox(body,"Peak Height",catchY,function()
+		updateConfigFromBoxes()
+	end)
+	leadBox=makeTextBox(body,"Lead Delay",leadDelay,function()
+		updateConfigFromBoxes()
+	end)
 
 	statusLabel=new("TextLabel",{
 		BackgroundTransparency=1,
-		Position=UDim2.fromOffset(14,160),
-		Size=UDim2.new(1,-28,0,54),
+		Size=UDim2.new(1,0,0,34),
+		Text="H locks. "..bindingToText(currentBinding).." throws.",
 		Font=Enum.Font.Gotham,
-		Text="Ready",
-		TextColor3=Color3.fromRGB(170,255,190),
-		TextSize=11,
+		TextSize=12,
+		TextColor3=Color3.fromRGB(190,190,190),
 		TextWrapped=true,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		TextYAlignment=Enum.TextYAlignment.Top,
-	},panel)
+	},body)
 
-	local dragStart=nil
-	local panelStart=nil
-	connect(title.InputBegan,function(input)
-		if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then
-			return
-		end
-
-		dragStart=input.Position
-		panelStart=panel.Position
-	end)
-
-	connect(UIS.InputChanged,function(input)
-		if not dragStart then return end
-		if input.UserInputType~=Enum.UserInputType.MouseMovement and input.UserInputType~=Enum.UserInputType.Touch then
-			return
-		end
-
-		local delta=input.Position-dragStart
-		panel.Position=UDim2.new(panelStart.X.Scale,panelStart.X.Offset+delta.X,panelStart.Y.Scale,panelStart.Y.Offset+delta.Y)
-	end)
-
-	connect(UIS.InputEnded,function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
-			dragStart=nil
-			panelStart=nil
+	connect(close.MouseButton1Click,function()
+		local owner=type(runtimeOwner)=="table" and rawget(runtimeOwner,RUNTIME_KEY)
+		if owner and type(owner.Destroy)=="function" then
+			owner:Destroy()
 		end
 	end)
-
-	local function buttonHover(button,normal,hover)
-		connect(button.MouseEnter,function()
-			TweenService:Create(button,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundColor3=hover}):Play()
-		end)
-		connect(button.MouseLeave,function()
-			TweenService:Create(button,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundColor3=normal}):Play()
-		end)
-	end
-
-	buttonHover(close,Color3.fromRGB(32,32,32),Color3.fromRGB(70,32,32))
-	for _,button in ipairs({keyButton,sendButton,copyButton,clearButton,captureButton}) do
-		buttonHover(button,button.BackgroundColor3,Color3.fromRGB(54,54,54))
-	end
-
-	connect(keyButton.Activated,function()
-		capturing=true
-		keyButton.Text="PRESS..."
-		setStatus("Press a key/button. Esc cancels. Backspace clears.",Color3.fromRGB(255,225,160))
-	end)
-
-	connect(sendButton.Activated,function()
-		triggerThrowInput()
-	end)
-	connect(copyButton.Activated,function()
-		copyOrWriteLogs()
-	end)
-	connect(clearButton.Activated,function()
-		clearLogs()
-	end)
-	connect(captureButton.Activated,function()
-		captureRemoteConnections()
-		captureScriptCandidates()
-		setStatus("Captured remote/script decompiler info",Color3.fromRGB(150,255,180))
-	end)
-
-	local api
-	api={
-		Destroy=function()
-			disconnectAll()
-			if screenGui then
-				screenGui:Destroy()
-				screenGui=nil
-			end
-			if type(runtimeOwner)=="table" and rawget(runtimeOwner,RUNTIME_KEY)==api then
-				rawset(runtimeOwner,RUNTIME_KEY,nil)
-			end
-		end,
-	}
-
-	connect(close.Activated,function()
-		api:Destroy()
-	end)
-
-	return api
 end
 
-local api=buildGui()
+local function destroy()
+	disconnectAll()
+	clearPreview()
+	if targetHighlight then
+		targetHighlight:Destroy()
+		targetHighlight=nil
+	end
+	if screenGui then
+		screenGui:Destroy()
+		screenGui=nil
+	end
+	if type(runtimeOwner)=="table" and rawget(runtimeOwner,RUNTIME_KEY) then
+		rawset(runtimeOwner,RUNTIME_KEY,nil)
+	end
+end
+
+buildGui()
 
 connect(UIS.InputBegan,function(input,processed)
 	if capturing then
-		if input.KeyCode==Enum.KeyCode.Escape then
+		if input.UserInputType==Enum.UserInputType.Keyboard and input.KeyCode~=Enum.KeyCode.Unknown then
+			currentBinding=input.KeyCode
 			capturing=false
-			keyButton.Text=bindingToLabel(currentBinding)
-			setStatus("Capture cancelled",Color3.fromRGB(220,220,220))
-			return
+			keyButton.Text="Throw Key: "..bindingToText(currentBinding)
+			setStatus("Throw key set to "..bindingToText(currentBinding))
 		end
-
-		if input.KeyCode==Enum.KeyCode.Backspace or input.KeyCode==Enum.KeyCode.Delete then
-			currentBinding=Enum.KeyCode.Unknown
-			capturing=false
-			keyButton.Text=bindingToLabel(currentBinding)
-			setStatus("Throw key cleared",Color3.fromRGB(220,220,220))
-			addLog("binding_cleared",{snapshot=snapshotLocalState("binding cleared")})
-			return
-		end
-
-		local binding=inputToBinding(input)
-		if binding then
-			currentBinding=binding
-			capturing=false
-			keyButton.Text=bindingToLabel(currentBinding)
-			setStatus("Throw key set to "..bindingToLabel(currentBinding),Color3.fromRGB(170,255,190))
-			addLog("binding_set",{binding=serializeValue(currentBinding,0,{}),snapshot=snapshotLocalState("binding set")})
-		end
-
 		return
 	end
 
-	if processed or UIS:GetFocusedTextBox() then
+	if processed then
 		return
 	end
 
-	if bindingMatches(input,currentBinding) then
-		triggerThrowInput()
+	if input.UserInputType==Enum.UserInputType.Keyboard and input.KeyCode==lockBinding then
+		lockNearestReceiver()
+		return
+	end
+
+	if input.UserInputType==Enum.UserInputType.Keyboard and input.KeyCode==currentBinding then
+		updateConfigFromBoxes()
+		attemptAimAssistThrow()
+	end
+end)
+
+connect(RunService.RenderStepped,function()
+	if selectedReceiver and not canTarget(selectedReceiver) then
+		selectedReceiver=nil
+		setTargetText()
+		ensureHighlight()
+	end
+
+	if selectedReceiver and not throwing then
+		local plan=buildPlan(selectedReceiver,displayPower)
+		lastPlan=plan
+		updatePreview(plan)
+		ensureHighlight()
+	elseif not selectedReceiver and not throwing then
+		clearPreview()
 	end
 end)
 
 if type(runtimeOwner)=="table" then
-	rawset(runtimeOwner,RUNTIME_KEY,api)
+	rawset(runtimeOwner,RUNTIME_KEY,{Destroy=destroy})
 end
 
-addLog("session_started",{
-	snapshot=snapshotLocalState("start"),
-	capabilities={
-		getconnections=type(getconnections),
-		decompile=type(decompile),
-		bytefall=type(bytefall),
-		getscriptbytecode=type(getscriptbytecode),
-		mouse1click=type(mouse1click),
-		mouse1press=type(mouse1press),
-		virtualInputManager=VirtualInputManager~=nil,
-	},
-})
-addLog("outgoing_hook_disabled",{reason="No outgoing hooks are installed by this safe logger version"})
-bindIncomingRemotes()
-setStatus("Ready - key is "..bindingToLabel(currentBinding)..". Throw, then COPY LOG.",Color3.fromRGB(170,255,190))
+setStatus("Ready. H locks, "..bindingToText(currentBinding).." throws.")
