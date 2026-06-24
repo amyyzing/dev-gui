@@ -31,6 +31,8 @@ local DT=0.02
 local AIM_SCALE=1000
 local MAX_TARGET_SPEED=90
 local REFRESH_INTERVAL=0.12
+local PREVIEW_UPDATE_INTERVAL=1/30
+local TARGET_VELOCITY_DAMPING=0.62
 local GAUNTLET_TARGET_PATHS={
 	{score=5,name="5",path={"Throw5_1","RotateModel","Throw1","TouchDetect"}},
 	{score=5,name="5",path={"SideToSide","Throw5_1","RotateModel","Throw1","TouchDetect"}},
@@ -65,6 +67,8 @@ local lastRefresh=0
 local activeTargets={}
 local targetHistory={}
 local currentTarget=nil
+local cachedPlan=nil
+local lastPreviewUpdate=0
 
 local screenGui=nil
 local statusLabel=nil
@@ -241,8 +245,10 @@ end
 local function targetScore(touch)
 	local path=pathOf(touch):lower()
 	if path:find("throw5") then return 5 end
-	if path:find("throw4") then return 4 end
+	if path:find("stationary") and path:find("throw3") then return 3 end
+	if path:find("sidetoside") and path:find("throw4") then return 4 end
 	if path:find("throw3") then return 3 end
+	if path:find("throw4") then return 4 end
 	return 0
 end
 
@@ -291,7 +297,12 @@ local function targetVelocity(part)
 	if velocity.Magnitude>MAX_TARGET_SPEED then
 		velocity=velocity.Unit*MAX_TARGET_SPEED
 	end
+	velocity=velocity*TARGET_VELOCITY_DAMPING
 	return velocity
+end
+
+local function targetStillActive(target)
+	return target and target.part and target.part.Parent and target.canHit and target.canHit.Value
 end
 
 local function refreshTargets(force)
@@ -352,7 +363,24 @@ local function refreshTargets(force)
 		if a.score~=b.score then return a.score>b.score end
 		return a.part.Position.Y>b.part.Position.Y
 	end)
-	currentTarget=activeTargets[1]
+	local best=activeTargets[1]
+	if targetStillActive(currentTarget) then
+		local matched=false
+		for _,target in ipairs(activeTargets) do
+			if target.part==currentTarget.part then
+				currentTarget=target
+				matched=true
+				break
+			end
+		end
+		if not matched then
+			currentTarget=best
+		elseif best and best.score>currentTarget.score then
+			currentTarget=best
+		end
+	else
+		currentTarget=best
+	end
 	updateTargetText()
 	return activeTargets
 end
@@ -597,6 +625,8 @@ local function throwAtBestTarget()
 		return
 	end
 	updatePreview(plan)
+	cachedPlan=plan
+	lastPreviewUpdate=os.clock()
 	local ok,err=fireThrow(plan)
 	if ok then
 		setStatus(string.format("Thrown at %dpt target",plan.targetScore),Color3.fromRGB(115,240,170))
@@ -784,9 +814,14 @@ connect(RunService.RenderStepped,function()
 	refreshTargets(false)
 	ensureHighlight()
 	if currentTarget then
-		local plan=solveThrow(currentTarget)
-		updatePreview(plan)
+		local now=os.clock()
+		if not cachedPlan or cachedPlan.targetPart~=currentTarget.part or now-lastPreviewUpdate>=PREVIEW_UPDATE_INTERVAL then
+			cachedPlan=solveThrow(currentTarget)
+			lastPreviewUpdate=now
+		end
+		updatePreview(cachedPlan)
 	else
+		cachedPlan=nil
 		clearPreview()
 	end
 end)
