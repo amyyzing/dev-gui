@@ -9,6 +9,7 @@ local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local Workspace=game:GetService("Workspace")
 local CoreGui=game:GetService("CoreGui")
 local TweenService=game:GetService("TweenService")
+local CollectionService=game:GetService("CollectionService")
 
 local LP=Players.LocalPlayer
 local RUNTIME_KEY="StandalonePracticeQBGauntlet"
@@ -23,8 +24,6 @@ local G=Vector3.new(0,-BALL_G,0)
 local POWER_COEFFICIENT=0.95
 local DEFAULT_POWER=100
 local DEFAULT_TARGET_LEAD=0
-local SEND_HIT_CONFIRM=true
-local HIT_CONFIRM_DELAY=0.08
 local MIN_T=0.25
 local MAX_T=5
 local DT=0.02
@@ -72,6 +71,7 @@ local lastPreviewUpdate=0
 local cachedPracticeBall=nil
 local practiceControlsEnabled=true
 local boundPracticeEvent=nil
+local ballHitConn=nil
 
 local screenGui=nil
 local statusLabel=nil
@@ -424,6 +424,48 @@ local function clearPreview()
 	end
 end
 
+local function stopBallDetection()
+	if ballHitConn then
+		pcall(function() ballHitConn:Disconnect() end)
+		ballHitConn=nil
+	end
+end
+
+local function startBallDetection(event,ball)
+	stopBallDetection()
+	if not event or not ball or not ball.Parent or not ball:IsA("BasePart") then
+		return
+	end
+
+	local radius=math.max(ball.Size.X,ball.Size.Y,ball.Size.Z)/2+0.5
+	local params=OverlapParams.new()
+	params.MaxParts=10
+	params.FilterType=Enum.RaycastFilterType.Include
+	params.FilterDescendantsInstances=CollectionService:GetTagged("FootballCanHit")
+
+	local hit=false
+	ballHitConn=RunService.Heartbeat:Connect(function()
+		if hit or not ball or not ball.Parent then
+			stopBallDetection()
+			return
+		end
+
+		for _,part in ipairs(Workspace:GetPartBoundsInRadius(ball.Position,radius,params)) do
+			local canHit=part.Parent and part.Parent:FindFirstChild("CanHit")
+			if part.Name=="TouchDetect" and canHit and canHit:IsA("BoolValue") and canHit.Value then
+				hit=true
+				pcall(function()
+					event:FireServer("Mechanics","QBGauntletClientHit",part)
+				end)
+				setStatus("Gauntlet hit confirmed",Color3.fromRGB(115,240,170))
+				stopBallDetection()
+				return
+			end
+		end
+	end)
+	connections[#connections+1]=ballHitConn
+end
+
 local function notePracticeBall(ball)
 	if typeof(ball)=="Instance" then
 		cachedPracticeBall=ball
@@ -439,6 +481,7 @@ local function handlePracticeEvent(action,...)
 		else
 			currentTarget=nil
 			cachedPlan=nil
+			stopBallDetection()
 			updateTargetText()
 			clearPreview()
 		end
@@ -455,6 +498,14 @@ local function handlePracticeEvent(action,...)
 			notePracticeBall(ball)
 			refreshTargets(true)
 			cachedPlan=nil
+		end
+		return
+	end
+	if action=="QBGA_Throwing" then
+		local method,ball=...
+		if method=="BallThrown" then
+			notePracticeBall(ball)
+			startBallDetection(boundPracticeEvent,heldFootball())
 		end
 	end
 end
@@ -601,7 +652,6 @@ local function solveThrow(target)
 					landing=landing,
 					landingTime=landingTime,
 					targetPart=target.part,
-					targetCanHit=target.canHit,
 					targetScore=target.score,
 					speedError=speedError,
 					miss=miss,
@@ -630,20 +680,6 @@ local function updatePreview(plan)
 	parts.beam.CurveSize1=math.clamp(curve1 or -endVelocity.Magnitude*previewTime/3,-400,400)
 end
 
-local function confirmGauntletHit(event,targetPart,canHit,timeToHit)
-	if not SEND_HIT_CONFIRM or not event or not targetPart then
-		return
-	end
-	local delayTime=math.clamp((tonumber(timeToHit) or 0)+HIT_CONFIRM_DELAY,HIT_CONFIRM_DELAY,MAX_T+HIT_CONFIRM_DELAY)
-	task.delay(delayTime,function()
-		if targetPart and targetPart.Parent and (not canHit or canHit.Value) then
-			pcall(function()
-				event:FireServer("Mechanics","QBGauntletClientHit",targetPart)
-			end)
-		end
-	end)
-end
-
 local function fireThrow(plan)
 	local event=findPracticeRemote(findPracticeWorkspace())
 	if not event then
@@ -654,7 +690,7 @@ local function fireThrow(plan)
 		AutoThrow=false,
 		Power=math.clamp(power,30,100),
 	})
-	confirmGauntletHit(event,plan.targetPart,plan.targetCanHit,plan.time)
+	startBallDetection(event,heldFootball())
 	return true,nil
 end
 
@@ -841,6 +877,7 @@ local function buildGui()
 end
 
 local function destroy()
+	stopBallDetection()
 	disconnectAll()
 	clearPreview()
 	if targetHighlight then
@@ -880,6 +917,7 @@ connect(RunService.RenderStepped,function()
 	if not practiceControlsEnabled then
 		currentTarget=nil
 		cachedPlan=nil
+		stopBallDetection()
 		clearPreview()
 		ensureHighlight()
 		updateTargetText()
