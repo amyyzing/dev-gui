@@ -76,6 +76,7 @@ local ballHitConn=nil
 
 local screenGui=nil
 local statusLabel=nil
+local probeLabel=nil
 local targetLabel=nil
 local keyButton=nil
 local powerBox=nil
@@ -289,12 +290,100 @@ local function resetHitStats()
 	hitStats={overlaps=0,sent=0,canHitTrue=0,canHitFalse=0}
 end
 
-local function hitStatsText()
-	return string.format("Overlap %d | Sent %d | CanHit T/F %d/%d",hitStats.overlaps,hitStats.sent,hitStats.canHitTrue,hitStats.canHitFalse)
+local function updateHitStatsStatus()
+	setStatus(string.format("Hit monitor active. Sent %d event(s).",hitStats.sent),hitSpamEnabled and Color3.fromRGB(255,190,100) or Color3.fromRGB(190,190,190))
 end
 
-local function updateHitStatsStatus()
-	setStatus(hitStatsText(),hitSpamEnabled and Color3.fromRGB(255,190,100) or Color3.fromRGB(190,190,190))
+local function compactVector(v)
+	if not v then
+		return "n/a"
+	end
+	return string.format("%.1f, %.1f, %.1f",v.X,v.Y,v.Z)
+end
+
+local function yesNo(value)
+	if value==nil then
+		return "n/a"
+	end
+	return value and "Y" or "N"
+end
+
+local function compactNumber(value)
+	value=tonumber(value) or 0
+	if value>=1000000 then
+		return string.format("%.1fm",value/1000000)
+	end
+	if value>=10000 then
+		return string.format("%.1fk",value/1000)
+	end
+	return tostring(value)
+end
+
+local function setProbe(text)
+	if probeLabel then
+		probeLabel.Text=tostring(text or "")
+	end
+end
+
+local function canHitState(part)
+	local canHit=part and part.Parent and part.Parent:FindFirstChild("CanHit")
+	if canHit and canHit:IsA("BoolValue") then
+		return canHit.Value
+	end
+	return nil
+end
+
+local function closestTaggedTouch(position,tagged)
+	local best=nil
+	local bestDist=nil
+	local bestTagged=false
+	for _,obj in ipairs(tagged or {}) do
+		if obj and obj.Parent then
+			local touch=nil
+			if obj:IsA("BasePart") and obj.Name=="TouchDetect" then
+				touch=obj
+			else
+				local found=obj:FindFirstChild("TouchDetect",true)
+				if found then
+					touch=touchDetectPart(found)
+				end
+			end
+			if touch and touch:IsA("BasePart") and touch.Parent then
+				local dist=(touch.Position-position).Magnitude
+				if not bestDist or dist<bestDist then
+					best=touch
+					bestDist=dist
+					bestTagged=CollectionService:HasTag(touch,"FootballCanHit") or CollectionService:HasTag(obj,"FootballCanHit")
+				end
+			end
+		end
+	end
+	return best,bestDist,bestTagged
+end
+
+local function updateProbe(ball,overlapCount,closest,closestDist,closestTagged,canHitReady)
+	local ballFound=ball and ball.Parent and ball:IsA("BasePart")
+	local sizeText="n/a"
+	local posText="n/a"
+	if ballFound then
+		sizeText=string.format("%.1f",math.max(ball.Size.X,ball.Size.Y,ball.Size.Z))
+		posText=compactVector(ball.Position)
+	end
+	local distText=closestDist and string.format("%.1f",closestDist) or "n/a"
+	setProbe(string.format(
+		"Ball %s  Size %s  Sent %s\nPos %s\nFrame ov %s  Near %s\nTotal ov %s  T/F %s/%s\nTagged %s  CanHit %s",
+		yesNo(ballFound),
+		sizeText,
+		compactNumber(hitStats.sent),
+		posText,
+		compactNumber(overlapCount or 0),
+		distText,
+		compactNumber(hitStats.overlaps),
+		compactNumber(hitStats.canHitTrue),
+		compactNumber(hitStats.canHitFalse),
+		yesNo(closestTagged),
+		yesNo(canHitReady)
+	))
 end
 
 local function targetLabelText(target)
@@ -372,7 +461,8 @@ end
 
 local function refreshHitboxButton()
 	if hitboxButton then
-		hitboxButton.Text=hitboxEnabled and "2x Hitbox: ON" or "2x Hitbox: OFF"
+		local prefix=string.format("%gx Hitbox",HITBOX_SCALE)
+		hitboxButton.Text=hitboxEnabled and (prefix..": ON") or (prefix..": OFF")
 		hitboxButton.BackgroundColor3=hitboxEnabled and Color3.fromRGB(30,110,70) or Color3.fromRGB(32,32,32)
 	end
 end
@@ -387,7 +477,8 @@ local function setHitboxEnabled(enabled)
 		end
 	end
 	refreshHitboxButton()
-	setStatus(hitboxEnabled and "2x gauntlet hitboxes enabled" or "2x gauntlet hitboxes disabled",hitboxEnabled and Color3.fromRGB(115,240,170) or Color3.fromRGB(190,190,190))
+	local scaleText=string.format("%gx",HITBOX_SCALE)
+	setStatus(hitboxEnabled and (scaleText.." gauntlet hitboxes enabled") or (scaleText.." gauntlet hitboxes disabled"),hitboxEnabled and Color3.fromRGB(115,240,170) or Color3.fromRGB(190,190,190))
 end
 
 local function refreshHitSpamButton()
@@ -528,12 +619,13 @@ end
 local function startBallDetection(event,ball)
 	stopBallDetection()
 	if not event or not ball or not ball.Parent or not ball:IsA("BasePart") then
+		updateProbe(nil,0,nil,nil,nil,nil)
 		return
 	end
 
 	local radius=math.max(ball.Size.X,ball.Size.Y,ball.Size.Z)/2+0.5
 	local params=OverlapParams.new()
-	params.MaxParts=10
+	params.MaxParts=40
 	params.FilterType=Enum.RaycastFilterType.Include
 	params.FilterDescendantsInstances=CollectionService:GetTagged("FootballCanHit")
 
@@ -541,18 +633,25 @@ local function startBallDetection(event,ball)
 	local lastSent={}
 	ballHitConn=RunService.Heartbeat:Connect(function()
 		if hit or not ball or not ball.Parent then
+			updateProbe(nil,0,nil,nil,nil,nil)
 			stopBallDetection()
 			return
 		end
 
+		local tagged=CollectionService:GetTagged("FootballCanHit")
+		params.FilterDescendantsInstances=tagged
+		local parts=Workspace:GetPartBoundsInRadius(ball.Position,radius,params)
+		local closest,closestDist,closestTagged=closestTaggedTouch(ball.Position,tagged)
+		local closestCanHit=canHitState(closest)
 		local sawOverlap=false
+		local overlapCount=0
 		local now=os.clock()
-		for _,part in ipairs(Workspace:GetPartBoundsInRadius(ball.Position,radius,params)) do
-			local canHit=part.Parent and part.Parent:FindFirstChild("CanHit")
+		for _,part in ipairs(parts) do
 			if part.Name=="TouchDetect" then
 				sawOverlap=true
+				overlapCount=overlapCount+1
 				hitStats.overlaps=hitStats.overlaps+1
-				local canHitReady=canHit and canHit:IsA("BoolValue") and canHit.Value
+				local canHitReady=canHitState(part)
 				if canHitReady then
 					hitStats.canHitTrue=hitStats.canHitTrue+1
 				else
@@ -567,6 +666,7 @@ local function startBallDetection(event,ball)
 							event:FireServer("Mechanics","QBGauntletClientHit",part)
 						end)
 						updateHitStatsStatus()
+						updateProbe(ball,overlapCount,closest,closestDist,closestTagged,closestCanHit)
 						if not hitSpamEnabled then
 							hit=true
 							stopBallDetection()
@@ -576,6 +676,7 @@ local function startBallDetection(event,ball)
 				end
 			end
 		end
+		updateProbe(ball,overlapCount,closest,closestDist,closestTagged,closestCanHit)
 		if sawOverlap and hitSpamEnabled then
 			updateHitStatsStatus()
 		end
@@ -905,7 +1006,7 @@ local function buildGui()
 		BackgroundColor3=Color3.fromRGB(12,12,12),
 		BorderSizePixel=0,
 		Position=UDim2.new(0,80,0,180),
-		Size=UDim2.new(0,240,0,162),
+		Size=UDim2.new(0,318,0,268),
 		Active=true,
 		Draggable=true,
 	},screenGui)
@@ -952,15 +1053,30 @@ local function buildGui()
 
 	statusLabel=new("TextLabel",{
 		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,34),
+		Size=UDim2.new(1,0,0,28),
 		Text="Expands active gauntlet TouchDetect hitboxes.",
 		Font=Enum.Font.Gotham,
 		TextSize=12,
 		TextColor3=Color3.fromRGB(190,190,190),
+		TextWrapped=false,
+		TextTruncate=Enum.TextTruncate.AtEnd,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		TextYAlignment=Enum.TextYAlignment.Top,
+	},body)
+
+	probeLabel=new("TextLabel",{
+		BackgroundColor3=Color3.fromRGB(20,20,20),
+		BorderSizePixel=0,
+		Size=UDim2.new(1,0,0,92),
+		Text="Ball n/a  Size n/a  Sent 0\nPos n/a\nFrame ov 0  Near n/a\nTotal ov 0  T/F 0/0\nTagged n/a  CanHit n/a",
+		Font=Enum.Font.Gotham,
+		TextSize=10,
+		TextColor3=Color3.fromRGB(205,205,205),
 		TextWrapped=true,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		TextYAlignment=Enum.TextYAlignment.Top,
 	},body)
+	new("UIPadding",{PaddingTop=UDim.new(0,6),PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8)},probeLabel)
 
 	connect(close.MouseButton1Click,function()
 		local owner=type(runtimeOwner)=="table" and rawget(runtimeOwner,RUNTIME_KEY)
