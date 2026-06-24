@@ -23,6 +23,8 @@ local G=Vector3.new(0,-BALL_G,0)
 local POWER_COEFFICIENT=0.95
 local DEFAULT_POWER=100
 local DEFAULT_TARGET_LEAD=0
+local SEND_HIT_CONFIRM=true
+local HIT_CONFIRM_DELAY=0.08
 local MIN_T=0.25
 local MAX_T=5
 local DT=0.02
@@ -212,9 +214,13 @@ end
 
 local function canHitValue(touch)
 	local cursor=touch
-	for _=1,4 do
+	for _=1,8 do
 		if not cursor then break end
 		local value=cursor:FindFirstChild("CanHit")
+		if value and value:IsA("BoolValue") then
+			return value
+		end
+		value=cursor:FindFirstChild("CanHit",true)
 		if value and value:IsA("BoolValue") then
 			return value
 		end
@@ -224,11 +230,18 @@ local function canHitValue(touch)
 end
 
 local function targetScore(touch)
-	local path=pathOf(touch)
-	if path:find("Throw5") then return 5 end
-	if path:find("Throw4") then return 4 end
-	if path:find("Throw3") then return 3 end
+	local path=pathOf(touch):lower()
+	if path:find("throw5") then return 5 end
+	if path:find("throw4") then return 4 end
+	if path:find("throw3") then return 3 end
 	return 0
+end
+
+local function touchDetectPart(instance)
+	if instance:IsA("BasePart") then
+		return instance
+	end
+	return instance:FindFirstChildWhichIsA("BasePart",true)
 end
 
 local function targetLabelText(target)
@@ -280,20 +293,25 @@ local function refreshTargets(force)
 		return activeTargets
 	end
 
+	local seen={}
 	for _,descendant in ipairs(base:GetDescendants()) do
-		if descendant.Name=="TouchDetect" and descendant:IsA("BasePart") then
-			local canHit=canHitValue(descendant)
-			if canHit and canHit.Value then
-				local score=targetScore(descendant)
-				if score>0 then
-					local target={
-						part=descendant,
-						score=score,
-						canHit=canHit,
-						velocity=targetVelocity(descendant),
-						workspaceGame=workspaceGame,
-					}
-					activeTargets[#activeTargets+1]=target
+		if descendant.Name=="TouchDetect" then
+			local part=touchDetectPart(descendant)
+			if part and not seen[part] then
+				seen[part]=true
+				local canHit=canHitValue(descendant) or canHitValue(part)
+				if canHit and canHit.Value then
+					local score=targetScore(descendant)
+					if score>0 then
+						local target={
+							part=part,
+							score=score,
+							canHit=canHit,
+							velocity=targetVelocity(part),
+							workspaceGame=workspaceGame,
+						}
+						activeTargets[#activeTargets+1]=target
+					end
 				end
 			end
 		end
@@ -393,6 +411,32 @@ local function beamCFrame(point,velocity,fallback)
 	return CFrame.lookAt(point,point+dir)
 end
 
+local function beamDirection(velocity,origin,time)
+	if not(velocity and origin and time and time>0) then
+		return nil
+	end
+	local endPoint=0.5*G*time*time+velocity*time+origin
+	local c1=endPoint-(G*time*time+velocity*time)/3
+	local c0=(0.125*G*time*time+0.5*velocity*time+origin-0.125*(origin+endPoint))/0.375-c1
+	local tangent0=c0-origin
+	local tangent1=c1-endPoint
+	local chord=origin-endPoint
+	if tangent0.Magnitude<1e-6 or tangent1.Magnitude<1e-6 or chord.Magnitude<1e-6 then
+		return nil
+	end
+	local x0=safeUnit(tangent0,velocity)
+	local zLine=safeUnit(chord,Vector3.new(0,0,-1))
+	local y0=safeUnit(x0:Cross(zLine),Vector3.new(0,1,0))
+	local x1=safeUnit(tangent1,velocity+G*time)
+	local y1=safeUnit(x1:Cross(zLine),y0)
+	local z0=safeUnit(y0:Cross(x0),Vector3.new(0,0,1))
+	local curve0=tangent0.Magnitude
+	local curve1=-tangent1.Magnitude
+	local cf0=CFrame.new(origin.X,origin.Y,origin.Z,x0.X,y0.X,z0.X,x0.Y,y0.Y,z0.Y,x0.Z,y0.Z,z0.Z)
+	local cf1=CFrame.new(endPoint.X,endPoint.Y,endPoint.Z,x1.X,y1.X,z0.X,x1.Y,y1.Y,z0.Y,x1.Z,y1.Z,z0.Z)
+	return curve0,curve1,cf0,cf1,endPoint
+end
+
 local function landingAtY(origin,velocity,y)
 	local a=0.5*G.Y
 	local b=velocity.Y
@@ -439,6 +483,7 @@ local function solveThrow(target)
 					landing=landing,
 					landingTime=landingTime,
 					targetPart=target.part,
+					targetCanHit=target.canHit,
 					targetScore=target.score,
 					speedError=speedError,
 					miss=miss,
@@ -456,14 +501,29 @@ local function updatePreview(plan)
 	end
 	local parts=ensurePreview()
 	if not parts then return end
-	local previewTime=plan.landingTime or plan.time
-	local endPoint=plan.origin+plan.velocity*previewTime+0.5*G*previewTime*previewTime
+	local previewTime=plan.time
+	local curve0,curve1,c2,c3,endPoint=beamDirection(plan.velocity,plan.origin,previewTime)
+	endPoint=endPoint or plan.origin+plan.velocity*previewTime+0.5*G*previewTime*previewTime
 	local endVelocity=plan.velocity+G*previewTime
-	parts.origin.CFrame=beamCFrame(plan.origin,plan.velocity)
-	parts.ending.CFrame=beamCFrame(endPoint,endVelocity,plan.velocity)
+	parts.origin.CFrame=c2 or beamCFrame(plan.origin,plan.velocity)
+	parts.ending.CFrame=c3 or beamCFrame(endPoint,endVelocity,plan.velocity)
 	parts.target.CFrame=CFrame.new(plan.target)
-	parts.beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-400,400)
-	parts.beam.CurveSize1=math.clamp(-endVelocity.Magnitude*previewTime/3,-400,400)
+	parts.beam.CurveSize0=math.clamp(curve0 or plan.velocity.Magnitude*previewTime/3,-400,400)
+	parts.beam.CurveSize1=math.clamp(curve1 or -endVelocity.Magnitude*previewTime/3,-400,400)
+end
+
+local function confirmGauntletHit(event,targetPart,canHit,timeToHit)
+	if not SEND_HIT_CONFIRM or not event or not targetPart then
+		return
+	end
+	local delayTime=math.clamp((tonumber(timeToHit) or 0)+HIT_CONFIRM_DELAY,HIT_CONFIRM_DELAY,MAX_T+HIT_CONFIRM_DELAY)
+	task.delay(delayTime,function()
+		if targetPart and targetPart.Parent and (not canHit or canHit.Value) then
+			pcall(function()
+				event:FireServer("Mechanics","QBGauntletClientHit",targetPart)
+			end)
+		end
+	end)
 end
 
 local function fireThrow(plan)
@@ -476,6 +536,7 @@ local function fireThrow(plan)
 		AutoThrow=false,
 		Power=math.clamp(power,30,100),
 	})
+	confirmGauntletHit(event,plan.targetPart,plan.targetCanHit,plan.time)
 	return true,nil
 end
 
