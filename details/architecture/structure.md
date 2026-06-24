@@ -14,7 +14,7 @@ This project should move toward a hybrid structure: shared infrastructure for li
 
 ## Migration Order
 
-1. Add lifecycle and contracts: `Scope`, `Scheduler`, state slices, theme tokens, diagnostics.
+1. Add lifecycle and contracts: `Scope`, `Scheduler`, state slices, and theme tokens.
 2. Build the design system: tokens, resolver, theme binding, UI primitive, then shared controls.
 3. Add compatibility adapters so existing controls can delegate to the new UI library.
 4. Migrate simple pages first: Settings, Keybinds, then GUI Customizer.
@@ -26,10 +26,9 @@ This project should move toward a hybrid structure: shared infrastructure for li
 
 - `core/scope.lua` owns cleanup for connections, instances, functions, nested scopes, destroyable tables, cancellable delayed callbacks, and arbitrary cleanup tasks. `destroy()` is idempotent; `cancelAll()` is an alias for cleanup without marking the scope destroyed.
 - `core/scheduler.lua` is the preferred owner for repeated `RenderStepped`, `Heartbeat`, interval, and delayed jobs. Jobs are named, cancellable, pausable, and expose timing stats through `stats()`, `jobStats(name)`, and `resetStats()`.
-- `diagnostics/logger.lua` provides a small scoped logger with levels and bounded history. Runtime code exposes it through `RuntimeServices.Logger`.
-- `runtime/loader-part-1.lua` exposes shared services through `RuntimeServices`: `Janitor`, `Scheduler`, `StateStore`, `ThemeStore`, `Logger`, `PlayerCache`, and `BallTracker`.
+- `runtime/loader-part-1.lua` exposes shared services through `RuntimeServices`: `Janitor`, `Scheduler`, `StateStore`, `ThemeStore`, `PlayerCache`, and `BallTracker`.
 
-New feature code should depend on these contracts instead of adding feature-local connection arrays, direct repeated `RunService` loops, or ad hoc logging.
+New feature code should depend on these contracts instead of adding feature-local connection arrays or direct repeated `RunService` loops.
 
 ## Feature Shape
 

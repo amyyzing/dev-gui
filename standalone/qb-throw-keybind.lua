@@ -78,7 +78,6 @@ local ballHitConn=nil
 
 local screenGui=nil
 local statusLabel=nil
-local probeLabel=nil
 local targetLabel=nil
 local keyButton=nil
 local powerBox=nil
@@ -91,7 +90,6 @@ local originalHitboxes={}
 local hitboxButton=nil
 local hitSpamEnabled=false
 local hitSpamButton=nil
-local hitStats={overlaps=0,sent=0,canHitTrue=0,canHitFalse=0,near=0}
 
 local function connect(signal,fn)
 	local conn=signal:Connect(fn)
@@ -288,45 +286,6 @@ local function findByPath(root,segments)
 	return cursor
 end
 
-local function resetHitStats()
-	hitStats={overlaps=0,sent=0,canHitTrue=0,canHitFalse=0,near=0}
-end
-
-local function updateHitStatsStatus()
-	setStatus(string.format("Hit monitor active. Sent %d event(s).",hitStats.sent),hitSpamEnabled and Color3.fromRGB(255,190,100) or Color3.fromRGB(190,190,190))
-end
-
-local function compactVector(v)
-	if not v then
-		return "n/a"
-	end
-	return string.format("%.1f, %.1f, %.1f",v.X,v.Y,v.Z)
-end
-
-local function yesNo(value)
-	if value==nil then
-		return "n/a"
-	end
-	return value and "Y" or "N"
-end
-
-local function compactNumber(value)
-	value=tonumber(value) or 0
-	if value>=1000000 then
-		return string.format("%.1fm",value/1000000)
-	end
-	if value>=10000 then
-		return string.format("%.1fk",value/1000)
-	end
-	return tostring(value)
-end
-
-local function setProbe(text)
-	if probeLabel then
-		probeLabel.Text=tostring(text or "")
-	end
-end
-
 local function canHitState(part)
 	local canHit=part and part.Parent and part.Parent:FindFirstChild("CanHit")
 	if canHit and canHit:IsA("BoolValue") then
@@ -338,7 +297,6 @@ end
 local function closestTaggedTouch(position,tagged)
 	local best=nil
 	local bestDist=nil
-	local bestTagged=false
 	for _,obj in ipairs(tagged or {}) do
 		if obj and obj.Parent then
 			local touch=nil
@@ -355,38 +313,11 @@ local function closestTaggedTouch(position,tagged)
 				if not bestDist or dist<bestDist then
 					best=touch
 					bestDist=dist
-					bestTagged=CollectionService:HasTag(touch,"FootballCanHit") or CollectionService:HasTag(obj,"FootballCanHit")
 				end
 			end
 		end
 	end
-	return best,bestDist,bestTagged
-end
-
-local function updateProbe(ball,overlapCount,closest,closestDist,closestTagged,canHitReady,windowOpen)
-	local ballFound=ball and ball.Parent and ball:IsA("BasePart")
-	local sizeText="n/a"
-	local posText="n/a"
-	if ballFound then
-		sizeText=string.format("%.1f",math.max(ball.Size.X,ball.Size.Y,ball.Size.Z))
-		posText=compactVector(ball.Position)
-	end
-	local distText=closestDist and string.format("%.1f",closestDist) or "n/a"
-	setProbe(string.format(
-		"Ball %s  Size %s  Sent %s\nPos %s\nFrame ov %s  Near %s  Win %s\nTotal ov %s  T/F %s/%s\nTagged %s  CanHit %s",
-		yesNo(ballFound),
-		sizeText,
-		compactNumber(hitStats.sent),
-		posText,
-		compactNumber(overlapCount or 0),
-		distText,
-		yesNo(windowOpen),
-		compactNumber(hitStats.overlaps),
-		compactNumber(hitStats.canHitTrue),
-		compactNumber(hitStats.canHitFalse),
-		yesNo(closestTagged),
-		yesNo(canHitReady)
-	))
+	return best,bestDist
 end
 
 local function targetLabelText(target)
@@ -493,7 +424,6 @@ end
 
 local function setHitSpamEnabled(enabled)
 	hitSpamEnabled=enabled==true
-	resetHitStats()
 	refreshHitSpamButton()
 	if hitSpamEnabled then
 		setStatus("Hit retry armed; waits for CanHit.",Color3.fromRGB(255,190,100))
@@ -622,7 +552,6 @@ end
 local function startBallDetection(event,ball)
 	stopBallDetection()
 	if not event or not ball or not ball.Parent or not ball:IsA("BasePart") then
-		updateProbe(nil,0,nil,nil,nil,nil,false)
 		return
 	end
 
@@ -634,11 +563,11 @@ local function startBallDetection(event,ball)
 
 	local hit=false
 	local lastSent={}
+	local sentCount=0
 	local firstNearAt=nil
 	local lastNearAt=nil
 	ballHitConn=RunService.Heartbeat:Connect(function()
 		if hit or not ball or not ball.Parent then
-			updateProbe(nil,0,nil,nil,nil,nil,false)
 			stopBallDetection()
 			return
 		end
@@ -646,10 +575,9 @@ local function startBallDetection(event,ball)
 		local tagged=CollectionService:GetTagged("FootballCanHit")
 		params.FilterDescendantsInstances=tagged
 		local parts=Workspace:GetPartBoundsInRadius(ball.Position,radius,params)
-		local closest,closestDist,closestTagged=closestTaggedTouch(ball.Position,tagged)
+		local closest,closestDist=closestTaggedTouch(ball.Position,tagged)
 		local closestCanHit=canHitState(closest)
 		local sawOverlap=false
-		local overlapCount=0
 		local now=os.clock()
 		local nearWindow=closestDist and closestDist<=radius+HIT_NEAR_MARGIN
 		local sentThisFrame=false
@@ -660,11 +588,11 @@ local function startBallDetection(event,ball)
 				return false
 			end
 			lastSent[part]=now
-			hitStats.sent=hitStats.sent+1
+			sentCount=sentCount+1
 			pcall(function()
 				event:FireServer("Mechanics","QBGauntletClientHit",part)
 			end)
-			updateHitStatsStatus()
+			setStatus(string.format("Hit retry sent %d event(s).",sentCount),Color3.fromRGB(255,190,100))
 			if stopAfterSend then
 				hit=true
 			end
@@ -674,17 +602,9 @@ local function startBallDetection(event,ball)
 		for _,part in ipairs(parts) do
 			if part.Name=="TouchDetect" then
 				sawOverlap=true
-				overlapCount=overlapCount+1
-				hitStats.overlaps=hitStats.overlaps+1
 				local canHitReady=canHitState(part)
-				if canHitReady then
-					hitStats.canHitTrue=hitStats.canHitTrue+1
-				else
-					hitStats.canHitFalse=hitStats.canHitFalse+1
-				end
 				if canHitReady and not sentThisFrame then
 					sentThisFrame=fireHit(part,not hitSpamEnabled) or sentThisFrame
-					updateProbe(ball,overlapCount,closest,closestDist,closestTagged,closestCanHit,nearWindow)
 					if hit then
 						stopBallDetection()
 						return
@@ -696,23 +616,19 @@ local function startBallDetection(event,ball)
 		if nearWindow then
 			firstNearAt=firstNearAt or now
 			lastNearAt=now
-			hitStats.near=hitStats.near+1
 		end
 
 		if hitSpamEnabled and not sentThisFrame and nearWindow and closest and closestCanHit then
 			sentThisFrame=fireHit(closest,false) or sentThisFrame
 		end
 
-		updateProbe(ball,overlapCount,closest,closestDist,closestTagged,closestCanHit,nearWindow)
-		if sentThisFrame then
-			updateHitStatsStatus()
-		elseif sawOverlap and not closestCanHit then
+		if sawOverlap and not closestCanHit then
 			setStatus("Overlap seen; waiting for CanHit.",Color3.fromRGB(255,190,100))
 		elseif firstNearAt and lastNearAt and now-lastNearAt>HIT_RETRY_WINDOW then
 			setStatus("Hit window passed.",Color3.fromRGB(190,190,190))
 			stopBallDetection()
 		elseif sawOverlap and hitSpamEnabled then
-			updateHitStatsStatus()
+			setStatus(string.format("Hit retry active. Sent %d event(s).",sentCount),Color3.fromRGB(255,190,100))
 		end
 	end)
 	connections[#connections+1]=ballHitConn
@@ -1040,7 +956,7 @@ local function buildGui()
 		BackgroundColor3=Color3.fromRGB(12,12,12),
 		BorderSizePixel=0,
 		Position=UDim2.new(0,80,0,180),
-		Size=UDim2.new(0,318,0,268),
+		Size=UDim2.new(0,318,0,168),
 		Active=true,
 		Draggable=true,
 	},screenGui)
@@ -1097,20 +1013,6 @@ local function buildGui()
 		TextXAlignment=Enum.TextXAlignment.Left,
 		TextYAlignment=Enum.TextYAlignment.Top,
 	},body)
-
-	probeLabel=new("TextLabel",{
-		BackgroundColor3=Color3.fromRGB(20,20,20),
-		BorderSizePixel=0,
-		Size=UDim2.new(1,0,0,92),
-		Text="Ball n/a  Size n/a  Sent 0\nPos n/a\nFrame ov 0  Near n/a  Win N\nTotal ov 0  T/F 0/0\nTagged n/a  CanHit n/a",
-		Font=Enum.Font.Gotham,
-		TextSize=10,
-		TextColor3=Color3.fromRGB(205,205,205),
-		TextWrapped=true,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		TextYAlignment=Enum.TextYAlignment.Top,
-	},body)
-	new("UIPadding",{PaddingTop=UDim.new(0,6),PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8)},probeLabel)
 
 	connect(close.MouseButton1Click,function()
 		local owner=type(runtimeOwner)=="table" and rawget(runtimeOwner,RUNTIME_KEY)

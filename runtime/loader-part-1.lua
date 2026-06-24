@@ -133,11 +133,7 @@ function disconnectRuntimeConnections()
 
 	if CoreScope and CoreScope.new then
 		RUNTIME_ROOT_SCOPE=CoreScope.new("runtime",function(err,scopeName)
-			if RuntimeLogger and RuntimeLogger.warn then
-				RuntimeLogger:warn("cleanup failed",scopeName,err)
-			else
-				warn("Runtime cleanup failed:",scopeName,err)
-			end
+			warn("Runtime cleanup failed:",scopeName,err)
 		end)
 	end
 end
@@ -329,10 +325,9 @@ end}
 RuntimeScheduler={Register=function() return false end,SetEnabled=function() end,Unregister=function() end,Count=function() return 0 end,Stats=function() return{} end,ResetStats=function() end}
 RuntimeStateStore={dirty=false,Get=function(_,_,default) return default end,Set=function(_,_,value) return value end}
 RuntimeThemeStore={Apply=function() end,RefreshObject=function() end}
-RuntimeLogger={debug=function() end,info=function() end,warn=function() end,error=function() end,scope=function(self) return self end}
 RuntimePlayerCache={getPlayers=function() return Players:GetPlayers() end,getCharacter=function(_,player) return player and (Workspace:FindFirstChild(player.Name) or player.Character) or nil end,getRoot=function(self,player) local character=self:getCharacter(player) return character and (character.PrimaryPart or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")) or nil end,getTeamId=function(_,player) local replicated=player and player:FindFirstChild("Replicated") local teamValue=replicated and replicated:FindFirstChild("TeamID") local ok,value=pcall(function() return teamValue and teamValue.Value end) return ok and value and tostring(value) or nil end}
 RuntimeBallTracker={getHeldBall=function() return nil end,getFootballPartFromPlayer=function() return nil end,getCarrier=function() return nil end}
-RuntimeServices={Janitor=RuntimeJanitor,Scheduler=RuntimeScheduler,StateStore=RuntimeStateStore,ThemeStore=RuntimeThemeStore,Logger=RuntimeLogger,PlayerCache=RuntimePlayerCache,BallTracker=RuntimeBallTracker}
+RuntimeServices={Janitor=RuntimeJanitor,Scheduler=RuntimeScheduler,StateStore=RuntimeStateStore,ThemeStore=RuntimeThemeStore,PlayerCache=RuntimePlayerCache,BallTracker=RuntimeBallTracker}
 
 function fmtNumber(n, decimals)
 	decimals=decimals or 2
@@ -519,7 +514,6 @@ MANUAL_REFRESH_RELOAD_PATH="loader.lua"
 MODULE_PATHS={
 	CoreScope="core/scope.lua",
 	CoreSignal="core/signal.lua",
-	DiagnosticsLogger="diagnostics/logger.lua",
 	CoreScheduler="core/scheduler.lua",
 	CorePlayerCache="core/player-cache.lua",
 	CoreBallTracker="core/ball-tracker.lua",
@@ -581,7 +575,6 @@ MODULE_PATHS={
 MODULE_GLOBAL_NAMES={
 	CoreScope="CoreScope",
 	CoreSignal="CoreSignal",
-	DiagnosticsLogger="DiagnosticsLogger",
 	CoreScheduler="CoreScheduler",
 	CorePlayerCache="CorePlayerCache",
 	CoreBallTracker="CoreBallTracker",
@@ -597,7 +590,7 @@ MODULE_GLOBAL_NAMES={
 	GuiFusion="FusionModule"
 }
 STARTUP_MODULE_NAMES={"CoreScope","CoreSignal","CoreScheduler","StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura","GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimMath","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","DataSave"}
-OPTIONAL_MODULE_NAMES={"DiagnosticsLogger","CorePlayerCache","CoreBallTracker"}
+OPTIONAL_MODULE_NAMES={"CorePlayerCache","CoreBallTracker"}
 MAP_RELOAD_NAMES={"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds"}
 CUSTOMIZE_RELOAD_NAMES={"StrokeColourLogic","StrokeColour"}
 PAGE2_RELOAD_NAMES={"HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor"}
@@ -1307,21 +1300,9 @@ for _,name in ipairs(STARTUP_MODULE_NAMES) do
 end
 
 function installRuntimeArchitecture()
-	if DiagnosticsLogger and DiagnosticsLogger.new then
-		RuntimeLogger=DiagnosticsLogger.new({
-			name="runtime",
-			level="warn",
-			historyLimit=80
-		})
-	end
-
 	if CoreScope and CoreScope.new then
 		RUNTIME_ROOT_SCOPE=RUNTIME_ROOT_SCOPE or CoreScope.new("runtime",function(err,scopeName)
-			if RuntimeLogger and RuntimeLogger.warn then
-				RuntimeLogger:warn("cleanup failed",scopeName,err)
-			else
-				warn("Runtime cleanup failed:",scopeName,err)
-			end
+			warn("Runtime cleanup failed:",scopeName,err)
 		end)
 
 		RuntimeJanitor={}
@@ -1329,11 +1310,7 @@ function installRuntimeArchitecture()
 
 		function RuntimeJanitor.new(name)
 			return setmetatable({_scope=CoreScope.new(name or "janitor",function(err,scopeName)
-				if RuntimeLogger and RuntimeLogger.warn then
-					RuntimeLogger:warn("janitor cleanup failed",scopeName,err)
-				else
-					warn("Runtime janitor cleanup failed:",scopeName,err)
-				end
+				warn("Runtime janitor cleanup failed:",scopeName,err)
 			end)},RuntimeJanitor)
 		end
 
@@ -1387,11 +1364,7 @@ function installRuntimeArchitecture()
 				state.elapsed=0
 				local ok,err=pcall(fn,elapsed,dt)
 				if not ok then
-					if RuntimeLogger and RuntimeLogger.warn then
-						RuntimeLogger:warn("scheduler job failed",id,err)
-					else
-						warn("Runtime scheduler job failed:",id,err)
-					end
+					warn("Runtime scheduler job failed:",id,err)
 				end
 			end
 
@@ -1538,7 +1511,6 @@ function installRuntimeArchitecture()
 		Scheduler=RuntimeScheduler,
 		StateStore=RuntimeStateStore,
 		ThemeStore=RuntimeThemeStore,
-		Logger=RuntimeLogger,
 		PlayerCache=RuntimePlayerCache,
 		BallTracker=RuntimeBallTracker
 	}
