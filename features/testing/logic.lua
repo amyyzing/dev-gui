@@ -10,6 +10,7 @@ local LP=Players.LocalPlayer
 local BALL_G=28
 local TESTING_C1_Y=14.30
 local DEFENDER_SPEED=21
+local TESTING_BALL_SPEED=95
 local C1_MARKER_HEIGHT=80
 local C1_MARKER_THICKNESS=0.12
 local GROUND_MARKER_DIAMETER=5.5
@@ -337,13 +338,12 @@ function Testing.new(ctx,parent)
 		if not throwerTeam then
 			throwerTeam=teamOf(LP)
 		end
-		if not throwerTeam then
-			return false
-		end
 
 		local reach=DEFENDER_SPEED*flightTime
 		for _,player in ipairs(Players:GetPlayers()) do
-			if player~=thrower and teamOf(player)~=throwerTeam then
+			local playerTeam=teamOf(player)
+			local isDefender=player~=thrower and player~=LP and (not throwerTeam or playerTeam~=throwerTeam)
+			if isDefender then
 				local defenderRoot=rootOfPlayer(player)
 				if defenderRoot and (flat(defenderRoot.Position)-flat(c1Position)).Magnitude<=reach then
 					return true
@@ -370,6 +370,11 @@ function Testing.new(ctx,parent)
 			local heightDelta=math.max(c1Position.Y-c2Frame.Position.Y,0)
 			if heightDelta>0 then
 				flightTime=math.sqrt((2*heightDelta)/BALL_G)
+			end
+			local flatDistance=(flat(c1Position)-flat(c2Frame.Position)).Magnitude
+			local distanceTime=flatDistance/TESTING_BALL_SPEED
+			if distanceTime>0 then
+				flightTime=math.max(flightTime or 0,distanceTime)
 			end
 		end
 
