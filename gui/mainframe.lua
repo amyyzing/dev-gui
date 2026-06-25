@@ -924,27 +924,27 @@ function MainFrame.new(ctx)
 		end)
 	end
 
-	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=THEME.CARD,BackgroundTransparency=0.02,BorderSizePixel=0,Text="",ZIndex=30,ThemeRole="CARD"},root)
+	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=getUIStrokeColor(),BackgroundTransparency=0.18,BorderSizePixel=0,Text="",ZIndex=30,SkipThemeRole=true},root)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},resizeHandle)
-	local resizeStroke=New("UIStroke",{Color=getUIStrokeColor(),Thickness=1,Transparency=0.05},resizeHandle)
+	local resizeStroke=New("UIStroke",{Color=THEME.BG,Thickness=1,Transparency=0.25},resizeHandle)
 
 	local resizeHovering=false
 	local resizing=false
 
 	local function paintResizeHandle(held)
 		local targetSize=held and 18 or (resizeHovering and 16 or 14)
-		local targetTransparency=held and 0 or (resizeHovering and 0.01 or 0.02)
+		local targetTransparency=held and 0.02 or (resizeHovering and 0.08 or 0.18)
 
 		TweenService:Create(resizeHandle,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
 			Size=UDim2.fromOffset(targetSize,targetSize),
-			BackgroundColor3=held and (THEME.GREEN or THEME.CARD) or THEME.CARD,
+			BackgroundColor3=getUIStrokeColor(),
 			BackgroundTransparency=targetTransparency,
 		}):Play()
 
 		TweenService:Create(resizeStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
-			Color=getUIStrokeColor(),
+			Color=held and (THEME.TEXT or Color3.new(1,1,1)) or (THEME.BG or Color3.new()),
 			Thickness=1,
-			Transparency=(held or resizeHovering) and 0 or 0.05,
+			Transparency=(held or resizeHovering) and 0.08 or 0.25,
 		}):Play()
 	end
 

@@ -15,14 +15,12 @@ local function defaultBindingRows(ctx)
 	ensure("TOGGLE_JB_KEY")
 	ensure("TOGGLE_AB_KEY")
 	ensure("TOGGLE_ACTION_KEY")
-	ensure("TOGGLE_SPEED_KEY")
 	return{
 		{label="Toggle open / hide GUI",key="TOGGLE_UI_KEY"},
 		{label="Hitbox Toggle",key="TOGGLE_HB_KEY"},
 		{label="Jump Boost Toggle",key="TOGGLE_JB_KEY"},
 		{label="Always Boost Toggle",key="TOGGLE_AB_KEY"},
 		{label="ESP Toggle",key="TOGGLE_ACTION_KEY"},
-		{label="Speed Toggle",key="TOGGLE_SPEED_KEY"},
 	}
 end
 
@@ -152,7 +150,7 @@ function KeybindSettings.new(ctx,bindSection)
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,-138,1,0),
 			Position=UDim2.fromOffset(0,0),
-			Text=label,
+			Text=string.upper(tostring(label or "")),
 			Font=Enum.Font.GothamMedium,
 			TextSize=12,
 			TextColor3=THEME.TEXT,
@@ -244,7 +242,7 @@ function KeybindSettings.new(ctx,bindSection)
 			api.CaptureInput(input)
 		end)
 
-		table.insert(bindRows,{button=btn,getter=getter,label=labelButton,strike=strike})
+		table.insert(bindRows,{button=btn,getter=getter,label=labelButton,strike=strike,displayLabel=string.upper(tostring(label or ""))})
 		return btn
 	end
 
@@ -257,6 +255,7 @@ function KeybindSettings.new(ctx,bindSection)
 			end
 
 			if item.label then
+				item.label.Text=item.displayLabel or string.upper(tostring(item.label.Text or ""))
 				item.label.TextColor3=THEME.TEXT
 			end
 

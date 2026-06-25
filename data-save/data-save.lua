@@ -727,7 +727,6 @@ function DataSave.new(ctx)
 				toggleAlwaysBoost=encodeBinding(getValue(ctx,"TOGGLE_AB_KEY",Enum.KeyCode.Unknown)),
 				toggleESP=encodeBinding(getValue(ctx,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
 				toggleActionStatus=encodeBinding(getValue(ctx,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
-				toggleSpeed=encodeBinding(getValue(ctx,"TOGGLE_SPEED_KEY",Enum.KeyCode.Unknown)),
 				qbAimLock=encodeBinding(getValue(ctx,"QB_AIM_LOCK_KEY",Enum.KeyCode.H)),
 				qbAimThrow=encodeBinding(getValue(ctx,"QB_AIM_THROW_KEY",Enum.KeyCode.T)),
 				qbAimToggle=encodeBinding(getValue(ctx,"QB_AIM_TOGGLE_KEY",Enum.KeyCode.P)),
@@ -737,7 +736,7 @@ function DataSave.new(ctx)
 			uiStyle=collectUIStylePayload(uiStyle,defaultUIStyle),
 
 			workspace={
-				smoothPlastic=false,
+				smoothPlastic=ctx.WORLD_SETTINGS and ctx.WORLD_SETTINGS.SmoothPlastic and true or false,
 			},
 
 			window={
@@ -849,7 +848,6 @@ function DataSave.new(ctx)
 			toggleHitbox="TOGGLE_HB_KEY",
 			toggleJumpBoost="TOGGLE_JB_KEY",
 			toggleAlwaysBoost="TOGGLE_AB_KEY",
-			toggleSpeed="TOGGLE_SPEED_KEY",
 			qbAimLock="QB_AIM_LOCK_KEY",
 			qbAimThrow="QB_AIM_THROW_KEY",
 			qbAimToggle="QB_AIM_TOGGLE_KEY",
@@ -927,8 +925,9 @@ function DataSave.new(ctx)
 			ctx.UI_STYLE.CornerRadius=0
 		end
 
+		local workspaceSettings=settings.workspace or settings.Workspace or {}
 		if ctx.WORLD_SETTINGS then
-			ctx.WORLD_SETTINGS.SmoothPlastic=false
+			ctx.WORLD_SETTINGS.SmoothPlastic=workspaceSettings.smoothPlastic and true or false
 		end
 
 		local window=settings.window or {}
@@ -1131,6 +1130,66 @@ function DataSave.new(ctx)
 		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
 
 		return true,preset
+	end
+
+	function api.ImportOwnedPreset(code)
+		local cleanCode=trim(code)
+		if cleanCode=="" then
+			return false,"Preset code cannot be empty."
+		end
+
+		if not(ctx.BOT_API and ctx.BOT_API.Post) then
+			return false,"Preset import needs the remote preset service."
+		end
+
+		local response=ctx.BOT_API.Post("/preset/load",{
+			playerId=getPlayerId(ctx),
+			code=cleanCode,
+		})
+
+		if not response or not response.ok then
+			return false,response and response.error or "Import failed."
+		end
+
+		if response.presets and type(response.presets)=="table" and ctx.OWNED_PRESETS then
+			clearArray(ctx.OWNED_PRESETS)
+
+			for _,rawPreset in ipairs(response.presets) do
+				local normalized=normalizePreset(rawPreset)
+				if normalized then
+					table.insert(ctx.OWNED_PRESETS,normalized)
+				end
+			end
+		else
+			local preset=normalizePreset(response.preset or response.Preset or response)
+			if not preset then
+				return false,"Import returned invalid preset data."
+			end
+
+			if ctx.OWNED_PRESETS then
+				local replaced=false
+				for index,owned in ipairs(ctx.OWNED_PRESETS) do
+					if tostring(owned.Code or owned.code or "")==tostring(preset.Code or preset.code or "") then
+						ctx.OWNED_PRESETS[index]=preset
+						replaced=true
+						break
+					end
+				end
+
+				if not replaced then
+					table.insert(ctx.OWNED_PRESETS,preset)
+				end
+			end
+
+			if ctx.expandedOwned then
+				ctx.expandedOwned[tostring(preset.Code or preset.code or cleanCode)]=true
+			end
+		end
+
+		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
+		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
+
+		return true,response
 	end
 
 	function api.EquipOwnedPreset(preset)

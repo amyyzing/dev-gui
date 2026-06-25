@@ -32,6 +32,9 @@ function HitboxPreset.new(ctx,ownedSection)
 	local connections={}
 	local listConnections={}
 	local modalConnections={}
+	local importBox=nil
+	local importWarning=nil
+	local requestImport=nil
 
 	local function trackConnection(conn,bucket)
 		bucket=bucket or connections
@@ -47,6 +50,70 @@ function HitboxPreset.new(ctx,ownedSection)
 		end
 		table.clear(bucket)
 	end
+
+	local importRow=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,54),ZIndex=5,LayoutOrder=0},ownedSection)
+	importBox=New("TextBox",{
+		BackgroundColor3=THEME.BG,
+		BorderSizePixel=0,
+		ClearTextOnFocus=false,
+		PlaceholderText="IMPORT PRESET CODE",
+		Text="",
+		Font=Enum.Font.GothamMedium,
+		TextSize=12,
+		TextColor3=THEME.TEXT,
+		PlaceholderColor3=THEME.MUTED,
+		TextXAlignment=Enum.TextXAlignment.Center,
+		Size=UDim2.new(1,-104,0,28),
+		Position=UDim2.fromOffset(0,0),
+		ZIndex=6,
+	},importRow)
+	wrapTextBox(importBox,THEME.BG,2)
+
+	local importButton=New("TextButton",{
+		BackgroundColor3=THEME.BUTTON or THEME.BG,
+		BorderSizePixel=0,
+		Text="IMPORT",
+		Font=Enum.Font.GothamMedium,
+		TextSize=11,
+		TextColor3=THEME.TEXT,
+		AutoButtonColor=false,
+		Position=UDim2.new(1,-96,0,0),
+		Size=UDim2.fromOffset(96,28),
+		ZIndex=6,
+		ThemeRole="BUTTON",
+	},importRow)
+	local importButtonWrap=wrapTextButton(importButton,THEME.BUTTON or THEME.BG,2)
+	importButtonWrap:SetAttribute("ThemeRole","BUTTON")
+
+	importWarning=New("TextLabel",{
+		BackgroundTransparency=1,
+		Position=UDim2.fromOffset(0,34),
+		Size=UDim2.new(1,0,0,16),
+		Text="",
+		Font=Enum.Font.Gotham,
+		TextSize=11,
+		TextColor3=THEME.RED,
+		TextXAlignment=Enum.TextXAlignment.Left,
+		ZIndex=6,
+	},importRow)
+
+	trackConnection(importButton.MouseEnter:Connect(function()
+		importButtonWrap.BackgroundColor3=THEME.CARD
+	end))
+
+	trackConnection(importButton.MouseLeave:Connect(function()
+		importButtonWrap.BackgroundColor3=THEME.BUTTON or THEME.BG
+	end))
+
+	trackConnection(importButton.Activated:Connect(function()
+		if requestImport then requestImport() end
+	end))
+
+	trackConnection(importBox.FocusLost:Connect(function(enterPressed)
+		if enterPressed and requestImport then
+			requestImport()
+		end
+	end))
 
 	local ownedList=New("ScrollingFrame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,190),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BorderSizePixel=0,ZIndex=5},ownedSection)
 	New("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},ownedList)
@@ -257,6 +324,29 @@ function HitboxPreset.new(ctx,ownedSection)
 		return true,preset
 	end
 
+	function api.ImportPreset(code)
+		local cleanCode=trim(code)
+		if cleanCode=="" then
+			return false,"Enter a preset code."
+		end
+
+		if ctx.importOwnedPreset then
+			local ok,success,result=pcall(ctx.importOwnedPreset,cleanCode)
+			if not ok then
+				return false,tostring(success)
+			end
+
+			if success==false then
+				return false,tostring(result)
+			end
+
+			requestRefresh()
+			return true,result
+		end
+
+		return false,"Preset import is unavailable."
+	end
+
 	local function closePresetModal()
 		disconnectAll(modalConnections)
 		if modalOverlay then
@@ -280,6 +370,47 @@ function HitboxPreset.new(ctx,ownedSection)
 		end),modalConnections)
 
 		return btn
+	end
+
+	local function showImportConfirm(code)
+		closePresetModal()
+		code=trim(code)
+
+		modalOverlay=New("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.35,BorderSizePixel=0,ZIndex=90},SG)
+
+		local box=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),Size=UDim2.fromOffset(380,166),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=100},modalOverlay)
+		New("UIStroke",{Color=THEME.STROKE,Thickness=2,Transparency=0},box)
+
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="Import preset?",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,44),Size=UDim2.new(1,-32,0,42),Text="Add preset "..code.." to your saved preset list?",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,ZIndex=101},box)
+
+		local no=modalButton(box,"NO",166)
+		local yes=modalButton(box,"YES",268)
+
+		trackConnection(no.Activated:Connect(closePresetModal),modalConnections)
+		trackConnection(yes.Activated:Connect(function()
+			local ok,result=api.ImportPreset(code)
+			if not ok then
+				if importWarning then importWarning.Text=tostring(result) end
+				closePresetModal()
+				return
+			end
+
+			if importBox then importBox.Text="" end
+			if importWarning then importWarning.Text="" end
+			closePresetModal()
+		end),modalConnections)
+	end
+
+	requestImport=function()
+		local code=trim(importBox and importBox.Text or "")
+		if code=="" then
+			if importWarning then importWarning.Text="Enter a preset code." end
+			return
+		end
+
+		if importWarning then importWarning.Text="" end
+		showImportConfirm(code)
 	end
 
 	local function showNamePrompt(collectFn)

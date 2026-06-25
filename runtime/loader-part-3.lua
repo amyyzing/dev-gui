@@ -249,6 +249,10 @@ function makeMapCtx(name)
 		ctx.AntiMaterialLogicModule=AntiMaterialLogicModule
 		ctx.onChanged=function(state)
 			potatoMode=state and true or false
+			if WORLD_SETTINGS then
+				WORLD_SETTINGS.SmoothPlastic=potatoMode
+			end
+			requestPlayerAutosave()
 		end
 	elseif name=="MapCleaner" then
 		ctx.MapCleanerLogicModule=MapCleanerLogicModule
@@ -297,14 +301,14 @@ function buildAllRuntimePages()
 		if ensureRuntimePageBuilt then
 			loaderPhaseCurrent=(loaderPhaseCurrent or #STARTUP_MODULE_PATHS)+1
 			if setLoaderProgress then
-				setLoaderProgress("Building page: "..tostring(pageName),loaderPhaseCurrent,LOADER_TOTAL,false)
+				setLoaderProgress("Building interface page.",loaderPhaseCurrent,LOADER_TOTAL,false)
 			end
 
 			local ok,result=pcall(ensureRuntimePageBuilt,pageName)
 			if not ok or result==false then
 				okAll=false
 				if setLoaderProgress then
-					setLoaderProgress("Failed to build page: "..tostring(pageName),loaderPhaseCurrent,LOADER_TOTAL,true)
+					setLoaderProgress("Interface page failed to build.",loaderPhaseCurrent,LOADER_TOTAL,true)
 				end
 				warn("Page build failed:",pageName,ok and result or result)
 			end
@@ -314,7 +318,7 @@ function buildAllRuntimePages()
 	if #RUNTIME_BUILD_ERRORS>0 then
 		okAll=false
 		if setLoaderProgress then
-			setLoaderProgress("Build errors: "..table.concat(RUNTIME_BUILD_ERRORS,"; "),LOADER_TOTAL,LOADER_TOTAL,true)
+			setLoaderProgress("One or more GUI pages failed to build.",LOADER_TOTAL,LOADER_TOTAL,true)
 		end
 	elseif okAll and setLoaderProgress then
 		setLoaderProgress("Built all GUI pages.",#STARTUP_MODULE_PATHS+pageCount,LOADER_TOTAL,false)

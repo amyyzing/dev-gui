@@ -666,24 +666,6 @@ function GameParams.new(ctx)
 		stateListener=nil
 	end
 
-	local function handleSpeedInput(input)
-		local speedKey=ctx.getSpeedToggleKey and ctx.getSpeedToggleKey() or Enum.KeyCode.Unknown
-		if speedKey==nil or speedKey==Enum.KeyCode.Unknown then return false end
-
-		local binding=inputToBinding and inputToBinding(input) or nil
-		if binding==speedKey then
-			api.SetParamsPageEnabled("speed",not state.speedParamsEnabled,true)
-			return true
-		end
-
-		return false
-	end
-
-	inputConn=UIS.InputBegan:Connect(function(input,processed)
-		if processed then return end
-		handleSpeedInput(input)
-	end)
-
 	api.Refresh()
 
 	return api

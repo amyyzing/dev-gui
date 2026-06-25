@@ -253,6 +253,14 @@ function createOwnedPresetFromDataSave(name,editor)
 	return true,preset
 end
 
+function importOwnedPresetFromDataSave(code)
+	if DataSaveAPI and DataSaveAPI.ImportOwnedPreset then
+		return DataSaveAPI.ImportOwnedPreset(code)
+	end
+
+	return false,"Preset import is unavailable."
+end
+
 function equipOwnedPresetFromDataSave(preset)
 	if DataSaveAPI and DataSaveAPI.EquipOwnedPreset then
 		return DataSaveAPI.EquipOwnedPreset(preset)
@@ -416,7 +424,6 @@ function makePage1Ctx()
 		Page1TestingLogicModule=Page1TestingLogicModule,
 		getCurrentModeKey=function() return CURRENT_MODE_KEY end,
 		getHitboxToggleKey=function() return TOGGLE_HB_KEY end,
-		getSpeedToggleKey=function() return TOGGLE_SPEED_KEY end,
 		getJumpBoostToggleKey=function() return TOGGLE_JB_KEY end,
 		getAlwaysBoostToggleKey=function() return TOGGLE_AB_KEY end,
 		getESPToggleKey=function() return TOGGLE_ACTION_KEY end,

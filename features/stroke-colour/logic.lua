@@ -167,8 +167,8 @@ local NUMBER_LIMITS={
 }
 
 local HIGHLIGHT_MODES={
-	{Key="espOffense",Prefix="ESPOffense",Label="ESP Offense",Short="O",States={{Key="open",Suffix="Open",Label="Open"},{Key="closed",Suffix="Closed",Label="Closed"}}},
-	{Key="espDefense",Prefix="ESPDefense",Label="ESP Defense",Short="D",States={{Key="holder",Suffix="Holder",Label="Holder"},{Key="open",Suffix="Open",Label="Open"},{Key="closed",Suffix="Closed",Label="Closed"}}},
+	{Key="espOffense",Prefix="ESPOffense",Label="ESP Offense",Short="O",States={{Key="open",Suffix="Open",Label="Open"},{Key="closed",Suffix="Closed",Label="Guarded"}}},
+	{Key="espDefense",Prefix="ESPDefense",Label="ESP Defense",Short="D",States={{Key="holder",Suffix="Holder",Label="Holder"},{Key="open",Suffix="Open",Label="Open"},{Key="closed",Suffix="Closed",Label="Guarded"}}},
 	{Key="qbHighlight",Prefix="QBAimHighlight",Label="QB Highlight",Short="Q",States={{Key="target",Suffix="",Label="Target"}}},
 }
 local HIGHLIGHT_MODE_BY_KEY={}
@@ -976,6 +976,7 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function makeMiniSlider(parent,labelText,minVal,maxVal,startVal,decimals,fillColor,onChange)
+		local labelWidth=math.clamp((#tostring(labelText or "")*7)+12,34,64)
 		local row=New("Frame",{
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,0,0,28),
@@ -985,7 +986,7 @@ function StrokeColour.new(ctx,page)
 		New("TextLabel",{
 			BackgroundTransparency=1,
 			Position=UDim2.fromOffset(0,0),
-			Size=UDim2.fromOffset(34,28),
+			Size=UDim2.fromOffset(labelWidth,28),
 			Text=labelText,
 			Font=Enum.Font.GothamBold,
 			TextSize=12,
@@ -1014,8 +1015,8 @@ function StrokeColour.new(ctx,page)
 		local track=New("Frame",{
 			BackgroundColor3=themeColor("SLIDER_BG",THEME.BG),
 			BorderSizePixel=0,
-			Position=UDim2.fromOffset(36,9),
-			Size=UDim2.new(1,-92,0,10),
+			Position=UDim2.fromOffset(labelWidth+4,9),
+			Size=UDim2.new(1,-(labelWidth+64),0,10),
 			ClipsDescendants=true,
 			ZIndex=6,
 			ThemeRole="SLIDER_BG",
@@ -1656,31 +1657,31 @@ function StrokeColour.new(ctx,page)
 
 	local rgbBody=modeBodies.RGB
 	New("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},rgbBody)
-	rgbSliders.R=makeMiniSlider(rgbBody,"R",0,255,0,0,Color3.fromRGB(255,0,0),function()
+	rgbSliders.R=makeMiniSlider(rgbBody,"Red",0,255,0,0,Color3.fromRGB(255,0,0),function()
 		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.G.get(),rgbSliders.B.get()),false)
 	end)
-	rgbSliders.G=makeMiniSlider(rgbBody,"G",0,255,0,0,Color3.fromRGB(0,255,0),function()
+	rgbSliders.G=makeMiniSlider(rgbBody,"Green",0,255,0,0,Color3.fromRGB(0,255,0),function()
 		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.G.get(),rgbSliders.B.get()),false)
 	end)
-	rgbSliders.B=makeMiniSlider(rgbBody,"B",0,255,0,0,Color3.fromRGB(0,120,255),function()
+	rgbSliders.B=makeMiniSlider(rgbBody,"Blue",0,255,0,0,Color3.fromRGB(0,120,255),function()
 		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.G.get(),rgbSliders.B.get()),false)
 	end)
 
 	local hsvBody=modeBodies.HSV
 	New("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},hsvBody)
-	hsvSliders.H=makeMiniSlider(hsvBody,"H",0,360,0,0,getUIStrokeColor(),function()
+	hsvSliders.H=makeMiniSlider(hsvBody,"Hue",0,360,0,0,getUIStrokeColor(),function()
 		pickerHue=math.clamp(hsvSliders.H.get()/360,0,1)
 		pickerSat=math.clamp(hsvSliders.S.get()/100,0,1)
 		pickerVal=math.clamp(hsvSliders.V.get()/100,0,1)
 		applyActiveColor(Color3.fromHSV(pickerHue,pickerSat,pickerVal),true)
 	end)
-	hsvSliders.S=makeMiniSlider(hsvBody,"S",0,100,0,0,getUIStrokeColor(),function()
+	hsvSliders.S=makeMiniSlider(hsvBody,"Sat",0,100,0,0,getUIStrokeColor(),function()
 		pickerHue=math.clamp(hsvSliders.H.get()/360,0,1)
 		pickerSat=math.clamp(hsvSliders.S.get()/100,0,1)
 		pickerVal=math.clamp(hsvSliders.V.get()/100,0,1)
 		applyActiveColor(Color3.fromHSV(pickerHue,pickerSat,pickerVal),true)
 	end)
-	hsvSliders.V=makeMiniSlider(hsvBody,"V",0,100,0,0,getUIStrokeColor(),function()
+	hsvSliders.V=makeMiniSlider(hsvBody,"Value",0,100,0,0,getUIStrokeColor(),function()
 		pickerHue=math.clamp(hsvSliders.H.get()/360,0,1)
 		pickerSat=math.clamp(hsvSliders.S.get()/100,0,1)
 		pickerVal=math.clamp(hsvSliders.V.get()/100,0,1)
@@ -1693,12 +1694,12 @@ function StrokeColour.new(ctx,page)
 		BorderSizePixel=0,
 		ClearTextOnFocus=false,
 		Position=UDim2.fromOffset(0,8),
-		Size=UDim2.new(1,-104,0,32),
+		Size=UDim2.fromOffset(120,26),
 		Text=colorToHex(getActiveColor()),
 		Font=Enum.Font.GothamMedium,
-		TextSize=13,
+		TextSize=11,
 		TextColor3=THEME.TEXT,
-		TextXAlignment=Enum.TextXAlignment.Left,
+		TextXAlignment=Enum.TextXAlignment.Center,
 		ZIndex=6,
 		ThemeRole="INPUT",
 		CornerRole="Control",
@@ -1708,8 +1709,8 @@ function StrokeColour.new(ctx,page)
 	local applyHex=New("TextButton",{
 		BackgroundColor3=themeColor("BUTTON",THEME.PANEL),
 		BorderSizePixel=0,
-		Position=UDim2.new(1,-96,0,8),
-		Size=UDim2.fromOffset(96,32),
+		Position=UDim2.fromOffset(128,8),
+		Size=UDim2.fromOffset(78,26),
 		Text="Apply",
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
@@ -2205,7 +2206,7 @@ function StrokeColour.new(ctx,page)
 		SortOrder=Enum.SortOrder.LayoutOrder,
 	},highlightTargetRow)
 
-	for i,target in ipairs({"Fill","Outline"}) do
+	for i,target in ipairs({"Outline","Fill"}) do
 		local button,marker=makeFlatButton(highlightTargetRow,target,i,0.5)
 		trackConnection(button.Activated:Connect(function()
 			setHighlightTarget(target)
@@ -2443,6 +2444,10 @@ function StrokeColour.new(ctx,page)
 
 		if hexBox then
 			hexBox.Text=colorToHex(color)
+		end
+
+		if pickerBody then
+			pickerBody.Size=activeMode=="Hex" and UDim2.new(1,0,0,48) or UDim2.new(1,0,0,128)
 		end
 
 		if rgbSliders.R then

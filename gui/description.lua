@@ -129,7 +129,6 @@ Description.Categories={
 			["G"]="Gravity",
 			["S"]="Speed",
 			["Force Speed"]="Force speed",
-			["Speed Toggle"]="Speed",
 		},
 
 		GameParams={

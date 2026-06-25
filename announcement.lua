@@ -22,6 +22,7 @@ function Announcement.new(ctx)
 	local THEME=ctx.THEME
 	local SG=ctx.SG
 	local BOT_API=ctx.BOT_API
+	local TextService=game:GetService("TextService")
 	local playerId=tostring(ctx.playerId or "")
 	local getSessionId=ctx.getSessionId
 	local wrapTextButton=ctx.wrapTextButton
@@ -140,6 +141,14 @@ function Announcement.new(ctx)
 		for _ in string.gmatch(description,"\n") do
 			lineCount+=1
 		end
+		local bodyWidth=448
+		local measuredHeight=math.max(44,lineCount*18)
+		pcall(function()
+			measuredHeight=math.max(measuredHeight,TextService:GetTextSize(description,13,Enum.Font.Gotham,Vector2.new(bodyWidth,10000)).Y+18)
+		end)
+		local scrollHeight=math.clamp(math.floor(measuredHeight+18),74,330)
+		local boxHeight=math.clamp(scrollHeight+120,210,470)
+		local useScroll=measuredHeight>scrollHeight
 
 		local modal=New("Frame",{
 			Name="AnnouncementModal",
@@ -153,7 +162,7 @@ function Announcement.new(ctx)
 		local box=New("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
 			Position=UDim2.new(0.5,0,0.5,0),
-			Size=UDim2.fromOffset(500,360),
+			Size=UDim2.fromOffset(500,boxHeight),
 			BackgroundColor3=THEME.BG,
 			BorderSizePixel=0,
 			ZIndex=151,
@@ -164,10 +173,10 @@ function Announcement.new(ctx)
 
 		New("TextLabel",{
 			BackgroundTransparency=1,
-			Size=UDim2.new(1,-36,0,24),
+			Size=UDim2.new(1,-36,0,30),
 			Text=string.upper(title),
 			Font=Enum.Font.GothamMedium,
-			TextSize=16,
+			TextSize=20,
 			TextColor3=THEME.TEXT,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			ZIndex=152,
@@ -188,11 +197,11 @@ function Announcement.new(ctx)
 		},box)
 
 		local scroll=New("ScrollingFrame",{
-			Position=UDim2.fromOffset(0,38),
-			Size=UDim2.new(1,0,1,-92),
-			CanvasSize=UDim2.fromOffset(0,math.max(230,lineCount*18+24)),
+			Position=UDim2.fromOffset(0,46),
+			Size=UDim2.new(1,0,0,scrollHeight),
+			CanvasSize=UDim2.fromOffset(0,math.max(scrollHeight,math.floor(measuredHeight+16))),
 			AutomaticCanvasSize=Enum.AutomaticSize.Y,
-			ScrollBarThickness=4,
+			ScrollBarThickness=useScroll and 4 or 0,
 			BackgroundColor3=THEME.PANEL,
 			BorderSizePixel=0,
 			ZIndex=152,
@@ -212,7 +221,7 @@ function Announcement.new(ctx)
 			TextWrapped=true,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			TextYAlignment=Enum.TextYAlignment.Top,
-			Size=UDim2.new(1,-4,0,math.max(214,lineCount*18+16)),
+			Size=UDim2.new(1,-4,0,math.max(scrollHeight-16,math.floor(measuredHeight+8))),
 			ZIndex=153,
 		},scroll)
 

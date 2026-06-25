@@ -131,7 +131,6 @@ local PERSISTENT_GLOBAL_KEYS={
 	TOGGLE_JB_KEY=true,
 	TOGGLE_AB_KEY=true,
 	TOGGLE_ACTION_KEY=true,
-	TOGGLE_SPEED_KEY=true,
 	QB_AIM_LOCK_KEY=true,
 	QB_AIM_THROW_KEY=true,
 	QB_AIM_TOGGLE_KEY=true,
@@ -507,7 +506,7 @@ initManualRefresh()
 if LOADER_MODULES_READY==false then
 	setLoaderProgress("Required modules failed to load. Run /update, then re-execute.",LOADER_TOTAL,LOADER_TOTAL,true)
 elseif pagesReady==false or #RUNTIME_BUILD_ERRORS>0 then
-	setLoaderProgress("GUI build failed: "..table.concat(RUNTIME_BUILD_ERRORS,"; "),LOADER_TOTAL,LOADER_TOTAL,true)
+	setLoaderProgress("One or more GUI pages failed to build.",LOADER_TOTAL,LOADER_TOTAL,true)
 else
 	setLoaderProgress("Runtime ready. Scheduler jobs: "..tostring(RuntimeScheduler.Count()),LOADER_TOTAL,LOADER_TOTAL,false)
 	finishLoader()

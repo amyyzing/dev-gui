@@ -17,6 +17,7 @@ local C1_MARKER_HEIGHT=80
 local C1_MARKER_THICKNESS=0.12
 local GROUND_MARKER_DIAMETER=5.5
 local GROUND_MARKER_THICKNESS=0.05
+local MARKER_TRANSPARENCY=0.75
 local GROUND_MARKER_TRANSPARENCY=0.75
 
 local function destroyControl(control)
@@ -554,9 +555,9 @@ function Testing.new(ctx,parent)
 		part.CanCollide=false
 		part.CanTouch=false
 		part.CanQuery=false
-		part.Material=Enum.Material.Neon
-		part.Color=THEME.GREEN or Color3.fromRGB(80,220,140)
-		part.Transparency=0.15
+		part.Material=Enum.Material.SmoothPlastic
+		part.Color=Color3.fromRGB(0,0,0)
+		part.Transparency=MARKER_TRANSPARENCY
 	end
 
 	local function styleGroundMarker(part)
@@ -566,8 +567,8 @@ function Testing.new(ctx,parent)
 		part.CanCollide=false
 		part.CanTouch=false
 		part.CanQuery=false
-		part.Material=Enum.Material.Neon
-		part.Color=THEME.GREEN or Color3.fromRGB(80,220,140)
+		part.Material=Enum.Material.SmoothPlastic
+		part.Color=Color3.fromRGB(0,0,0)
 		part.Transparency=GROUND_MARKER_TRANSPARENCY
 	end
 

@@ -57,7 +57,6 @@ TOGGLE_HB_KEY=Enum.KeyCode.Unknown
 TOGGLE_JB_KEY=Enum.KeyCode.Unknown
 TOGGLE_AB_KEY=Enum.KeyCode.Unknown
 TOGGLE_ACTION_KEY=Enum.KeyCode.Unknown
-TOGGLE_SPEED_KEY=Enum.KeyCode.Unknown
 QB_AIM_LOCK_KEY=Enum.KeyCode.H
 QB_AIM_THROW_KEY=Enum.KeyCode.T
 QB_AIM_TOGGLE_KEY=Enum.KeyCode.P
@@ -591,7 +590,19 @@ MODULE_GLOBAL_NAMES={
 	DesignThemeSakura="DesignThemeSakura",
 	GuiFusion="FusionModule"
 }
-STARTUP_MODULE_NAMES={"CoreScope","CoreSignal","CoreScheduler","StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura","GuiFusion","GuiLogic","MainFrame","Description","Announcement","Page1HitboxLogic","Page1Hitbox","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost","Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP","Page1QBAimMath","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing","DataSave"}
+STARTUP_MODULE_NAMES={
+	"CoreScope","CoreSignal","CoreScheduler","CorePlayerCache","CoreBallTracker",
+	"StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura",
+	"GuiFusion","GuiLogic","MainFrame","Description","Announcement",
+	"Page1HitboxLogic","Page1Hitbox","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost",
+	"Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP",
+	"Page1QBAimMath","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing",
+	"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds",
+	"StrokeColourLogic","StrokeColour",
+	"HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor",
+	"PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord",
+	"DataSave",
+}
 OPTIONAL_MODULE_NAMES={"CorePlayerCache","CoreBallTracker"}
 MAP_RELOAD_NAMES={"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds"}
 CUSTOMIZE_RELOAD_NAMES={"StrokeColourLogic","StrokeColour"}
@@ -789,11 +800,11 @@ function loadRemoteModuleBatch(paths)
 			setLoadedModuleByPath(modulePath,module)
 			loaded=loaded+1
 		else
-			failed=failed+1
 			REMOTE_MODULE_SOURCES[modulePath]=false
 			if OPTIONAL_MODULE_PATH_SET[modulePath] then
 				warn("Optional batched module unavailable:",modulePath,err)
 			else
+				failed=failed+1
 				warn("Batched module failed while loading:",modulePath,err)
 			end
 		end
@@ -1097,7 +1108,7 @@ local function loaderPhaseFromStatus(text,current,total)
 		return 4
 	elseif text:find("restored",1,true) or text:find("binding",1,true) or text:find("applying theme",1,true) then
 		return 3
-	elseif text:find("building page",1,true) or text:find("built all gui",1,true) or text:find("gui build",1,true) then
+	elseif text:find("building page",1,true) or text:find("interface",1,true) or text:find("built all gui",1,true) or text:find("gui build",1,true) then
 		return 3
 	elseif text:find("verified",1,true) or text:find("validate",1,true) then
 		return 2
@@ -1221,7 +1232,7 @@ end
 function finishLoader()
 	if not loaderOverlay or not loaderOverlay.Parent then return end
 
-	loaderTitle.Text="Ready, "..me.Name
+	loaderTitle.Text="Ready"
 	loaderSubtitle.Text="All pages and modules are available"
 	setLoaderProgress("Everything is loaded and up to date.",LOADER_TOTAL,LOADER_TOTAL,false)
 
@@ -1260,13 +1271,13 @@ function loadRemoteModuleStep(name,path)
 	loaderCurrent=loaderCurrent+1
 	local cached=REMOTE_MODULE_CACHE[path]
 	if cached then
-		setLoaderProgress("Loaded cached "..path,loaderCurrent,LOADER_TOTAL,false)
+		setLoaderProgress("Loaded cached module.",loaderCurrent,LOADER_TOTAL,false)
 		return cached
 	end
 
-	setLoaderProgress("Fetching "..path,loaderCurrent-0.35,LOADER_TOTAL,false)
+	setLoaderProgress("Fetching required module.",loaderCurrent-0.35,LOADER_TOTAL,false)
 	local module=loadRemoteModule(path)
-	setLoaderProgress((module and "Loaded " or "Missing ")..path,loaderCurrent,LOADER_TOTAL,not module)
+	setLoaderProgress(module and "Loaded required module." or "Required module unavailable.",loaderCurrent,LOADER_TOTAL,not module)
 	return module
 end
 
@@ -1532,7 +1543,7 @@ function runLoaderCheck()
 	if #missing>0 then
 		table.sort(missing)
 		warn("Loader check found missing modules:",table.concat(missing,", "))
-		setLoaderProgress("Missing modules: "..table.concat(missing,", "),LOADER_TOTAL,LOADER_TOTAL,true)
+		setLoaderProgress("Required modules unavailable. Run /update, then re-execute.",LOADER_TOTAL,LOADER_TOTAL,true)
 		return false
 	else
 		warn("Loader check complete: all startup modules loaded.")

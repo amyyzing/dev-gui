@@ -330,15 +330,14 @@ function addPage2Error(parent,text)
 end
 
 PAGE2_BINDING_SPECS={
-	{label="Toggle open / hide GUI",key="TOGGLE_UI_KEY"},
-	{label="Hitbox Toggle",key="TOGGLE_HB_KEY"},
-	{label="Jump Boost Toggle",key="TOGGLE_JB_KEY"},
-	{label="Always Boost Toggle",key="TOGGLE_AB_KEY"},
-	{label="ESP Toggle",key="TOGGLE_ACTION_KEY"},
-	{label="Speed Toggle",key="TOGGLE_SPEED_KEY"},
-	{label="QB Aim Lock Receiver",key="QB_AIM_LOCK_KEY"},
-	{label="QB Aim Throw",key="QB_AIM_THROW_KEY"},
-	{label="QB Aim Toggle",key="QB_AIM_TOGGLE_KEY"},
+	{label="TOGGLE OPEN / HIDE GUI",key="TOGGLE_UI_KEY"},
+	{label="HITBOX TOGGLE",key="TOGGLE_HB_KEY"},
+	{label="JUMP BOOST TOGGLE",key="TOGGLE_JB_KEY"},
+	{label="ALWAYS BOOST TOGGLE",key="TOGGLE_AB_KEY"},
+	{label="ESP TOGGLE",key="TOGGLE_ACTION_KEY"},
+	{label="QB AIM LOCK RECEIVER",key="QB_AIM_LOCK_KEY"},
+	{label="QB AIM THROW",key="QB_AIM_THROW_KEY"},
+	{label="QB AIM TOGGLE",key="QB_AIM_TOGGLE_KEY"},
 }
 
 PAGE2_SECTION_SPECS={
@@ -409,6 +408,7 @@ function makePage2Ctx()
 		resetPreset=resetPresetFromDataSave,
 		applyPresetEditor=applyPresetEditorFromDataSave,
 		createOwnedPreset=createOwnedPresetFromDataSave,
+		importOwnedPreset=importOwnedPresetFromDataSave,
 		equipOwnedPreset=equipOwnedPresetFromDataSave,
 		deleteOwnedPreset=deleteOwnedPresetFromDataSave,
 		State={},
@@ -508,7 +508,6 @@ resetKeybindPresetPageDefaults=function()
 	TOGGLE_JB_KEY=Enum.KeyCode.Unknown
 	TOGGLE_AB_KEY=Enum.KeyCode.Unknown
 	TOGGLE_ACTION_KEY=Enum.KeyCode.Unknown
-	TOGGLE_SPEED_KEY=Enum.KeyCode.Unknown
 	QB_AIM_LOCK_KEY=Enum.KeyCode.H
 	QB_AIM_THROW_KEY=Enum.KeyCode.T
 	QB_AIM_TOGGLE_KEY=Enum.KeyCode.P
