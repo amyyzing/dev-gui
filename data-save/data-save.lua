@@ -716,6 +716,8 @@ function DataSave.new(ctx)
 
 			testing={
 				enabled=getValue(ctx,"testingEnabled",false),
+				wr=getValue(ctx,"testingWREnabled",true),
+				qb=getValue(ctx,"testingQBEnabled",true),
 			},
 
 			keybinds={
@@ -838,6 +840,8 @@ function DataSave.new(ctx)
 
 		local testing=settings.testing or {}
 		applyBoolean(ctx,"setTestingState","testingEnabled",testing.enabled)
+		applyBoolean(ctx,"setTestingWRState","testingWREnabled",testing.wr)
+		applyBoolean(ctx,"setTestingQBState","testingQBEnabled",testing.qb)
 
 		local keybinds=settings.keybinds or {}
 		local keyMap={

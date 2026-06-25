@@ -221,6 +221,8 @@ local DATA_SAVE_STATE_SETTERS={
 	setQBAimQBDrift={"qbAimQBDrift",false,"QBAim","SetQBDrift",true},
 	setQBAimQBYDrift={"qbAimQBYDrift",false,"QBAim","SetQBYDrift",true},
 	setTestingState={"testingEnabled",true,"Testing","SetTestingState",true},
+	setTestingWRState={"testingWREnabled",true,"Testing","SetTestingWRState",true},
+	setTestingQBState={"testingQBEnabled",true,"Testing","SetTestingQBState",true},
 }
 
 local function callPage1Api(apiName,method,...)

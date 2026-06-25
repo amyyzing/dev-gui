@@ -49,6 +49,8 @@ potatoMode=false
 actionStatusOn=false
 qbAimEnabled=false
 testingEnabled=false
+testingWREnabled=true
+testingQBEnabled=true
 
 TOGGLE_UI_KEY=Enum.KeyCode.Unknown
 TOGGLE_HB_KEY=Enum.KeyCode.Unknown

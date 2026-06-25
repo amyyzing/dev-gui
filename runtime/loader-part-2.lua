@@ -322,6 +322,8 @@ PAGE1_DEFAULTS={
 	qbAimQBDrift=0.15,
 	qbAimQBYDrift=0.15,
 	testingEnabled=false,
+	testingWREnabled=true,
+	testingQBEnabled=true,
 }
 
 PAGE1_STATE={}

@@ -1,6 +1,7 @@
 local Testing={}
 
 local Players=game:GetService("Players")
+local RunService=game:GetService("RunService")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local Workspace=game:GetService("Workspace")
 
@@ -216,9 +217,13 @@ function Testing.new(ctx,parent)
 	local api={}
 	local section=nil
 	local toggle=nil
+	local wrToggle=nil
+	local qbToggle=nil
 	local statusLabel=nil
 	local marker=nil
 	local groundMarker=nil
+	local qbSafetyConn=nil
+	local qbSafetyElapsed=0
 	local remoteConnections={}
 	local topologyConnections={}
 	local lifetimeConnections={}
@@ -229,6 +234,8 @@ function Testing.new(ctx,parent)
 	local centerBeamDefaults={}
 
 	state.testingEnabled=state.testingEnabled and true or false
+	if state.testingWREnabled==nil then state.testingWREnabled=true end
+	if state.testingQBEnabled==nil then state.testingQBEnabled=true end
 
 	local function changed()
 		if ctx.onChanged then
@@ -246,6 +253,12 @@ function Testing.new(ctx,parent)
 	local function syncControls()
 		if toggle then
 			toggle.set(state.testingEnabled)
+		end
+		if wrToggle then
+			wrToggle.set(state.testingWREnabled~=false)
+		end
+		if qbToggle then
+			qbToggle.set(state.testingQBEnabled~=false)
 		end
 	end
 
@@ -307,12 +320,19 @@ function Testing.new(ctx,parent)
 		table.clear(centerBeamDefaults)
 	end
 
-	local function c1IsDefended(c1Position,flightTime)
+	local function disconnectQBSafety()
+		safeDisconnect(qbSafetyConn)
+		qbSafetyConn=nil
+		qbSafetyElapsed=0
+		restoreCenterBeams()
+	end
+
+	local function c1IsDefended(c1Position,flightTime,throwerOverride)
 		if not(c1Position and flightTime and flightTime>0) then
 			return false
 		end
 
-		local thrower=playerByName(lastThrower)
+		local thrower=throwerOverride or playerByName(lastThrower)
 		local throwerTeam=teamOf(thrower)
 		if not throwerTeam then
 			throwerTeam=teamOf(LP)
@@ -332,6 +352,58 @@ function Testing.new(ctx,parent)
 		end
 
 		return false
+	end
+
+	local function currentCenterC1AndTime()
+		local center=findCenter()
+		local c1=center and center:FindFirstChild("C1",true)
+		local c2=center and center:FindFirstChild("C2",true)
+		local c1Frame=c1 and attachmentCFrame(c1)
+		local c2Frame=c2 and attachmentCFrame(c2)
+		if not c1Frame then
+			return nil,nil
+		end
+
+		local c1Position=Vector3.new(c1Frame.Position.X,TESTING_C1_Y,c1Frame.Position.Z)
+		local flightTime=nil
+		if c2Frame then
+			local heightDelta=math.max(c1Position.Y-c2Frame.Position.Y,0)
+			if heightDelta>0 then
+				flightTime=math.sqrt((2*heightDelta)/BALL_G)
+			end
+		end
+
+		return c1Position,flightTime
+	end
+
+	local function updateQBCenterSafety()
+		if not(state.testingEnabled and state.testingQBEnabled~=false) then
+			disconnectQBSafety()
+			return
+		end
+
+		local c1Position,flightTime=currentCenterC1AndTime()
+		if not(c1Position and flightTime and flightTime>0) then
+			restoreCenterBeams()
+			return
+		end
+
+		setCenterBeamUnsafe(c1IsDefended(c1Position,flightTime,LP))
+	end
+
+	local function syncQBSafety()
+		if not(state.testingEnabled and state.testingQBEnabled~=false) then
+			disconnectQBSafety()
+			return
+		end
+
+		if qbSafetyConn then return end
+		qbSafetyConn=RunService.RenderStepped:Connect(function(dt)
+			qbSafetyElapsed=qbSafetyElapsed+dt
+			if qbSafetyElapsed<0.05 then return end
+			qbSafetyElapsed=0
+			updateQBCenterSafety()
+		end)
 	end
 
 	local function styleMarker(part)
@@ -429,7 +501,7 @@ function Testing.new(ctx,parent)
 	end
 
 	local function captureC1(source,payload)
-		if not state.testingEnabled then return end
+		if not(state.testingEnabled and state.testingWREnabled~=false) then return end
 
 		local center,folder=findCenter()
 		local c1=center and center:FindFirstChild("C1",true)
@@ -448,12 +520,11 @@ function Testing.new(ctx,parent)
 		end
 
 		pos=Vector3.new(pos.X,TESTING_C1_Y,pos.Z)
-		local unsafe=c1IsDefended(pos,flightTime)
-		setCenterBeamUnsafe(unsafe)
 		ensureMarker(folder).CFrame=CFrame.new(pos)
 		ensureGroundMarker(folder).CFrame=CFrame.new(pos.X,groundYAt(pos),pos.Z)*CFrame.Angles(0,0,math.rad(90))
 		local powerText=payload and (" "..fmtPower(payload.Power)) or ""
 		local timeText=flightTime and string.format(" %.2fs",flightTime) or ""
+		local unsafe=c1IsDefended(pos,flightTime)
 		local safetyText=unsafe and " unsafe" or " safe"
 		local label=(lastThrower and (lastThrower.." ") or "")..(fromPayload and "C1 calc" or "C1")..safetyText..powerText..timeText..": "..fmtVector(pos)
 		setStatus(label,unsafe and (THEME.RED or Color3.fromRGB(254,94,86)) or (THEME.GREEN or THEME.TEXT))
@@ -477,7 +548,7 @@ function Testing.new(ctx,parent)
 	end
 
 	local function handleIncoming(...)
-		if not state.testingEnabled then return end
+		if not(state.testingEnabled and state.testingWREnabled~=false) then return end
 
 		local args={...}
 		local topic=args[1]
@@ -512,12 +583,12 @@ function Testing.new(ctx,parent)
 	local connectIncoming
 
 	local function scheduleReconnect()
-		if reconnectQueued or not state.testingEnabled then return end
+		if reconnectQueued or not(state.testingEnabled and state.testingWREnabled~=false) then return end
 		reconnectQueued=true
 
 		task.defer(function()
 			reconnectQueued=false
-			if state.testingEnabled and connectIncoming then
+			if state.testingEnabled and state.testingWREnabled~=false and connectIncoming then
 				connectIncoming()
 			end
 		end)
@@ -590,6 +661,9 @@ function Testing.new(ctx,parent)
 
 	connectIncoming=function()
 		disconnectRemoteConnections()
+		if not(state.testingEnabled and state.testingWREnabled~=false) then
+			return
+		end
 		watchRemoteTopology()
 
 		for _,event in ipairs(collectGameReEvents()) do
@@ -606,13 +680,46 @@ function Testing.new(ctx,parent)
 		state.testingEnabled=value and true or false
 		if state.testingEnabled then
 			connectIncoming()
+			syncQBSafety()
 		else
 			disconnectAll()
+			disconnectQBSafety()
 			destroyMarker()
-			restoreCenterBeams()
 			lastThrower=nil
 			lastThrowAt=0
 			setStatus("Off",THEME.MUTED)
+		end
+
+		syncControls()
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetTestingWRState(value,fire)
+		state.testingWREnabled=value and true or false
+		if state.testingEnabled and state.testingWREnabled then
+			connectIncoming()
+		else
+			disconnectAll()
+			destroyMarker()
+			lastThrower=nil
+			lastThrowAt=0
+		end
+
+		syncControls()
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetTestingQBState(value,fire)
+		state.testingQBEnabled=value and true or false
+		if state.testingQBEnabled then
+			syncQBSafety()
+			updateQBCenterSafety()
+		else
+			disconnectQBSafety()
 		end
 
 		syncControls()
@@ -625,7 +732,9 @@ function Testing.new(ctx,parent)
 		syncControls()
 		if state.testingEnabled then
 			connectIncoming()
+			syncQBSafety()
 		else
+			disconnectQBSafety()
 			setStatus("Off",THEME.MUTED)
 		end
 	end
@@ -636,17 +745,19 @@ function Testing.new(ctx,parent)
 
 	function api.Destroy()
 		disconnectAll()
+		disconnectQBSafety()
 		for _,conn in ipairs(lifetimeConnections) do
 			safeDisconnect(conn)
 		end
 		table.clear(lifetimeConnections)
 		destroyControl(toggle)
+		destroyControl(wrToggle)
+		destroyControl(qbToggle)
 		destroyMarker()
-		restoreCenterBeams()
 	end
 
 	local sectionControls=nil
-	section,sectionControls=makeSection(parent,5,"Testing","incoming C1 capture",{
+	section,sectionControls=makeSection(parent,5,"Testing","WR C1 and QB arc safety",{
 		headerToggle={
 			startState=state.testingEnabled,
 			onChange=function(value)
@@ -662,6 +773,13 @@ function Testing.new(ctx,parent)
 			api.SetTestingState(value,true)
 		end)
 	end
+
+	wrToggle=buildToggleRow(section,"WR",state.testingWREnabled~=false,function(value)
+		api.SetTestingWRState(value,true)
+	end)
+	qbToggle=buildToggleRow(section,"QB",state.testingQBEnabled~=false,function(value)
+		api.SetTestingQBState(value,true)
+	end)
 
 	local ancestryConn=section.AncestryChanged:Connect(function()
 		if not section.Parent then

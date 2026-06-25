@@ -34,7 +34,7 @@ Description.Categories={
 			["Boost"]={Title="AUTO BOOST",Description="Boost force, chance, and radius"},
 			["ESP"]={Title="ESP",Description="Player highlights and possession filters"},
 			["QB Aim"]={Title="QB AIM",Description="Receiver lock, arc preview, and throw timing"},
-			["Testing"]={Title="TESTING",Description="Incoming throw C1 capture"},
+			["Testing"]={Title="TESTING",Description="WR C1 and QB arc safety"},
 		},
 
 		Maps={
@@ -172,6 +172,9 @@ Description.Categories={
 		Testing={
 			["Testing"]="Testing",
 			["incoming C1 capture"]="incoming C1 capture",
+			["WR C1 and QB arc safety"]="WR C1 and QB arc safety",
+			["WR"]="WR",
+			["QB"]="QB",
 			["Off"]="Off",
 		},
 
