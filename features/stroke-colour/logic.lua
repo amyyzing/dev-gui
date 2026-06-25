@@ -312,7 +312,6 @@ function StrokeColour.new(ctx,page)
 	local UIS=ctx.UIS or game:GetService("UserInputService")
 	local GuiService=game:GetService("GuiService")
 	local buildSlider=ctx.buildSlider
-	local createUIShadow=ctx.createUIShadow
 
 	applyDefaultOverrides(ctx.DEFAULT_UI_STYLE)
 	ensureStyleDefaults(UI_STYLE)
@@ -711,7 +710,6 @@ function StrokeColour.new(ctx,page)
 	local highlightDialImages={}
 	local highlightDialGlowImages={}
 	local highlightDialHighlightImages={}
-	local highlightDialShadows={}
 	local highlightFallbackSlices={}
 	local highlightDialPaintTweens={}
 	local highlightDialCanvas=nil
@@ -1875,16 +1873,7 @@ function StrokeColour.new(ctx,page)
 			previous:Cancel()
 		end
 
-		local ok,tween=pcall(TweenService.Create,TweenService,object,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),goal)
-		if not ok or not tween then
-			for key,value in pairs(goal) do
-				pcall(function()
-					object[key]=value
-				end)
-			end
-			return
-		end
-
+		local tween=TweenService:Create(object,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),goal)
 		highlightDialPaintTweens[object]=tween
 		tween.Completed:Connect(function()
 			if highlightDialPaintTweens[object]==tween then
@@ -1919,9 +1908,6 @@ function StrokeColour.new(ctx,page)
 			local nearGlowTransparency=1
 			local midGlowTransparency=1
 			local farGlowTransparency=1
-			local shadowTransparency=1
-			local shadowBlur=8
-			local shadowSpread=0
 
 			if isSelected then
 				color=isHover and hover or core
@@ -1930,28 +1916,14 @@ function StrokeColour.new(ctx,page)
 				nearGlowTransparency=isHover and 0.42 or 0.54
 				midGlowTransparency=isHover and 0.62 or 0.72
 				farGlowTransparency=isHover and 0.82 or 0.90
-				shadowTransparency=isHover and 0.42 or 0.52
-				shadowBlur=isHover and 16 or 13
-				shadowSpread=isHover and 2 or 1
 			elseif isCustom then
 				color=core
 				transparency=isHover and 0.24 or 0.40
 				nearGlowTransparency=isHover and 0.72 or 0.92
 				midGlowTransparency=isHover and 0.86 or 0.98
-				shadowTransparency=isHover and 0.64 or 0.76
-				shadowBlur=isHover and 11 or 8
-				shadowSpread=isHover and 1 or 0
 			elseif isHover then
 				color=brightenColor(muted,0.13)
 				transparency=0.60
-				shadowTransparency=0.78
-				shadowBlur=8
-			end
-
-			if highlightDialShadows[key] then
-				nearGlowTransparency=1
-				midGlowTransparency=1
-				farGlowTransparency=1
 			end
 
 			local image=highlightDialImages[key]
@@ -1984,20 +1956,6 @@ function StrokeColour.new(ctx,page)
 						glowImage.ImageColor3=glow
 						glowImage.ImageTransparency=glowTransparency
 					end
-				end
-			end
-
-			local shadow=highlightDialShadows[key]
-			if shadow then
-				if animate then
-					tweenHighlightDialObject(shadow,{Color=glow,Transparency=shadowTransparency,BlurRadius=shadowBlur,Spread=shadowSpread})
-				else
-					pcall(function()
-						shadow.Color=glow
-						shadow.Transparency=shadowTransparency
-						shadow.BlurRadius=shadowBlur
-						shadow.Spread=shadowSpread
-					end)
 				end
 			end
 
@@ -2120,17 +2078,6 @@ function StrokeColour.new(ctx,page)
 				ScaleType=Enum.ScaleType.Stretch,
 				ZIndex=7,
 			},highlightDialCanvas)
-
-			if type(createUIShadow)=="function" then
-				highlightDialShadows[mode.Key]=createUIShadow(highlightDialImages[mode.Key],{
-					Name="HighlightNativeGlow",
-					Color=getUIStrokeColor(),
-					Transparency=1,
-					BlurRadius=10,
-					Spread=0,
-					Offset=Vector2.new(0,0),
-				})
-			end
 		else
 			local index=mode.Key=="espDefense" and 1 or (mode.Key=="espOffense" and 2 or 3)
 			local fallback=New("TextButton",{

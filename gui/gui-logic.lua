@@ -105,41 +105,6 @@ function GuiLogic.new(ctx)
 		return New("UICorner",{CornerRadius=UDim.new(0,0)},obj)
 	end
 
-	local function setProperty(object,key,value)
-		if object==nil or key==nil then
-			return false
-		end
-
-		local ok=pcall(function()
-			object[key]=value
-		end)
-
-		return ok
-	end
-
-	local function createUIShadow(parent,props)
-		if not parent then return nil end
-
-		local ok,shadow=pcall(Instance.new,"UIShadow")
-		if not ok or not shadow then
-			return nil
-		end
-
-		props=props or {}
-		shadow.Name=props.Name or "NativeShadow"
-		shadow.Parent=parent
-		setProperty(shadow,"Color",props.Color or THEME.STROKE or Color3.fromRGB(255,255,255))
-		setProperty(shadow,"Transparency",props.Transparency~=nil and props.Transparency or 1)
-		setProperty(shadow,"BlurRadius",props.BlurRadius or 8)
-		setProperty(shadow,"Spread",props.Spread or 0)
-		setProperty(shadow,"Offset",props.Offset or Vector2.new(0,0))
-		if props.Enabled~=nil then
-			setProperty(shadow,"Enabled",props.Enabled and true or false)
-		end
-
-		return shadow
-	end
-
 	local function themeColor(role,fallback)
 		return THEME[role] or fallback
 	end
@@ -249,7 +214,6 @@ function GuiLogic.new(ctx)
 
 	api.pointerPosition=pointerPosition
 	api.objectLocalPointer=objectLocalPointer
-	api.createUIShadow=createUIShadow
 
 	local function createSwitch(parent,startState,onChange,width,height,_knobSize,_pad,zIndex)
 		local c=components()

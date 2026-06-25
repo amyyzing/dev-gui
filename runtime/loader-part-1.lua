@@ -848,7 +848,7 @@ function playLoaderKeyframes(sequence,asynchronous)
 	end
 end
 
-LOADER_PAGE_BUILD_NAMES={}
+LOADER_PAGE_BUILD_NAMES={"maps","customize","page2","settings","server"}
 LOADER_TOTAL=#STARTUP_MODULE_PATHS+#LOADER_PAGE_BUILD_NAMES+4
 
 loaderCurrent=0

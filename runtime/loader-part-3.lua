@@ -112,7 +112,6 @@ function makeCustomizeCtx()
 		makeSection=makeSection,
 		buildSlider=buildSlider,
 		buildToggleRow=buildToggleRow,
-		createUIShadow=createUIShadow,
 		wrapTextButton=wrapTextButton,
 		getUIStrokeColor=getUIStrokeColor,
 		getUIStrokeGradientColor=getUIStrokeGradientColor,
