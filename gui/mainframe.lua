@@ -92,10 +92,11 @@ function MainFrame.new(ctx)
 	local navTabInset=6
 	local pageShellTransparency=0
 	local pageSliderTransparency=0
-	local rootStrokeTransparency=0.62
+	local rootStrokeTransparency=1
 	local headerStrokeTransparency=0.86
 	local pageShellStrokeTransparency=0.9
 	local pageSliderStrokeTransparency=0.92
+	local resizeHandleVisible=false
 	local headerSubtitleVisible=true
 	local headerSearchVisible=false
 	local headerSearchPlaceholder="Search"
@@ -134,10 +135,11 @@ function MainFrame.new(ctx)
 		navTabInset=layoutNumber(layoutProfile,"NavTabInset",6)
 		pageShellTransparency=layoutNumber(layoutProfile,"PageShellTransparency",0)
 		pageSliderTransparency=layoutNumber(layoutProfile,"PageSliderTransparency",0)
-		rootStrokeTransparency=layoutNumber(layoutProfile,"RootStrokeTransparency",0.62)
+		rootStrokeTransparency=1
 		headerStrokeTransparency=layoutNumber(layoutProfile,"HeaderStrokeTransparency",0.86)
 		pageShellStrokeTransparency=layoutNumber(layoutProfile,"PageShellStrokeTransparency",0.9)
 		pageSliderStrokeTransparency=layoutNumber(layoutProfile,"PageSliderStrokeTransparency",0.92)
+		resizeHandleVisible=layoutProfile.ResizeHandleVisible==true
 		headerSubtitleVisible=layoutProfile.HeaderSubtitleVisible~=false
 		headerSearchVisible=layoutProfile.HeaderSearchVisible==true
 		headerSearchPlaceholder=tostring(layoutProfile.HeaderSearchPlaceholder or "Search")
@@ -332,6 +334,7 @@ function MainFrame.new(ctx)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},root)
 	local rootStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=rootStrokeTransparency},root)
 	rootStroke:SetAttribute("BaseStrokeTransparency",rootStrokeTransparency)
+	rootStroke:SetAttribute("StrokeRole","Hidden")
 	local rootPad=New("UIPadding",{PaddingTop=UDim.new(0,rootPadding),PaddingLeft=UDim.new(0,rootPadding),PaddingRight=UDim.new(0,rootPadding),PaddingBottom=UDim.new(0,rootPadding)},root)
 
 	local uiScale=New("UIScale",{Scale=1},root)
@@ -549,6 +552,7 @@ function MainFrame.new(ctx)
 
 	local activePageName="main"
 	local activePageValue=makeFusionValue(activePageName)
+	local resizeHandle=nil
 	local function getPageIndex(name)
 		return ({main=1,maps=2,server=3,customize=4,page2=5,settings=6})[name] or 1
 	end
@@ -676,6 +680,9 @@ function MainFrame.new(ctx)
 		pageSliderStroke:SetAttribute("BaseStrokeTransparency",pageSliderStrokeTransparency)
 		pageSliderStroke.Transparency=pageSliderStrokeTransparency
 		pageSlider.Visible=pageSliderVisible
+		if resizeHandle then
+			resizeHandle.Visible=resizeHandleVisible
+		end
 
 		titleLabel.Position=UDim2.fromOffset(headerTitleX,headerTitleY)
 		titleLabel.TextSize=headerTitleSize
@@ -924,7 +931,7 @@ function MainFrame.new(ctx)
 		end)
 	end
 
-	local resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=getUIStrokeColor(),BackgroundTransparency=0.18,BorderSizePixel=0,Text="",ZIndex=30,SkipThemeRole=true},root)
+	resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=getUIStrokeColor(),BackgroundTransparency=0.18,BorderSizePixel=0,Text="",Visible=resizeHandleVisible,ZIndex=30,SkipThemeRole=true},root)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},resizeHandle)
 	local resizeStroke=New("UIStroke",{Color=THEME.BG,Thickness=1,Transparency=0.25},resizeHandle)
 
@@ -1139,7 +1146,8 @@ function MainFrame.new(ctx)
 	end
 
 	function api.ResetPosition(animate)
-		local defaultPosition=UDim2.new(0.5,0,0,rootStartY)
+		local rootHeight=(root and root.AbsoluteSize and root.AbsoluteSize.Y) or UI_WINDOW.H or 540
+		local defaultPosition=UDim2.new(0.5,0,0.5,-math.floor(rootHeight/2))
 		if animate==false then
 			if rootPositionTween then
 				rootPositionTween:Cancel()

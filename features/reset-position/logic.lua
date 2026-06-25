@@ -32,7 +32,8 @@ function ResetPosition.new(ctx,page)
 			ok=pcall(ctx.MainFrame.ResetPosition,true)
 		elseif ctx.root then
 			ok=pcall(function()
-				ctx.root.Position=UDim2.new(0.5,0,0,80)
+				local height=(ctx.root.AbsoluteSize and ctx.root.AbsoluteSize.Y) or 540
+				ctx.root.Position=UDim2.new(0.5,0,0.5,-math.floor(height/2))
 			end)
 		end
 
