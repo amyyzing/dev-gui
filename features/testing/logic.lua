@@ -7,7 +7,8 @@ local Workspace=game:GetService("Workspace")
 local LP=Players.LocalPlayer
 
 local BALL_G=28
-local TESTING_C1_Y=14.22
+local TESTING_C1_Y=14.30
+local DEFENDER_SPEED=21
 local C1_MARKER_HEIGHT=80
 local C1_MARKER_THICKNESS=0.12
 local GROUND_MARKER_DIAMETER=5.5
@@ -56,6 +57,47 @@ end
 local function fmtPower(power)
 	local n=tonumber(power)
 	return n and string.format("P%.0f",n) or "P?"
+end
+
+local function flat(v)
+	return Vector3.new(v.X,0,v.Z)
+end
+
+local function rootOfPlayer(player)
+	local character=player and (Workspace:FindFirstChild(player.Name) or player.Character)
+	return character and (character.PrimaryPart or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso"))
+end
+
+local function teamOf(player)
+	if not player then return nil end
+
+	local replicated=player:FindFirstChild("Replicated")
+	local teamValue=replicated and replicated:FindFirstChild("TeamID")
+	local ok,value=pcall(function()
+		return teamValue and teamValue.Value
+	end)
+	if ok and value~=nil then
+		return tostring(value)
+	end
+
+	if player.Team then
+		return tostring(player.Team)
+	end
+	if player.TeamColor then
+		return tostring(player.TeamColor)
+	end
+
+	return nil
+end
+
+local function playerByName(name)
+	if not name then return nil end
+	for _,player in ipairs(Players:GetPlayers()) do
+		if player.Name==name or player.DisplayName==name then
+			return player
+		end
+	end
+	return nil
 end
 
 local function projectileAt(origin,velocity,time)
@@ -184,6 +226,7 @@ function Testing.new(ctx,parent)
 	local reconnectQueued=false
 	local lastThrower=nil
 	local lastThrowAt=0
+	local centerBeamDefaults={}
 
 	state.testingEnabled=state.testingEnabled and true or false
 
@@ -239,6 +282,56 @@ function Testing.new(ctx,parent)
 
 		marker=nil
 		groundMarker=nil
+	end
+
+	local function setCenterBeamUnsafe(unsafe)
+		local center=findCenter()
+		if not center then return end
+
+		for _,descendant in ipairs(center:GetDescendants()) do
+			if descendant:IsA("Beam") then
+				if not centerBeamDefaults[descendant] then
+					centerBeamDefaults[descendant]=descendant.Color
+				end
+				descendant.Color=unsafe and ColorSequence.new(THEME.RED or Color3.fromRGB(254,94,86)) or centerBeamDefaults[descendant]
+			end
+		end
+	end
+
+	local function restoreCenterBeams()
+		for beam,color in pairs(centerBeamDefaults) do
+			if beam and beam.Parent then
+				beam.Color=color
+			end
+		end
+		table.clear(centerBeamDefaults)
+	end
+
+	local function c1IsDefended(c1Position,flightTime)
+		if not(c1Position and flightTime and flightTime>0) then
+			return false
+		end
+
+		local thrower=playerByName(lastThrower)
+		local throwerTeam=teamOf(thrower)
+		if not throwerTeam then
+			throwerTeam=teamOf(LP)
+		end
+		if not throwerTeam then
+			return false
+		end
+
+		local reach=DEFENDER_SPEED*flightTime
+		for _,player in ipairs(Players:GetPlayers()) do
+			if player~=thrower and teamOf(player)~=throwerTeam then
+				local defenderRoot=rootOfPlayer(player)
+				if defenderRoot and (flat(defenderRoot.Position)-flat(c1Position)).Magnitude<=reach then
+					return true
+				end
+			end
+		end
+
+		return false
 	end
 
 	local function styleMarker(part)
@@ -342,10 +435,11 @@ function Testing.new(ctx,parent)
 		local c1=center and center:FindFirstChild("C1",true)
 		local cframe=c1 and attachmentCFrame(c1)
 		local pos=cframe and cframe.Position
+		local payloadPos,payloadFlightTime=c1FromPayload(payload)
 		local fromPayload=false
-		local flightTime=nil
+		local flightTime=payloadFlightTime
 		if not pos then
-			pos,flightTime=c1FromPayload(payload)
+			pos=payloadPos
 			fromPayload=pos~=nil
 		end
 		if not pos then
@@ -354,12 +448,15 @@ function Testing.new(ctx,parent)
 		end
 
 		pos=Vector3.new(pos.X,TESTING_C1_Y,pos.Z)
+		local unsafe=c1IsDefended(pos,flightTime)
+		setCenterBeamUnsafe(unsafe)
 		ensureMarker(folder).CFrame=CFrame.new(pos)
 		ensureGroundMarker(folder).CFrame=CFrame.new(pos.X,groundYAt(pos),pos.Z)*CFrame.Angles(0,0,math.rad(90))
 		local powerText=payload and (" "..fmtPower(payload.Power)) or ""
 		local timeText=flightTime and string.format(" %.2fs",flightTime) or ""
-		local label=(lastThrower and (lastThrower.." ") or "")..(fromPayload and "C1 calc" or "C1")..powerText..timeText..": "..fmtVector(pos)
-		setStatus(label,THEME.GREEN or THEME.TEXT)
+		local safetyText=unsafe and " unsafe" or " safe"
+		local label=(lastThrower and (lastThrower.." ") or "")..(fromPayload and "C1 calc" or "C1")..safetyText..powerText..timeText..": "..fmtVector(pos)
+		setStatus(label,unsafe and (THEME.RED or Color3.fromRGB(254,94,86)) or (THEME.GREEN or THEME.TEXT))
 	end
 
 	local function captureSoon(source,payload)
@@ -512,6 +609,7 @@ function Testing.new(ctx,parent)
 		else
 			disconnectAll()
 			destroyMarker()
+			restoreCenterBeams()
 			lastThrower=nil
 			lastThrowAt=0
 			setStatus("Off",THEME.MUTED)
@@ -544,6 +642,7 @@ function Testing.new(ctx,parent)
 		table.clear(lifetimeConnections)
 		destroyControl(toggle)
 		destroyMarker()
+		restoreCenterBeams()
 	end
 
 	local sectionControls=nil
