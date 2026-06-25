@@ -186,6 +186,7 @@ function GameParamsGui.new(ctx,parent)
 	local safeDisconnect=ctx.safeDisconnect
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
+	local createUIShadow=ctx.createUIShadow
 	local state=runtime.GetState and runtime.GetState() or ctx.State
 	local api={}
 	local gravitySlider=nil
@@ -200,6 +201,7 @@ function GameParamsGui.new(ctx,parent)
 	local dialImages={}
 	local dialGlowImages={}
 	local dialHighlightImages={}
+	local dialShadows={}
 	local dialCenterCap=nil
 	local fallbackSlices={}
 	local currentPage=nil
@@ -358,7 +360,16 @@ function GameParamsGui.new(ctx,parent)
 			end)
 		end
 
-		local tween=TweenService:Create(object,PAINT_TWEEN,goal)
+		local ok,tween=pcall(TweenService.Create,TweenService,object,PAINT_TWEEN,goal)
+		if not ok or not tween then
+			for key,value in pairs(goal) do
+				pcall(function()
+					object[key]=value
+				end)
+			end
+			return nil
+		end
+
 		paintTweens[object]=tween
 		tween.Completed:Connect(function()
 			if paintTweens[object]==tween then
@@ -391,6 +402,9 @@ function GameParamsGui.new(ctx,parent)
 			local midGlowTransparency=1
 			local farGlowTransparency=1
 			local outerGlowTransparency=1
+			local shadowTransparency=1
+			local shadowBlur=8
+			local shadowSpread=0
 
 			if enabled then
 				if isSelected then
@@ -401,6 +415,9 @@ function GameParamsGui.new(ctx,parent)
 					farGlowTransparency=isHover and 0.91 or 0.94
 					outerGlowTransparency=1
 					highlightTransparency=isHover and 0.82 or 0.90
+					shadowTransparency=lightTheme and (isHover and 0.58 or 0.66) or (isHover and 0.42 or 0.52)
+					shadowBlur=isHover and 16 or 13
+					shadowSpread=isHover and 2 or 1
 				elseif isHover then
 					targetColor=hoverColor
 					targetTransparency=0.20
@@ -409,6 +426,9 @@ function GameParamsGui.new(ctx,parent)
 					farGlowTransparency=0.97
 					outerGlowTransparency=1
 					highlightTransparency=0.92
+					shadowTransparency=lightTheme and 0.72 or 0.62
+					shadowBlur=11
+					shadowSpread=1
 				else
 					targetColor=enabledIdleColor
 					targetTransparency=0.26
@@ -417,6 +437,9 @@ function GameParamsGui.new(ctx,parent)
 					farGlowTransparency=1
 					outerGlowTransparency=1
 					highlightTransparency=0.95
+					shadowTransparency=lightTheme and 0.84 or 0.78
+					shadowBlur=8
+					shadowSpread=0
 				end
 			elseif isSelected then
 				targetColor=brightenColor(muted,0.12)
@@ -430,6 +453,12 @@ function GameParamsGui.new(ctx,parent)
 			local highlightColor=lightTheme and Color3.new(0,0,0) or Color3.new(1,1,1)
 			if lightTheme and highlightTransparency<1 then
 				highlightTransparency=math.max(highlightTransparency,0.90)
+			end
+			if dialShadows[pageKey] then
+				nearGlowTransparency=1
+				midGlowTransparency=1
+				farGlowTransparency=1
+				outerGlowTransparency=1
 			end
 
 			if dialImages[pageKey] then
@@ -459,6 +488,20 @@ function GameParamsGui.new(ctx,parent)
 						glow.ImageColor3=haloColor
 						glow.ImageTransparency=glowTransparency
 					end
+				end
+			end
+
+			if dialShadows[pageKey] then
+				local shadowColor=lightTheme and darkenColor(targetColor,0.20) or brightenColor(targetColor,0.18)
+				if animate then
+					tweenObject(dialShadows[pageKey],{Color=shadowColor,Transparency=shadowTransparency,BlurRadius=shadowBlur,Spread=shadowSpread})
+				else
+					pcall(function()
+						dialShadows[pageKey].Color=shadowColor
+						dialShadows[pageKey].Transparency=shadowTransparency
+						dialShadows[pageKey].BlurRadius=shadowBlur
+						dialShadows[pageKey].Spread=shadowSpread
+					end)
 				end
 			end
 
@@ -649,6 +692,17 @@ function GameParamsGui.new(ctx,parent)
 					ScaleType=Enum.ScaleType.Stretch,
 					ZIndex=7,
 				},canvas)
+
+				if type(createUIShadow)=="function" then
+					dialShadows[pageKey]=createUIShadow(dialImages[pageKey],{
+						Name="DialNativeGlow",
+						Color=inputColor(),
+						Transparency=1,
+						BlurRadius=10,
+						Spread=0,
+						Offset=Vector2.new(0,0),
+					})
+				end
 			else
 				local angle=DIAL_MID_ANGLE[pageKey] or 90
 				local radians=math.rad(angle)
