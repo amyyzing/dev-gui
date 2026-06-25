@@ -60,6 +60,7 @@ local ARC_SETTINGS={
 }
 local DEFENDER_SETTINGS={
 	Speed=21,
+	ReactionBuffer=0.05,
 	CatchHeightTolerance=0.25,
 }
 local TRACK_SETTINGS={
@@ -656,7 +657,6 @@ function QBAim.new(ctx,parent)
 	local receiverData={}
 	local receiverTrackElapsed=0
 	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,beamDefaultColor=nil,orig=nil,p1=nil,p2=nil,p3=nil,ballMissingSince=nil}
-	local originalCenterBeamDefaults={}
 	local previewFrozen=false
 	local previewFreezeStarted=0
 	local lastHeldBall=nil
@@ -1839,7 +1839,7 @@ function QBAim.new(ctx,parent)
 			return false
 		end
 
-		local reachRadius=DEFENDER_SETTINGS.Speed*elapsed
+		local reachRadius=DEFENDER_SETTINGS.Speed*(elapsed+DEFENDER_SETTINGS.ReactionBuffer)
 		return (flat(defenderRoot.Position)-flat(ballPosition)).Magnitude<=reachRadius
 	end
 
@@ -1879,35 +1879,11 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
-	local function setOriginalCenterBeamUnsafe(unsafe)
-		local center=originalCenter()
-		if not center then return end
-
-		for _,descendant in ipairs(center:GetDescendants()) do
-			if descendant:IsA("Beam") then
-				if not originalCenterBeamDefaults[descendant] then
-					originalCenterBeamDefaults[descendant]=descendant.Color
-				end
-				descendant.Color=unsafe and ColorSequence.new(ARC_SETTINGS.UnsafeColor) or originalCenterBeamDefaults[descendant]
-			end
-		end
-	end
-
-	local function restoreOriginalCenterBeams()
-		for beam,color in pairs(originalCenterBeamDefaults) do
-			if beam and beam.Parent then
-				beam.Color=color
-			end
-		end
-		table.clear(originalCenterBeamDefaults)
-	end
-
 	local function clearPreviewVisuals(destroyCenter)
 		previewFrozen=false
 		preview.ballMissingSince=nil
 		preview.p1,preview.p2,preview.p3=nil,nil,nil
 		hideQBTrailPreview()
-		restoreOriginalCenterBeams()
 
 		if destroyCenter then
 			destroyPreviewCenter()
@@ -1960,9 +1936,7 @@ function QBAim.new(ctx,parent)
 		beam.Attachment1=c3
 		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
 		beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
-		local unsafe=planCanBeDefended(plan,trackedReceiver)
-		updateArcSafetyColor(beam,unsafe)
-		setOriginalCenterBeamUnsafe(unsafe)
+		updateArcSafetyColor(beam,planCanBeDefended(plan,trackedReceiver))
 		setPreviewCenterVisible(true)
 		beam.Enabled=true
 	end
@@ -2389,7 +2363,6 @@ function QBAim.new(ctx,parent)
 		table.clear(connections)
 
 		destroyPreviewCenter()
-		restoreOriginalCenterBeams()
 		clearTargetHighlights()
 		if preview.c1Marker and preview.c1Marker.Parent then
 			preview.c1Marker:Destroy()
