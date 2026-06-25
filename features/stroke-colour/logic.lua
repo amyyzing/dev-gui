@@ -190,11 +190,10 @@ local HIGHLIGHT_DIAL_GLOW_LAYERS={
 	{pad=4,z=4},
 	{pad=8,z=3},
 }
-local HIGHLIGHT_DIAL_ASSET_KEY={espOffense="speed",espDefense="gravity",qbHighlight="stamina"}
-local HIGHLIGHT_DIAL_SECTORS={
-	{key="espDefense",start=30,finish=150},
-	{key="espOffense",start=150,finish=270},
-	{key="qbHighlight",start=270,finish=390},
+local HIGHLIGHT_DIAL_SLICES={
+	{key="espDefense",assetKey="gravity",start=30,finish=150,fallbackIndex=1},
+	{key="espOffense",assetKey="speed",start=150,finish=270,fallbackIndex=2},
+	{key="qbHighlight",assetKey="stamina",start=270,finish=390,fallbackIndex=3},
 }
 
 local function brightenColor(color,amount)
@@ -2009,9 +2008,9 @@ function StrokeColour.new(ctx,page)
 			angle=angle+360
 		end
 
-		for _,sector in ipairs(HIGHLIGHT_DIAL_SECTORS) do
-			if inAngleRange(angle,sector.start,sector.finish) then
-				return sector.key
+		for _,slice in ipairs(HIGHLIGHT_DIAL_SLICES) do
+			if inAngleRange(angle,slice.start,slice.finish) then
+				return slice.key
 			end
 		end
 
@@ -2035,11 +2034,10 @@ function StrokeColour.new(ctx,page)
 	local paramsDial=ctx.Page1GameParamsModule
 	local assets=paramsDial and type(paramsDial.GetDialSliceAssets)=="function" and paramsDial.GetDialSliceAssets() or nil
 
-	for _,mode in ipairs(HIGHLIGHT_MODES) do
-		local assetKey=HIGHLIGHT_DIAL_ASSET_KEY[mode.Key]
-		local pageAssets=assets and assets[assetKey]
+	for _,slice in ipairs(HIGHLIGHT_DIAL_SLICES) do
+		local pageAssets=assets and assets[slice.assetKey]
 		if pageAssets and pageAssets.slice and pageAssets.glow then
-			highlightDialGlowImages[mode.Key]={}
+			highlightDialGlowImages[slice.key]={}
 			for _,layer in ipairs(HIGHLIGHT_DIAL_GLOW_LAYERS) do
 				local pad=layer.pad
 				local glowImage=New("ImageLabel",{
@@ -2053,10 +2051,10 @@ function StrokeColour.new(ctx,page)
 					ScaleType=Enum.ScaleType.Stretch,
 					ZIndex=layer.z,
 				},highlightDialCanvas)
-				highlightDialGlowImages[mode.Key][#highlightDialGlowImages[mode.Key]+1]=glowImage
+				highlightDialGlowImages[slice.key][#highlightDialGlowImages[slice.key]+1]=glowImage
 			end
 
-			highlightDialImages[mode.Key]=New("ImageLabel",{
+			highlightDialImages[slice.key]=New("ImageLabel",{
 				BackgroundTransparency=1,
 				Position=UDim2.fromScale(0,0),
 				Size=UDim2.fromScale(1,1),
@@ -2068,7 +2066,7 @@ function StrokeColour.new(ctx,page)
 				ZIndex=6,
 			},highlightDialCanvas)
 
-			highlightDialHighlightImages[mode.Key]=New("ImageLabel",{
+			highlightDialHighlightImages[slice.key]=New("ImageLabel",{
 				BackgroundTransparency=1,
 				Position=UDim2.fromScale(0,0),
 				Size=UDim2.fromScale(1,1),
@@ -2080,7 +2078,7 @@ function StrokeColour.new(ctx,page)
 				ZIndex=7,
 			},highlightDialCanvas)
 		else
-			local index=mode.Key=="espDefense" and 1 or (mode.Key=="espOffense" and 2 or 3)
+			local index=slice.fallbackIndex
 			local fallback=New("TextButton",{
 				Position=UDim2.new((index-1)/3,1,0,8),
 				Size=UDim2.new(1/3,-2,1,-16),
@@ -2094,7 +2092,7 @@ function StrokeColour.new(ctx,page)
 				ThemeRole="INPUT",
 			},highlightDialCanvas)
 			addCorner(fallback,"Control")
-			highlightFallbackSlices[mode.Key]=fallback
+			highlightFallbackSlices[slice.key]=fallback
 		end
 	end
 

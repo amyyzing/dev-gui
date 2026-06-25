@@ -232,7 +232,7 @@ local function findCenter()
 	return localFolder and localFolder:FindFirstChild("Center"),localFolder
 end
 
-function Testing.new(ctx,parent)
+function Testing.new(ctx,parent,guiBuilder)
 	local New=ctx.New
 	local THEME=ctx.THEME
 	local safeDisconnect=ctx.safeDisconnect
@@ -898,30 +898,46 @@ function Testing.new(ctx,parent)
 		destroyMarker()
 	end
 
-	local sectionControls=nil
-	section,sectionControls=makeSection(parent,5,"Testing","WR C1 and QB arc safety",{
-		headerToggle={
-			startState=state.testingEnabled,
-			onChange=function(value)
-				api.SetTestingState(value,true)
-			end,
-		},
-		compact=true,
-	})
-
-	toggle=sectionControls and sectionControls.toggle
-	if not toggle then
-		toggle=buildToggleRow(section,"Testing",state.testingEnabled,function(value)
-			api.SetTestingState(value,true)
-		end)
+	local builtGui=nil
+	if guiBuilder and type(guiBuilder.build)=="function" then
+		local ok,result=pcall(guiBuilder.build,ctx,parent,state,api)
+		if ok and type(result)=="table" then
+			builtGui=result
+		else
+			warn("Testing GUI build failed:",result)
+		end
 	end
 
-	wrToggle=buildToggleRow(section,"WR",state.testingWREnabled~=false,function(value)
-		api.SetTestingWRState(value,true)
-	end)
-	qbToggle=buildToggleRow(section,"QB",state.testingQBEnabled~=false,function(value)
-		api.SetTestingQBState(value,true)
-	end)
+	if builtGui then
+		section=builtGui.body or builtGui.section
+		toggle=builtGui.toggle
+		wrToggle=builtGui.wrToggle
+		qbToggle=builtGui.qbToggle
+	else
+		local sectionControls=nil
+		section,sectionControls=makeSection(parent,5,"Testing","WR C1 and QB arc safety",{
+			headerToggle={
+				startState=state.testingEnabled,
+				onChange=function(value)
+					api.SetTestingState(value,true)
+				end,
+			},
+		})
+
+		toggle=sectionControls and sectionControls.toggle
+		if not toggle then
+			toggle=buildToggleRow(section,"Testing",state.testingEnabled,function(value)
+				api.SetTestingState(value,true)
+			end)
+		end
+
+		wrToggle=buildToggleRow(section,"WR",state.testingWREnabled~=false,function(value)
+			api.SetTestingWRState(value,true)
+		end)
+		qbToggle=buildToggleRow(section,"QB",state.testingQBEnabled~=false,function(value)
+			api.SetTestingQBState(value,true)
+		end)
+	end
 
 	local ancestryConn=section.AncestryChanged:Connect(function()
 		if not section.Parent then
