@@ -11,23 +11,13 @@ local BALL_G=28
 local TESTING_C1_Y=14.30
 local DEFENDER_SPEED=21
 local TESTING_BALL_SPEED=95
+local QB_SAFETY_JOB_ID="TestingQBCenterSafety"
+local QB_SAFETY_INTERVAL=0.05
 local C1_MARKER_HEIGHT=80
 local C1_MARKER_THICKNESS=0.12
 local GROUND_MARKER_DIAMETER=5.5
 local GROUND_MARKER_THICKNESS=0.05
 local GROUND_MARKER_TRANSPARENCY=0.75
-
-local function firstFolder(container)
-	if not container then return nil end
-
-	for _,child in ipairs(container:GetChildren()) do
-		if child:IsA("Folder") or child:IsA("Model") then
-			return child
-		end
-	end
-
-	return nil
-end
 
 local function destroyControl(control)
 	if control and type(control.destroy)=="function" then
@@ -202,10 +192,38 @@ local function collectGameReEvents()
 	return packed
 end
 
+local function centerHasArc(localFolder)
+	local center=localFolder and localFolder:FindFirstChild("Center")
+	if not center then
+		return false
+	end
+
+	return center:FindFirstChild("ThrowingArc")~=nil
+		or center:FindFirstChild("ThrowingArc",true)~=nil
+		or center:FindFirstChild("C2",true)~=nil
+		or center:FindFirstChild("C3",true)~=nil
+end
+
+local function findLocalFolderIn(container,requireArc)
+	if not container then return nil end
+
+	for _,gameFolder in ipairs(container:GetChildren()) do
+		local localFolder=gameFolder:FindFirstChild("Local")
+		if localFolder and (not requireArc or centerHasArc(localFolder)) then
+			return localFolder
+		end
+	end
+
+	return nil
+end
+
 local function findLocalFolder()
+	local games=Workspace:FindFirstChild("Games")
 	local miniGames=Workspace:FindFirstChild("MiniGames")
-	local gameFolder=(miniGames and #miniGames:GetChildren()==1) and firstFolder(miniGames) or firstFolder(Workspace:FindFirstChild("Games"))
-	return gameFolder and gameFolder:FindFirstChild("Local")
+	return findLocalFolderIn(games,true)
+		or findLocalFolderIn(miniGames,true)
+		or findLocalFolderIn(games,false)
+		or findLocalFolderIn(miniGames,false)
 end
 
 local function findCenter()
@@ -219,6 +237,7 @@ function Testing.new(ctx,parent)
 	local safeDisconnect=ctx.safeDisconnect
 	local makeSection=ctx.makeSection
 	local buildToggleRow=ctx.buildToggleRow
+	local scheduler=ctx.Scheduler
 	local state=ctx.State
 	local api={}
 	local section=nil
@@ -229,6 +248,7 @@ function Testing.new(ctx,parent)
 	local marker=nil
 	local groundMarker=nil
 	local qbSafetyConn=nil
+	local qbSafetyScheduled=false
 	local remoteConnections={}
 	local topologyConnections={}
 	local lifetimeConnections={}
@@ -355,6 +375,10 @@ function Testing.new(ctx,parent)
 	end
 
 	local function disconnectQBSafety()
+		if qbSafetyScheduled and scheduler and type(scheduler.Unregister)=="function" then
+			pcall(scheduler.Unregister,"Heartbeat",QB_SAFETY_JOB_ID)
+		end
+		qbSafetyScheduled=false
 		safeDisconnect(qbSafetyConn)
 		qbSafetyConn=nil
 		restoreCenterBeams()
@@ -499,7 +523,26 @@ function Testing.new(ctx,parent)
 		end
 
 		if qbSafetyConn then return end
-		qbSafetyConn=RunService.RenderStepped:Connect(function()
+		if qbSafetyScheduled then return end
+
+		if scheduler and type(scheduler.Register)=="function" then
+			local ok,result=pcall(scheduler.Register,"Heartbeat",QB_SAFETY_JOB_ID,QB_SAFETY_INTERVAL,function()
+				updateQBCenterSafety()
+			end)
+			if ok and result then
+				qbSafetyScheduled=true
+				updateQBCenterSafety()
+				return
+			end
+		end
+
+		local elapsed=0
+		qbSafetyConn=RunService.Heartbeat:Connect(function(dt)
+			elapsed=elapsed+(dt or 0)
+			if elapsed<QB_SAFETY_INTERVAL then
+				return
+			end
+			elapsed=0
 			updateQBCenterSafety()
 		end)
 	end
@@ -813,7 +856,7 @@ function Testing.new(ctx,parent)
 
 	function api.SetTestingQBState(value,fire)
 		state.testingQBEnabled=value and true or false
-		if state.testingQBEnabled then
+		if state.testingEnabled and state.testingQBEnabled then
 			syncQBSafety()
 			updateQBCenterSafety()
 		else
