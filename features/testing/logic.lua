@@ -224,7 +224,6 @@ function Testing.new(ctx,parent)
 	local marker=nil
 	local groundMarker=nil
 	local qbSafetyConn=nil
-	local qbSafetyElapsed=0
 	local remoteConnections={}
 	local topologyConnections={}
 	local lifetimeConnections={}
@@ -298,17 +297,46 @@ function Testing.new(ctx,parent)
 		groundMarker=nil
 	end
 
+	local function addBeamTarget(list,seen,instance)
+		if not instance then return end
+		if instance:IsA("Beam") and not seen[instance] then
+			seen[instance]=true
+			list[#list+1]=instance
+		end
+		for _,descendant in ipairs(instance:GetDescendants()) do
+			if descendant:IsA("Beam") and not seen[descendant] then
+				seen[descendant]=true
+				list[#list+1]=descendant
+			end
+		end
+	end
+
+	local function centerArcBeams(center)
+		local beams={}
+		local seen={}
+		addBeamTarget(beams,seen,center:FindFirstChild("ThrowingArc"))
+		addBeamTarget(beams,seen,center:FindFirstChild("ThrowingArc",true))
+
+		if #beams==0 then
+			for _,descendant in ipairs(center:GetDescendants()) do
+				if descendant:IsA("Beam") then
+					addBeamTarget(beams,seen,descendant)
+				end
+			end
+		end
+
+		return beams
+	end
+
 	local function setCenterBeamUnsafe(unsafe)
 		local center=findCenter()
 		if not center then return end
 
-		for _,descendant in ipairs(center:GetDescendants()) do
-			if descendant:IsA("Beam") then
-				if not centerBeamDefaults[descendant] then
-					centerBeamDefaults[descendant]=descendant.Color
-				end
-				descendant.Color=unsafe and ColorSequence.new(THEME.RED or Color3.fromRGB(254,94,86)) or centerBeamDefaults[descendant]
+		for _,beam in ipairs(centerArcBeams(center)) do
+			if not centerBeamDefaults[beam] then
+				centerBeamDefaults[beam]=beam.Color
 			end
+			beam.Color=unsafe and ColorSequence.new(THEME.RED or Color3.fromRGB(254,94,86)) or centerBeamDefaults[beam]
 		end
 	end
 
@@ -324,7 +352,6 @@ function Testing.new(ctx,parent)
 	local function disconnectQBSafety()
 		safeDisconnect(qbSafetyConn)
 		qbSafetyConn=nil
-		qbSafetyElapsed=0
 		restoreCenterBeams()
 	end
 
@@ -403,10 +430,7 @@ function Testing.new(ctx,parent)
 		end
 
 		if qbSafetyConn then return end
-		qbSafetyConn=RunService.RenderStepped:Connect(function(dt)
-			qbSafetyElapsed=qbSafetyElapsed+dt
-			if qbSafetyElapsed<0.05 then return end
-			qbSafetyElapsed=0
+		qbSafetyConn=RunService.RenderStepped:Connect(function()
 			updateQBCenterSafety()
 		end)
 	end
