@@ -106,6 +106,11 @@ local function projectileAt(origin,velocity,time)
 	return origin+velocity*time+Vector3.new(0,-0.5*BALL_G*time*time,0)
 end
 
+local function cubicBezier(p0,p1,p2,p3,t)
+	local u=1-t
+	return p0*(u*u*u)+p1*(3*u*u*t)+p2*(3*u*t*t)+p3*(t*t*t)
+end
+
 local function c1FromPayload(payload)
 	if type(payload)~="table" then return nil,nil end
 	if typeof(payload.SpawnPos)~="Vector3" or typeof(payload.Target)~="Vector3" then return nil,nil end
@@ -381,31 +386,95 @@ function Testing.new(ctx,parent)
 		return false
 	end
 
+	local function beamC1Position(beam)
+		if not(beam and beam:IsA("Beam") and beam.Attachment0 and beam.Attachment1) then
+			return nil,nil
+		end
+
+		local c2Frame=attachmentCFrame(beam.Attachment0)
+		local c3Frame=attachmentCFrame(beam.Attachment1)
+		if not(c2Frame and c3Frame) then
+			return nil,nil
+		end
+
+		local p0=c2Frame.Position
+		local p3=c3Frame.Position
+		local p1=p0+c2Frame.RightVector*beam.CurveSize0
+		local p2=p3-c3Frame.RightVector*beam.CurveSize1
+		local bestPoint=nil
+		local bestT=0
+		local bestDiff=math.huge
+		local crossingPoint=nil
+		local crossingT=nil
+		local previousPoint=p0
+		local previousT=0
+		local previousY=previousPoint.Y-TESTING_C1_Y
+
+		for i=1,96 do
+			local t=i/96
+			local point=cubicBezier(p0,p1,p2,p3,t)
+			local y=point.Y-TESTING_C1_Y
+			local diff=math.abs(y)
+			if diff<bestDiff then
+				bestDiff=diff
+				bestPoint=point
+				bestT=t
+			end
+
+			if previousY==0 or y==0 or (previousY<0 and y>0) or (previousY>0 and y<0) then
+				local denom=math.abs(previousY)+math.abs(y)
+				local alpha=denom>1e-6 and math.abs(previousY)/denom or 0
+				crossingT=previousT+(t-previousT)*alpha
+				crossingPoint=previousPoint:Lerp(point,alpha)
+			end
+
+			previousPoint=point
+			previousT=t
+			previousY=y
+		end
+
+		local c1Point=crossingPoint or bestPoint
+		local c1T=crossingT or bestT
+		if not c1Point then
+			return nil,nil
+		end
+
+		c1Point=Vector3.new(c1Point.X,TESTING_C1_Y,c1Point.Z)
+		local flatDistance=(flat(c1Point)-flat(p0)).Magnitude
+		local distanceTime=flatDistance/TESTING_BALL_SPEED
+		local heightDelta=math.max(c1Point.Y-p0.Y,0)
+		local verticalTime=heightDelta>0 and math.sqrt((2*heightDelta)/BALL_G) or 0
+		local estimatedTime=math.max(distanceTime,verticalTime,c1T*distanceTime)
+		return c1Point,estimatedTime
+	end
+
 	local function currentCenterC1AndTime()
 		local center=findCenter()
-		local c1=center and center:FindFirstChild("C1",true)
-		local c2=center and center:FindFirstChild("C2",true)
+		if not center then
+			return nil,nil
+		end
+
+		for _,beam in ipairs(centerArcBeams(center)) do
+			local point,time=beamC1Position(beam)
+			if point and time and time>0 then
+				return point,time
+			end
+		end
+
+		local c1=center:FindFirstChild("C1",true)
+		local c2=center:FindFirstChild("C2",true)
 		local c1Frame=c1 and attachmentCFrame(c1)
 		local c2Frame=c2 and attachmentCFrame(c2)
-		if not c1Frame then
+		if not(c1Frame and c2Frame) then
 			return nil,nil
 		end
 
 		local c1Position=Vector3.new(c1Frame.Position.X,TESTING_C1_Y,c1Frame.Position.Z)
-		local flightTime=nil
-		if c2Frame then
-			local heightDelta=math.max(c1Position.Y-c2Frame.Position.Y,0)
-			if heightDelta>0 then
-				flightTime=math.sqrt((2*heightDelta)/BALL_G)
-			end
-			local flatDistance=(flat(c1Position)-flat(c2Frame.Position)).Magnitude
-			local distanceTime=flatDistance/TESTING_BALL_SPEED
-			if distanceTime>0 then
-				flightTime=math.max(flightTime or 0,distanceTime)
-			end
-		end
-
-		return c1Position,flightTime
+		local flatDistance=(flat(c1Position)-flat(c2Frame.Position)).Magnitude
+		local heightDelta=math.max(c1Position.Y-c2Frame.Position.Y,0)
+		local distanceTime=flatDistance/TESTING_BALL_SPEED
+		local verticalTime=heightDelta>0 and math.sqrt((2*heightDelta)/BALL_G) or 0
+		return c1Position,math.max(distanceTime,verticalTime)
 	end
 
 	local function updateQBCenterSafety()
