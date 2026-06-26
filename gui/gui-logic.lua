@@ -1264,7 +1264,7 @@ function GuiLogic.new(ctx)
 			Text=labelText,
 			Font=componentFont("ControlFont",Enum.Font.GothamMedium),
 			TextSize=componentNumber("ToggleLabelTextSize",12),
-			TextColor3=THEME.MUTED,
+			TextColor3=THEME.TEXT,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			TextTruncate=Enum.TextTruncate.AtEnd,
 			ZIndex=6,
@@ -1273,7 +1273,7 @@ function GuiLogic.new(ctx)
 
 		local fillClip=New("Frame",{
 			AnchorPoint=Vector2.new(0,0.5),
-			Position=UDim2.fromScale(0,0.5),
+			Position=UDim2.new(0,padX,0.5,0),
 			Size=UDim2.new(0,0,1,0),
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
@@ -1284,17 +1284,17 @@ function GuiLogic.new(ctx)
 
 		local activeLabel=New("TextLabel",{
 			BackgroundTransparency=1,
-			Position=UDim2.fromOffset(padX,0),
+			Position=UDim2.fromOffset(0,0),
 			Size=UDim2.new(0,1,1,0),
 			Text=labelText,
 			Font=componentFont("ControlFont",Enum.Font.GothamMedium),
 			TextSize=componentNumber("ToggleLabelTextSize",12),
-			TextColor3=themeColor("SLIDER_FILL",THEME.ACC or THEME.GREEN or Color3.fromRGB(32,202,106)),
+			TextColor3=themeColor("STROKE",THEME.STROKE or THEME.ACC or Color3.fromRGB(182,180,180)),
 			TextXAlignment=Enum.TextXAlignment.Left,
 			TextTruncate=Enum.TextTruncate.AtEnd,
 			ZIndex=8,
 			SkipTextRole=true,
-		},row)
+		},fillClip)
 
 		local function connect(signal,fn)
 			local conn=signal:Connect(fn)
@@ -1328,13 +1328,12 @@ function GuiLogic.new(ctx)
 		local function applyVisuals(animate)
 			cancelTweens()
 
-			local accent=themeColor("SLIDER_FILL",THEME.ACC or THEME.GREEN or Color3.fromRGB(32,202,106))
-			local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
+			local accent=themeColor("STROKE",THEME.STROKE or THEME.ACC or Color3.fromRGB(182,180,180))
 			local text=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235))
-			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
-			local labelColor=hovered and text or muted
-			local labelStrokeTransparency=hovered and 0.72 or 1
-			local activeStrokeTransparency=state and (hovered and 0.18 or 0.42) or 1
+			local fillSize=state and UDim2.new(1,-(padX*2),1,0) or UDim2.new(0,0,1,0)
+			local labelColor=text
+			local labelStrokeTransparency=hovered and 0.74 or 1
+			local activeStrokeTransparency=state and (hovered and 0.2 or 0.46) or 1
 
 			label.TextStrokeColor3=accent
 			activeLabel.TextStrokeColor3=accent
