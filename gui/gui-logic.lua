@@ -1243,12 +1243,10 @@ function GuiLogic.new(ctx)
 		local stateValue=makeFusionValue(state)
 		local connections={}
 		local fillTween=nil
-		local fillTweenPending=false
-		local fillTweenSerial=0
 
 		local labelTweenInInfo=TweenInfo.new(
-			componentNumber("ToggleLabelTweenInTime",0.38),
-			Enum.EasingStyle.Quart,
+			componentNumber("ToggleLabelTweenInTime",0.48),
+			Enum.EasingStyle.Quad,
 			Enum.EasingDirection.Out
 		)
 
@@ -1260,6 +1258,12 @@ function GuiLogic.new(ctx)
 
 		local textFont=componentFont("ToggleLabelFont",Enum.Font.GothamBold)
 		local textSize=componentNumber("ToggleLabelTextSize",14)
+
+		local function connect(signal,fn)
+			local conn=signal:Connect(fn)
+			table.insert(connections,conn)
+			return conn
+		end
 
 		local row=New("TextButton",{
 			BackgroundTransparency=1,
@@ -1318,7 +1322,7 @@ function GuiLogic.new(ctx)
 		local activeLabel=New("TextLabel",{
 			BackgroundTransparency=1,
 			Position=UDim2.fromOffset(0,0),
-			Size=UDim2.new(0,1,1,0),
+			Size=UDim2.fromOffset(1,height),
 			Text=labelText,
 			Font=textFont,
 			TextSize=textSize,
@@ -1331,11 +1335,10 @@ function GuiLogic.new(ctx)
 			SkipTextRole=true,
 		},fillClip)
 
-		local function connect(signal,fn)
-			local conn=signal:Connect(fn)
-			table.insert(connections,conn)
-			return conn
-		end
+		local fillProgress=Instance.new("NumberValue")
+		fillProgress.Name="ToggleLabelFillProgress"
+		fillProgress.Value=state and 1 or 0
+		fillProgress.Parent=row
 
 		local function usableWidth()
 			return math.max(row.AbsoluteSize.X-(padX*2),1)
@@ -1351,109 +1354,114 @@ function GuiLogic.new(ctx)
 			return accent
 		end
 
-		local function resizeOverlayText()
-			local width=usableWidth()
+		local function resizeOverlayText(width)
+			width=width or usableWidth()
 			activeShadow.Size=UDim2.fromOffset(width,height)
 			activeLabel.Size=UDim2.fromOffset(width,height)
 		end
 
-		local function resizeActiveLabel()
+		local function updateClip()
 			local width=usableWidth()
+			local progress=math.clamp(fillProgress.Value,0,1)
 
-			resizeOverlayText()
-
-			if not fillTween and not fillTweenPending then
-				fillClip.Size=UDim2.fromOffset(state and width or 0,height)
-			end
+			resizeOverlayText(width)
+			fillClip.Size=UDim2.fromOffset(math.floor((width*progress)+0.5),height)
 		end
 
-		connect(row:GetPropertyChangedSignal("AbsoluteSize"),resizeActiveLabel)
-		resizeActiveLabel()
-
-		local function cancelFillTween()
-			fillTweenPending=false
-			fillTweenSerial=fillTweenSerial+1
-
-			if fillTween then
-				fillTween:Cancel()
-				fillTween=nil
-			end
-		end
-
-		local function applyVisuals(animate,previousState)
+		local function applyTextStyle()
 			local text=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235))
 			local accent=currentAccent()
 
 			label.TextColor3=text
 			label.TextTransparency=state and 0.18 or 0.06
 			label.TextStrokeTransparency=1
+
 			activeLabel.TextColor3=accent
 			activeLabel.TextTransparency=0
 			activeLabel.TextStrokeTransparency=1
+
 			activeShadow.TextTransparency=0.56
 			activeShadow.TextStrokeTransparency=1
+		end
 
-			resizeOverlayText()
+		local function cancelFillTween()
+			if fillTween then
+				pcall(function()
+					fillTween:Cancel()
+				end)
+
+				fillTween=nil
+			end
+		end
+
+		local function tweenProgress(targetProgress,tweenInfo)
 			cancelFillTween()
 
+			fillTween=TweenService:Create(fillProgress,tweenInfo,{
+				Value=targetProgress
+			})
+
+			local thisTween=fillTween
+
+			fillTween.Completed:Connect(function()
+				if fillTween==thisTween then
+					fillTween=nil
+					fillProgress.Value=targetProgress
+					updateClip()
+				end
+			end)
+
+			fillTween:Play()
+		end
+
+		local function applyVisuals(animate)
+			local targetProgress=state and 1 or 0
+
+			applyTextStyle()
+			updateClip()
+
 			if not animate then
-				fillClip.Size=UDim2.fromOffset(state and usableWidth() or 0,height)
+				cancelFillTween()
+				fillProgress.Value=targetProgress
+				updateClip()
 				return
 			end
 
-			fillTweenPending=true
-			fillTweenSerial=fillTweenSerial+1
-			local thisSerial=fillTweenSerial
-
-			task.defer(function()
-				if destroyed or not fillClip.Parent or thisSerial~=fillTweenSerial then
-					return
-				end
-
-				local width=usableWidth()
-
-				resizeOverlayText()
-
-				if previousState~=nil then
-					fillClip.Size=UDim2.fromOffset(previousState and width or 0,height)
-				end
-
-				local targetSize=UDim2.fromOffset(state and width or 0,height)
-
-				fillTweenPending=false
-				fillTween=TweenService:Create(fillClip,state and labelTweenInInfo or labelTweenOutInfo,{Size=targetSize})
-				local thisTween=fillTween
-				fillTween.Completed:Connect(function()
-					if fillTween==thisTween then
-						fillTween=nil
-						fillClip.Size=UDim2.fromOffset(state and usableWidth() or 0,height)
-					end
-				end)
-				fillTween:Play()
-			end)
+			tweenProgress(
+				targetProgress,
+				state and labelTweenInInfo or labelTweenOutInfo
+			)
 		end
+
+		connect(row:GetPropertyChangedSignal("AbsoluteSize"),function()
+			updateClip()
+		end)
+
+		connect(fillProgress:GetPropertyChangedSignal("Value"),function()
+			updateClip()
+		end)
 
 		local function setState(value,fire,animate)
 			local nextState=value and true or false
 			local changed=nextState~=state
+
 			if not changed then
-				if (fillTween or fillTweenPending) and animate~=false then
-					return
+				if animate==false then
+					applyVisuals(false)
 				end
 
-				applyVisuals(false)
 				return
 			end
 
-			local previousState=state
 			state=nextState
+
 			if stateValue then
 				stateValue:set(state)
 			end
 
-			applyVisuals((animate~=false) and changed,previousState)
+			applyVisuals(animate~=false)
 
-			if fire and changed and onChange then
+			if fire and onChange then
 				onChange(state)
 			end
 		end
@@ -1465,21 +1473,48 @@ function GuiLogic.new(ctx)
 		local function destroyToggleLabel()
 			if destroyed then return end
 			destroyed=true
+
 			cancelFillTween()
 			destroyFusionValue(stateValue)
+
 			for _,conn in ipairs(connections) do
 				pcall(function()
 					conn:Disconnect()
 				end)
 			end
+
 			table.clear(connections)
+
+			if fillProgress then
+				fillProgress:Destroy()
+			end
+
 			if row then
 				row:Destroy()
 			end
 		end
 
-		setState(state,false,false)
-		return{set=function(v,animate) if not destroyed then setState(v,false,animate~=false) end end,get=function() return state end,Destroy=destroyToggleLabel,destroy=destroyToggleLabel,stateValue=stateValue,wrap=row,label=label,activeLabel=activeLabel,activeShadow=activeShadow,fill=fillClip}
+		applyVisuals(false)
+
+		return{
+			set=function(v,animate)
+				if not destroyed then
+					setState(v,false,animate~=false)
+				end
+			end,
+			get=function()
+				return state
+			end,
+			Destroy=destroyToggleLabel,
+			destroy=destroyToggleLabel,
+			stateValue=stateValue,
+			wrap=row,
+			label=label,
+			activeLabel=activeLabel,
+			activeShadow=activeShadow,
+			fill=fillClip,
+			fillProgress=fillProgress,
+		}
 	end
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)
