@@ -1372,11 +1372,12 @@ function GuiLogic.new(ctx)
 			if stateValue then
 				stateValue:set(state)
 			end
-			applyVisuals((animate~=false) and changed,previousState)
 
 			if fire and changed and onChange then
 				onChange(state)
 			end
+
+			applyVisuals((animate~=false) and changed,previousState)
 		end
 
 		connect(row.Activated,function()
