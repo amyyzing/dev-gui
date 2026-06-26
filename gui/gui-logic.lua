@@ -1243,6 +1243,8 @@ function GuiLogic.new(ctx)
 		local stateValue=makeFusionValue(state)
 		local connections={}
 		local fillTween=nil
+		local fillTweenPending=false
+		local fillTweenSerial=0
 		local labelTweenInInfo=TweenInfo.new(componentNumber("ToggleLabelTweenInTime",0.56),Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 		local labelTweenOutInfo=TweenInfo.new(componentNumber("ToggleLabelTweenOutTime",0.56),Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 
@@ -1321,6 +1323,7 @@ function GuiLogic.new(ctx)
 		resizeActiveLabel()
 
 		local function cancelFillTween()
+			fillTweenPending=false
 			if fillTween then
 				fillTween:Cancel()
 				fillTween=nil
@@ -1341,11 +1344,25 @@ function GuiLogic.new(ctx)
 			activeLabel.Size=UDim2.fromOffset(width,height)
 			cancelFillTween()
 
-			if animate then
-				if startSize then
-					fillClip.Size=startSize
+			if not animate then
+				fillClip.Size=targetSize
+				return
+			end
+
+			if startSize then
+				fillClip.Size=startSize
+			end
+
+			fillTweenPending=true
+			fillTweenSerial=fillTweenSerial+1
+			local thisSerial=fillTweenSerial
+
+			task.defer(function()
+				if destroyed or not fillClip.Parent or thisSerial~=fillTweenSerial then
+					return
 				end
 
+				fillTweenPending=false
 				fillTween=TweenService:Create(fillClip,state and labelTweenInInfo or labelTweenOutInfo,{Size=targetSize})
 				local thisTween=fillTween
 				fillTween.Completed:Connect(function()
@@ -1355,15 +1372,18 @@ function GuiLogic.new(ctx)
 					end
 				end)
 				fillTween:Play()
-			else
-				fillClip.Size=targetSize
-			end
+			end)
 		end
 
 		local function setState(value,fire,animate)
 			local nextState=value and true or false
 			local changed=nextState~=state
-			if not changed and fillTween and animate~=false then
+			if not changed then
+				if (fillTween or fillTweenPending) and animate~=false then
+					return
+				end
+
+				applyVisuals(false)
 				return
 			end
 
@@ -1373,11 +1393,11 @@ function GuiLogic.new(ctx)
 				stateValue:set(state)
 			end
 
+			applyVisuals((animate~=false) and changed,previousState)
+
 			if fire and changed and onChange then
 				onChange(state)
 			end
-
-			applyVisuals((animate~=false) and changed,previousState)
 		end
 
 		connect(row.Activated,function()
