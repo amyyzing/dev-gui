@@ -1236,14 +1236,15 @@ function GuiLogic.new(ctx)
 	end
 
 	function api.buildToggleLabel(parent,labelText,startState,onChange)
-		local height=componentNumber("ToggleLabelHeight",24)
+		local height=componentNumber("ToggleLabelHeight",28)
 		local padX=componentNumber("ToggleLabelPaddingX",12)
 		local state=startState and true or false
 		local destroyed=false
 		local stateValue=makeFusionValue(state)
 		local connections={}
 		local fillTween=nil
-		local labelTweenInfo=TweenInfo.new(componentNumber("ToggleLabelTweenTime",0.34),Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+		local labelTweenInInfo=TweenInfo.new(componentNumber("ToggleLabelTweenInTime",0.56),Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+		local labelTweenOutInfo=TweenInfo.new(componentNumber("ToggleLabelTweenOutTime",0.34),Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 
 		local row=New("TextButton",{
 			BackgroundTransparency=1,
@@ -1263,7 +1264,7 @@ function GuiLogic.new(ctx)
 			Size=UDim2.new(1,-(padX*2),1,0),
 			Text=labelText,
 			Font=componentFont("ControlFont",Enum.Font.GothamMedium),
-			TextSize=componentNumber("ToggleLabelTextSize",12),
+			TextSize=componentNumber("ToggleLabelTextSize",14),
 			TextColor3=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235)),
 			TextStrokeTransparency=1,
 			TextXAlignment=Enum.TextXAlignment.Left,
@@ -1288,7 +1289,7 @@ function GuiLogic.new(ctx)
 			Size=UDim2.new(0,1,1,0),
 			Text=labelText,
 			Font=componentFont("ControlFont",Enum.Font.GothamMedium),
-			TextSize=componentNumber("ToggleLabelTextSize",12),
+			TextSize=componentNumber("ToggleLabelTextSize",14),
 			TextColor3=themeColor("STROKE",THEME.STROKE or THEME.ACC or Color3.fromRGB(182,180,180)),
 			TextStrokeTransparency=1,
 			TextXAlignment=Enum.TextXAlignment.Left,
@@ -1340,7 +1341,7 @@ function GuiLogic.new(ctx)
 			cancelFillTween()
 
 			if animate then
-				fillTween=TweenService:Create(fillClip,labelTweenInfo,{Size=targetSize})
+				fillTween=TweenService:Create(fillClip,state and labelTweenInInfo or labelTweenOutInfo,{Size=targetSize})
 				local thisTween=fillTween
 				fillTween.Completed:Connect(function()
 					if fillTween==thisTween then
