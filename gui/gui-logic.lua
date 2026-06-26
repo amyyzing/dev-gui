@@ -1327,11 +1327,12 @@ function GuiLogic.new(ctx)
 			end
 		end
 
-		local function applyVisuals(animate)
+		local function applyVisuals(animate,previousState)
 			local accent=themeColor("STROKE",THEME.STROKE or THEME.ACC or Color3.fromRGB(182,180,180))
 			local text=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235))
 			local width=usableWidth()
 			local targetSize=UDim2.fromOffset(state and width or 0,height)
+			local startSize=previousState~=nil and UDim2.fromOffset(previousState and width or 0,height) or nil
 
 			label.TextColor3=text
 			label.TextStrokeTransparency=1
@@ -1341,6 +1342,10 @@ function GuiLogic.new(ctx)
 			cancelFillTween()
 
 			if animate then
+				if startSize then
+					fillClip.Size=startSize
+				end
+
 				fillTween=TweenService:Create(fillClip,state and labelTweenInInfo or labelTweenOutInfo,{Size=targetSize})
 				local thisTween=fillTween
 				fillTween.Completed:Connect(function()
@@ -1362,11 +1367,12 @@ function GuiLogic.new(ctx)
 				return
 			end
 
+			local previousState=state
 			state=nextState
 			if stateValue then
 				stateValue:set(state)
 			end
-			applyVisuals((animate~=false) and changed)
+			applyVisuals((animate~=false) and changed,previousState)
 
 			if fire and changed and onChange then
 				onChange(state)
