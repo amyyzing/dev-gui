@@ -1243,6 +1243,7 @@ function GuiLogic.new(ctx)
 		local stateValue=makeFusionValue(state)
 		local connections={}
 		local fillTween=nil
+		local labelTweenInfo=TweenInfo.new(componentNumber("ToggleLabelTweenTime",0.34),Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 
 		local row=New("TextButton",{
 			BackgroundTransparency=1,
@@ -1339,7 +1340,7 @@ function GuiLogic.new(ctx)
 			cancelFillTween()
 
 			if animate then
-				fillTween=TweenService:Create(fillClip,TOGGLE_SNAP_TWEEN,{Size=targetSize})
+				fillTween=TweenService:Create(fillClip,labelTweenInfo,{Size=targetSize})
 				local thisTween=fillTween
 				fillTween.Completed:Connect(function()
 					if fillTween==thisTween then
@@ -1356,6 +1357,10 @@ function GuiLogic.new(ctx)
 		local function setState(value,fire,animate)
 			local nextState=value and true or false
 			local changed=nextState~=state
+			if not changed and fillTween and animate~=false then
+				return
+			end
+
 			state=nextState
 			if stateValue then
 				stateValue:set(state)
