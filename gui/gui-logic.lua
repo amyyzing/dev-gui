@@ -1242,8 +1242,7 @@ function GuiLogic.new(ctx)
 		local destroyed=false
 		local stateValue=makeFusionValue(state)
 		local connections={}
-		local fillTween=nil
-		local visualProgress=state and 1 or 0
+		local textTween=nil
 
 		local tweenInfo=TweenInfo.new(
 			componentNumber("ToggleLabelTweenTime",0.56),
@@ -1266,7 +1265,7 @@ function GuiLogic.new(ctx)
 			SkipThemeRole=true,
 		},parent)
 
-		local baseLabel=New("TextLabel",{
+		local label=New("TextLabel",{
 			BackgroundTransparency=1,
 			Position=UDim2.fromOffset(padX,0),
 			Size=UDim2.new(1,-(padX*2),1,0),
@@ -1282,138 +1281,70 @@ function GuiLogic.new(ctx)
 			SkipTextRole=true,
 		},row)
 
-		local overlayClip=New("Frame",{
-			Position=UDim2.fromOffset(padX,0),
-			Size=UDim2.fromOffset(0,height),
-			BackgroundTransparency=1,
-			BorderSizePixel=0,
-			ClipsDescendants=true,
-			ZIndex=7,
-			SkipThemeRole=true,
-		},row)
-
-		local overlayShadow=New("TextLabel",{
-			BackgroundTransparency=1,
-			Position=UDim2.fromOffset(1,1),
-			Size=UDim2.fromOffset(1,height),
-			Text=labelText,
-			Font=textFont,
-			TextSize=textSize,
-			TextColor3=Color3.fromRGB(0,0,0),
-			TextTransparency=0.58,
-			TextStrokeTransparency=1,
-			TextXAlignment=Enum.TextXAlignment.Left,
-			TextTruncate=Enum.TextTruncate.AtEnd,
-			ZIndex=8,
-			SkipTextRole=true,
-		},overlayClip)
-
-		local overlayLabel=New("TextLabel",{
-			BackgroundTransparency=1,
-			Position=UDim2.fromOffset(0,0),
-			Size=UDim2.fromOffset(1,height),
-			Text=labelText,
-			Font=textFont,
-			TextSize=textSize,
-			TextColor3=themeColor("SLIDER_FILL",THEME.ACC or THEME.STROKE or Color3.fromRGB(90,190,255)),
-			TextTransparency=0,
-			TextStrokeTransparency=1,
-			TextXAlignment=Enum.TextXAlignment.Left,
-			TextTruncate=Enum.TextTruncate.AtEnd,
-			ZIndex=9,
-			SkipTextRole=true,
-		},overlayClip)
-
 		local function connect(signal,fn)
 			local conn=signal:Connect(fn)
 			table.insert(connections,conn)
 			return conn
 		end
 
-		local function usableWidth()
-			return math.max(row.AbsoluteSize.X-(padX*2),1)
+		local function offColor()
+			return themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235))
 		end
 
-		local function clipSizeForProgress(progress)
-			progress=math.clamp(progress,0,1)
-			return UDim2.new(progress,-(padX*2)*progress,0,height)
-		end
+		local function onColor()
+			local active=themeColor("STROKE",THEME.STROKE or themeColor("SLIDER_FILL",THEME.ACC or Color3.fromRGB(90,190,255)))
+			local inactive=offColor()
 
-		local function accentColor()
-			local accent=themeColor("SLIDER_FILL",THEME.ACC or THEME.STROKE or Color3.fromRGB(90,190,255))
-
-			if luminance(accent)<0.48 then
-				accent=accent:Lerp(Color3.new(1,1,1),0.24)
+			if math.abs(luminance(active)-luminance(inactive))<0.18 then
+				local target=luminance(inactive)<0.50 and Color3.new(1,1,1) or Color3.new(0,0,0)
+				active=active:Lerp(target,0.32)
 			end
 
-			return accent
-		end
-
-		local function updateOverlayFromProgress(progress)
-			visualProgress=math.clamp(progress,0,1)
-
-			local width=usableWidth()
-
-			overlayShadow.Size=UDim2.fromOffset(width,height)
-			overlayLabel.Size=UDim2.fromOffset(width,height)
-			overlayClip.Size=clipSizeForProgress(visualProgress)
-
-			baseLabel.TextColor3=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235))
-			baseLabel.TextStrokeTransparency=1
-			baseLabel.TextTransparency=visualProgress>0.98 and 0.18 or 0.08
-
-			overlayLabel.TextColor3=accentColor()
-			overlayLabel.TextStrokeTransparency=1
-			overlayLabel.TextTransparency=0
-
-			overlayShadow.TextStrokeTransparency=1
-			overlayShadow.TextTransparency=0.58
-		end
-
-		local function currentProgress()
-			if row.AbsoluteSize.X<=padX*2 then
-				return visualProgress
-			end
-
-			return math.clamp(overlayClip.AbsoluteSize.X/usableWidth(),0,1)
+			return active
 		end
 
 		local function cancelTween()
-			if fillTween then
-				visualProgress=currentProgress()
-
+			if textTween then
 				pcall(function()
-					fillTween:Cancel()
+					textTween:Cancel()
 				end)
-				fillTween=nil
+				textTween=nil
 			end
 		end
 
-		local function tweenOverlayTo(progress)
+		local function targetProps()
+			return{
+				TextColor3=state and onColor() or offColor(),
+				TextTransparency=state and 0 or 0.08,
+				TextStrokeTransparency=1,
+			}
+		end
+
+		local function applyVisuals(animate)
 			cancelTween()
+			local props=targetProps()
 
-			local width=usableWidth()
-			local targetProgress=math.clamp(progress,0,1)
-			local targetSize=clipSizeForProgress(targetProgress)
+			if not animate then
+				for key,value in pairs(props) do
+					label[key]=value
+				end
+				return
+			end
 
-			overlayShadow.Size=UDim2.fromOffset(width,height)
-			overlayLabel.Size=UDim2.fromOffset(width,height)
-			overlayClip.Size=clipSizeForProgress(currentProgress())
+			textTween=TweenService:Create(label,tweenInfo,props)
 
-			fillTween=TweenService:Create(overlayClip,tweenInfo,{
-				Size=targetSize
-			})
+			local thisTween=textTween
 
-			local thisTween=fillTween
-
-			fillTween.Completed:Connect(function()
-				if fillTween==thisTween then
-					fillTween=nil
-					updateOverlayFromProgress(targetProgress)
+			textTween.Completed:Connect(function()
+				if textTween==thisTween then
+					textTween=nil
+					for key,value in pairs(props) do
+						label[key]=value
+					end
 				end
 			end)
 
-			fillTween:Play()
+			textTween:Play()
 		end
 
 		local function setState(value,fire,animate)
@@ -1431,24 +1362,15 @@ function GuiLogic.new(ctx)
 			end
 
 			if animate~=false then
-				tweenOverlayTo(state and 1 or 0)
+				applyVisuals(true)
 			else
-				cancelTween()
-				updateOverlayFromProgress(state and 1 or 0)
+				applyVisuals(false)
 			end
 
 			if fire and onChange then
 				onChange(state)
 			end
 		end
-
-		connect(row:GetPropertyChangedSignal("AbsoluteSize"),function()
-			if fillTween then
-				return
-			end
-
-			updateOverlayFromProgress(visualProgress)
-		end)
 
 		connect(row.Activated,function()
 			setState(not state,true,true)
@@ -1474,7 +1396,7 @@ function GuiLogic.new(ctx)
 			end
 		end
 
-		updateOverlayFromProgress(visualProgress)
+		applyVisuals(false)
 
 		return{
 			set=function(v,animate)
@@ -1491,10 +1413,10 @@ function GuiLogic.new(ctx)
 			destroy=destroyToggleLabel,
 			stateValue=stateValue,
 			wrap=row,
-			label=baseLabel,
-			activeLabel=overlayLabel,
-			activeShadow=overlayShadow,
-			fill=overlayClip,
+			label=label,
+			activeLabel=label,
+			activeShadow=nil,
+			fill=nil,
 		}
 	end
 
