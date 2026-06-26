@@ -1239,11 +1239,10 @@ function GuiLogic.new(ctx)
 		local height=componentNumber("ToggleLabelHeight",24)
 		local padX=componentNumber("ToggleLabelPaddingX",12)
 		local state=startState and true or false
-		local hovered=false
 		local destroyed=false
 		local stateValue=makeFusionValue(state)
-		local activeTweens={}
 		local connections={}
+		local fillTween=nil
 
 		local row=New("TextButton",{
 			BackgroundTransparency=1,
@@ -1264,7 +1263,8 @@ function GuiLogic.new(ctx)
 			Text=labelText,
 			Font=componentFont("ControlFont",Enum.Font.GothamMedium),
 			TextSize=componentNumber("ToggleLabelTextSize",12),
-			TextColor3=THEME.TEXT,
+			TextColor3=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235)),
+			TextStrokeTransparency=1,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			TextTruncate=Enum.TextTruncate.AtEnd,
 			ZIndex=6,
@@ -1272,9 +1272,8 @@ function GuiLogic.new(ctx)
 		},row)
 
 		local fillClip=New("Frame",{
-			AnchorPoint=Vector2.new(0,0.5),
-			Position=UDim2.new(0,padX,0.5,0),
-			Size=UDim2.new(0,0,1,0),
+			Position=UDim2.fromOffset(padX,0),
+			Size=UDim2.fromOffset(0,height),
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
 			ClipsDescendants=true,
@@ -1289,7 +1288,8 @@ function GuiLogic.new(ctx)
 			Text=labelText,
 			Font=componentFont("ControlFont",Enum.Font.GothamMedium),
 			TextSize=componentNumber("ToggleLabelTextSize",12),
-			TextColor3=themeColor("STROKE",THEME.STROKE or THEME.ACC or Color3.fromRGB(182,180,180)),
+			TextColor3=themeColor("SLIDER_FILL",THEME.ACC or THEME.STROKE or Color3.fromRGB(80,180,255)),
+			TextStrokeTransparency=1,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			TextTruncate=Enum.TextTruncate.AtEnd,
 			ZIndex=8,
@@ -1302,54 +1302,55 @@ function GuiLogic.new(ctx)
 			return conn
 		end
 
+		local function usableWidth()
+			return math.max(row.AbsoluteSize.X-(padX*2),1)
+		end
+
 		local function resizeActiveLabel()
-			activeLabel.Size=UDim2.new(0,math.max(row.AbsoluteSize.X-(padX*2),1),1,0)
+			local width=usableWidth()
+			activeLabel.Size=UDim2.fromOffset(width,height)
+
+			if not fillTween then
+				fillClip.Size=UDim2.fromOffset(state and width or 0,height)
+			end
 		end
 
 		connect(row:GetPropertyChangedSignal("AbsoluteSize"),resizeActiveLabel)
 		resizeActiveLabel()
 
-		local function cancelTweens()
-			for _,tw in ipairs(activeTweens) do
-				pcall(function()
-					tw:Cancel()
-				end)
+		local function cancelFillTween()
+			if fillTween then
+				fillTween:Cancel()
+				fillTween=nil
 			end
-			table.clear(activeTweens)
-		end
-
-		local function tween(object,info,goal)
-			local tw=TweenService:Create(object,info,goal)
-			table.insert(activeTweens,tw)
-			tw:Play()
-			return tw
 		end
 
 		local function applyVisuals(animate)
-			cancelTweens()
-
-			local accent=themeColor("STROKE",THEME.STROKE or THEME.ACC or Color3.fromRGB(182,180,180))
+			local accent=themeColor("SLIDER_FILL",THEME.ACC or THEME.STROKE or Color3.fromRGB(80,180,255))
 			local text=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235))
-			local fillSize=state and UDim2.new(1,-(padX*2),1,0) or UDim2.new(0,0,1,0)
-			local labelColor=text
-			local labelStrokeTransparency=hovered and 0.74 or 1
-			local activeStrokeTransparency=state and (hovered and 0.2 or 0.46) or 1
+			local width=usableWidth()
+			local targetSize=UDim2.fromOffset(state and width or 0,height)
 
-			label.TextStrokeColor3=accent
-			activeLabel.TextStrokeColor3=accent
+			label.TextColor3=text
+			label.TextStrokeTransparency=1
+			activeLabel.TextColor3=accent
+			activeLabel.TextStrokeTransparency=1
+			activeLabel.Size=UDim2.fromOffset(width,height)
+			cancelFillTween()
 
-			if not animate then
-				fillClip.Size=fillSize
-				label.TextColor3=labelColor
-				label.TextStrokeTransparency=labelStrokeTransparency
-				activeLabel.TextColor3=accent
-				activeLabel.TextStrokeTransparency=activeStrokeTransparency
-				return
+			if animate then
+				fillTween=TweenService:Create(fillClip,TOGGLE_SNAP_TWEEN,{Size=targetSize})
+				local thisTween=fillTween
+				fillTween.Completed:Connect(function()
+					if fillTween==thisTween then
+						fillTween=nil
+						fillClip.Size=targetSize
+					end
+				end)
+				fillTween:Play()
+			else
+				fillClip.Size=targetSize
 			end
-
-			tween(fillClip,TOGGLE_SNAP_TWEEN,{Size=fillSize})
-			tween(label,TOGGLE_SOFT_TWEEN,{TextColor3=labelColor,TextStrokeTransparency=labelStrokeTransparency})
-			tween(activeLabel,TOGGLE_SOFT_TWEEN,{TextColor3=accent,TextStrokeTransparency=activeStrokeTransparency})
 		end
 
 		local function setState(value,fire,animate)
@@ -1366,23 +1367,14 @@ function GuiLogic.new(ctx)
 			end
 		end
 
-		connect(row.MouseEnter,function()
-			hovered=true
-			applyVisuals(true)
-		end)
-
-		connect(row.MouseLeave,function()
-			hovered=false
-			applyVisuals(true)
-		end)
-
 		connect(row.Activated,function()
 			setState(not state,true,true)
 		end)
 
 		local function destroyToggleLabel()
+			if destroyed then return end
 			destroyed=true
-			cancelTweens()
+			cancelFillTween()
 			destroyFusionValue(stateValue)
 			for _,conn in ipairs(connections) do
 				pcall(function()
