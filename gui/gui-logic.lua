@@ -1244,7 +1244,7 @@ function GuiLogic.new(ctx)
 		local connections={}
 		local fillTween=nil
 		local labelTweenInInfo=TweenInfo.new(componentNumber("ToggleLabelTweenInTime",0.56),Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
-		local labelTweenOutInfo=TweenInfo.new(componentNumber("ToggleLabelTweenOutTime",0.34),Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+		local labelTweenOutInfo=TweenInfo.new(componentNumber("ToggleLabelTweenOutTime",0.56),Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 
 		local row=New("TextButton",{
 			BackgroundTransparency=1,
