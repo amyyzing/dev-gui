@@ -683,6 +683,12 @@ function DataSave.new(ctx)
 				speedEnabled=getValue(ctx,"speedParamsEnabled",false),
 				gravityJumpEnabled=getValue(ctx,"gravityJumpParamsEnabled",false),
 				staminaEnabled=getValue(ctx,"staminaParamsEnabled",false),
+				speedSettingEnabled=getValue(ctx,"speedSettingEnabled",false),
+				diveSettingEnabled=getValue(ctx,"diveSettingEnabled",false),
+				gravitySettingEnabled=getValue(ctx,"gravitySettingEnabled",false),
+				jumpPowerSettingEnabled=getValue(ctx,"jumpPowerSettingEnabled",false),
+				staminaRegenSettingEnabled=getValue(ctx,"staminaRegenSettingEnabled",false),
+				staminaDepleteSettingEnabled=getValue(ctx,"staminaDepleteSettingEnabled",false),
 				staminaRegen=getValue(ctx,"staminaRegenValue",10),
 				staminaDeplete=getValue(ctx,"staminaDepleteValue",10),
 				jumpPower=getValue(ctx,"jumpPowerValue",53.5),
@@ -802,6 +808,20 @@ function DataSave.new(ctx)
 		applyBoolean(ctx,"setSpeedParamsState","speedParamsEnabled",speedParamsEnabled)
 		applyBoolean(ctx,"setGravityJumpParamsState","gravityJumpParamsEnabled",gravityJumpParamsEnabled)
 		applyBoolean(ctx,"setStaminaParamsState","staminaParamsEnabled",staminaParamsEnabled)
+		local diveSettingEnabled=gameParams.diveEnabled
+		if diveSettingEnabled==nil then diveSettingEnabled=gameParams.diveSettingEnabled end
+		local jumpPowerSettingEnabled=gameParams.jumpPowerEnabled
+		if jumpPowerSettingEnabled==nil then jumpPowerSettingEnabled=gameParams.jumpPowerSettingEnabled end
+		local staminaRegenSettingEnabled=gameParams.staminaRegenEnabled
+		if staminaRegenSettingEnabled==nil then staminaRegenSettingEnabled=gameParams.staminaRegenSettingEnabled end
+		local staminaDepleteSettingEnabled=gameParams.staminaDepleteEnabled
+		if staminaDepleteSettingEnabled==nil then staminaDepleteSettingEnabled=gameParams.staminaDepleteSettingEnabled end
+		applyBoolean(ctx,"setSpeedSettingState","speedSettingEnabled",gameParams.speedSettingEnabled)
+		applyBoolean(ctx,"setDiveSettingState","diveSettingEnabled",diveSettingEnabled)
+		applyBoolean(ctx,"setGravitySettingState","gravitySettingEnabled",gameParams.gravitySettingEnabled)
+		applyBoolean(ctx,"setJumpPowerSettingState","jumpPowerSettingEnabled",jumpPowerSettingEnabled)
+		applyBoolean(ctx,"setStaminaRegenSettingState","staminaRegenSettingEnabled",staminaRegenSettingEnabled)
+		applyBoolean(ctx,"setStaminaDepleteSettingState","staminaDepleteSettingEnabled",staminaDepleteSettingEnabled)
 		if legacyGameParamsEnabled~=nil or speedParamsEnabled~=nil or gravityJumpParamsEnabled~=nil or staminaParamsEnabled~=nil then
 			applyBoolean(ctx,"setGameParamsState","gameParamsEnabled",true)
 		end

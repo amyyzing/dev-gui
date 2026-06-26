@@ -29,6 +29,19 @@ local PAGE_ENABLED_KEY={
 	gravity="gravityJumpParamsEnabled",
 	stamina="staminaParamsEnabled",
 }
+local PARAM_ENABLED_KEY={
+	gravityValue="gravitySettingEnabled",
+	speedValue="speedSettingEnabled",
+	jumpPowerValue="jumpPowerSettingEnabled",
+	divePowerValue="diveSettingEnabled",
+	staminaRegenValue="staminaRegenSettingEnabled",
+	staminaDepleteValue="staminaDepleteSettingEnabled",
+}
+local PAGE_SETTING_KEYS={
+	speed={"speedSettingEnabled","diveSettingEnabled"},
+	gravity={"gravitySettingEnabled","jumpPowerSettingEnabled"},
+	stamina={"staminaRegenSettingEnabled","staminaDepleteSettingEnabled"},
+}
 local function clampStaminaDeplete(value)
 	local n=tonumber(value)
 	if not n then return 10 end
@@ -122,22 +135,41 @@ function GameParams.new(ctx)
 		return math.clamp(n,min,max)
 	end
 
+	local function isSettingEnabled(settingKey)
+		return state[settingKey]==true
+	end
+
 	local function isPageEnabled(pageKey)
 		pageKey=normalizePageKey(pageKey)
+		local keys=PAGE_SETTING_KEYS[pageKey]
+		if keys then
+			for _,key in ipairs(keys) do
+				if isSettingEnabled(key) then
+					return true
+				end
+			end
+			return false
+		end
+
 		return state[PAGE_ENABLED_KEY[pageKey]]~=false
 	end
 
 	local function isStateKeyActive(stateKey)
+		local enabledKey=PARAM_ENABLED_KEY[stateKey]
+		if enabledKey then
+			return isSettingEnabled(enabledKey)
+		end
+
 		local pageKey=PARAM_STATE_PAGE[stateKey]
 		return not pageKey or isPageEnabled(pageKey)
 	end
 
 	local function isSpeedActive()
-		return isPageEnabled("speed")
+		return isSettingEnabled("speedSettingEnabled")
 	end
 
 	local function isGravityActive()
-		return isPageEnabled("gravity")
+		return isSettingEnabled("gravitySettingEnabled")
 	end
 
 	local function normalizeState()
@@ -146,8 +178,14 @@ function GameParams.new(ctx)
 		state.speedParamsEnabled=boolDefault(state.speedParamsEnabled,false)
 		state.gravityJumpParamsEnabled=boolDefault(state.gravityJumpParamsEnabled,false)
 		state.staminaParamsEnabled=boolDefault(state.staminaParamsEnabled,false)
-		state.speedEnabled=state.speedParamsEnabled
-		state.gravityEnabled=state.gravityJumpParamsEnabled
+		state.speedSettingEnabled=boolDefault(state.speedSettingEnabled,state.speedParamsEnabled)
+		state.diveSettingEnabled=boolDefault(state.diveSettingEnabled,state.speedParamsEnabled)
+		state.gravitySettingEnabled=boolDefault(state.gravitySettingEnabled,state.gravityJumpParamsEnabled)
+		state.jumpPowerSettingEnabled=boolDefault(state.jumpPowerSettingEnabled,state.gravityJumpParamsEnabled)
+		state.staminaRegenSettingEnabled=boolDefault(state.staminaRegenSettingEnabled,state.staminaParamsEnabled)
+		state.staminaDepleteSettingEnabled=boolDefault(state.staminaDepleteSettingEnabled,state.staminaParamsEnabled)
+		state.speedEnabled=state.speedSettingEnabled
+		state.gravityEnabled=state.gravitySettingEnabled
 		state.gravityValue=clampNumber(state.gravityValue,0,1000,DEFAULT_GRAVITY)
 		state.speedValue=clampSpeed(state.speedValue)
 		state.staminaRegenValue=clampNumber(state.staminaRegenValue,0,50,10)
@@ -440,6 +478,10 @@ function GameParams.new(ctx)
 		return isPageEnabled(pageKey)
 	end
 
+	function api.IsParamSettingEnabled(settingKey)
+		return isSettingEnabled(settingKey)
+	end
+
 	function api.SetOnStateChanged(callback)
 		stateListener=type(callback)=="function" and callback or nil
 		if stateListener then
@@ -447,8 +489,9 @@ function GameParams.new(ctx)
 		end
 	end
 	function api.SetGravityState(value,fire)
-		state.gravityJumpParamsEnabled=value and true or false
-		state.gravityEnabled=state.gravityJumpParamsEnabled
+		state.gravitySettingEnabled=value and true or false
+		state.gravityEnabled=state.gravitySettingEnabled
+		state.gravityJumpParamsEnabled=isPageEnabled("gravity")
 		if isGravityActive() then
 			applyGravity(state.gravityValue)
 		end
@@ -475,8 +518,9 @@ function GameParams.new(ctx)
 	end
 
 	function api.SetSpeedState(value,fire,resetValue)
-		state.speedParamsEnabled=value and true or false
-		state.speedEnabled=state.speedParamsEnabled
+		state.speedSettingEnabled=value and true or false
+		state.speedEnabled=state.speedSettingEnabled
+		state.speedParamsEnabled=isPageEnabled("speed")
 		state.speedValue=clampSpeed(state.speedValue)
 
 		if isSpeedActive() then
@@ -517,21 +561,20 @@ function GameParams.new(ctx)
 	end
 
 	function api.ActivateParamsPage(pageKey,fire)
-		pageKey=normalizePageKey(pageKey)
-
-		if normalizePageKey(state.paramsSelectedPage)==pageKey then
-			api.SetParamsPageEnabled(pageKey,not isPageEnabled(pageKey),fire)
-		else
-			api.SetParamsSelectedPage(pageKey,fire)
-		end
+		api.SetParamsSelectedPage(pageKey,fire)
 	end
 
 	function api.SetParamsPageEnabled(pageKey,value,fire)
 		pageKey=normalizePageKey(pageKey)
-		state[PAGE_ENABLED_KEY[pageKey]]=value and true or false
+		local enabled=value and true or false
+		state[PAGE_ENABLED_KEY[pageKey]]=enabled
+
+		for _,settingKey in ipairs(PAGE_SETTING_KEYS[pageKey] or {}) do
+			state[settingKey]=enabled
+		end
 
 		if pageKey=="speed" then
-			state.speedEnabled=state.speedParamsEnabled
+			state.speedEnabled=state.speedSettingEnabled
 			if isSpeedActive() then
 				ensureSpeedForcing()
 			end
@@ -540,7 +583,7 @@ function GameParams.new(ctx)
 				stopSpeedForcing(false)
 			end
 		elseif pageKey=="gravity" then
-			state.gravityEnabled=state.gravityJumpParamsEnabled
+			state.gravityEnabled=state.gravitySettingEnabled
 			if isGravityActive() then
 				applyGravity(state.gravityValue)
 				applyGameParams()
@@ -552,6 +595,52 @@ function GameParams.new(ctx)
 		end
 
 		syncControls("page-toggle")
+
+		if fire~=false then
+			changed()
+		end
+	end
+
+	function api.SetParamSettingEnabled(settingKey,value,fire)
+		settingKey=tostring(settingKey or "")
+		local allowed=false
+		for _,keys in pairs(PAGE_SETTING_KEYS) do
+			for _,key in ipairs(keys) do
+				if key==settingKey then
+					allowed=true
+					break
+				end
+			end
+			if allowed then break end
+		end
+		if not allowed then return end
+
+		state[settingKey]=value and true or false
+		state.speedParamsEnabled=isPageEnabled("speed")
+		state.gravityJumpParamsEnabled=isPageEnabled("gravity")
+		state.staminaParamsEnabled=isPageEnabled("stamina")
+		state.speedEnabled=state.speedSettingEnabled
+		state.gravityEnabled=state.gravitySettingEnabled
+
+		if settingKey=="speedSettingEnabled" then
+			if isSpeedActive() then
+				ensureSpeedForcing()
+			else
+				stopSpeedForcing(false)
+			end
+			applyGameParams()
+		elseif settingKey=="gravitySettingEnabled" then
+			if isGravityActive() then
+				applyGravity(state.gravityValue)
+			else
+				workspace.Gravity=DEFAULT_GRAVITY
+			end
+			applyGameParams()
+		else
+			applyGameParams()
+		end
+
+		syncControls("setting-toggle")
 
 		if fire~=false then
 			changed()
@@ -644,6 +733,12 @@ function GameParams.new(ctx)
 		state.speedParamsEnabled=false
 		state.gravityJumpParamsEnabled=false
 		state.staminaParamsEnabled=false
+		state.speedSettingEnabled=false
+		state.diveSettingEnabled=false
+		state.gravitySettingEnabled=false
+		state.jumpPowerSettingEnabled=false
+		state.staminaRegenSettingEnabled=false
+		state.staminaDepleteSettingEnabled=false
 		state.gravityEnabled=false
 		state.gravityValue=DEFAULT_GRAVITY
 		state.speedEnabled=false

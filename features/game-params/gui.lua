@@ -15,7 +15,7 @@ local DIAL_GLOW_LAYERS={
 	{pad=2,z=5},
 	{pad=4,z=4},
 }
-local PARAMS_PAGE_H=112
+local PARAMS_PAGE_H=176
 local PAGE_TWEEN=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 local PAINT_TWEEN=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 local PAGE_ORDER={"speed","gravity","stamina"}
@@ -30,6 +30,11 @@ local PAGE_ENABLED_KEY={
 	speed="speedParamsEnabled",
 	gravity="gravityJumpParamsEnabled",
 	stamina="staminaParamsEnabled",
+}
+local PAGE_SETTING_KEYS={
+	speed={"speedSettingEnabled","diveSettingEnabled"},
+	gravity={"gravitySettingEnabled","jumpPowerSettingEnabled"},
+	stamina={"staminaRegenSettingEnabled","staminaDepleteSettingEnabled"},
 }
 local DIAL_ASSET_VERSION="v12"
 local DIAL_SLICE_DATA={
@@ -186,6 +191,7 @@ function GameParamsGui.new(ctx,parent)
 	local safeDisconnect=ctx.safeDisconnect
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
+	local buildToggleRow=ctx.buildToggleRow
 	local state=runtime.GetState and runtime.GetState() or ctx.State
 	local api={}
 	local gravitySlider=nil
@@ -194,6 +200,7 @@ function GameParamsGui.new(ctx,parent)
 	local staminaDepleteSlider=nil
 	local jumpSlider=nil
 	local diveSlider=nil
+	local settingToggles={}
 	local dialWrap=nil
 	local pageClip=nil
 	local pageFrames={}
@@ -237,6 +244,17 @@ function GameParamsGui.new(ctx,parent)
 
 	local function isPageEnabled(pageKey)
 		pageKey=normalizePageKey(pageKey)
+		local settingKeys=PAGE_SETTING_KEYS[pageKey]
+		if settingKeys then
+			for _,settingKey in ipairs(settingKeys) do
+				if state[settingKey]==true then
+					return true
+				end
+			end
+
+			return false
+		end
+
 		return state[PAGE_ENABLED_KEY[pageKey]]~=false
 	end
 
@@ -270,6 +288,11 @@ function GameParamsGui.new(ctx,parent)
 		if staminaDepleteSlider then staminaDepleteSlider.set(state.staminaDepleteValue) end
 		if jumpSlider then jumpSlider.set(state.jumpPowerValue) end
 		if diveSlider then diveSlider.set(state.divePowerValue) end
+		for settingKey,toggle in pairs(settingToggles) do
+			if toggle and toggle.set then
+				toggle.set(state[settingKey]==true)
+			end
+		end
 		if paintDial then paintDial(reason=="page" or reason=="page-toggle" or reason=="hover") end
 		if showPage then showPage(state.paramsSelectedPage,reason=="page" or reason=="page-toggle") end
 	end
@@ -307,6 +330,10 @@ function GameParamsGui.new(ctx,parent)
 
 	function api.SetParamsPageEnabled(...)
 		return delegate("SetParamsPageEnabled",...)
+	end
+
+	function api.SetParamSettingEnabled(...)
+		return delegate("SetParamSettingEnabled",...)
 	end
 
 	function api.SetGameParamsState(...)
@@ -746,27 +773,37 @@ function GameParamsGui.new(ctx,parent)
 			pageFrames[pageKey]=page
 		end
 
-		speedSlider=buildSlider(pageFrames.speed,"Speed",0,100,state.speedValue,0,function(v)
+		local function buildSettingSlider(page,settingKey,label,min,max,start,decimals,onChange)
+			if buildToggleRow then
+				settingToggles[settingKey]=buildToggleRow(page,label,state[settingKey]==true,function(value)
+					api.SetParamSettingEnabled(settingKey,value,true)
+				end)
+			end
+
+			return buildSlider(page,buildToggleRow and "" or label,min,max,start,decimals,onChange)
+		end
+
+		speedSlider=buildSettingSlider(pageFrames.speed,"speedSettingEnabled","Speed",0,100,state.speedValue,0,function(v)
 			api.SetSpeedValue(v,true)
 		end)
 
-		diveSlider=buildSlider(pageFrames.speed,"Dive",0,15,state.divePowerValue,2,function(v)
+		diveSlider=buildSettingSlider(pageFrames.speed,"diveSettingEnabled","Dive",0,15,state.divePowerValue,2,function(v)
 			api.SetDivePowerValue(v,true)
 		end)
 
-		gravitySlider=buildSlider(pageFrames.gravity,"Gravity",0,1000,state.gravityValue,1,function(v)
+		gravitySlider=buildSettingSlider(pageFrames.gravity,"gravitySettingEnabled","Gravity",0,1000,state.gravityValue,1,function(v)
 			api.SetGravityValue(v,true)
 		end)
 
-		jumpSlider=buildSlider(pageFrames.gravity,"Jump Power",0,300,state.jumpPowerValue,1,function(v)
+		jumpSlider=buildSettingSlider(pageFrames.gravity,"jumpPowerSettingEnabled","Jump Power",0,300,state.jumpPowerValue,1,function(v)
 			api.SetJumpPowerValue(v,true)
 		end)
 
-		staminaDepleteSlider=buildSlider(pageFrames.stamina,"Stamina Depletion",0,50,state.staminaDepleteValue,0,function(v)
+		staminaDepleteSlider=buildSettingSlider(pageFrames.stamina,"staminaDepleteSettingEnabled","Stamina Depletion",0,50,state.staminaDepleteValue,0,function(v)
 			api.SetStaminaDepleteValue(v,true)
 		end)
 
-		staminaRegenSlider=buildSlider(pageFrames.stamina,"Stamina Regeneration",0,50,state.staminaRegenValue,1,function(v)
+		staminaRegenSlider=buildSettingSlider(pageFrames.stamina,"staminaRegenSettingEnabled","Stamina Regeneration",0,50,state.staminaRegenValue,1,function(v)
 			api.SetStaminaRegenValue(v,true)
 		end)
 	end
@@ -803,6 +840,10 @@ function GameParamsGui.new(ctx,parent)
 		destroyControl(staminaDepleteSlider)
 		destroyControl(jumpSlider)
 		destroyControl(diveSlider)
+		for _,toggle in pairs(settingToggles) do
+			destroyControl(toggle)
+		end
+		table.clear(settingToggles)
 		cancelPageTweens()
 		cancelPaintTweens()
 		disconnectConnections()

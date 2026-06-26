@@ -266,6 +266,7 @@ local function attachDataSaveSetters(ctx)
 	ctx.setSpeedState=function(value)
 		local stateValue=setPage1Field("speedEnabled",value,true)
 		PAGE1_STATE.speedParamsEnabled=stateValue
+		PAGE1_STATE.speedSettingEnabled=stateValue
 		syncPage1State()
 		callPage1Api("GameParams","SetSpeedState",stateValue,false)
 	end
@@ -273,6 +274,7 @@ local function attachDataSaveSetters(ctx)
 	ctx.setGravityState=function(value)
 		local stateValue=setPage1Field("gravityEnabled",value,true)
 		PAGE1_STATE.gravityJumpParamsEnabled=stateValue
+		PAGE1_STATE.gravitySettingEnabled=stateValue
 		syncPage1State()
 		callPage1Api("GameParams","SetGravityState",stateValue,false)
 	end
@@ -290,6 +292,8 @@ local function attachDataSaveSetters(ctx)
 	ctx.setSpeedParamsState=function(value)
 		local stateValue=setPage1Field("speedParamsEnabled",value,true)
 		PAGE1_STATE.speedEnabled=stateValue
+		PAGE1_STATE.speedSettingEnabled=stateValue
+		PAGE1_STATE.diveSettingEnabled=stateValue
 		syncPage1State()
 		callPage1Api("GameParams","SetParamsPageEnabled","speed",stateValue,false)
 	end
@@ -297,13 +301,56 @@ local function attachDataSaveSetters(ctx)
 	ctx.setGravityJumpParamsState=function(value)
 		local stateValue=setPage1Field("gravityJumpParamsEnabled",value,true)
 		PAGE1_STATE.gravityEnabled=stateValue
+		PAGE1_STATE.gravitySettingEnabled=stateValue
+		PAGE1_STATE.jumpPowerSettingEnabled=stateValue
 		syncPage1State()
 		callPage1Api("GameParams","SetParamsPageEnabled","gravity",stateValue,false)
 	end
 
 	ctx.setStaminaParamsState=function(value)
 		local stateValue=setPage1Field("staminaParamsEnabled",value,true)
+		PAGE1_STATE.staminaRegenSettingEnabled=stateValue
+		PAGE1_STATE.staminaDepleteSettingEnabled=stateValue
+		syncPage1State()
 		callPage1Api("GameParams","SetParamsPageEnabled","stamina",stateValue,false)
+	end
+
+	local function setParamSettingState(stateKey,value)
+		local stateValue=setPage1Field(stateKey,value,true)
+		if stateKey=="speedSettingEnabled" then
+			PAGE1_STATE.speedEnabled=stateValue
+		elseif stateKey=="gravitySettingEnabled" then
+			PAGE1_STATE.gravityEnabled=stateValue
+		end
+		PAGE1_STATE.speedParamsEnabled=PAGE1_STATE.speedSettingEnabled==true or PAGE1_STATE.diveSettingEnabled==true
+		PAGE1_STATE.gravityJumpParamsEnabled=PAGE1_STATE.gravitySettingEnabled==true or PAGE1_STATE.jumpPowerSettingEnabled==true
+		PAGE1_STATE.staminaParamsEnabled=PAGE1_STATE.staminaRegenSettingEnabled==true or PAGE1_STATE.staminaDepleteSettingEnabled==true
+		syncPage1State()
+		callPage1Api("GameParams","SetParamSettingEnabled",stateKey,stateValue,false)
+	end
+
+	ctx.setSpeedSettingState=function(value)
+		setParamSettingState("speedSettingEnabled",value)
+	end
+
+	ctx.setDiveSettingState=function(value)
+		setParamSettingState("diveSettingEnabled",value)
+	end
+
+	ctx.setGravitySettingState=function(value)
+		setParamSettingState("gravitySettingEnabled",value)
+	end
+
+	ctx.setJumpPowerSettingState=function(value)
+		setParamSettingState("jumpPowerSettingEnabled",value)
+	end
+
+	ctx.setStaminaRegenSettingState=function(value)
+		setParamSettingState("staminaRegenSettingEnabled",value)
+	end
+
+	ctx.setStaminaDepleteSettingState=function(value)
+		setParamSettingState("staminaDepleteSettingEnabled",value)
 	end
 
 	return ctx
