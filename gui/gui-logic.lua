@@ -1243,27 +1243,15 @@ function GuiLogic.new(ctx)
 		local stateValue=makeFusionValue(state)
 		local connections={}
 		local fillTween=nil
+		local changeSerial=0
 
-		local labelTweenInInfo=TweenInfo.new(
-			componentNumber("ToggleLabelTweenInTime",0.48),
-			Enum.EasingStyle.Quad,
-			Enum.EasingDirection.Out
-		)
-
-		local labelTweenOutInfo=TweenInfo.new(
-			componentNumber("ToggleLabelTweenOutTime",0.34),
-			Enum.EasingStyle.Quart,
-			Enum.EasingDirection.Out
-		)
-
+		local labelTweenInTime=componentNumber("ToggleLabelTweenInTime",0.44)
+		local labelTweenOutTime=componentNumber("ToggleLabelTweenOutTime",0.34)
+		local labelTweenInInfo=TweenInfo.new(labelTweenInTime,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+		local labelTweenOutInfo=TweenInfo.new(labelTweenOutTime,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+		local deferOnChange=componentValue("ToggleLabelDeferOnChange",true)~=false
 		local textFont=componentFont("ToggleLabelFont",Enum.Font.GothamBold)
 		local textSize=componentNumber("ToggleLabelTextSize",14)
-
-		local function connect(signal,fn)
-			local conn=signal:Connect(fn)
-			table.insert(connections,conn)
-			return conn
-		end
 
 		local row=New("TextButton",{
 			BackgroundTransparency=1,
@@ -1340,6 +1328,12 @@ function GuiLogic.new(ctx)
 		fillProgress.Value=state and 1 or 0
 		fillProgress.Parent=row
 
+		local function connect(signal,fn)
+			local conn=signal:Connect(fn)
+			table.insert(connections,conn)
+			return conn
+		end
+
 		local function usableWidth()
 			return math.max(row.AbsoluteSize.X-(padX*2),1)
 		end
@@ -1361,9 +1355,12 @@ function GuiLogic.new(ctx)
 		end
 
 		local function updateClip()
+			if destroyed or not row.Parent then
+				return
+			end
+
 			local width=usableWidth()
 			local progress=math.clamp(fillProgress.Value,0,1)
-
 			resizeOverlayText(width)
 			fillClip.Size=UDim2.fromOffset(math.floor((width*progress)+0.5),height)
 		end
@@ -1389,7 +1386,6 @@ function GuiLogic.new(ctx)
 				pcall(function()
 					fillTween:Cancel()
 				end)
-
 				fillTween=nil
 			end
 		end
@@ -1397,10 +1393,7 @@ function GuiLogic.new(ctx)
 		local function tweenProgress(targetProgress,tweenInfo)
 			cancelFillTween()
 
-			fillTween=TweenService:Create(fillProgress,tweenInfo,{
-				Value=targetProgress
-			})
-
+			fillTween=TweenService:Create(fillProgress,tweenInfo,{Value=targetProgress})
 			local thisTween=fillTween
 
 			fillTween.Completed:Connect(function()
@@ -1427,29 +1420,44 @@ function GuiLogic.new(ctx)
 				return
 			end
 
-			tweenProgress(
-				targetProgress,
-				state and labelTweenInInfo or labelTweenOutInfo
-			)
+			tweenProgress(targetProgress,state and labelTweenInInfo or labelTweenOutInfo)
 		end
 
-		connect(row:GetPropertyChangedSignal("AbsoluteSize"),function()
-			updateClip()
-		end)
+		local function fireOnChange(value,animate)
+			if not onChange then
+				return
+			end
 
-		connect(fillProgress:GetPropertyChangedSignal("Value"),function()
-			updateClip()
-		end)
+			changeSerial=changeSerial+1
+			local thisSerial=changeSerial
+
+			if not deferOnChange or not animate then
+				onChange(value)
+				return
+			end
+
+			local delayTime=value and labelTweenInTime or labelTweenOutTime
+			task.delay(delayTime,function()
+				if destroyed or thisSerial~=changeSerial or state~=value then
+					return
+				end
+
+				onChange(value)
+			end)
+		end
+
+		connect(row:GetPropertyChangedSignal("AbsoluteSize"),updateClip)
+		connect(fillProgress:GetPropertyChangedSignal("Value"),updateClip)
 
 		local function setState(value,fire,animate)
 			local nextState=value and true or false
 			local changed=nextState~=state
+			local shouldAnimate=animate~=false
 
 			if not changed then
-				if animate==false then
+				if not shouldAnimate then
 					applyVisuals(false)
 				end
-
 				return
 			end
 
@@ -1459,10 +1467,10 @@ function GuiLogic.new(ctx)
 				stateValue:set(state)
 			end
 
-			applyVisuals(animate~=false)
+			applyVisuals(shouldAnimate)
 
-			if fire and onChange then
-				onChange(state)
+			if fire then
+				fireOnChange(state,shouldAnimate)
 			end
 		end
 
@@ -1473,7 +1481,7 @@ function GuiLogic.new(ctx)
 		local function destroyToggleLabel()
 			if destroyed then return end
 			destroyed=true
-
+			changeSerial=changeSerial+1
 			cancelFillTween()
 			destroyFusionValue(stateValue)
 
@@ -1502,11 +1510,9 @@ function GuiLogic.new(ctx)
 					setState(v,false,animate~=false)
 				end
 			end,
-
 			get=function()
 				return state
 			end,
-
 			Destroy=destroyToggleLabel,
 			destroy=destroyToggleLabel,
 			stateValue=stateValue,
