@@ -1289,7 +1289,7 @@ function GuiLogic.new(ctx)
 			Text=labelText,
 			Font=componentFont("ControlFont",Enum.Font.GothamMedium),
 			TextSize=componentNumber("ToggleLabelTextSize",12),
-			TextColor3=themeColor("SLIDER_FILL",THEME.ACC or THEME.STROKE or Color3.fromRGB(80,180,255)),
+			TextColor3=themeColor("STROKE",THEME.STROKE or THEME.ACC or Color3.fromRGB(182,180,180)),
 			TextStrokeTransparency=1,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			TextTruncate=Enum.TextTruncate.AtEnd,
@@ -1327,7 +1327,7 @@ function GuiLogic.new(ctx)
 		end
 
 		local function applyVisuals(animate)
-			local accent=themeColor("SLIDER_FILL",THEME.ACC or THEME.STROKE or Color3.fromRGB(80,180,255))
+			local accent=themeColor("STROKE",THEME.STROKE or THEME.ACC or Color3.fromRGB(182,180,180))
 			local text=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235))
 			local width=usableWidth()
 			local targetSize=UDim2.fromOffset(state and width or 0,height)
