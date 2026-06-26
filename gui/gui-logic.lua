@@ -1245,8 +1245,21 @@ function GuiLogic.new(ctx)
 		local fillTween=nil
 		local fillTweenPending=false
 		local fillTweenSerial=0
-		local labelTweenInInfo=TweenInfo.new(componentNumber("ToggleLabelTweenInTime",0.56),Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
-		local labelTweenOutInfo=TweenInfo.new(componentNumber("ToggleLabelTweenOutTime",0.56),Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+
+		local labelTweenInInfo=TweenInfo.new(
+			componentNumber("ToggleLabelTweenInTime",0.38),
+			Enum.EasingStyle.Quart,
+			Enum.EasingDirection.Out
+		)
+
+		local labelTweenOutInfo=TweenInfo.new(
+			componentNumber("ToggleLabelTweenOutTime",0.34),
+			Enum.EasingStyle.Quart,
+			Enum.EasingDirection.Out
+		)
+
+		local textFont=componentFont("ToggleLabelFont",Enum.Font.GothamBold)
+		local textSize=componentNumber("ToggleLabelTextSize",14)
 
 		local row=New("TextButton",{
 			BackgroundTransparency=1,
@@ -1265,9 +1278,10 @@ function GuiLogic.new(ctx)
 			Position=UDim2.fromOffset(padX,0),
 			Size=UDim2.new(1,-(padX*2),1,0),
 			Text=labelText,
-			Font=componentFont("ControlFont",Enum.Font.GothamMedium),
-			TextSize=componentNumber("ToggleLabelTextSize",14),
+			Font=textFont,
+			TextSize=textSize,
 			TextColor3=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235)),
+			TextTransparency=0.06,
 			TextStrokeTransparency=1,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			TextTruncate=Enum.TextTruncate.AtEnd,
@@ -1285,18 +1299,35 @@ function GuiLogic.new(ctx)
 			SkipThemeRole=true,
 		},row)
 
+		local activeShadow=New("TextLabel",{
+			BackgroundTransparency=1,
+			Position=UDim2.fromOffset(1,1),
+			Size=UDim2.fromOffset(1,height),
+			Text=labelText,
+			Font=textFont,
+			TextSize=textSize,
+			TextColor3=Color3.fromRGB(0,0,0),
+			TextTransparency=0.56,
+			TextStrokeTransparency=1,
+			TextXAlignment=Enum.TextXAlignment.Left,
+			TextTruncate=Enum.TextTruncate.AtEnd,
+			ZIndex=8,
+			SkipTextRole=true,
+		},fillClip)
+
 		local activeLabel=New("TextLabel",{
 			BackgroundTransparency=1,
 			Position=UDim2.fromOffset(0,0),
 			Size=UDim2.new(0,1,1,0),
 			Text=labelText,
-			Font=componentFont("ControlFont",Enum.Font.GothamMedium),
-			TextSize=componentNumber("ToggleLabelTextSize",14),
-			TextColor3=themeColor("STROKE",THEME.STROKE or THEME.ACC or Color3.fromRGB(182,180,180)),
+			Font=textFont,
+			TextSize=textSize,
+			TextColor3=themeColor("SLIDER_FILL",THEME.ACC or THEME.STROKE or Color3.fromRGB(90,190,255)),
+			TextTransparency=0,
 			TextStrokeTransparency=1,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			TextTruncate=Enum.TextTruncate.AtEnd,
-			ZIndex=8,
+			ZIndex=9,
 			SkipTextRole=true,
 		},fillClip)
 
@@ -1310,11 +1341,28 @@ function GuiLogic.new(ctx)
 			return math.max(row.AbsoluteSize.X-(padX*2),1)
 		end
 
+		local function currentAccent()
+			local accent=themeColor("SLIDER_FILL",THEME.ACC or THEME.STROKE or Color3.fromRGB(90,190,255))
+
+			if luminance(accent)<0.52 then
+				accent=accent:Lerp(Color3.new(1,1,1),0.22)
+			end
+
+			return accent
+		end
+
+		local function resizeOverlayText()
+			local width=usableWidth()
+			activeShadow.Size=UDim2.fromOffset(width,height)
+			activeLabel.Size=UDim2.fromOffset(width,height)
+		end
+
 		local function resizeActiveLabel()
 			local width=usableWidth()
-			activeLabel.Size=UDim2.fromOffset(width,height)
 
-			if not fillTween then
+			resizeOverlayText()
+
+			if not fillTween and not fillTweenPending then
 				fillClip.Size=UDim2.fromOffset(state and width or 0,height)
 			end
 		end
@@ -1324,6 +1372,8 @@ function GuiLogic.new(ctx)
 
 		local function cancelFillTween()
 			fillTweenPending=false
+			fillTweenSerial=fillTweenSerial+1
+
 			if fillTween then
 				fillTween:Cancel()
 				fillTween=nil
@@ -1331,26 +1381,24 @@ function GuiLogic.new(ctx)
 		end
 
 		local function applyVisuals(animate,previousState)
-			local accent=themeColor("STROKE",THEME.STROKE or THEME.ACC or Color3.fromRGB(182,180,180))
 			local text=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235))
-			local width=usableWidth()
-			local targetSize=UDim2.fromOffset(state and width or 0,height)
-			local startSize=previousState~=nil and UDim2.fromOffset(previousState and width or 0,height) or nil
+			local accent=currentAccent()
 
 			label.TextColor3=text
+			label.TextTransparency=state and 0.18 or 0.06
 			label.TextStrokeTransparency=1
 			activeLabel.TextColor3=accent
+			activeLabel.TextTransparency=0
 			activeLabel.TextStrokeTransparency=1
-			activeLabel.Size=UDim2.fromOffset(width,height)
+			activeShadow.TextTransparency=0.56
+			activeShadow.TextStrokeTransparency=1
+
+			resizeOverlayText()
 			cancelFillTween()
 
 			if not animate then
-				fillClip.Size=targetSize
+				fillClip.Size=UDim2.fromOffset(state and usableWidth() or 0,height)
 				return
-			end
-
-			if startSize then
-				fillClip.Size=startSize
 			end
 
 			fillTweenPending=true
@@ -1362,13 +1410,23 @@ function GuiLogic.new(ctx)
 					return
 				end
 
+				local width=usableWidth()
+
+				resizeOverlayText()
+
+				if previousState~=nil then
+					fillClip.Size=UDim2.fromOffset(previousState and width or 0,height)
+				end
+
+				local targetSize=UDim2.fromOffset(state and width or 0,height)
+
 				fillTweenPending=false
 				fillTween=TweenService:Create(fillClip,state and labelTweenInInfo or labelTweenOutInfo,{Size=targetSize})
 				local thisTween=fillTween
 				fillTween.Completed:Connect(function()
 					if fillTween==thisTween then
 						fillTween=nil
-						fillClip.Size=targetSize
+						fillClip.Size=UDim2.fromOffset(state and usableWidth() or 0,height)
 					end
 				end)
 				fillTween:Play()
@@ -1421,7 +1479,7 @@ function GuiLogic.new(ctx)
 		end
 
 		setState(state,false,false)
-		return{set=function(v,animate) if not destroyed then setState(v,false,animate~=false) end end,get=function() return state end,Destroy=destroyToggleLabel,destroy=destroyToggleLabel,stateValue=stateValue,wrap=row,label=label,activeLabel=activeLabel,fill=fillClip}
+		return{set=function(v,animate) if not destroyed then setState(v,false,animate~=false) end end,get=function() return state end,Destroy=destroyToggleLabel,destroy=destroyToggleLabel,stateValue=stateValue,wrap=row,label=label,activeLabel=activeLabel,activeShadow=activeShadow,fill=fillClip}
 	end
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)
