@@ -1246,7 +1246,7 @@ function GuiLogic.new(ctx)
 		local visualProgress=state and 1 or 0
 
 		local tweenInfo=TweenInfo.new(
-			componentNumber("ToggleLabelTweenTime",0.28),
+			componentNumber("ToggleLabelTweenTime",0.56),
 			Enum.EasingStyle.Quart,
 			Enum.EasingDirection.Out
 		)
@@ -1334,6 +1334,11 @@ function GuiLogic.new(ctx)
 			return math.max(row.AbsoluteSize.X-(padX*2),1)
 		end
 
+		local function clipSizeForProgress(progress)
+			progress=math.clamp(progress,0,1)
+			return UDim2.new(progress,-(padX*2)*progress,0,height)
+		end
+
 		local function accentColor()
 			local accent=themeColor("SLIDER_FILL",THEME.ACC or THEME.STROKE or Color3.fromRGB(90,190,255))
 
@@ -1348,11 +1353,10 @@ function GuiLogic.new(ctx)
 			visualProgress=math.clamp(progress,0,1)
 
 			local width=usableWidth()
-			local clipWidth=math.floor((width*visualProgress)+0.5)
 
 			overlayShadow.Size=UDim2.fromOffset(width,height)
 			overlayLabel.Size=UDim2.fromOffset(width,height)
-			overlayClip.Size=UDim2.fromOffset(clipWidth,height)
+			overlayClip.Size=clipSizeForProgress(visualProgress)
 
 			baseLabel.TextColor3=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235))
 			baseLabel.TextStrokeTransparency=1
@@ -1367,6 +1371,10 @@ function GuiLogic.new(ctx)
 		end
 
 		local function currentProgress()
+			if row.AbsoluteSize.X<=padX*2 then
+				return visualProgress
+			end
+
 			return math.clamp(overlayClip.AbsoluteSize.X/usableWidth(),0,1)
 		end
 
@@ -1386,10 +1394,11 @@ function GuiLogic.new(ctx)
 
 			local width=usableWidth()
 			local targetProgress=math.clamp(progress,0,1)
-			local targetSize=UDim2.fromOffset(math.floor((width*targetProgress)+0.5),height)
+			local targetSize=clipSizeForProgress(targetProgress)
 
 			overlayShadow.Size=UDim2.fromOffset(width,height)
 			overlayLabel.Size=UDim2.fromOffset(width,height)
+			overlayClip.Size=clipSizeForProgress(currentProgress())
 
 			fillTween=TweenService:Create(overlayClip,tweenInfo,{
 				Size=targetSize
