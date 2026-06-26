@@ -18,6 +18,7 @@ local DIAL_GLOW_LAYERS={
 local PARAMS_PAGE_H=176
 local PAGE_TWEEN=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
 local PAINT_TWEEN=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+local GLOW_TWEEN=TweenInfo.new(0.34,Enum.EasingStyle.Sine,Enum.EasingDirection.Out)
 local PAGE_ORDER={"speed","gravity","stamina"}
 local PAGE_INDEX={speed=1,gravity=2,stamina=3}
 local DIAL_SECTORS={
@@ -349,7 +350,7 @@ function GameParamsGui.new(ctx,parent)
 		table.clear(paintTweens)
 	end
 
-	local function tweenObject(object,goal)
+	local function tweenObject(object,goal,tweenInfo)
 		if not object then return nil end
 
 		local oldTween=paintTweens[object]
@@ -359,7 +360,7 @@ function GameParamsGui.new(ctx,parent)
 			end)
 		end
 
-		local tween=TweenService:Create(object,PAINT_TWEEN,goal)
+		local tween=TweenService:Create(object,tweenInfo or PAINT_TWEEN,goal)
 		paintTweens[object]=tween
 		tween.Completed:Connect(function()
 			if paintTweens[object]==tween then
@@ -402,7 +403,7 @@ function GameParamsGui.new(ctx,parent)
 
 			if dialHighlightImages[pageKey] then
 				if animate then
-					tweenObject(dialHighlightImages[pageKey],{ImageColor3=highlightColor,ImageTransparency=highlightTransparency})
+					tweenObject(dialHighlightImages[pageKey],{ImageColor3=highlightColor,ImageTransparency=highlightTransparency},GLOW_TWEEN)
 				else
 					dialHighlightImages[pageKey].ImageColor3=highlightColor
 					dialHighlightImages[pageKey].ImageTransparency=highlightTransparency
@@ -413,7 +414,7 @@ function GameParamsGui.new(ctx,parent)
 				for index,glow in ipairs(dialGlowImages[pageKey]) do
 					local glowTransparency=index==1 and nearGlowTransparency or (index==2 and midGlowTransparency or (index==3 and farGlowTransparency or outerGlowTransparency))
 					if animate then
-						tweenObject(glow,{ImageColor3=haloColor,ImageTransparency=glowTransparency})
+						tweenObject(glow,{ImageColor3=haloColor,ImageTransparency=glowTransparency},GLOW_TWEEN)
 					else
 						glow.ImageColor3=haloColor
 						glow.ImageTransparency=glowTransparency
