@@ -1502,9 +1502,11 @@ function GuiLogic.new(ctx)
 					setState(v,false,animate~=false)
 				end
 			end,
+
 			get=function()
 				return state
 			end,
+
 			Destroy=destroyToggleLabel,
 			destroy=destroyToggleLabel,
 			stateValue=stateValue,
