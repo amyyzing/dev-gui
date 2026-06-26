@@ -1246,8 +1246,7 @@ function GuiLogic.new(ctx)
 		local connections={}
 
 		local row=New("TextButton",{
-			BackgroundColor3=themeColor("INPUT",THEME.PANEL),
-			BackgroundTransparency=componentNumber("ToggleLabelBackgroundTransparency",0.12),
+			BackgroundTransparency=1,
 			BorderSizePixel=0,
 			ClipsDescendants=true,
 			Size=UDim2.new(1,0,0,height),
@@ -1255,36 +1254,8 @@ function GuiLogic.new(ctx)
 			AutoButtonColor=false,
 			Selectable=true,
 			ZIndex=5,
-			ThemeRole="INPUT",
-			CornerRole="Control",
+			SkipThemeRole=true,
 		},parent)
-		addCorner(row,"Control")
-
-		local fill=New("Frame",{
-			AnchorPoint=Vector2.new(0,0.5),
-			Position=UDim2.fromScale(0,0.5),
-			Size=UDim2.new(0,0,1,0),
-			BackgroundColor3=themeColor("SLIDER_FILL",THEME.ACC or THEME.GREEN or Color3.fromRGB(32,202,106)),
-			BackgroundTransparency=0.14,
-			BorderSizePixel=0,
-			ZIndex=6,
-			ThemeRole="SLIDER_FILL",
-			CornerRole="Control",
-		},row)
-		addCorner(fill,"Control")
-
-		local hoverFill=New("Frame",{
-			AnchorPoint=Vector2.new(0,0.5),
-			Position=UDim2.fromScale(0,0.5),
-			Size=UDim2.new(1,0,1,0),
-			BackgroundColor3=themeColor("SLIDER_FILL",THEME.ACC or THEME.GREEN or Color3.fromRGB(32,202,106)),
-			BackgroundTransparency=1,
-			BorderSizePixel=0,
-			ZIndex=7,
-			ThemeRole="SLIDER_FILL",
-			CornerRole="Control",
-		},row)
-		addCorner(hoverFill,"Control")
 
 		local label=New("TextLabel",{
 			BackgroundTransparency=1,
@@ -1296,6 +1267,31 @@ function GuiLogic.new(ctx)
 			TextColor3=THEME.MUTED,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			TextTruncate=Enum.TextTruncate.AtEnd,
+			ZIndex=6,
+			SkipTextRole=true,
+		},row)
+
+		local fillClip=New("Frame",{
+			AnchorPoint=Vector2.new(0,0.5),
+			Position=UDim2.fromScale(0,0.5),
+			Size=UDim2.new(0,0,1,0),
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			ClipsDescendants=true,
+			ZIndex=7,
+			SkipThemeRole=true,
+		},row)
+
+		local activeLabel=New("TextLabel",{
+			BackgroundTransparency=1,
+			Position=UDim2.fromOffset(padX,0),
+			Size=UDim2.new(0,1,1,0),
+			Text=labelText,
+			Font=componentFont("ControlFont",Enum.Font.GothamMedium),
+			TextSize=componentNumber("ToggleLabelTextSize",12),
+			TextColor3=themeColor("SLIDER_FILL",THEME.ACC or THEME.GREEN or Color3.fromRGB(32,202,106)),
+			TextXAlignment=Enum.TextXAlignment.Left,
+			TextTruncate=Enum.TextTruncate.AtEnd,
 			ZIndex=8,
 			SkipTextRole=true,
 		},row)
@@ -1305,6 +1301,13 @@ function GuiLogic.new(ctx)
 			table.insert(connections,conn)
 			return conn
 		end
+
+		local function resizeActiveLabel()
+			activeLabel.Size=UDim2.new(0,math.max(row.AbsoluteSize.X-(padX*2),1),1,0)
+		end
+
+		connect(row:GetPropertyChangedSignal("AbsoluteSize"),resizeActiveLabel)
+		resizeActiveLabel()
 
 		local function cancelTweens()
 			for _,tw in ipairs(activeTweens) do
@@ -1326,39 +1329,28 @@ function GuiLogic.new(ctx)
 			cancelTweens()
 
 			local accent=themeColor("SLIDER_FILL",THEME.ACC or THEME.GREEN or Color3.fromRGB(32,202,106))
-			local input=themeColor("INPUT",THEME.PANEL or Color3.fromRGB(24,24,24))
 			local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
 			local text=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235))
-			local activeText=readableOn(accent)
 			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
-			local fillTransparency=state and (hovered and 0.02 or 0.14) or 0.18
-			local hoverTransparency
-			if state then
-				hoverTransparency=hovered and 0.78 or 1
-			else
-				hoverTransparency=hovered and 0.86 or 1
-			end
-			local labelColor=state and activeText or (hovered and text or muted)
-			local strokeTransparency=state and (hovered and 0.32 or 0.52) or (hovered and 0.62 or 1)
+			local labelColor=hovered and text or muted
+			local labelStrokeTransparency=hovered and 0.72 or 1
+			local activeStrokeTransparency=state and (hovered and 0.18 or 0.42) or 1
 
 			label.TextStrokeColor3=accent
+			activeLabel.TextStrokeColor3=accent
 
 			if not animate then
-				row.BackgroundColor3=input
-				fill.BackgroundColor3=accent
-				fill.BackgroundTransparency=fillTransparency
-				fill.Size=fillSize
-				hoverFill.BackgroundColor3=accent
-				hoverFill.BackgroundTransparency=hoverTransparency
+				fillClip.Size=fillSize
 				label.TextColor3=labelColor
-				label.TextStrokeTransparency=strokeTransparency
+				label.TextStrokeTransparency=labelStrokeTransparency
+				activeLabel.TextColor3=accent
+				activeLabel.TextStrokeTransparency=activeStrokeTransparency
 				return
 			end
 
-			tween(row,TOGGLE_SOFT_TWEEN,{BackgroundColor3=input})
-			tween(fill,TOGGLE_SNAP_TWEEN,{Size=fillSize,BackgroundColor3=accent,BackgroundTransparency=fillTransparency})
-			tween(hoverFill,TOGGLE_SOFT_TWEEN,{BackgroundColor3=accent,BackgroundTransparency=hoverTransparency})
-			tween(label,TOGGLE_SOFT_TWEEN,{TextColor3=labelColor,TextStrokeTransparency=strokeTransparency})
+			tween(fillClip,TOGGLE_SNAP_TWEEN,{Size=fillSize})
+			tween(label,TOGGLE_SOFT_TWEEN,{TextColor3=labelColor,TextStrokeTransparency=labelStrokeTransparency})
+			tween(activeLabel,TOGGLE_SOFT_TWEEN,{TextColor3=accent,TextStrokeTransparency=activeStrokeTransparency})
 		end
 
 		local function setState(value,fire,animate)
@@ -1405,7 +1397,7 @@ function GuiLogic.new(ctx)
 		end
 
 		setState(state,false,false)
-		return{set=function(v,animate) if not destroyed then setState(v,false,animate~=false) end end,get=function() return state end,Destroy=destroyToggleLabel,destroy=destroyToggleLabel,stateValue=stateValue,wrap=row,label=label,fill=fill}
+		return{set=function(v,animate) if not destroyed then setState(v,false,animate~=false) end end,get=function() return state end,Destroy=destroyToggleLabel,destroy=destroyToggleLabel,stateValue=stateValue,wrap=row,label=label,activeLabel=activeLabel,fill=fillClip}
 	end
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)
