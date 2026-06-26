@@ -23,6 +23,7 @@ setWrappedButtonBg=GuiLogic.setWrappedButtonBg
 makeSection=GuiLogic.makeSection
 makeBox=GuiLogic.makeBox
 buildSlider=GuiLogic.buildSlider
+buildToggleLabel=GuiLogic.buildToggleLabel
 buildToggleRow=GuiLogic.buildToggleRow
 objectLocalPointer=GuiLogic.objectLocalPointer
 HITBOX_ORIGINALS=HITBOX_ORIGINALS or {
@@ -413,6 +414,7 @@ function makePage1Ctx()
 		State=PAGE1_STATE,
 		makeSection=makeSection,
 		buildSlider=buildSlider,
+		buildToggleLabel=buildToggleLabel,
 		buildToggleRow=buildToggleRow,
 		objectLocalPointer=objectLocalPointer,
 		HITBOX_ORIGINALS=HITBOX_ORIGINALS,

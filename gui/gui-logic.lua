@@ -944,6 +944,8 @@ function GuiLogic.new(ctx)
 	end
 
 	function api.buildSlider(parent,labelText,minVal,maxVal,startVal,decimals,onChange)
+		labelText=tostring(labelText or "")
+		local hasLabel=labelText~=""
 		local s=shape()
 		local sliderHeight=s.SliderHeight or componentNumber("SliderHeight",26)
 		local rowHeight=math.max(componentNumber("SliderRowHeight",38),sliderHeight+10)
@@ -959,6 +961,10 @@ function GuiLogic.new(ctx)
 		local labelY=componentNumber("SliderLabelY",0)
 		local controlGap=componentNumber("SliderControlGap",4)
 		local bottomPadding=componentNumber("SliderBottomPadding",4)
+		if not hasLabel and labelPlacement=="above" then
+			labelHeight=0
+			controlGap=0
+		end
 		local trackLeft=labelX+labelWidth+trackGap
 		local trackRight=valueBoxWidth+valueBoxGap+rightPadding
 		local trackYScale=0.5
@@ -996,7 +1002,7 @@ function GuiLogic.new(ctx)
 		local containerStrokeTransparency=componentNumber("SliderContainerStrokeTransparency",1)
 		local containerStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=containerStrokeTransparency},container)
 		containerStroke:SetAttribute("BaseStrokeTransparency",containerStrokeTransparency)
-		New("TextLabel",{BackgroundTransparency=1,Position=labelPosition,Size=labelSize,Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false},container)
+		New("TextLabel",{BackgroundTransparency=1,Position=labelPosition,Size=labelSize,Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false,Visible=hasLabel},container)
 
 		local track=New("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor(trackRole,THEME.PANEL),BackgroundTransparency=sliderTrackTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=6,ThemeRole=trackRole,CornerRole="Slider"},container)
 		addCorner(track,"Slider")
@@ -1227,6 +1233,179 @@ function GuiLogic.new(ctx)
 
 		setValue(startVal,false)
 		return{set=function(v) setValue(v,false) end,get=function() return value end,Destroy=destroySlider,destroy=destroySlider,valueState=valueState,box=valueBox,fill=fill,fillGlow=fillGlow,knob=knob,track=track}
+	end
+
+	function api.buildToggleLabel(parent,labelText,startState,onChange)
+		local height=componentNumber("ToggleLabelHeight",24)
+		local padX=componentNumber("ToggleLabelPaddingX",12)
+		local state=startState and true or false
+		local hovered=false
+		local destroyed=false
+		local stateValue=makeFusionValue(state)
+		local activeTweens={}
+		local connections={}
+
+		local row=New("TextButton",{
+			BackgroundColor3=themeColor("INPUT",THEME.PANEL),
+			BackgroundTransparency=componentNumber("ToggleLabelBackgroundTransparency",0.12),
+			BorderSizePixel=0,
+			ClipsDescendants=true,
+			Size=UDim2.new(1,0,0,height),
+			Text="",
+			AutoButtonColor=false,
+			Selectable=true,
+			ZIndex=5,
+			ThemeRole="INPUT",
+			CornerRole="Control",
+		},parent)
+		addCorner(row,"Control")
+
+		local fill=New("Frame",{
+			AnchorPoint=Vector2.new(0,0.5),
+			Position=UDim2.fromScale(0,0.5),
+			Size=UDim2.new(0,0,1,0),
+			BackgroundColor3=themeColor("SLIDER_FILL",THEME.ACC or THEME.GREEN or Color3.fromRGB(32,202,106)),
+			BackgroundTransparency=0.14,
+			BorderSizePixel=0,
+			ZIndex=6,
+			ThemeRole="SLIDER_FILL",
+			CornerRole="Control",
+		},row)
+		addCorner(fill,"Control")
+
+		local hoverFill=New("Frame",{
+			AnchorPoint=Vector2.new(0,0.5),
+			Position=UDim2.fromScale(0,0.5),
+			Size=UDim2.new(1,0,1,0),
+			BackgroundColor3=themeColor("SLIDER_FILL",THEME.ACC or THEME.GREEN or Color3.fromRGB(32,202,106)),
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			ZIndex=7,
+			ThemeRole="SLIDER_FILL",
+			CornerRole="Control",
+		},row)
+		addCorner(hoverFill,"Control")
+
+		local label=New("TextLabel",{
+			BackgroundTransparency=1,
+			Position=UDim2.fromOffset(padX,0),
+			Size=UDim2.new(1,-(padX*2),1,0),
+			Text=labelText,
+			Font=componentFont("ControlFont",Enum.Font.GothamMedium),
+			TextSize=componentNumber("ToggleLabelTextSize",12),
+			TextColor3=THEME.MUTED,
+			TextXAlignment=Enum.TextXAlignment.Left,
+			TextTruncate=Enum.TextTruncate.AtEnd,
+			ZIndex=8,
+			SkipTextRole=true,
+		},row)
+
+		local function connect(signal,fn)
+			local conn=signal:Connect(fn)
+			table.insert(connections,conn)
+			return conn
+		end
+
+		local function cancelTweens()
+			for _,tw in ipairs(activeTweens) do
+				pcall(function()
+					tw:Cancel()
+				end)
+			end
+			table.clear(activeTweens)
+		end
+
+		local function tween(object,info,goal)
+			local tw=TweenService:Create(object,info,goal)
+			table.insert(activeTweens,tw)
+			tw:Play()
+			return tw
+		end
+
+		local function applyVisuals(animate)
+			cancelTweens()
+
+			local accent=themeColor("SLIDER_FILL",THEME.ACC or THEME.GREEN or Color3.fromRGB(32,202,106))
+			local input=themeColor("INPUT",THEME.PANEL or Color3.fromRGB(24,24,24))
+			local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
+			local text=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235))
+			local activeText=readableOn(accent)
+			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
+			local fillTransparency=state and (hovered and 0.02 or 0.14) or 0.18
+			local hoverTransparency
+			if state then
+				hoverTransparency=hovered and 0.78 or 1
+			else
+				hoverTransparency=hovered and 0.86 or 1
+			end
+			local labelColor=state and activeText or (hovered and text or muted)
+			local strokeTransparency=state and (hovered and 0.32 or 0.52) or (hovered and 0.62 or 1)
+
+			label.TextStrokeColor3=accent
+
+			if not animate then
+				row.BackgroundColor3=input
+				fill.BackgroundColor3=accent
+				fill.BackgroundTransparency=fillTransparency
+				fill.Size=fillSize
+				hoverFill.BackgroundColor3=accent
+				hoverFill.BackgroundTransparency=hoverTransparency
+				label.TextColor3=labelColor
+				label.TextStrokeTransparency=strokeTransparency
+				return
+			end
+
+			tween(row,TOGGLE_SOFT_TWEEN,{BackgroundColor3=input})
+			tween(fill,TOGGLE_SNAP_TWEEN,{Size=fillSize,BackgroundColor3=accent,BackgroundTransparency=fillTransparency})
+			tween(hoverFill,TOGGLE_SOFT_TWEEN,{BackgroundColor3=accent,BackgroundTransparency=hoverTransparency})
+			tween(label,TOGGLE_SOFT_TWEEN,{TextColor3=labelColor,TextStrokeTransparency=strokeTransparency})
+		end
+
+		local function setState(value,fire,animate)
+			local nextState=value and true or false
+			local changed=nextState~=state
+			state=nextState
+			if stateValue then
+				stateValue:set(state)
+			end
+			applyVisuals((animate~=false) and changed)
+
+			if fire and changed and onChange then
+				onChange(state)
+			end
+		end
+
+		connect(row.MouseEnter,function()
+			hovered=true
+			applyVisuals(true)
+		end)
+
+		connect(row.MouseLeave,function()
+			hovered=false
+			applyVisuals(true)
+		end)
+
+		connect(row.Activated,function()
+			setState(not state,true,true)
+		end)
+
+		local function destroyToggleLabel()
+			destroyed=true
+			cancelTweens()
+			destroyFusionValue(stateValue)
+			for _,conn in ipairs(connections) do
+				pcall(function()
+					conn:Disconnect()
+				end)
+			end
+			table.clear(connections)
+			if row then
+				row:Destroy()
+			end
+		end
+
+		setState(state,false,false)
+		return{set=function(v,animate) if not destroyed then setState(v,false,animate~=false) end end,get=function() return state end,Destroy=destroyToggleLabel,destroy=destroyToggleLabel,stateValue=stateValue,wrap=row,label=label,fill=fill}
 	end
 
 	function api.buildToggleRow(parent,labelText,startState,onChange)

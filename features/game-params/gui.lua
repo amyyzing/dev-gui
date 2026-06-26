@@ -191,6 +191,7 @@ function GameParamsGui.new(ctx,parent)
 	local safeDisconnect=ctx.safeDisconnect
 	local makeSection=ctx.makeSection
 	local buildSlider=ctx.buildSlider
+	local buildToggleLabel=ctx.buildToggleLabel
 	local buildToggleRow=ctx.buildToggleRow
 	local state=runtime.GetState and runtime.GetState() or ctx.State
 	local api={}
@@ -774,13 +775,17 @@ function GameParamsGui.new(ctx,parent)
 		end
 
 		local function buildSettingSlider(page,settingKey,label,min,max,start,decimals,onChange)
-			if buildToggleRow then
+			if buildToggleLabel then
+				settingToggles[settingKey]=buildToggleLabel(page,label,state[settingKey]==true,function(value)
+					api.SetParamSettingEnabled(settingKey,value,true)
+				end)
+			elseif buildToggleRow then
 				settingToggles[settingKey]=buildToggleRow(page,label,state[settingKey]==true,function(value)
 					api.SetParamSettingEnabled(settingKey,value,true)
 				end)
 			end
 
-			return buildSlider(page,buildToggleRow and "" or label,min,max,start,decimals,onChange)
+			return buildSlider(page,(buildToggleLabel or buildToggleRow) and "" or label,min,max,start,decimals,onChange)
 		end
 
 		speedSlider=buildSettingSlider(pageFrames.speed,"speedSettingEnabled","Speed",0,100,state.speedValue,0,function(v)
