@@ -716,8 +716,6 @@ function DataSave.new(ctx)
 				targetHighlight=getValue(ctx,"qbAimTargetHighlight",true),
 				leadDelay=getValue(ctx,"qbAimLeadDelay",0.38),
 				peakHeight=getValue(ctx,"qbAimPeakHeight",14.00),
-				serverXZLead=getValue(ctx,"qbAimQBDrift",0.15),
-				serverYLead=getValue(ctx,"qbAimQBYDrift",getValue(ctx,"qbAimQBDrift",0.15)),
 			},
 
 			testing={
