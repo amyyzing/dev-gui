@@ -1,3 +1,5 @@
+-- gui half for this feature. logic stays next door in logic.lua.
+
 local GameParamsGui={}
 
 local TweenService=game:GetService("TweenService")

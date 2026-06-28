@@ -1,3 +1,5 @@
+-- logic half for this feature. avoid starting loops unless the feature is enabled.
+
 local StrokeColour={}
 
 local TweenService=game:GetService("TweenService")

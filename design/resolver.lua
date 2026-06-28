@@ -1,3 +1,5 @@
+-- design glue. resolves theme tokens into concrete gui colours.
+
 local env = (getfenv and getfenv()) or _G
 local Tokens = rawget(env, "DesignTokens") or rawget(env, "DesignTokensModule")
 

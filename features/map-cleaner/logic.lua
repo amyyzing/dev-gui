@@ -1,3 +1,5 @@
+-- logic half for this feature. avoid starting loops unless the feature is enabled.
+
 local MapCleaner={}
 
 local function firstChild(parent)

@@ -1,3 +1,5 @@
+-- gui half for this feature. logic stays next door in logic.lua.
+
 local TestingGui={}
 
 function TestingGui.build(ctx,parent,state,api)

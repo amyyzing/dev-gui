@@ -1,3 +1,5 @@
+-- tiny announcement popup module; keep the layout plain and predictable.
+
 local Announcement={}
 
 local function safeDisconnect(conn)

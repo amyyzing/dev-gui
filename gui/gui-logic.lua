@@ -1,3 +1,5 @@
+-- main control factory. sliders, toggles, sections, and the odd custom widget live here.
+
 local GuiLogic={}
 
 function GuiLogic.new(ctx)

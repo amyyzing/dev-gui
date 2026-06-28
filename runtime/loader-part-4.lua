@@ -1,4 +1,6 @@
 -- HB_RUNTIME_PART_4
+-- feature binding chunk. gameplay modules should stay quiet until toggled.
+
 -- Runtime chunk 4. Loaded by loader.lua with a shared environment.
 refreshPage2UI=function() end
 PAGE2_EXPANDED_OWNED={}

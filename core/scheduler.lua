@@ -1,3 +1,5 @@
+-- small core helper. these modules are deliberately plain so features can share them.
+
 local env = (getfenv and getfenv()) or _G
 local Scope = rawget(env, "CoreScope") or rawget(env, "CoreScopeModule")
 

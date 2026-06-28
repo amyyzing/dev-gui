@@ -1,3 +1,5 @@
+-- save/restore glue. old field names are kept so updates do not wipe user settings.
+
 local DataSave={}
 
 local HttpService=game:GetService("HttpService")

@@ -1,3 +1,5 @@
+-- standalone scratch script. not part of the main panel loader path.
+
 -- Standalone Practice / Quarterback Gauntlet hitbox toggle.
 -- Toggle locally expands gauntlet TouchDetect hitboxes for easier overlap.
 

@@ -1,3 +1,5 @@
+-- testing helpers. these draw diagnostics and should clean up after refresh.
+
 local Testing={}
 
 local Players=game:GetService("Players")

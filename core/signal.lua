@@ -1,3 +1,5 @@
+-- small core helper. these modules are deliberately plain so features can share them.
+
 local Signal = {}
 Signal.__index = Signal
 

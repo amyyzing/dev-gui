@@ -1,3 +1,5 @@
+-- design glue. resolves theme tokens into concrete gui colours.
+
 local Tokens = {}
 
 Tokens.Color = {

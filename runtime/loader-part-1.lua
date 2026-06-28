@@ -1,4 +1,6 @@
 -- HB_RUNTIME_PART_1
+-- old globals live here because the runtime chunks share one env.
+
 -- Runtime chunk 1. Loaded by loader.lua with a shared environment.
 Players=game:GetService("Players")
 UIS=game:GetService("UserInputService")

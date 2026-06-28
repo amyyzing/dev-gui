@@ -1,3 +1,5 @@
+-- qb aim runtime. keep preview, throw timing, and cleanup paths separate.
+
 local QBAim={}
 
 local Players=game:GetService("Players")

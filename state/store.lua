@@ -1,3 +1,5 @@
+-- shared state bucket. most gui weirdness starts here if this gets clever.
+
 local env = (getfenv and getfenv()) or _G
 local Signal = rawget(env, "CoreSignal") or rawget(env, "CoreSignalModule")
 

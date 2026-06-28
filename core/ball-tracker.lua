@@ -1,3 +1,5 @@
+-- small core helper. these modules are deliberately plain so features can share them.
+
 local BallTracker = {}
 BallTracker.__index = BallTracker
 

@@ -1,3 +1,5 @@
+-- theme preset. keep values obvious so screenshots are easy to reason about.
+
 local env = (getfenv and getfenv()) or _G
 local Tokens = rawget(env, "DesignTokens") or rawget(env, "DesignTokensModule")
 

@@ -1,4 +1,6 @@
 -- HB_RUNTIME_PART_5
+-- final boot chunk. this is where the panel becomes usable.
+
 -- Runtime chunk 5. Loaded by loader.lua with a shared environment.
 function shutdownTool()
 	if not toolAlive then return end

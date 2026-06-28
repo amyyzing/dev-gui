@@ -1,3 +1,5 @@
+-- tiny reactive helper layer. only the bits this gui actually uses are in here.
+
 local Fusion={}
 
 local function makeKey(kind,name)

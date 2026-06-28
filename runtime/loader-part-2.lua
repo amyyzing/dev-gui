@@ -1,4 +1,6 @@
 -- HB_RUNTIME_PART_2
+-- second boot chunk. mostly ui plumbing and saved-state restore helpers.
+
 -- Runtime chunk 2. Loaded by loader.lua with a shared environment.
 GuiLogic=GuiLogicModule.new({
 	New=New,

@@ -1,3 +1,5 @@
+-- projectile math only. no gui state belongs in this file.
+
 local QBAimMath={}
 
 local BALL_G=28

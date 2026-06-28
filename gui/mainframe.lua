@@ -1,3 +1,5 @@
+-- builds the shell: tabs, body, reset row, and page containers.
+
 local MainFrame={}
 
 function MainFrame.new(ctx)

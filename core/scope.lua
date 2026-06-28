@@ -1,3 +1,5 @@
+-- small core helper. these modules are deliberately plain so features can share them.
+
 local Scope = {}
 Scope.__index = Scope
 

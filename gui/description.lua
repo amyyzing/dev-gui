@@ -1,3 +1,5 @@
+-- central page/category labels so the loader and panel say the same thing.
+
 local EMPTY=""
 
 local Description={}
