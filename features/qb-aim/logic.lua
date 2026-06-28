@@ -56,7 +56,7 @@ local GLOBAL_MAX_ANGLE=55
 local AIM_SCALE=1000
 local ARC_PREVIEW_ENABLED=true
 local ARC_SETTINGS={
-	UpdateInterval=0.035,
+	UpdateInterval=1/60,
 	AttachmentRoll=math.rad(90),
 	UnsafeColor=Color3.fromRGB(254,94,86),
 }
@@ -66,7 +66,7 @@ local DEFENDER_SETTINGS={
 	CatchHeightTolerance=0.25,
 }
 local TRACK_SETTINGS={
-	ReceiverInterval=0.05,
+	ReceiverInterval=1/60,
 }
 local POSSESSION_RESEED_SETTLE_TIME=0.12
 local MOVE_DIRECTION_EPSILON=0.05
@@ -75,7 +75,7 @@ local FREEZE_PREVIEW_WHILE_BALL_RELEASED=true
 local PREVIEW_POST_THROW_FREEZE_MIN=0.75
 local PREVIEW_MISSING_BALL_GRACE=0.2
 local ARC_MAX_CURVE=400
-local PREVIEW_SMOOTH=1.00
+local PREVIEW_SMOOTH=0.72
 local C1_MARKER_ENABLED=true
 local C1_MARKER_SIZE=1.65
 local C3_INFO_GUI_ENABLED=false
@@ -107,8 +107,8 @@ local SAFE_ARC_SAMPLE_DT=0.04
 local SAFE_ARC_CATCHABLE_Y_MARGIN=0.25
 local C2_MAX_RELEASE_DISTANCE=12.00
 -- Manual server-origin drift. C2 is still the base; this nudges the sampled release point.
-local QB_RELEASE_ORIGIN_DRIFT_TIME=0.15
-local QB_RELEASE_VERTICAL_DRIFT_TIME=0.15
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0
+local QB_RELEASE_VERTICAL_DRIFT_TIME=0
 local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 -- Key model:
 --   1. Keypress locks receiver identity and preview only.
@@ -2181,11 +2181,13 @@ function QBAim.new(ctx,parent)
 		local xzDrift=math.clamp(tonumber(state.qbAimQBDrift) or QB_RELEASE_ORIGIN_DRIFT_TIME,QB_DRIFT_MIN,QB_DRIFT_MAX)
 		local yDrift=math.clamp(tonumber(state.qbAimQBYDrift) or QB_RELEASE_VERTICAL_DRIFT_TIME,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
 		local sampledOrigin=origin(qbRoot,releaseBall or currentHeldBall(),xzDrift,yDrift)
-		local plan=buildPlan(receiver,ballPower,xzDrift,releaseBall,wrOffset,yDrift,sampledOrigin)
+		local plan=buildPlan(receiver,ballPower,0,releaseBall,wrOffset,0,sampledOrigin)
 		if plan then
 			plan.centerReleaseOrigin=sampledOrigin
-			plan.releaseTimingOffset=xzDrift
-			plan.releaseYOffset=yDrift
+			plan.originDriftXZ=xzDrift
+			plan.originDriftY=yDrift
+			plan.releaseTimingOffset=0
+			plan.releaseYOffset=0
 			plan.receiverTimingOffset=wrOffset
 		end
 

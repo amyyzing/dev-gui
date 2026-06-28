@@ -718,8 +718,8 @@ function DataSave.new(ctx)
 				targetHighlight=getValue(ctx,"qbAimTargetHighlight",true),
 				leadDelay=getValue(ctx,"qbAimLeadDelay",0.38),
 				peakHeight=getValue(ctx,"qbAimPeakHeight",14.00),
-				serverXZLead=getValue(ctx,"qbAimQBDrift",0.15),
-				serverYLead=getValue(ctx,"qbAimQBYDrift",0.15),
+				serverXZLead=getValue(ctx,"qbAimQBDrift",0),
+				serverYLead=getValue(ctx,"qbAimQBYDrift",0),
 			},
 
 			testing={
@@ -856,8 +856,8 @@ function DataSave.new(ctx)
 		if savedXZLead==nil then savedXZLead=legacyDrift end
 		local savedYLead=qbAim.serverYLead
 		if savedYLead==nil then savedYLead=savedXZLead end
-		applyClamped(ctx,"setQBAimQBDrift","qbAimQBDrift",savedXZLead,0,0.25,0.15)
-		applyClamped(ctx,"setQBAimQBYDrift","qbAimQBYDrift",savedYLead,0,0.35,0.15)
+		applyClamped(ctx,"setQBAimQBDrift","qbAimQBDrift",savedXZLead,0,0.25,0)
+		applyClamped(ctx,"setQBAimQBYDrift","qbAimQBYDrift",savedYLead,0,0.35,0)
 
 		local testing=settings.testing or {}
 		applyBoolean(ctx,"setTestingState","testingEnabled",testing.enabled)
