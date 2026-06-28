@@ -12,7 +12,7 @@ local TESTING_C1_Y=14.30
 local DEFENDER_SPEED=21
 local TESTING_BALL_SPEED=95
 local QB_SAFETY_JOB_ID="TestingQBCenterSafety"
-local QB_SAFETY_INTERVAL=0.05
+local QB_SAFETY_INTERVAL=0
 local C1_MARKER_HEIGHT=80
 local C1_MARKER_THICKNESS=0.12
 local GROUND_MARKER_DIAMETER=5.5
@@ -377,6 +377,7 @@ function Testing.new(ctx,parent,guiBuilder)
 
 	local function disconnectQBSafety()
 		if qbSafetyScheduled and scheduler and type(scheduler.Unregister)=="function" then
+			pcall(scheduler.Unregister,"RenderStepped",QB_SAFETY_JOB_ID)
 			pcall(scheduler.Unregister,"Heartbeat",QB_SAFETY_JOB_ID)
 		end
 		qbSafetyScheduled=false
@@ -527,7 +528,7 @@ function Testing.new(ctx,parent,guiBuilder)
 		if qbSafetyScheduled then return end
 
 		if scheduler and type(scheduler.Register)=="function" then
-			local ok,result=pcall(scheduler.Register,"Heartbeat",QB_SAFETY_JOB_ID,QB_SAFETY_INTERVAL,function()
+			local ok,result=pcall(scheduler.Register,"RenderStepped",QB_SAFETY_JOB_ID,QB_SAFETY_INTERVAL,function()
 				updateQBCenterSafety()
 			end)
 			if ok and result then
@@ -537,13 +538,7 @@ function Testing.new(ctx,parent,guiBuilder)
 			end
 		end
 
-		local elapsed=0
-		qbSafetyConn=RunService.Heartbeat:Connect(function(dt)
-			elapsed=elapsed+(dt or 0)
-			if elapsed<QB_SAFETY_INTERVAL then
-				return
-			end
-			elapsed=0
+		qbSafetyConn=RunService.RenderStepped:Connect(function()
 			updateQBCenterSafety()
 		end)
 	end
@@ -674,7 +669,9 @@ function Testing.new(ctx,parent,guiBuilder)
 
 	local function captureSoon(source,payload)
 		task.defer(captureC1,source,payload)
-		task.delay(0.05,captureC1,source,payload)
+		task.delay(0.016,captureC1,source,payload)
+		task.delay(0.033,captureC1,source,payload)
+		task.delay(0.08,captureC1,source,payload)
 		task.delay(0.15,captureC1,source,payload)
 	end
 

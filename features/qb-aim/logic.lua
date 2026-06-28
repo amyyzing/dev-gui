@@ -2202,14 +2202,26 @@ function QBAim.new(ctx,parent)
 		end
 
 		local timing=getTimingWindow()
+		local age=receiverAge(data)
+		local mid=buildTwoPassPlan(receiver,ballPower,releaseBall,timing.mid,age+timing.mid)
+		if not mid then
+			return nil,"no release throw solution"
+		end
+
+		if state.qbAimSafeArc==false then
+			return{
+				mid=mid,
+				timing=timing,
+				uncertainty=0,
+			}
+		end
+
 		local uncertainty=receiverUncertainty(data,timing)
 		if uncertainty>RECEIVER_UNCERTAINTY_MAX then
 			return nil,"receiver uncertainty too high"
 		end
 
-		local age=receiverAge(data)
 		local early=buildTwoPassPlan(receiver,ballPower,releaseBall,timing.min,age+timing.min)
-		local mid=buildTwoPassPlan(receiver,ballPower,releaseBall,timing.mid,age+timing.mid)
 		local late=buildTwoPassPlan(receiver,ballPower,releaseBall,timing.max,age+timing.max)
 		local stable=stableAcrossWindow(early,mid,late)
 		if not stable then

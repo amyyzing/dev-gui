@@ -3,6 +3,7 @@ local Boost={}
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
 local Debris=game:GetService("Debris")
+local RunService=game:GetService("RunService")
 
 local me=Players.LocalPlayer
 
@@ -11,6 +12,9 @@ local DEFAULT_COOLDOWN=5
 local DEFAULT_CHANCE=100
 local DEFAULT_RADIUS=10
 local FOOTBALL_CACHE_INTERVAL=0.20
+local BOOST_SCAN_INTERVAL=0.05
+local BOOST_CONTACT_RADIUS=4.5
+local BOOST_SCAN_JOB_ID="AutoBoostContactScan"
 local TOGGLE_JB_KEY=Enum.KeyCode.Unknown
 local TOGGLE_AB_KEY=Enum.KeyCode.Unknown
 
@@ -99,6 +103,7 @@ function Boost.new(ctx,parent)
 	local buildSlider=ctx.buildSlider
 	local buildToggleRow=ctx.buildToggleRow
 	local state=ctx.State
+	local scheduler=ctx.Scheduler
 	local api={}
 	local jumpBoostToggle=nil
 	local jumpBoostModeToggle=nil
@@ -106,6 +111,8 @@ function Boost.new(ctx,parent)
 	local chanceSlider=nil
 	local radiusSlider=nil
 	local jumpBoostTouchConn=nil
+	local jumpBoostScanConn=nil
+	local jumpBoostScanScheduled=false
 	local characterAddedConn=nil
 	local inputConn=nil
 	local destroyConn=nil
@@ -191,9 +198,93 @@ function Boost.new(ctx,parent)
 		return footballCache
 	end
 
+	local function characterRoot(character)
+		return character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+	end
+
+	local function hasNearbyBoostTarget(character,root)
+		for _,player in ipairs(Players:GetPlayers()) do
+			local otherChar=player~=me and player.Character
+			if otherChar and otherChar~=character then
+				local humanoid=otherChar:FindFirstChildOfClass("Humanoid")
+				local otherRoot=characterRoot(otherChar)
+				if humanoid and humanoid.Health>0 and otherRoot and (otherRoot.Position-root.Position).Magnitude<=BOOST_CONTACT_RADIUS then
+					return true
+				end
+			end
+		end
+
+		return false
+	end
+
+	local function ballInBoostRange(root)
+		if state.jumpBoostTradeMode then
+			return true
+		end
+
+		local football=getCachedFootball()
+		return football and (football.Position-root.Position).Magnitude<=state.ballDetectionRadius
+	end
+
 	local function clearJumpBoostTouchConnection()
 		safeDisconnect(jumpBoostTouchConn)
 		jumpBoostTouchConn=nil
+	end
+
+	local function clearJumpBoostScanConnection()
+		if jumpBoostScanScheduled and scheduler and type(scheduler.Unregister)=="function" then
+			pcall(scheduler.Unregister,"Heartbeat",BOOST_SCAN_JOB_ID)
+		end
+
+		jumpBoostScanScheduled=false
+		safeDisconnect(jumpBoostScanConn)
+		jumpBoostScanConn=nil
+	end
+
+	local function scanJumpBoostContact()
+		if not isAlive() or not state.jumpBoostOn or not boostReady then
+			return
+		end
+
+		local character=me.Character
+		local root=characterRoot(character)
+		if not root or root.AssemblyLinearVelocity.Y>=-2 then
+			return
+		end
+
+		if hasNearbyBoostTarget(character,root) and ballInBoostRange(root) then
+			tryJumpBoost(root)
+		end
+	end
+
+	local function syncJumpBoostScan()
+		if not state.jumpBoostOn then
+			clearJumpBoostScanConnection()
+			return
+		end
+
+		if jumpBoostScanConn or jumpBoostScanScheduled then
+			return
+		end
+
+		if scheduler and type(scheduler.Register)=="function" then
+			local ok,result=pcall(scheduler.Register,"Heartbeat",BOOST_SCAN_JOB_ID,BOOST_SCAN_INTERVAL,scanJumpBoostContact)
+			if ok and result then
+				jumpBoostScanScheduled=true
+				return
+			end
+		end
+
+		local elapsed=0
+		jumpBoostScanConn=RunService.Heartbeat:Connect(function(dt)
+			elapsed=elapsed+(dt or 0)
+			if elapsed<BOOST_SCAN_INTERVAL then
+				return
+			end
+
+			elapsed=0
+			scanJumpBoostContact()
+		end)
 	end
 
 	local function setupJumpBoost(character)
@@ -233,6 +324,8 @@ function Boost.new(ctx,parent)
 				end
 			end
 		end)
+
+		syncJumpBoostScan()
 	end
 
 	function api.SetJumpBoostState(value,fire)
@@ -244,8 +337,10 @@ function Boost.new(ctx,parent)
 			if character then
 				setupJumpBoost(character)
 			end
+			syncJumpBoostScan()
 		else
 			clearJumpBoostTouchConnection()
+			clearJumpBoostScanConnection()
 		end
 
 		syncControls()
@@ -257,6 +352,7 @@ function Boost.new(ctx,parent)
 
 	function api.SetAlwaysBoostState(value,fire)
 		state.jumpBoostTradeMode=value and true or false
+		syncJumpBoostScan()
 		syncControls()
 
 		if fire~=false then
@@ -351,6 +447,7 @@ function Boost.new(ctx,parent)
 		safeDisconnect(destroyConn)
 		destroyConn=nil
 		clearJumpBoostTouchConnection()
+		clearJumpBoostScanConnection()
 		footballCache=nil
 		footballCacheExpires=0
 		destroyControl(jumpBoostToggle)
