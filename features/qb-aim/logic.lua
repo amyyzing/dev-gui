@@ -106,9 +106,9 @@ local RELEASE_ANGLE_SPREAD_MAX=2.0
 local SAFE_ARC_SAMPLE_DT=0.04
 local SAFE_ARC_CATCHABLE_Y_MARGIN=0.25
 local C2_MAX_RELEASE_DISTANCE=12.00
--- Legacy save/API compatibility only. Final throws no longer use manual drift.
-local QB_RELEASE_ORIGIN_DRIFT_TIME=0
-local QB_RELEASE_VERTICAL_DRIFT_TIME=0
+-- Manual server-origin drift. C2 is still the base; this nudges the sampled release point.
+local QB_RELEASE_ORIGIN_DRIFT_TIME=0.15
+local QB_RELEASE_VERTICAL_DRIFT_TIME=0.15
 local QB_RELEASE_VERTICAL_DRIFT_MAX=6.00
 -- Key model:
 --   1. Keypress locks receiver identity and preview only.
@@ -2157,17 +2157,20 @@ function QBAim.new(ctx,parent)
 		}),ball
 	end
 
-	local function buildTwoPassPlan(receiver,ballPower,releaseBall,qbOffset,wrOffset)
+	local function buildTwoPassPlan(receiver,ballPower,releaseBall,wrOffset)
 		local qbRoot=rootOfPlayer(LP) or root(LP.Character)
 		if not qbRoot then
 			return nil
 		end
 
-		local sampledOrigin=origin(qbRoot,releaseBall or currentHeldBall(),0,0)
-		local plan=buildPlan(receiver,ballPower,0,releaseBall,wrOffset,0,sampledOrigin)
+		local xzDrift=math.clamp(tonumber(state.qbAimQBDrift) or QB_RELEASE_ORIGIN_DRIFT_TIME,QB_DRIFT_MIN,QB_DRIFT_MAX)
+		local yDrift=math.clamp(tonumber(state.qbAimQBYDrift) or QB_RELEASE_VERTICAL_DRIFT_TIME,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
+		local sampledOrigin=origin(qbRoot,releaseBall or currentHeldBall(),xzDrift,yDrift)
+		local plan=buildPlan(receiver,ballPower,xzDrift,releaseBall,wrOffset,yDrift,sampledOrigin)
 		if plan then
 			plan.centerReleaseOrigin=sampledOrigin
-			plan.releaseTimingOffset=0
+			plan.releaseTimingOffset=xzDrift
+			plan.releaseYOffset=yDrift
 			plan.receiverTimingOffset=wrOffset
 		end
 
@@ -2183,7 +2186,7 @@ function QBAim.new(ctx,parent)
 
 		local timing=getTimingWindow()
 		local age=receiverAge(data)
-		local mid=buildTwoPassPlan(receiver,ballPower,releaseBall,timing.mid,age+timing.mid)
+		local mid=buildTwoPassPlan(receiver,ballPower,releaseBall,age+timing.mid)
 		if not mid then
 			return nil,"no release throw solution"
 		end
@@ -2201,8 +2204,8 @@ function QBAim.new(ctx,parent)
 			return nil,"receiver uncertainty too high"
 		end
 
-		local early=buildTwoPassPlan(receiver,ballPower,releaseBall,timing.min,age+timing.min)
-		local late=buildTwoPassPlan(receiver,ballPower,releaseBall,timing.max,age+timing.max)
+		local early=buildTwoPassPlan(receiver,ballPower,releaseBall,age+timing.min)
+		local late=buildTwoPassPlan(receiver,ballPower,releaseBall,age+timing.max)
 		local stable=stableAcrossWindow(early,mid,late)
 		if not stable then
 			return nil,"timing window unstable"
@@ -2226,7 +2229,7 @@ function QBAim.new(ctx,parent)
 				if THROW_TARGET_LOCK_PREVIEW_LIVE then
 					local data=receiverData[receiver]
 					local timing=getTimingWindow()
-					local livePlan=buildTwoPassPlan(receiver,ballPower,releaseBall,timing.mid,receiverAge(data)+timing.mid)
+					local livePlan=buildTwoPassPlan(receiver,ballPower,releaseBall,receiverAge(data)+timing.mid)
 					if livePlan then
 						previewPlan(livePlan)
 					end
@@ -2317,7 +2320,7 @@ function QBAim.new(ctx,parent)
 
 		local previewData=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
 		local previewTiming=getTimingWindow()
-		local previewReleasePlan=buildTwoPassPlan(receiver,power,heldBall,previewTiming.mid,receiverAge(previewData)+previewTiming.mid)
+		local previewReleasePlan=buildTwoPassPlan(receiver,power,heldBall,receiverAge(previewData)+previewTiming.mid)
 		if previewReleasePlan then
 			previewPlan(previewReleasePlan)
 		end
@@ -2695,7 +2698,7 @@ function QBAim.new(ctx,parent)
 
 		local timing=getTimingWindow()
 		local data=receiverData[trackedReceiver]
-		local plan=buildTwoPassPlan(trackedReceiver,nil,heldBall,timing.mid,receiverAge(data)+timing.mid)
+		local plan=buildTwoPassPlan(trackedReceiver,nil,heldBall,receiverAge(data)+timing.mid)
 		if plan then
 			previewPlan(plan)
 		end
