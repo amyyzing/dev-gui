@@ -103,8 +103,7 @@ local RELEASE_TARGET_SPREAD_MAX=3
 local RELEASE_ANGLE_SPREAD_MAX=2.0
 local SAFE_ARC_SAMPLE_DT=0.04
 local SAFE_ARC_CATCHABLE_Y_MARGIN=0.25
-local DIRECTIONAL_RELEASE_SIDE_OFFSET=1
-local DIRECTIONAL_RELEASE_HEIGHT_OFFSET=1.5
+local C2_MAX_RELEASE_DISTANCE=12.00
 -- Legacy save/API compatibility only. Final throws no longer use manual drift.
 local QB_RELEASE_ORIGIN_DRIFT_TIME=0
 local QB_RELEASE_VERTICAL_DRIFT_TIME=0
@@ -1631,28 +1630,27 @@ function QBAim.new(ctx,parent)
 			yReleaseOffset=0
 		end
 
-		local rootVelocity=movementAwareRootVelocity(qbRoot)
 		local fallbackPosition=ball and ball.Position or qbRoot.Position
 		local c2Pos=c2Position()
-		local y=fallbackPosition.Y
+		local basePosition=fallbackPosition
 
 		if c2Pos then
-			local rootY=qbRoot.Position.Y
-			local ballY=ball and ball.Position.Y or rootY
-			local yDelta=math.min(math.abs(c2Pos.Y-rootY),math.abs(c2Pos.Y-ballY))
-			local yValid=yDelta<=C2_MAX_Y_DELTA
-				and c2Pos.Y>=math.min(rootY,ballY)-C2_GROUND_FALLBACK_MARGIN
-				and c2Pos.Y<=math.max(rootY,ballY)+C2_MAX_ABOVE_BALL
+			local referencePosition=fallbackPosition
+			local yValid=c2Pos.Y>=referencePosition.Y-C2_GROUND_FALLBACK_MARGIN
+				and c2Pos.Y<=referencePosition.Y+C2_MAX_ABOVE_BALL
+				and math.abs(c2Pos.Y-referencePosition.Y)<=C2_MAX_Y_DELTA
+			local distanceValid=(c2Pos-referencePosition).Magnitude<=C2_MAX_RELEASE_DISTANCE
 
-			if yValid then
-				-- C2 belongs to the local preview rig. Keep its useful release height,
-				-- but never take its XZ and then add server-position drift on top.
-				y=c2Pos.Y
+			if yValid and distanceValid then
+				basePosition=c2Pos
+			elseif yValid then
+				basePosition=Vector3.new(fallbackPosition.X,c2Pos.Y,fallbackPosition.Z)
 			end
 		end
 
 		local dx,dz=0,0
 		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and xzReleaseOffset>0 then
+			local rootVelocity=movementAwareRootVelocity(qbRoot)
 			dx=rootVelocity.X*xzReleaseOffset
 			dz=rootVelocity.Z*xzReleaseOffset
 		end
@@ -1662,26 +1660,11 @@ function QBAim.new(ctx,parent)
 			local airborne=math.abs(verticalVelocity)>=QB_AIRBORNE_VY_EPSILON or qbRoot.Position.Y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON
 			if airborne then
 				local yOffset=verticalVelocity*yReleaseOffset-0.5*PLAYER_G*yReleaseOffset*yReleaseOffset
-				y=y+math.clamp(yOffset,-QB_RELEASE_VERTICAL_DRIFT_MAX,QB_RELEASE_VERTICAL_DRIFT_MAX)
+				basePosition=basePosition+Vector3.new(0,math.clamp(yOffset,-QB_RELEASE_VERTICAL_DRIFT_MAX,QB_RELEASE_VERTICAL_DRIFT_MAX),0)
 			end
 		end
 
-		return Vector3.new(fallbackPosition.X+dx,y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),fallbackPosition.Z+dz)
-	end
-
-	local function directionalReleaseOrigin(qbRoot,direction,timingOffset)
-		if not qbRoot then return nil end
-
-		local character=qbRoot.Parent
-		local primary=character and character.PrimaryPart
-		local base=(primary and primary:IsA("BasePart") and primary.Position) or qbRoot.Position
-		local velocity=movementAwareRootVelocity(qbRoot)
-		local futureBase=base+flat(velocity)*(timingOffset or 0)
-		local fallback=unit(flat(qbRoot.CFrame.LookVector),Vector3.new(0,0,-1))
-		local dir=unit(flat(direction or fallback),fallback)
-		local releaseCFrame=CFrame.lookAt(futureBase,futureBase+dir)
-
-		return(releaseCFrame*CFrame.new(DIRECTIONAL_RELEASE_SIDE_OFFSET,DIRECTIONAL_RELEASE_HEIGHT_OFFSET,0)).Position
+		return Vector3.new(basePosition.X+dx,basePosition.Y+QB_LAUNCH_Y_BIAS+qbYCorrection(qbRoot),basePosition.Z+dz)
 	end
 
 	local function ensureC1Marker()
@@ -2173,25 +2156,20 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function buildTwoPassPlan(receiver,ballPower,releaseBall,qbOffset,wrOffset)
-		local first=buildPlan(receiver,ballPower,0,releaseBall,wrOffset,0,nil)
-		if not(first and first.direction) then
-			return nil
-		end
-
 		local qbRoot=rootOfPlayer(LP) or root(LP.Character)
-		local originOverride=directionalReleaseOrigin(qbRoot,first.direction,qbOffset)
-		if not originOverride then
+		if not qbRoot then
 			return nil
 		end
 
-		local second=buildPlan(receiver,ballPower,qbOffset,releaseBall,wrOffset,0,originOverride)
-		if second then
-			second.firstPassOrigin=first.origin
-			second.directionalReleaseOrigin=originOverride
-			second.releaseTimingOffset=qbOffset
+		local sampledOrigin=origin(qbRoot,releaseBall or currentHeldBall(),0,0)
+		local plan=buildPlan(receiver,ballPower,0,releaseBall,wrOffset,0,sampledOrigin)
+		if plan then
+			plan.centerReleaseOrigin=sampledOrigin
+			plan.releaseTimingOffset=0
+			plan.receiverTimingOffset=wrOffset
 		end
 
-		return second
+		return plan
 	end
 
 	local function buildReleaseWindowPlans(receiver,ballPower,releaseBall)
