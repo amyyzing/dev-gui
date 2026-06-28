@@ -744,6 +744,8 @@ function QBAim.new(ctx,parent)
 	local peakHeightSliderKnob=nil
 	local peakHeightSliderControl=nil
 	local peakHeightDragging=false
+	local qbDriftSliderControl=nil
+	local qbYDriftSliderControl=nil
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
 	local PEAK_HEIGHT_MIN=8.00
@@ -952,6 +954,16 @@ function QBAim.new(ctx,parent)
 		end
 	end
 
+	local function updateDriftVisuals()
+		if qbDriftSliderControl then
+			qbDriftSliderControl.set(state.qbAimQBDrift)
+		end
+
+		if qbYDriftSliderControl then
+			qbYDriftSliderControl.set(state.qbAimQBYDrift)
+		end
+	end
+
 	local function setLeadDelay(value,showStatus)
 		local numberValue=tonumber(value)
 		if not numberValue then
@@ -976,6 +988,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		state.qbAimQBDrift=math.clamp(numberValue,QB_DRIFT_MIN,QB_DRIFT_MAX)
+		updateDriftVisuals()
 		if showStatus then
 			changed()
 		end
@@ -989,6 +1002,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		state.qbAimQBYDrift=math.clamp(numberValue,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
+		updateDriftVisuals()
 		if showStatus then
 			changed()
 		end
@@ -1274,6 +1288,7 @@ function QBAim.new(ctx,parent)
 
 		updateLeadDelayVisuals()
 		updatePeakHeightVisuals()
+		updateDriftVisuals()
 		setTargetText()
 
 		if not isAvailable() then
@@ -2563,6 +2578,12 @@ function QBAim.new(ctx,parent)
 		peakHeightSliderControl=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
 			api.SetPeakHeight(value,true)
 		end)
+		qbDriftSliderControl=buildSlider(sectionBody,"QB XZ Drift",QB_DRIFT_MIN,QB_DRIFT_MAX,state.qbAimQBDrift,2,function(value)
+			api.SetQBDrift(value,true)
+		end)
+		qbYDriftSliderControl=buildSlider(sectionBody,"QB Y Drift",QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX,state.qbAimQBYDrift,2,function(value)
+			api.SetQBYDrift(value,true)
+		end)
 	else
 		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
 		leadDelayBox=New("TextBox",{BackgroundColor3=THEME.BG,BorderSizePixel=0,Position=UDim2.new(1,-72,0,0),Size=UDim2.fromOffset(72,24),Text=string.format("%.2f",WR_LEAD_DELAY),ClearTextOnFocus=false,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=7},leadDelayFrame)
@@ -2580,6 +2601,7 @@ function QBAim.new(ctx,parent)
 
 	updateLeadDelayVisuals()
 	updatePeakHeightVisuals()
+	updateDriftVisuals()
 
 	local function receiverTrackStep(dt)
 		if not(enabled and isAvailable()) then return end
