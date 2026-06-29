@@ -605,6 +605,7 @@ function guiLogic.new(app)
 		local sectionMode=tostring(c.SectionMode or "card"):lower()
 		local descriptionOnly=options.compact==true or options.headerOnly==true
 		local hasBody=not descriptionOnly
+		local canCollapse=hasBody and options.collapsible~=false and options.Collapsible~=false
 		local sec=make("Frame",{BackgroundColor3=themeColor("SECTION",colors.card),BackgroundTransparency=componentNumber("SectionBackgroundTransparency",0),BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ClipsDescendants=true,ZIndex=4,LayoutOrder=order,ThemeRole="SECTION",CornerRole="Section"},parent)
 
 		addCorner(sec,"Section")
@@ -650,8 +651,8 @@ function guiLogic.new(app)
 		local toggleReserve=options.headerToggle and (headerToggleWidth+8) or 0
 		local customReserve=headerCustomOptions and (headerCustomWidth+8) or 0
 		local titleReserve=toggleReserve+customReserve+(headerButtonOptions and (headerButtonWidth+8) or 0)
-		local usesPrefix=componentValue("SectionPrefix",true)~=false
-		local titleButton=make("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-titleReserve,1,0),Text=(usesPrefix and "[-] " or "")..titleText,Font=componentFont("TitleFont",Enum.Font.GothamBold),TextSize=componentNumber("SectionTitleSize",14),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,Selectable=true,ZIndex=5},header)
+		local usesPrefix=canCollapse and componentValue("SectionPrefix",true)~=false
+		local titleButton=make("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-titleReserve,1,0),Text=(usesPrefix and "[-] " or "")..titleText,Font=componentFont("TitleFont",Enum.Font.GothamBold),TextSize=componentNumber("SectionTitleSize",14),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,Selectable=canCollapse,ZIndex=5},header)
 		local headerRightOffset=0
 
 		if sectionMode=="groupbox" then
@@ -882,22 +883,26 @@ function guiLogic.new(app)
 			end
 
 			if controls.toggle and controls.toggle.setExpanded then
-				controls.toggle.setExpanded(not collapsed,animate)
+				controls.toggle.setExpanded((not canCollapse) or not collapsed,animate)
 			end
 
 			tweenTitle()
 
-			if collapsed then
-				collapseBody(animate)
-			else
-				expandBody(animate)
+			if canCollapse then
+				if collapsed then
+					collapseBody(animate)
+				else
+					expandBody(animate)
+				end
 			end
 		end
 
-		connectSection(titleButton.Activated,function()
-			collapsed=not collapsed
-			paint(true)
-		end)
+		if canCollapse then
+			connectSection(titleButton.Activated,function()
+				collapsed=not collapsed
+				paint(true)
+			end)
+		end
 
 		connectSection(sec:GetPropertyChangedSignal("AbsoluteSize"),function()
 			if body and not collapsed then

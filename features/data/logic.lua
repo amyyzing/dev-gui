@@ -262,6 +262,7 @@ function playerData.new(app,page,deps)
 	end
 
 	local dataSection,sectionControls=makeSection(page,2,"Player Data","",{
+		headerOnly=true,
 		headerButton={
 			text="wipe",
 			width=104,
