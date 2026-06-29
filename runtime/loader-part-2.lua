@@ -163,7 +163,7 @@ resetKeybindPresetPageDefaults=function() end
 
 DataSaveAPI=nil
 requestPlayerAutosave=function()
-	if DataSaveAPI and DataSaveAPI.Schedule then
+	if DataSaveAPI and type(DataSaveAPI.Schedule)=="function" then
 		DataSaveAPI.Schedule()
 	end
 end
@@ -175,7 +175,7 @@ function makeLocalPresetCode(name)
 end
 
 function setPresetSizeFromDataSave(index,x,y,z)
-	if DataSaveAPI and DataSaveAPI.SetPresetSize then
+	if DataSaveAPI and type(DataSaveAPI.SetPresetSize)=="function" then
 		return DataSaveAPI.SetPresetSize(index,x,y,z)
 	end
 
@@ -194,7 +194,7 @@ function setPresetSizeFromDataSave(index,x,y,z)
 end
 
 function setPresetKeyFromDataSave(index,binding)
-	if DataSaveAPI and DataSaveAPI.SetPresetKey then
+	if DataSaveAPI and type(DataSaveAPI.SetPresetKey)=="function" then
 		return DataSaveAPI.SetPresetKey(index,binding)
 	end
 
@@ -207,7 +207,7 @@ function setPresetKeyFromDataSave(index,binding)
 end
 
 function resetPresetFromDataSave(index)
-	if DataSaveAPI and DataSaveAPI.ResetPreset then
+	if DataSaveAPI and type(DataSaveAPI.ResetPreset)=="function" then
 		return DataSaveAPI.ResetPreset(index)
 	end
 
@@ -222,7 +222,7 @@ function resetPresetFromDataSave(index)
 end
 
 function applyPresetEditorFromDataSave(editor)
-	if DataSaveAPI and DataSaveAPI.ApplyPresetEditor then
+	if DataSaveAPI and type(DataSaveAPI.ApplyPresetEditor)=="function" then
 		return DataSaveAPI.ApplyPresetEditor(editor)
 	end
 
@@ -239,7 +239,7 @@ function applyPresetEditorFromDataSave(editor)
 end
 
 function createOwnedPresetFromDataSave(name,editor)
-	if DataSaveAPI and DataSaveAPI.CreateOwnedPreset then
+	if DataSaveAPI and type(DataSaveAPI.CreateOwnedPreset)=="function" then
 		return DataSaveAPI.CreateOwnedPreset(name,editor)
 	end
 
@@ -253,7 +253,7 @@ function createOwnedPresetFromDataSave(name,editor)
 end
 
 function importOwnedPresetFromDataSave(code)
-	if DataSaveAPI and DataSaveAPI.ImportOwnedPreset then
+	if DataSaveAPI and type(DataSaveAPI.ImportOwnedPreset)=="function" then
 		return DataSaveAPI.ImportOwnedPreset(code)
 	end
 
@@ -261,7 +261,7 @@ function importOwnedPresetFromDataSave(code)
 end
 
 function equipOwnedPresetFromDataSave(preset)
-	if DataSaveAPI and DataSaveAPI.EquipOwnedPreset then
+	if DataSaveAPI and type(DataSaveAPI.EquipOwnedPreset)=="function" then
 		return DataSaveAPI.EquipOwnedPreset(preset)
 	end
 
@@ -275,7 +275,7 @@ function equipOwnedPresetFromDataSave(preset)
 end
 
 function deleteOwnedPresetFromDataSave(code,index)
-	if DataSaveAPI and DataSaveAPI.DeleteOwnedPreset then
+	if DataSaveAPI and type(DataSaveAPI.DeleteOwnedPreset)=="function" then
 		return DataSaveAPI.DeleteOwnedPreset(code,index)
 	end
 

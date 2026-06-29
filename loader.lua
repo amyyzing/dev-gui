@@ -2,7 +2,7 @@ local HttpService = game:GetService( "HttpService" )
 
 local botUrl = "https://lint-bot-production.up.railway.app"
 local moduleGetPath="/module/get"
-local apiKey = "thekeytoheaven"
+local apiKey = "nydayohmy"
 local maxSourceBytes=300000
 
 local runtimeFiles = {
