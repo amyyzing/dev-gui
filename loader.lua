@@ -57,6 +57,7 @@ local function fetchModule(path)
 		path = path,
 		apiKey=apiKey,
 		fresh=true,
+		cacheBust=tostring(os.clock())..":"..tostring(path),
 	}
 
 	local body = HttpService:JSONEncode(apiBody)
@@ -103,7 +104,25 @@ local function validateSource(path, source)
 		return false,"runtime too big"
 	end
 
+	if path=="runtime/loader-part-2.lua" and not source:find('type%(DataSaveAPI%.DeleteOwnedPreset%)=="function"') then
+		return false,"old boot 2"
+	end
+
 	return true,nil
+end
+
+local function sourceLine(source,lineNumber)
+	local current=1
+	for line in string.gmatch(source.."\n","([^\n]*)\n") do
+		if current==lineNumber then
+			if #line>120 then
+				return string.sub(line,1,120)
+			end
+			return line
+		end
+		current=current+1
+	end
+	return ""
 end
 
 local runtimeSources={}
@@ -150,7 +169,7 @@ for _,path in ipairs(runtimeFiles) do
 
 	local ran, runError = pcall(chunk)
 	if not ran then
-		error("loader run failed "..path..": "..tostring(runError))
+		error("loader run failed "..path.." line281=["..sourceLine(source,281).."]: "..tostring(runError))
 	end
 end
 

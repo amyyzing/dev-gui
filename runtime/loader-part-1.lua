@@ -525,6 +525,7 @@ function botApi.Post(path,body)
 	body.apiKey=botApi.Key
 	if path=="/module/get" or path=="/module/batch" or path=="/module/manifest" then
 		body.fresh=true
+		body.cacheBust=tostring(os.clock())..":"..tostring(path)
 	end
 
 	local ok,response=pcall(function()

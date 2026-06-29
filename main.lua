@@ -47,7 +47,8 @@ local function fetchLoader()
 	local body=HttpService:JSONEncode({
 		path=loaderPath,
 		apiKey=apiKey,
-		fresh=true
+		fresh=true,
+		cacheBust=tostring(os.clock())
 	})
 
 	local ok,response=pcall(function()
