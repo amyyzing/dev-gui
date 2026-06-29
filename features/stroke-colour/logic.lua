@@ -2043,7 +2043,9 @@ function strokeColour.new(app,page)
 
 	for _,slice in ipairs(highlightDialSlices) do
 		local pageAssets=assets and assets[slice.assetKey]
-		if pageAssets and pageAssets.slice and pageAssets.glow then
+		local normalPiece=pageAssets and (pageAssets.normalPiece or pageAssets.slice)
+		local glowPiece=pageAssets and (pageAssets.glowPiece or pageAssets.glow)
+		if normalPiece and glowPiece then
 			highlightDialGlowImages[slice.key]={}
 			for _,layer in ipairs(highlightGlowLayers) do
 				local pad=layer.pad
@@ -2051,7 +2053,7 @@ function strokeColour.new(app,page)
 					BackgroundTransparency=1,
 					Position=UDim2.new(0,-pad,0,-pad),
 					Size=UDim2.new(1,pad*2,1,pad*2),
-					Image=pageAssets.glow,
+					Image=glowPiece,
 					ImageColor3=getUIStrokeColor(),
 					ImageTransparency=1,
 					ResampleMode=Enum.ResamplerMode.Default,
@@ -2065,7 +2067,7 @@ function strokeColour.new(app,page)
 				BackgroundTransparency=1,
 				Position=UDim2.fromScale(0,0),
 				Size=UDim2.fromScale(1,1),
-				Image=pageAssets.slice,
+				Image=normalPiece,
 				ImageColor3=themeColor("INPUT",colors.panel),
 				ImageTransparency=0.74,
 				ResampleMode=Enum.ResamplerMode.Default,
@@ -2077,7 +2079,7 @@ function strokeColour.new(app,page)
 				BackgroundTransparency=1,
 				Position=UDim2.fromScale(0,0),
 				Size=UDim2.fromScale(1,1),
-				Image=pageAssets.slice,
+				Image=normalPiece,
 				ImageColor3=Color3.new(1,1,1),
 				ImageTransparency=1,
 				ResampleMode=Enum.ResamplerMode.Default,
