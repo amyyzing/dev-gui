@@ -1,18 +1,18 @@
 -- shared heartbeat and render-step scheduler.
 
 local env = (getfenv and getfenv()) or _G
-local Scope = rawget(env, "CoreScope") or rawget(env, "CoreScopeModule")
+local scopeApi = rawget(env, "CoreScope") or rawget(env, "CoreScopeModule")
 
-if not Scope and script and script.Parent then
-	Scope = require(script.Parent.scope)
+if not scopeApi and script and script.Parent then
+	scopeApi = require(script.Parent.scope)
 end
 
-assert(Scope, "CoreScope must load before CoreScheduler")
+assert(scopeApi, "CoreScope must load before CoreScheduler")
 
-local Scheduler = {}
-Scheduler.__index = Scheduler
+local schedulerApi = {}
+schedulerApi.__index = schedulerApi
 
-local EMPTY_STATS = {}
+local emptyStats = {}
 
 local function sortJobs(jobs)
 	table.sort(jobs, function(a, b)
@@ -94,17 +94,17 @@ local function copyStats(job, kind)
 	}
 end
 
-function Scheduler.new(runService, scope)
+function schedulerApi.new(runService, scope)
 	local self = setmetatable({
 		_runService = runService or game:GetService("RunService"),
-		_scope = Scope.new("scheduler"),
+		_scope = scopeApi.new("scheduler"),
 		_paused = false,
 		_renderJobs = {},
 		_heartbeatJobs = {},
 		_renderConnection = nil,
 		_heartbeatConnection = nil,
 		_delayId = 0,
-	}, Scheduler)
+	}, schedulerApi)
 
 	if scope then
 		scope:add(self)
@@ -113,11 +113,11 @@ function Scheduler.new(runService, scope)
 	return self
 end
 
-function Scheduler:setPaused(paused)
+function schedulerApi:setPaused(paused)
 	self._paused = paused == true
 end
 
-function Scheduler:_removeJob(jobs, name)
+function schedulerApi:_removeJob(jobs, name)
 	for index = #jobs, 1, -1 do
 		if jobs[index].name == name then
 			table.remove(jobs, index)
@@ -126,7 +126,7 @@ function Scheduler:_removeJob(jobs, name)
 	end
 end
 
-function Scheduler:_runJobs(jobs, dt)
+function schedulerApi:_runJobs(jobs, dt)
 	if self._paused then
 		return
 	end
@@ -151,7 +151,7 @@ function Scheduler:_runJobs(jobs, dt)
 	end
 end
 
-function Scheduler:_ensureRender()
+function schedulerApi:_ensureRender()
 	if self._renderConnection then
 		return
 	end
@@ -161,7 +161,7 @@ function Scheduler:_ensureRender()
 	end))
 end
 
-function Scheduler:_ensureHeartbeat()
+function schedulerApi:_ensureHeartbeat()
 	if self._heartbeatConnection then
 		return
 	end
@@ -171,7 +171,7 @@ function Scheduler:_ensureHeartbeat()
 	end))
 end
 
-function Scheduler:_addJob(jobs, ensure, name, priority, callback, ownerScope, interval)
+function schedulerApi:_addJob(jobs, ensure, name, priority, callback, ownerScope, interval)
 	assert(type(name) == "string" and name ~= "", "Scheduler job needs a name")
 	assert(type(callback) == "function", "Scheduler job needs a callback")
 
@@ -207,19 +207,19 @@ function Scheduler:_addJob(jobs, ensure, name, priority, callback, ownerScope, i
 	return handle
 end
 
-function Scheduler:onRender(name, priority, callback, ownerScope)
+function schedulerApi:onRender(name, priority, callback, ownerScope)
 	return self:_addJob(self._renderJobs, self._ensureRender, name, priority, callback, ownerScope)
 end
 
-function Scheduler:onHeartbeat(name, priority, callback, ownerScope)
+function schedulerApi:onHeartbeat(name, priority, callback, ownerScope)
 	return self:_addJob(self._heartbeatJobs, self._ensureHeartbeat, name, priority, callback, ownerScope)
 end
 
-function Scheduler:every(name, interval, callback, ownerScope)
+function schedulerApi:every(name, interval, callback, ownerScope)
 	return self:_addJob(self._heartbeatJobs, self._ensureHeartbeat, name, 0, callback, ownerScope, interval)
 end
 
-function Scheduler:delay(nameOrSeconds, secondsOrCallback, callbackOrScope, maybeOwnerScope)
+function schedulerApi:delay(nameOrSeconds, secondsOrCallback, callbackOrScope, maybeOwnerScope)
 	local name = nil
 	local seconds = nameOrSeconds
 	local callback = secondsOrCallback
@@ -248,11 +248,11 @@ function Scheduler:delay(nameOrSeconds, secondsOrCallback, callbackOrScope, mayb
 	return handle
 end
 
-function Scheduler:jobCount()
+function schedulerApi:jobCount()
 	return #self._renderJobs + #self._heartbeatJobs
 end
 
-function Scheduler:stats()
+function schedulerApi:stats()
 	local result = {}
 
 	for _, job in ipairs(self._renderJobs) do
@@ -274,7 +274,7 @@ function Scheduler:stats()
 	return result
 end
 
-function Scheduler:jobStats(name)
+function schedulerApi:jobStats(name)
 	for _, job in ipairs(self._renderJobs) do
 		if job.name == name then
 			return copyStats(job, "RenderStepped")
@@ -287,10 +287,10 @@ function Scheduler:jobStats(name)
 		end
 	end
 
-	return EMPTY_STATS
+	return emptyStats
 end
 
-function Scheduler:resetStats()
+function schedulerApi:resetStats()
 	local function reset(jobs)
 		for _, job in ipairs(jobs) do
 			job.callCount = 0
@@ -304,7 +304,7 @@ function Scheduler:resetStats()
 	reset(self._heartbeatJobs)
 end
 
-function Scheduler:destroy()
+function schedulerApi:destroy()
 	self._scope:destroy()
 	table.clear(self._renderJobs)
 	table.clear(self._heartbeatJobs)
@@ -312,8 +312,8 @@ function Scheduler:destroy()
 	self._heartbeatConnection = nil
 end
 
-function Scheduler:Destroy()
+function schedulerApi:Destroy()
 	self:destroy()
 end
 
-return Scheduler
+return schedulerApi

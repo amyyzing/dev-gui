@@ -1,6 +1,6 @@
 -- hides unused map parts and restores them later.
 
-local MapCleaner={}
+local mapCleaner={}
 
 local function firstChild(parent)
 	if not parent then return nil end
@@ -25,7 +25,7 @@ local function workspaceParent()
 	return workspace
 end
 
-local TARGETS={
+local targetNames={
 	{key="GameSpawn",name="Spawn",parent=gameReplicated},
 	{key="GameVoting",name="Voting",parent=gameReplicated},
 	{key="WorkspaceSet",name="Set",parent=workspaceParent},
@@ -37,7 +37,7 @@ local TARGETS={
 local function isTarget(inst)
 	if not inst then return false end
 
-	for _,target in ipairs(TARGETS) do
+	for _,target in ipairs(targetNames) do
 		local parent=target.parent()
 		if parent and inst.Name==target.name and inst.Parent==parent then
 			return true
@@ -47,9 +47,9 @@ local function isTarget(inst)
 	return false
 end
 
-function MapCleaner.new(app,page)
-	local New=app.New
-	local THEME=app.THEME
+function mapCleaner.new(app,page)
+	local make=app.New
+	local colors=app.colors
 	local safeDisconnect=app.safeDisconnect
 	local makeSection=app.makeSection
 	local buildToggleRow=app.buildToggleRow
@@ -70,7 +70,7 @@ function MapCleaner.new(app,page)
 	local function setStatus(text,color)
 		if not statusLabel then return end
 		statusLabel.Text=text
-		statusLabel.TextColor3=color or THEME.MUTED
+		statusLabel.TextColor3=color or colors.muted
 	end
 
 	local function removeOne(inst,target,parent)
@@ -89,12 +89,12 @@ function MapCleaner.new(app,page)
 
 	local function removeCurrent()
 		if not isGameplay() then
-			setStatus("game only",THEME.MUTED)
+			setStatus("game only",colors.muted)
 			return
 		end
 
 		local changed=0
-		for _,target in ipairs(TARGETS) do
+		for _,target in ipairs(targetNames) do
 			local parent=target.parent()
 			local inst=parent and parent:FindFirstChild(target.name)
 			if inst then
@@ -104,7 +104,7 @@ function MapCleaner.new(app,page)
 			end
 		end
 
-		setStatus("removed "..tostring(#removed),changed>0 and THEME.GREEN or THEME.MUTED)
+		setStatus("removed "..tostring(#removed),changed>0 and colors.green or colors.muted)
 	end
 
 	local function restoreRemoved()
@@ -113,7 +113,7 @@ function MapCleaner.new(app,page)
 			local inst=entry and entry.instance
 			local target=nil
 
-			for _,candidate in ipairs(TARGETS) do
+			for _,candidate in ipairs(targetNames) do
 				if candidate.key==entry.key then
 					target=candidate
 					break
@@ -167,7 +167,7 @@ function MapCleaner.new(app,page)
 		else
 			disconnectWatchers()
 			restoreRemoved()
-			setStatus(isGameplay() and "map back" or "game only",THEME.MUTED)
+			setStatus(isGameplay() and "map back" or "game only",colors.muted)
 		end
 
 		if fire~=false and app.onChanged then
@@ -189,7 +189,7 @@ function MapCleaner.new(app,page)
 			watchWorkspace()
 			removeCurrent()
 		else
-			setStatus(isGameplay() and "" or "game only",THEME.MUTED)
+			setStatus(isGameplay() and "" or "game only",colors.muted)
 		end
 	end
 
@@ -222,4 +222,4 @@ function MapCleaner.new(app,page)
 	return api
 end
 
-return MapCleaner
+return mapCleaner

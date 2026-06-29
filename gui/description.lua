@@ -1,14 +1,14 @@
 -- central page/category labels so the loader and panel say the same thing.
 
-local EMPTY=""
+local blank=""
 
-local Description={}
+local description={}
 
-Description.Categories={
+description.Categories={
 	Main={
 		Title="untitled gui",
-		Description=EMPTY,
-		LoadedSuffix=EMPTY,
+		description=blank,
+		LoadedSuffix=blank,
 	},
 
 	Pages={
@@ -21,64 +21,64 @@ Description.Categories={
 	},
 
 	PageDescriptions={
-		Main=EMPTY,
-		Maps=EMPTY,
-		Server=EMPTY,
-		Customize=EMPTY,
-		Keybinds=EMPTY,
-		Settings=EMPTY,
+		Main=blank,
+		Maps=blank,
+		Server=blank,
+		Customize=blank,
+		Keybinds=blank,
+		Settings=blank,
 	},
 
 	Sections={
 		Main={
-			["Hitbox"]={Title="HITBOX",Description=EMPTY},
-			["Game Params"]={Title="PARAMS",Description=EMPTY},
-			["Boost"]={Title="AUTO BOOST",Description=EMPTY},
-			["ESP"]={Title="ESP",Description=EMPTY},
-			["QB Aim"]={Title="QB AIM",Description=EMPTY},
-			["Testing"]={Title="TESTING",Description=EMPTY},
+			["Hitbox"]={Title="HITBOX",description=blank},
+			["Game Params"]={Title="PARAMS",description=blank},
+			["Boost"]={Title="AUTO BOOST",description=blank},
+			["ESP"]={Title="ESP",description=blank},
+			["QB Aim"]={Title="QB AIM",description=blank},
+			["Testing"]={Title="TESTING",description=blank},
 		},
 
 		Maps={
-			["Map Editor"]={Title="MAP EDITOR",Description=EMPTY},
-			["Anti Material"]={Title="ANTI-MATERIAL",Description=EMPTY},
-			["Map Cleaner"]={Title="MAP CLEANER",Description=EMPTY},
-			["Remove Ads"]={Title="REMOVE BILLBOARD",Description=EMPTY},
-			["Workspace"]={Title="WORKSPACE",Description=EMPTY},
+			["Map Editor"]={Title="MAP EDITOR",description=blank},
+			["Anti Material"]={Title="ANTI-MATERIAL",description=blank},
+			["Map Cleaner"]={Title="MAP CLEANER",description=blank},
+			["Remove Ads"]={Title="REMOVE BILLBOARD",description=blank},
+			["Workspace"]={Title="WORKSPACE",description=blank},
 		},
 
 		Customize={
-			["Customisation"]={Title="CUSTOMIZATION",Description=EMPTY},
-			["Colours"]={Title="COLORS",Description=EMPTY},
-			["Primary Colours"]={Title="PRIMARY COLOURS",Description=EMPTY},
-			["Secondary Colours"]={Title="SECONDARY COLOURS",Description=EMPTY},
-			["Pulse Accent"]={Title="STROKE PATTERN",Description=EMPTY},
-			["Border Shape"]={Title="BORDER",Description=EMPTY},
-			["Stroke Colour"]={Title="STROKE",Description=EMPTY},
+			["Customisation"]={Title="CUSTOMIZATION",description=blank},
+			["Colours"]={Title="COLORS",description=blank},
+			["Primary Colours"]={Title="PRIMARY COLOURS",description=blank},
+			["Secondary Colours"]={Title="SECONDARY COLOURS",description=blank},
+			["Pulse Accent"]={Title="STROKE PATTERN",description=blank},
+			["Border Shape"]={Title="BORDER",description=blank},
+			["Stroke Colour"]={Title="STROKE",description=blank},
 		},
 
 		Keybinds={
-			["Hitbox Presets"]={Title="PRESETS",Description=EMPTY},
-			["Preset Editor"]={Title="SET EDITOR",Description=EMPTY},
-			["Keybind Settings"]={Title="KEYBINDS",Description=EMPTY},
+			["Hitbox Presets"]={Title="PRESETS",description=blank},
+			["Preset Editor"]={Title="SET EDITOR",description=blank},
+			["Keybind Settings"]={Title="KEYBINDS",description=blank},
 		},
 
 		Settings={
-			["Update"]={Title="UPDATE",Description=EMPTY},
-			["Player Data"]={Title="PLAYER DATA",Description=EMPTY},
-			["Discord"]={Title="COMMUNITY",Description=EMPTY},
+			["Update"]={Title="UPDATE",description=blank},
+			["Player Data"]={Title="PLAYER DATA",description=blank},
+			["Discord"]={Title="COMMUNITY",description=blank},
 		},
 	},
 
 	Labels={
-		ActionStatus=EMPTY,
-		Reset=EMPTY,
-		Ready=EMPTY,
-		Busy=EMPTY,
+		ActionStatus=blank,
+		Reset=blank,
+		Ready=blank,
+		Busy=blank,
 	},
 
 	Text={
-		MainFrame={
+		mainFrame={
 			["untitled gui"]="untitled gui",
 			["MAIN"]="Main",
 			["MAPS"]="Maps",
@@ -117,7 +117,7 @@ Description.Categories={
 			["Disabled"]="off",
 		},
 
-		Hitbox={
+		hitbox={
 			["Hitbox Toggle"]="hitbox",
 			["HITBOX SIZE"]="size",
 			["TRANSPARENCY"]="transparency",
@@ -133,14 +133,14 @@ Description.Categories={
 			["Force Speed"]="speed",
 		},
 
-		GameParams={
+		gameParams={
 			["SR"]="stamina regen",
 			["SD"]="stamina drain",
 			["J"]="jump",
 			["D"]="dive",
 		},
 
-		Boost={
+		boost={
 			["Jump Boost"]="boost",
 			["Always Boost"]="always",
 			["Jump Boost Toggle"]="boost",
@@ -153,7 +153,7 @@ Description.Categories={
 			["Radius"]="radius",
 		},
 
-		ESP={
+		esp={
 			["ESP"]="ESP",
 			["ESP Toggle"]="ESP",
 			["Gameplay only"]="game only",
@@ -184,7 +184,7 @@ Description.Categories={
 			["receiver tracking missing"]="wr not tracked",
 		},
 
-		Testing={
+		testing={
 			["Testing"]="Testing",
 			["incoming C1 capture"]="c1",
 			["WR C1 and QB arc safety"]="c1",
@@ -245,7 +245,7 @@ Description.Categories={
 			["Toggle open / hide GUI"]="open gui",
 		},
 
-		PlayerData={
+		playerData={
 			["Cloud Profile"]="data",
 			["READY"]="ready",
 			["BUSY"]="busy",
@@ -255,10 +255,10 @@ Description.Categories={
 			["This WILL delete your data across all gamemodes. Continue?"]="this deletes all saved gui data",
 			["Wiping player data..."]="wiping...",
 			["Player data wiped."]="data wiped",
-			["Saved settings and owned presets are available."]=EMPTY,
+			["Saved settings and owned presets are available."]=blank,
 		},
 
-		Discord={
+		discord={
 			["Loading invite link..."]="loading invite...",
 			["Fetching invite link..."]="getting invite...",
 			["No invite link set."]="no invite link set",
@@ -274,17 +274,17 @@ Description.Categories={
 	},
 }
 
-Description.Main=Description.Categories.Main
-Description.Pages=Description.Categories.Pages
-Description.PageDescriptions=Description.Categories.PageDescriptions
-Description.Labels=Description.Categories.Labels
-Description.Sections={}
-Description.Texts={}
+description.Main=description.Categories.Main
+description.Pages=description.Categories.Pages
+description.PageDescriptions=description.Categories.PageDescriptions
+description.Labels=description.Categories.Labels
+description.Sections={}
+description.Texts={}
 
 local function mergeSections(group)
 	for key,value in pairs(group) do
 		if type(value)=="table" and (value.Title~=nil or value.Description~=nil) then
-			Description.Sections[key]=value
+			description.Sections[key]=value
 		elseif type(value)=="table" then
 			mergeSections(value)
 		end
@@ -296,16 +296,16 @@ local function mergeTexts(group)
 		if type(value)=="table" then
 			mergeTexts(value)
 		else
-			Description.Texts[key]=value
+			description.Texts[key]=value
 		end
 	end
 end
 
-mergeSections(Description.Categories.Sections)
-mergeTexts(Description.Categories.Text)
+mergeSections(description.Categories.Sections)
+mergeTexts(description.Categories.Text)
 
-function Description.Get(path,fallback)
-	local value=Description
+function description.Get(path,fallback)
+	local value=description
 	for part in tostring(path or ""):gmatch("[^%.]+") do
 		if type(value)~="table" then
 			return fallback
@@ -320,8 +320,8 @@ function Description.Get(path,fallback)
 	return value
 end
 
-function Description.Section(title,subtitle)
-	local item=Description.Sections[tostring(title or "")]
+function description.Section(title,subtitle)
+	local item=description.Sections[tostring(title or "")]
 	if type(item)~="table" then
 		return title,subtitle
 	end
@@ -329,12 +329,12 @@ function Description.Section(title,subtitle)
 	return item.Title or title,item.Description or subtitle
 end
 
-function Description.Text(raw)
+function description.Text(raw)
 	if type(raw)~="string" then
 		return raw
 	end
 
-	local mapped=Description.Texts[raw]
+	local mapped=description.Texts[raw]
 	if mapped~=nil then
 		return mapped
 	end
@@ -342,4 +342,4 @@ function Description.Text(raw)
 	return raw
 end
 
-return Description
+return description

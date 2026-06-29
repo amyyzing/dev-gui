@@ -1,7 +1,7 @@
 -- cleanup bag for connections, tweens, and instances.
 
-local Scope = {}
-Scope.__index = Scope
+local scopeApi = {}
+scopeApi.__index = scopeApi
 
 local function runCleanup(task)
 	local kind = typeof(task)
@@ -27,36 +27,36 @@ local function runCleanup(task)
 	end
 end
 
-function Scope.new(name, errorHandler)
+function scopeApi.new(name, errorHandler)
 	return setmetatable({
 		_name = name or "scope",
 		_destroyed = false,
 		_tasks = {},
 		_errorHandler = errorHandler,
-	}, Scope)
+	}, scopeApi)
 end
 
-function Scope:isDestroyed()
+function scopeApi:isDestroyed()
 	return self._destroyed
 end
 
-function Scope:isAlive()
+function scopeApi:isAlive()
 	return not self._destroyed
 end
 
-function Scope:setErrorHandler(errorHandler)
+function scopeApi:setErrorHandler(errorHandler)
 	self._errorHandler = errorHandler
 	return self
 end
 
-function Scope:_cleanup(task, cleanup)
+function scopeApi:_cleanup(task, cleanup)
 	local ok, err = pcall(cleanup or runCleanup, task)
 	if not ok and self._errorHandler then
 		pcall(self._errorHandler, err, self._name)
 	end
 end
 
-function Scope:add(task, cleanup)
+function scopeApi:add(task, cleanup)
 	if task == nil then
 		return nil
 	end
@@ -74,7 +74,7 @@ function Scope:add(task, cleanup)
 	return task
 end
 
-function Scope:task(cleanup)
+function scopeApi:task(cleanup)
 	if type(cleanup) ~= "function" then
 		return nil
 	end
@@ -82,7 +82,7 @@ function Scope:task(cleanup)
 	return self:add(cleanup)
 end
 
-function Scope:connect(signal, callback)
+function scopeApi:connect(signal, callback)
 	if not signal or type(signal.Connect) ~= "function" then
 		return nil
 	end
@@ -90,13 +90,13 @@ function Scope:connect(signal, callback)
 	return self:add(signal:Connect(callback))
 end
 
-function Scope:nest(name)
-	local child = Scope.new(name, self._errorHandler)
+function scopeApi:nest(name)
+	local child = scopeApi.new(name, self._errorHandler)
 	self:add(child)
 	return child
 end
 
-function Scope:delay(seconds, callback)
+function scopeApi:delay(seconds, callback)
 	if type(callback) ~= "function" then
 		return nil
 	end
@@ -123,7 +123,7 @@ function Scope:delay(seconds, callback)
 	end)
 end
 
-function Scope:cleanup()
+function scopeApi:cleanup()
 	if self._destroyed then
 		return
 	end
@@ -135,11 +135,11 @@ function Scope:cleanup()
 	end
 end
 
-function Scope:cancelAll()
+function scopeApi:cancelAll()
 	self:cleanup()
 end
 
-function Scope:destroy()
+function scopeApi:destroy()
 	if self._destroyed then
 		return
 	end
@@ -148,8 +148,8 @@ function Scope:destroy()
 	self._destroyed = true
 end
 
-function Scope:Destroy()
+function scopeApi:Destroy()
 	self:destroy()
 end
 
-return Scope
+return scopeApi

@@ -1,26 +1,26 @@
 -- testing poles, C1 marker, and normal-arc safety colors.
 
-local Testing={}
+local testing={}
 
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local Workspace=game:GetService("Workspace")
 
-local LP=Players.LocalPlayer
+local localPlayer=Players.LocalPlayer
 
-local BALL_G=28
-local TESTING_C1_Y=14.30
-local DEFENDER_SPEED=21
-local TESTING_BALL_SPEED=95
-local QB_SAFETY_JOB_ID="TestingQBCenterSafety"
-local QB_SAFETY_INTERVAL=0
-local C1_MARKER_HEIGHT=80
-local C1_MARKER_THICKNESS=0.12
-local GROUND_MARKER_DIAMETER=5.5
-local GROUND_MARKER_THICKNESS=0.05
-local MARKER_TRANSPARENCY=0.75
-local GROUND_MARKER_TRANSPARENCY=0.75
+local ballGravity=28
+local testingCatchY=14.30
+local defenderSpeed=21
+local testingBallSpeed=95
+local qbSafetyJobName="TestingQBCenterSafety"
+local qbSafetyInterval=0
+local catchMarkerHeight=80
+local catchMarkerThickness=0.12
+local groundMarkerDiameter=5.5
+local groundMarkerThickness=0.05
+local markerTransparency=0.75
+local groundMarkerTransparency=0.75
 
 local function destroyControl(control)
 	if control and type(control.destroy)=="function" then
@@ -96,7 +96,7 @@ local function playerByName(name)
 end
 
 local function projectileAt(origin,velocity,time)
-	return origin+velocity*time+Vector3.new(0,-0.5*BALL_G*time*time,0)
+	return origin+velocity*time+Vector3.new(0,-0.5*ballGravity*time*time,0)
 end
 
 local function cubicBezier(startPoint,firstHandle,secondHandle,endPoint,progress)
@@ -113,12 +113,12 @@ local function c1FromPayload(payload)
 	if delta.Magnitude<1e-6 or power<=0 then return nil,nil end
 
 	local velocity=delta.Unit*power
-	local a=0.5*BALL_G
+	local a=0.5*ballGravity
 	local b=-velocity.Y
-	local c=TESTING_C1_Y-payload.SpawnPos.Y
+	local c=testingCatchY-payload.SpawnPos.Y
 	local disc=b*b-4*a*c
 	if disc<0 then
-		local apexTime=math.max(velocity.Y/BALL_G,0)
+		local apexTime=math.max(velocity.Y/ballGravity,0)
 		if apexTime<=0 then return nil,nil end
 		return projectileAt(payload.SpawnPos,velocity,apexTime),apexTime
 	end
@@ -144,7 +144,7 @@ local function instanceName(value)
 end
 
 local function isLocalView(value)
-	return value==LP or (typeof(value)=="Instance" and value.Name==LP.Name)
+	return value==localPlayer or (typeof(value)=="Instance" and value.Name==localPlayer.Name)
 end
 
 local function addEvent(list,event)
@@ -156,7 +156,7 @@ end
 local function localPlayerListed(gameFolder)
 	local replicated=gameFolder and gameFolder:FindFirstChild("Replicated")
 	local playersFolder=replicated and replicated:FindFirstChild("Players")
-	return playersFolder and playersFolder:FindFirstChild(LP.Name)~=nil
+	return playersFolder and playersFolder:FindFirstChild(localPlayer.Name)~=nil
 end
 
 local function addGameFolderEvents(list,gameFolder,requireLocalPlayer)
@@ -234,13 +234,13 @@ local function findCenter()
 	return localFolder and localFolder:FindFirstChild("Center"),localFolder
 end
 
-function Testing.new(app,parent,guiBuilder)
-	local New=app.New
-	local THEME=app.THEME
+function testing.new(app,parent,guiBuilder)
+	local make=app.New
+	local colors=app.colors
 	local safeDisconnect=app.safeDisconnect
 	local makeSection=app.makeSection
 	local buildToggleRow=app.buildToggleRow
-	local scheduler=app.Scheduler
+	local scheduler=app.schedulerApi
 	local state=app.State
 	local api={}
 	local section=nil
@@ -274,7 +274,7 @@ function Testing.new(app,parent,guiBuilder)
 	local function setStatus(text,color)
 		if statusLabel then
 			statusLabel.Text=text
-			statusLabel.TextColor3=color or THEME.MUTED
+			statusLabel.TextColor3=color or colors.muted
 		end
 	end
 
@@ -364,7 +364,7 @@ function Testing.new(app,parent,guiBuilder)
 			if not centerBeamDefaults[beam] then
 				centerBeamDefaults[beam]=beam.Color
 			end
-			beam.Color=unsafe and ColorSequence.new(THEME.RED or Color3.fromRGB(254,94,86)) or centerBeamDefaults[beam]
+			beam.Color=unsafe and ColorSequence.new(colors.red or Color3.fromRGB(254,94,86)) or centerBeamDefaults[beam]
 		end
 	end
 
@@ -379,8 +379,8 @@ function Testing.new(app,parent,guiBuilder)
 
 	local function disconnectQBSafety()
 		if qbSafetyScheduled and scheduler and type(scheduler.Unregister)=="function" then
-			pcall(scheduler.Unregister,"RenderStepped",QB_SAFETY_JOB_ID)
-			pcall(scheduler.Unregister,"Heartbeat",QB_SAFETY_JOB_ID)
+			pcall(scheduler.Unregister,"RenderStepped",qbSafetyJobName)
+			pcall(scheduler.Unregister,"Heartbeat",qbSafetyJobName)
 		end
 		qbSafetyScheduled=false
 		safeDisconnect(qbSafetyConn)
@@ -396,13 +396,13 @@ function Testing.new(app,parent,guiBuilder)
 		local thrower=throwerOverride or playerByName(lastThrower)
 		local throwerTeam=teamOf(thrower)
 		if not throwerTeam then
-			throwerTeam=teamOf(LP)
+			throwerTeam=teamOf(localPlayer)
 		end
 
-		local reach=DEFENDER_SPEED*flightTime
+		local reach=defenderSpeed*flightTime
 		for _,player in ipairs(Players:GetPlayers()) do
 			local playerTeam=teamOf(player)
-			local isDefender=player~=thrower and player~=LP and (not throwerTeam or playerTeam~=throwerTeam)
+			local isDefender=player~=thrower and player~=localPlayer and (not throwerTeam or playerTeam~=throwerTeam)
 			if isDefender then
 				local defenderRoot=rootOfPlayer(player)
 				if defenderRoot and (flat(defenderRoot.Position)-flat(c1Position)).Magnitude<=reach then
@@ -436,12 +436,12 @@ function Testing.new(app,parent,guiBuilder)
 		local crossingProgress=nil
 		local previousPoint=arcStart
 		local previousProgress=0
-		local previousY=previousPoint.Y-TESTING_C1_Y
+		local previousY=previousPoint.Y-testingCatchY
 
 		for i=1,96 do
 			local progress=i/96
 			local point=cubicBezier(arcStart,firstHandle,secondHandle,arcEnd,progress)
-			local y=point.Y-TESTING_C1_Y
+			local y=point.Y-testingCatchY
 			local diff=math.abs(y)
 			if diff<bestDiff then
 				bestDiff=diff
@@ -467,11 +467,11 @@ function Testing.new(app,parent,guiBuilder)
 			return nil,nil
 		end
 
-		c1Point=Vector3.new(c1Point.X,TESTING_C1_Y,c1Point.Z)
+		c1Point=Vector3.new(c1Point.X,testingCatchY,c1Point.Z)
 		local flatDistance=(flat(c1Point)-flat(arcStart)).Magnitude
-		local distanceTime=flatDistance/TESTING_BALL_SPEED
+		local distanceTime=flatDistance/testingBallSpeed
 		local heightDelta=math.max(c1Point.Y-arcStart.Y,0)
-		local verticalTime=heightDelta>0 and math.sqrt((2*heightDelta)/BALL_G) or 0
+		local verticalTime=heightDelta>0 and math.sqrt((2*heightDelta)/ballGravity) or 0
 		local estimatedTime=math.max(distanceTime,verticalTime,c1Progress*distanceTime)
 		return c1Point,estimatedTime
 	end
@@ -497,11 +497,11 @@ function Testing.new(app,parent,guiBuilder)
 			return nil,nil
 		end
 
-		local c1Position=Vector3.new(c1Frame.Position.X,TESTING_C1_Y,c1Frame.Position.Z)
+		local c1Position=Vector3.new(c1Frame.Position.X,testingCatchY,c1Frame.Position.Z)
 		local flatDistance=(flat(c1Position)-flat(c2Frame.Position)).Magnitude
 		local heightDelta=math.max(c1Position.Y-c2Frame.Position.Y,0)
-		local distanceTime=flatDistance/TESTING_BALL_SPEED
-		local verticalTime=heightDelta>0 and math.sqrt((2*heightDelta)/BALL_G) or 0
+		local distanceTime=flatDistance/testingBallSpeed
+		local verticalTime=heightDelta>0 and math.sqrt((2*heightDelta)/ballGravity) or 0
 		return c1Position,math.max(distanceTime,verticalTime)
 	end
 
@@ -517,7 +517,7 @@ function Testing.new(app,parent,guiBuilder)
 			return
 		end
 
-		setCenterBeamUnsafe(c1IsDefended(c1Position,flightTime,LP))
+		setCenterBeamUnsafe(c1IsDefended(c1Position,flightTime,localPlayer))
 	end
 
 	local function syncQBSafety()
@@ -530,7 +530,7 @@ function Testing.new(app,parent,guiBuilder)
 		if qbSafetyScheduled then return end
 
 		if scheduler and type(scheduler.Register)=="function" then
-			local ok,result=pcall(scheduler.Register,"RenderStepped",QB_SAFETY_JOB_ID,QB_SAFETY_INTERVAL,function()
+			local ok,result=pcall(scheduler.Register,"RenderStepped",qbSafetyJobName,qbSafetyInterval,function()
 				updateQBCenterSafety()
 			end)
 			if ok and result then
@@ -547,26 +547,26 @@ function Testing.new(app,parent,guiBuilder)
 
 	local function styleMarker(part)
 		part.Shape=Enum.PartType.Block
-		part.Size=Vector3.new(C1_MARKER_THICKNESS,C1_MARKER_HEIGHT,C1_MARKER_THICKNESS)
+		part.Size=Vector3.new(catchMarkerThickness,catchMarkerHeight,catchMarkerThickness)
 		part.Anchored=true
 		part.CanCollide=false
 		part.CanTouch=false
 		part.CanQuery=false
 		part.Material=Enum.Material.SmoothPlastic
 		part.Color=Color3.fromRGB(0,0,0)
-		part.Transparency=MARKER_TRANSPARENCY
+		part.Transparency=markerTransparency
 	end
 
 	local function styleGroundMarker(part)
 		part.Shape=Enum.PartType.Cylinder
-		part.Size=Vector3.new(GROUND_MARKER_THICKNESS,GROUND_MARKER_DIAMETER,GROUND_MARKER_DIAMETER)
+		part.Size=Vector3.new(groundMarkerThickness,groundMarkerDiameter,groundMarkerDiameter)
 		part.Anchored=true
 		part.CanCollide=false
 		part.CanTouch=false
 		part.CanQuery=false
 		part.Material=Enum.Material.SmoothPlastic
 		part.Color=Color3.fromRGB(0,0,0)
-		part.Transparency=GROUND_MARKER_TRANSPARENCY
+		part.Transparency=groundMarkerTransparency
 	end
 
 	local function groundYAt(position)
@@ -576,10 +576,10 @@ function Testing.new(app,parent,guiBuilder)
 
 		local result=Workspace:Raycast(position+Vector3.new(0,10,0),Vector3.new(0,-300,0),params)
 		if result then
-			return result.Position.Y+GROUND_MARKER_THICKNESS*0.5+0.01
+			return result.Position.Y+groundMarkerThickness*0.5+0.01
 		end
 
-		return GROUND_MARKER_THICKNESS*0.5+0.01
+		return groundMarkerThickness*0.5+0.01
 	end
 
 	local function ensureMarker(parentFolder)
@@ -618,7 +618,7 @@ function Testing.new(app,parent,guiBuilder)
 		label.Text="C1"
 		label.Font=Enum.Font.GothamBold
 		label.TextSize=12
-		label.TextColor3=THEME.TEXT or Color3.new(1,1,1)
+		label.TextColor3=colors.text or Color3.new(1,1,1)
 		label.TextStrokeTransparency=0.35
 
 		return marker
@@ -654,11 +654,11 @@ function Testing.new(app,parent,guiBuilder)
 			fromPayload=pos~=nil
 		end
 		if not pos then
-			setStatus("no c1: "..source,THEME.RED)
+			setStatus("no c1: "..source,colors.red)
 			return
 		end
 
-		pos=Vector3.new(pos.X,TESTING_C1_Y,pos.Z)
+		pos=Vector3.new(pos.X,testingCatchY,pos.Z)
 		ensureMarker(folder).CFrame=CFrame.new(pos)
 		ensureGroundMarker(folder).CFrame=CFrame.new(pos.X,groundYAt(pos),pos.Z)*CFrame.Angles(0,0,math.rad(90))
 		local powerText=payload and (" "..fmtPower(payload.Power)) or ""
@@ -666,7 +666,7 @@ function Testing.new(app,parent,guiBuilder)
 		local unsafe=c1IsDefended(pos,flightTime)
 		local safetyText=unsafe and " unsafe" or " safe"
 		local label=(lastThrower and (lastThrower.." ") or "")..(fromPayload and "C1 calc" or "C1")..safetyText..powerText..timeText..": "..fmtVector(pos)
-		setStatus(label,unsafe and (THEME.RED or Color3.fromRGB(254,94,86)) or (THEME.GREEN or THEME.TEXT))
+		setStatus(label,unsafe and (colors.red or Color3.fromRGB(254,94,86)) or (colors.green or colors.text))
 	end
 
 	local function captureSoon(source,payload)
@@ -699,7 +699,7 @@ function Testing.new(app,parent,guiBuilder)
 			if not isLocalView(view) then
 				lastThrower=instanceName(view)
 				lastThrowAt=os.clock()
-				setStatus("throw: "..lastThrower,THEME.MUTED)
+				setStatus("throw: "..lastThrower,colors.muted)
 				captureSoon("throw")
 			end
 			return
@@ -708,7 +708,7 @@ function Testing.new(app,parent,guiBuilder)
 		if topic=="Mechanics" and (args[2]=="UpdateBall" or args[2]=="UpdateFootball") then
 			local payload=updateFootballPayload(args,3)
 			local powerText=payload and (" "..fmtPower(payload.Power)) or ""
-			setStatus("ball"..powerText,THEME.MUTED)
+			setStatus("ball"..powerText,colors.muted)
 			captureSoon("update ball",payload)
 			return
 		end
@@ -716,7 +716,7 @@ function Testing.new(app,parent,guiBuilder)
 		if topic=="UpdateFootball" then
 			local payload=updateFootballPayload(args,2)
 			lastThrowAt=os.clock()
-			setStatus("football"..(payload and (" "..fmtPower(payload.Power)) or ""),THEME.MUTED)
+			setStatus("football"..(payload and (" "..fmtPower(payload.Power)) or ""),colors.muted)
 			captureSoon("update football",payload)
 		end
 	end
@@ -747,7 +747,7 @@ function Testing.new(app,parent,guiBuilder)
 			or name=="ReEvent"
 			or name=="Replicated"
 			or name=="Players"
-			or name==LP.Name
+			or name==localPlayer.Name
 	end
 
 	local function watchRoot(root)
@@ -814,7 +814,7 @@ function Testing.new(app,parent,guiBuilder)
 			end
 		end
 
-		setStatus(#remoteConnections>0 and (#remoteConnections.." events") or "no reevent",#remoteConnections>0 and THEME.MUTED or THEME.RED)
+		setStatus(#remoteConnections>0 and (#remoteConnections.." events") or "no reevent",#remoteConnections>0 and colors.muted or colors.red)
 	end
 
 	function api.SetTestingState(value,fire)
@@ -828,7 +828,7 @@ function Testing.new(app,parent,guiBuilder)
 			destroyMarker()
 			lastThrower=nil
 			lastThrowAt=0
-			setStatus("off",THEME.MUTED)
+			setStatus("off",colors.muted)
 		end
 
 		syncControls()
@@ -876,7 +876,7 @@ function Testing.new(app,parent,guiBuilder)
 			syncQBSafety()
 		else
 			disconnectQBSafety()
-			setStatus("off",THEME.MUTED)
+			setStatus("off",colors.muted)
 		end
 	end
 
@@ -950,4 +950,4 @@ function Testing.new(app,parent,guiBuilder)
 	return api
 end
 
-return Testing
+return testing

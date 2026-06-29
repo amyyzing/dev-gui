@@ -4,7 +4,7 @@
 -- Toggle locally expands gauntlet TouchDetect hitboxes for easier overlap.
 
 local Players=game:GetService("Players")
-local UIS=game:GetService("UserInputService")
+local inputService=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local Workspace=game:GetService("Workspace")
@@ -12,32 +12,32 @@ local CoreGui=game:GetService("CoreGui")
 local TweenService=game:GetService("TweenService")
 local CollectionService=game:GetService("CollectionService")
 
-local LP=Players.LocalPlayer
-local RUNTIME_KEY="StandalonePracticeQBGauntlet"
-local LEGACY_RUNTIME_KEYS={
+local localPlayer=Players.LocalPlayer
+local runtimeName="StandalonePracticeQBGauntlet"
+local oldRuntimeNames={
 	"StandaloneQBThrowKeybindGui",
 	"StandaloneQBAimAssist",
 	"StandaloneQBThrowKeybindGuiRemoteHook",
 }
 
-local BALL_G=28
-local G=Vector3.new(0,-BALL_G,0)
-local POWER_COEFFICIENT=0.95
-local DEFAULT_POWER=100
-local DEFAULT_TARGET_LEAD=0
-local HITBOX_SCALE=2
-local MIN_T=0.25
-local MAX_T=5
-local DT=0.02
-local AIM_SCALE=1000
-local MAX_TARGET_SPEED=90
-local REFRESH_INTERVAL=0.12
-local PREVIEW_UPDATE_INTERVAL=1/30
-local TARGET_VELOCITY_DAMPING=0.62
-local HIT_SPAM_INTERVAL=0.08
-local HIT_RETRY_WINDOW=0.55
-local HIT_NEAR_MARGIN=1.5
-local GAUNTLET_TARGET_PATHS={
+local ballGravity=28
+local gravityVector=Vector3.new(0,-ballGravity,0)
+local powerScale=0.95
+local defaultPower=100
+local defaultTargetLead=0
+local hitboxScale=2
+local minTime=0.25
+local maxTime=5
+local timeStep=0.02
+local aimDistance=1000
+local maxTargetSpeed=90
+local refreshInterval=0.12
+local previewInterval=1/30
+local targetVelocityDamping=0.62
+local hitRetryCooldown=0.08
+local hitRetryWindow=0.55
+local hitNearMargin=1.5
+local gauntletTargetPaths={
 	{score=5,name="5",path={"Throw5_1","RotateModel","Throw1","TouchDetect"}},
 	{score=5,name="5",path={"SideToSide","Throw5_1","RotateModel","Throw1","TouchDetect"}},
 	{score=4,name="4-1",path={"SideToSide","Throw4_1","RotateModel","Throw1","TouchDetect"}},
@@ -49,14 +49,14 @@ local GAUNTLET_TARGET_PATHS={
 
 local runtimeOwner=(type(getgenv)=="function" and getgenv()) or _G
 if type(runtimeOwner)=="table" then
-	for _,key in ipairs(LEGACY_RUNTIME_KEYS) do
+	for _,key in ipairs(oldRuntimeNames) do
 		local old=rawget(runtimeOwner,key)
 		if old and type(old.Destroy)=="function" then
 			pcall(function() old:Destroy() end)
 		end
 		rawset(runtimeOwner,key,nil)
 	end
-	local old=rawget(runtimeOwner,RUNTIME_KEY)
+	local old=rawget(runtimeOwner,runtimeName)
 	if old and type(old.Destroy)=="function" then
 		pcall(function() old:Destroy() end)
 	end
@@ -65,8 +65,8 @@ end
 local connections={}
 local currentBinding=Enum.KeyCode.T
 local capturing=false
-local power=DEFAULT_POWER
-local targetLead=DEFAULT_TARGET_LEAD
+local power=defaultPower
+local targetLead=defaultTargetLead
 local lastRefresh=0
 local activeTargets={}
 local targetHistory={}
@@ -140,7 +140,7 @@ local function pathOf(instance)
 end
 
 local function rootOfLocalPlayer()
-	local character=LP.Character or Workspace:FindFirstChild(LP.Name)
+	local character=localPlayer.Character or Workspace:FindFirstChild(localPlayer.Name)
 	return character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
 end
 
@@ -152,7 +152,7 @@ local function heldFootball()
 		local part=cachedPracticeBall:FindFirstChildWhichIsA("BasePart",true)
 		if part then return part end
 	end
-	local character=LP.Character or Workspace:FindFirstChild(LP.Name)
+	local character=localPlayer.Character or Workspace:FindFirstChild(localPlayer.Name)
 	if not character then return nil end
 	for _,child in ipairs(character:GetChildren()) do
 		if child.Name:lower():find("football") then
@@ -348,10 +348,10 @@ local function targetVelocity(part)
 		end
 	end
 	targetHistory[part]={pos=pos,t=now,velocity=velocity}
-	if velocity.Magnitude>MAX_TARGET_SPEED then
-		velocity=velocity.Unit*MAX_TARGET_SPEED
+	if velocity.Magnitude>maxTargetSpeed then
+		velocity=velocity.Unit*maxTargetSpeed
 	end
-	velocity=velocity*TARGET_VELOCITY_DAMPING
+	velocity=velocity*targetVelocityDamping
 	return velocity
 end
 
@@ -388,7 +388,7 @@ local function applyHitbox(part)
 		}
 	end
 	local original=originalHitboxes[part]
-	part.Size=original.Size*HITBOX_SCALE
+	part.Size=original.Size*hitboxScale
 	part.CanCollide=false
 	part.CanTouch=true
 	part.CanQuery=true
@@ -397,7 +397,7 @@ end
 
 local function refreshHitboxButton()
 	if hitboxButton then
-		local prefix=string.format("%gx Hitbox",HITBOX_SCALE)
+		local prefix=string.format("%gx Hitbox",hitboxScale)
 		hitboxButton.Text=hitboxEnabled and (prefix..": ON") or (prefix..": OFF")
 		hitboxButton.BackgroundColor3=hitboxEnabled and Color3.fromRGB(30,110,70) or Color3.fromRGB(32,32,32)
 	end
@@ -413,7 +413,7 @@ local function setHitboxEnabled(enabled)
 		end
 	end
 	refreshHitboxButton()
-	local scaleText=string.format("%gx",HITBOX_SCALE)
+	local scaleText=string.format("%gx",hitboxScale)
 	setStatus(hitboxEnabled and (scaleText.." gauntlet hitboxes enabled") or (scaleText.." gauntlet hitboxes disabled"),hitboxEnabled and Color3.fromRGB(115,240,170) or Color3.fromRGB(190,190,190))
 end
 
@@ -436,7 +436,7 @@ end
 
 local function refreshTargets(force)
 	local now=os.clock()
-	if not force and now-lastRefresh<REFRESH_INTERVAL then
+	if not force and now-lastRefresh<refreshInterval then
 		return activeTargets
 	end
 	lastRefresh=now
@@ -473,7 +473,7 @@ local function refreshTargets(force)
 	end
 
 	local seen={}
-	for _,entry in ipairs(GAUNTLET_TARGET_PATHS) do
+	for _,entry in ipairs(gauntletTargetPaths) do
 		local touch=findByPath(base,entry.path)
 		if touch then
 			addTarget(touch,entry.score,entry.name,seen)
@@ -581,12 +581,12 @@ local function startBallDetection(event,ball)
 		local closestCanHit=canHitState(closest)
 		local sawOverlap=false
 		local now=os.clock()
-		local nearWindow=closestDist and closestDist<=radius+HIT_NEAR_MARGIN
+		local nearWindow=closestDist and closestDist<=radius+hitNearMargin
 		local sentThisFrame=false
 
 		local function fireHit(part,stopAfterSend)
 			local last=lastSent[part] or 0
-			if hitSpamEnabled and now-last<HIT_SPAM_INTERVAL then
+			if hitSpamEnabled and now-last<hitRetryCooldown then
 				return false
 			end
 			lastSent[part]=now
@@ -626,7 +626,7 @@ local function startBallDetection(event,ball)
 
 		if sawOverlap and not closestCanHit then
 			setStatus("Overlap seen; waiting for CanHit.",Color3.fromRGB(255,190,100))
-		elseif firstNearAt and lastNearAt and now-lastNearAt>HIT_RETRY_WINDOW then
+		elseif firstNearAt and lastNearAt and now-lastNearAt>hitRetryWindow then
 			setStatus("Hit window passed.",Color3.fromRGB(190,190,190))
 			stopBallDetection()
 		elseif sawOverlap and hitSpamEnabled then
@@ -748,9 +748,9 @@ local function beamDirection(velocity,origin,time)
 	if not(velocity and origin and time and time>0) then
 		return nil
 	end
-	local endPoint=0.5*G*time*time+velocity*time+origin
-	local c1=endPoint-(G*time*time+velocity*time)/3
-	local c0=(0.125*G*time*time+0.5*velocity*time+origin-0.125*(origin+endPoint))/0.375-c1
+	local endPoint=0.5*gravityVector*time*time+velocity*time+origin
+	local c1=endPoint-(gravityVector*time*time+velocity*time)/3
+	local c0=(0.125*gravityVector*time*time+0.5*velocity*time+origin-0.125*(origin+endPoint))/0.375-c1
 	local tangent0=c0-origin
 	local tangent1=c1-endPoint
 	local chord=origin-endPoint
@@ -760,7 +760,7 @@ local function beamDirection(velocity,origin,time)
 	local x0=safeUnit(tangent0,velocity)
 	local zLine=safeUnit(chord,Vector3.new(0,0,-1))
 	local y0=safeUnit(x0:Cross(zLine),Vector3.new(0,1,0))
-	local x1=safeUnit(tangent1,velocity+G*time)
+	local x1=safeUnit(tangent1,velocity+gravityVector*time)
 	local y1=safeUnit(x1:Cross(zLine),y0)
 	local z0=safeUnit(y0:Cross(x0),Vector3.new(0,0,1))
 	local curve0=tangent0.Magnitude
@@ -771,7 +771,7 @@ local function beamDirection(velocity,origin,time)
 end
 
 local function landingAtY(origin,velocity,y)
-	local a=0.5*G.Y
+	local a=0.5*gravityVector.Y
 	local b=velocity.Y
 	local c=origin.Y-y
 	local disc=b*b-4*a*c
@@ -782,26 +782,26 @@ local function landingAtY(origin,velocity,y)
 	local time=math.max(lateLandingTime,earlyLandingTime)
 	if time<=0 then time=math.min(lateLandingTime,earlyLandingTime) end
 	if time<=0 then return nil,nil end
-	return origin+velocity*time+0.5*G*time*time,time
+	return origin+velocity*time+0.5*gravityVector*time*time,time
 end
 
 local function solveThrow(target)
 	local origin=releaseOrigin(target.workspaceGame)
 	if not origin then return nil end
-	local speed=math.clamp(power,30,100)*POWER_COEFFICIENT
+	local speed=math.clamp(power,30,100)*powerScale
 	local targetPos=target.part.Position
 	local targetVel=targetVelocity(target.part)
 	local best=nil
 
-	for time=MIN_T,MAX_T,DT do
+	for time=minTime,maxTime,timeStep do
 		local desired=targetPos+targetVel*(time+targetLead)
-		local needed=(desired-origin-0.5*G*time*time)/time
+		local needed=(desired-origin-0.5*gravityVector*time*time)/time
 		if needed.Magnitude>1e-6 then
 			local speedError=math.abs(needed.Magnitude-speed)
 			local missEstimate=speedError*time
 			local direction=needed.Unit
 			local velocity=direction*speed
-			local hit=origin+velocity*time+0.5*G*time*time
+			local hit=origin+velocity*time+0.5*gravityVector*time*time
 			local miss=(hit-desired).Magnitude
 			local score=miss+missEstimate*0.4+time*0.03
 			if not best or score<best.score then
@@ -812,7 +812,7 @@ local function solveThrow(target)
 					target=desired,
 					time=time,
 					velocity=velocity,
-					aimPoint=origin+direction*AIM_SCALE,
+					aimPoint=origin+direction*aimDistance,
 					landing=landing,
 					landingTime=landingTime,
 					targetPart=target.part,
@@ -835,8 +835,8 @@ local function updatePreview(plan)
 	if not parts then return end
 	local previewTime=plan.time
 	local curve0,curve1,c2,c3,endPoint=beamDirection(plan.velocity,plan.origin,previewTime)
-	endPoint=endPoint or plan.origin+plan.velocity*previewTime+0.5*G*previewTime*previewTime
-	local endVelocity=plan.velocity+G*previewTime
+	endPoint=endPoint or plan.origin+plan.velocity*previewTime+0.5*gravityVector*previewTime*previewTime
+	local endVelocity=plan.velocity+gravityVector*previewTime
 	parts.origin.CFrame=c2 or beamCFrame(plan.origin,plan.velocity)
 	parts.ending.CFrame=c3 or beamCFrame(endPoint,endVelocity,plan.velocity)
 	parts.target.CFrame=CFrame.new(plan.target)
@@ -946,12 +946,12 @@ end
 
 local function buildGui()
 	screenGui=Instance.new("ScreenGui")
-	screenGui.Name=RUNTIME_KEY
+	screenGui.Name=runtimeName
 	screenGui.ResetOnSpawn=false
 	screenGui.IgnoreGuiInset=true
 	pcall(function() screenGui.Parent=CoreGui end)
 	if not screenGui.Parent then
-		screenGui.Parent=LP:WaitForChild("PlayerGui")
+		screenGui.Parent=localPlayer:WaitForChild("PlayerGui")
 	end
 
 	local frame=new("Frame",{
@@ -1017,7 +1017,7 @@ local function buildGui()
 	},body)
 
 	connect(close.MouseButton1Click,function()
-		local owner=type(runtimeOwner)=="table" and rawget(runtimeOwner,RUNTIME_KEY)
+		local owner=type(runtimeOwner)=="table" and rawget(runtimeOwner,runtimeName)
 		if owner and type(owner.Destroy)=="function" then
 			owner:Destroy()
 		end
@@ -1038,7 +1038,7 @@ local function destroy()
 		screenGui=nil
 	end
 	if type(runtimeOwner)=="table" then
-		rawset(runtimeOwner,RUNTIME_KEY,nil)
+		rawset(runtimeOwner,runtimeName,nil)
 	end
 end
 
@@ -1056,7 +1056,7 @@ connect(RunService.RenderStepped,function()
 end)
 
 if type(runtimeOwner)=="table" then
-	rawset(runtimeOwner,RUNTIME_KEY,{Destroy=destroy})
+	rawset(runtimeOwner,runtimeName,{Destroy=destroy})
 end
 
 refreshHitboxButton()

@@ -1,8 +1,8 @@
 -- shared names for gui colors and text roles.
 
-local Tokens = {}
+local designTokens = {}
 
-Tokens.Color = {
+designTokens.Color = {
 	Text = {
 		Primary = "color.text.primary",
 		Muted = "color.text.muted",
@@ -31,7 +31,7 @@ Tokens.Color = {
 	},
 }
 
-Tokens.Typography = {
+designTokens.Typography = {
 	Title = "typography.title",
 	SectionTitle = "typography.sectionTitle",
 	Body = "typography.body",
@@ -39,7 +39,7 @@ Tokens.Typography = {
 	Control = "typography.control",
 }
 
-Tokens.Space = {
+designTokens.Space = {
 	XSmall = "space.xs",
 	Small = "space.sm",
 	Medium = "space.md",
@@ -47,19 +47,19 @@ Tokens.Space = {
 	XLarge = "space.xl",
 }
 
-Tokens.Radius = {
+designTokens.Radius = {
 	None = "radius.none",
 	Small = "radius.sm",
 	Medium = "radius.md",
 }
 
-Tokens.Motion = {
+designTokens.Motion = {
 	Fast = "motion.fast",
 	Normal = "motion.normal",
 	Slow = "motion.slow",
 }
 
-Tokens.Component = {
+designTokens.Component = {
 	Toggle = {
 		TrackOn = "component.toggle.trackOn",
 		TrackOff = "component.toggle.trackOff",
@@ -79,20 +79,20 @@ Tokens.Component = {
 	},
 }
 
-Tokens.Defaults = {
-	[Tokens.Space.XSmall] = 4,
-	[Tokens.Space.Small] = 6,
-	[Tokens.Space.Medium] = 10,
-	[Tokens.Space.Large] = 14,
-	[Tokens.Space.XLarge] = 18,
+designTokens.Defaults = {
+	[designTokens.Space.XSmall] = 4,
+	[designTokens.Space.Small] = 6,
+	[designTokens.Space.Medium] = 10,
+	[designTokens.Space.Large] = 14,
+	[designTokens.Space.XLarge] = 18,
 
-	[Tokens.Radius.None] = 0,
-	[Tokens.Radius.Small] = 0,
-	[Tokens.Radius.Medium] = 0,
+	[designTokens.Radius.None] = 0,
+	[designTokens.Radius.Small] = 0,
+	[designTokens.Radius.Medium] = 0,
 
-	[Tokens.Motion.Fast] = 0.12,
-	[Tokens.Motion.Normal] = 0.18,
-	[Tokens.Motion.Slow] = 0.28,
+	[designTokens.Motion.Fast] = 0.12,
+	[designTokens.Motion.Normal] = 0.18,
+	[designTokens.Motion.Slow] = 0.28,
 }
 
-return Tokens
+return designTokens

@@ -1,16 +1,16 @@
 -- simple event helper used by shared state.
 
-local Signal = {}
-Signal.__index = Signal
+local signalApi = {}
+signalApi.__index = signalApi
 
-function Signal.new()
+function signalApi.new()
 	return setmetatable({
 		_destroyed = false,
 		_connections = {},
-	}, Signal)
+	}, signalApi)
 end
 
-function Signal:Connect(callback)
+function signalApi:Connect(callback)
 	assert(type(callback) == "function", "Signal callback must be a function")
 
 	local connection = {
@@ -36,7 +36,7 @@ function Signal:Connect(callback)
 	return connection
 end
 
-function Signal:Once(callback)
+function signalApi:Once(callback)
 	local connection
 	connection = self:Connect(function(...)
 		connection:Disconnect()
@@ -46,7 +46,7 @@ function Signal:Once(callback)
 	return connection
 end
 
-function Signal:Fire(...)
+function signalApi:Fire(...)
 	if self._destroyed then
 		return
 	end
@@ -63,7 +63,7 @@ function Signal:Fire(...)
 	end
 end
 
-function Signal:Destroy()
+function signalApi:Destroy()
 	if self._destroyed then
 		return
 	end
@@ -76,4 +76,4 @@ function Signal:Destroy()
 	end
 end
 
-return Signal
+return signalApi

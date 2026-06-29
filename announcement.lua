@@ -1,6 +1,6 @@
 -- announcement popup used for bot messages.
 
-local Announcement={}
+local announcement={}
 
 local function safeDisconnect(connection)
 	if connection and typeof(connection)=="RBXScriptConnection" then
@@ -19,11 +19,11 @@ local function clampText(value,maxLen)
 	return text
 end
 
-function Announcement.new(app)
-	local New=app.New
-	local THEME=app.THEME
-	local SG=app.SG
-	local BOT_API=app.BOT_API
+function announcement.new(app)
+	local make=app.New
+	local colors=app.colors
+	local screenGui=app.SG
+	local botApi=app.botApi
 	local TextService=game:GetService("TextService")
 	local playerId=tostring(app.playerId or "")
 	local getSessionId=app.getSessionId
@@ -52,7 +52,7 @@ function Announcement.new(app)
 	end
 
 	local function post(path,body)
-		if not BOT_API or not BOT_API.Post then
+		if not botApi or not botApi.Post then
 			return nil
 		end
 
@@ -64,7 +64,7 @@ function Announcement.new(app)
 				body.sessionId=tostring(sessionId)
 			end
 		end
-		return BOT_API.Post(path,body)
+		return botApi.Post(path,body)
 	end
 
 	local function markSeen(id)
@@ -93,30 +93,30 @@ function Announcement.new(app)
 	end
 
 	local function makeButton(parent,text,x,width,bucket)
-		local button=New("TextButton",{
+		local button=make("TextButton",{
 			Position=UDim2.new(1,-x,1,-46),
 			Size=UDim2.fromOffset(width or 104,30),
-			BackgroundColor3=THEME.BG,
+			BackgroundColor3=colors.bg,
 			BorderSizePixel=0,
 			Text=text,
 			Font=Enum.Font.Gotham,
 			TextSize=12,
-			TextColor3=THEME.TEXT,
+			TextColor3=colors.text,
 			AutoButtonColor=false,
 			ZIndex=154,
 		},parent)
 
-		local wrap=wrapTextButton and wrapTextButton(button,THEME.BG,2)
+		local wrap=wrapTextButton and wrapTextButton(button,colors.bg,2)
 
 		trackModalConnection(button.MouseEnter:Connect(function()
 			if wrap then
-				wrap.BackgroundColor3=THEME.CARD
+				wrap.BackgroundColor3=colors.card
 			end
 		end),bucket)
 
 		trackModalConnection(button.MouseLeave:Connect(function()
 			if wrap then
-				wrap.BackgroundColor3=THEME.BG
+				wrap.BackgroundColor3=colors.bg
 			end
 		end),bucket)
 
@@ -124,7 +124,7 @@ function Announcement.new(app)
 	end
 
 	local function showAnnouncement(announcement)
-		if not alive or not SG or not SG.Parent or type(announcement)~="table" then
+		if not alive or not screenGui or not screenGui.Parent or type(announcement)~="table" then
 			return
 		end
 
@@ -152,39 +152,39 @@ function Announcement.new(app)
 		local boxHeight=math.clamp(scrollHeight+120,210,470)
 		local useScroll=measuredHeight>scrollHeight
 
-		local modal=New("Frame",{
+		local modal=make("Frame",{
 			Name="AnnouncementModal",
 			BackgroundColor3=Color3.fromRGB(0,0,0),
 			BackgroundTransparency=0.22,
 			BorderSizePixel=0,
 			Size=UDim2.new(1,0,1,0),
 			ZIndex=150,
-		},SG)
+		},screenGui)
 
-		local box=New("Frame",{
+		local box=make("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
 			Position=UDim2.new(0.5,0,0.5,0),
 			Size=UDim2.fromOffset(500,boxHeight),
-			BackgroundColor3=THEME.BG,
+			BackgroundColor3=colors.bg,
 			BorderSizePixel=0,
 			ZIndex=151,
 		},modal)
 
-		New("UIStroke",{Color=THEME.STROKE,Thickness=2,Transparency=0},box)
-		New("UIPadding",{PaddingTop=UDim.new(0,14),PaddingLeft=UDim.new(0,16),PaddingRight=UDim.new(0,16),PaddingBottom=UDim.new(0,14)},box)
+		make("UIStroke",{Color=colors.stroke,Thickness=2,Transparency=0},box)
+		make("UIPadding",{PaddingTop=UDim.new(0,14),PaddingLeft=UDim.new(0,16),PaddingRight=UDim.new(0,16),PaddingBottom=UDim.new(0,14)},box)
 
-		New("TextLabel",{
+		make("TextLabel",{
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,-36,0,30),
 			Text=string.upper(title),
 			Font=Enum.Font.GothamMedium,
 			TextSize=20,
-			TextColor3=THEME.TEXT,
+			TextColor3=colors.text,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			ZIndex=152,
 		},box)
 
-		local close=New("TextButton",{
+		local close=make("TextButton",{
 			AnchorPoint=Vector2.new(1,0),
 			Position=UDim2.new(1,0,0,0),
 			Size=UDim2.fromOffset(28,24),
@@ -193,33 +193,33 @@ function Announcement.new(app)
 			Text="x",
 			Font=Enum.Font.GothamMedium,
 			TextSize=14,
-			TextColor3=THEME.MUTED,
+			TextColor3=colors.muted,
 			AutoButtonColor=false,
 			ZIndex=153,
 		},box)
 
-		local scroll=New("ScrollingFrame",{
+		local scroll=make("ScrollingFrame",{
 			Position=UDim2.fromOffset(0,46),
 			Size=UDim2.new(1,0,0,scrollHeight),
 			CanvasSize=UDim2.fromOffset(0,math.max(scrollHeight,math.floor(measuredHeight+16))),
 			AutomaticCanvasSize=Enum.AutomaticSize.Y,
 			ScrollBarThickness=useScroll and 4 or 0,
-			BackgroundColor3=THEME.PANEL,
+			BackgroundColor3=colors.panel,
 			BorderSizePixel=0,
 			ZIndex=152,
 		},box)
 
-		New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},scroll)
-		New("UIPadding",{PaddingTop=UDim.new(0,8),PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8),PaddingBottom=UDim.new(0,8)},scroll)
+		make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=0},scroll)
+		make("UIPadding",{PaddingTop=UDim.new(0,8),PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8),PaddingBottom=UDim.new(0,8)},scroll)
 
-		local textBox=New("TextBox",{
+		local textBox=make("TextBox",{
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
 			ClearTextOnFocus=false,
 			Text=description,
 			Font=Enum.Font.Gotham,
 			TextSize=13,
-			TextColor3=THEME.TEXT,
+			TextColor3=colors.text,
 			TextWrapped=true,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			TextYAlignment=Enum.TextYAlignment.Top,
@@ -286,4 +286,4 @@ function Announcement.new(app)
 	return api
 end
 
-return Announcement
+return announcement

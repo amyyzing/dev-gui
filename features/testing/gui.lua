@@ -1,8 +1,8 @@
 -- testing switches for wr and qb checks.
 
-local TestingGui={}
+local testingGui={}
 
-function TestingGui.build(app,parent,state,api)
+function testingGui.build(app,parent,state,api)
 	local makeSection=app.makeSection
 	local buildToggleRow=app.buildToggleRow
 
@@ -38,8 +38,8 @@ function TestingGui.build(app,parent,state,api)
 	}
 end
 
-function TestingGui.new(app,...)
-	return app.Page1TestingLogicModule.new(app,...,TestingGui)
+function testingGui.new(app,...)
+	return app.Page1TestingLogicModule.new(app,...,testingGui)
 end
 
-return TestingGui
+return testingGui

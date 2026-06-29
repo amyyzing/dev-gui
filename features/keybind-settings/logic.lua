@@ -1,8 +1,8 @@
 -- keybind capture, clear, and restore actions.
 
-local KeybindSettings={}
+local keybindSettings={}
 
-local UIS=game:GetService("UserInputService")
+local inputService=game:GetService("UserInputService")
 local TweenService=game:GetService("TweenService")
 local TextService=game:GetService("TextService")
 
@@ -40,9 +40,9 @@ local function setBinding(app,item,value)
 	end
 end
 
-function KeybindSettings.new(app,bindSection)
-	local New=app.New
-	local THEME=app.THEME
+function keybindSettings.new(app,bindSection)
+	local make=app.New
+	local colors=app.colors
 	local bindingToLabel=app.bindingToLabel
 	local inputToBinding=app.inputToBinding
 	local wrapTextButton=app.wrapTextButton
@@ -103,19 +103,19 @@ function KeybindSettings.new(app,bindSection)
 	end
 
 	function api.MakeBindButton(parent,x,y,w)
-		local normalBg=THEME.BUTTON or THEME.BG
-		local button=New("TextButton",{BackgroundColor3=normalBg,BorderSizePixel=0,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w or 122,28),Text="NIL",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6,ThemeRole="BUTTON"},parent)
+		local normalBg=colors.button or colors.bg
+		local button=make("TextButton",{BackgroundColor3=normalBg,BorderSizePixel=0,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w or 122,28),Text="NIL",Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.text,AutoButtonColor=false,ZIndex=6,ThemeRole="BUTTON"},parent)
 		local wrap=wrapTextButton(button,normalBg,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 
 		connect(button.MouseEnter,function()
 			if activeCapture and activeCapture.button==button then return end
-			wrap.BackgroundColor3=THEME.CARD
+			wrap.BackgroundColor3=colors.card
 		end)
 
 		connect(button.MouseLeave,function()
 			if activeCapture and activeCapture.button==button then return end
-			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
+			wrap.BackgroundColor3=colors.button or colors.bg
 		end)
 
 		return button
@@ -123,14 +123,14 @@ function KeybindSettings.new(app,bindSection)
 
 	local function setButtonCaptureState(button,waiting)
 		button.Text=waiting and"PRESS..." or button.Text
-		setWrappedButtonBg(button,THEME.BUTTON or THEME.BG)
-		button.TextColor3=THEME.TEXT
+		setWrappedButtonBg(button,colors.button or colors.bg)
+		button.TextColor3=colors.text
 	end
 
 	function api.StartCapture(button,getter,setter)
 		if activeCapture and activeCapture.button and activeCapture.button~=button then
-			setWrappedButtonBg(activeCapture.button,THEME.BUTTON or THEME.BG)
-			activeCapture.button.TextColor3=THEME.TEXT
+			setWrappedButtonBg(activeCapture.button,colors.button or colors.bg)
+			activeCapture.button.TextColor3=colors.text
 			if activeCapture.getter then
 				activeCapture.button.Text=bindingToLabel(activeCapture.getter())
 			end
@@ -146,25 +146,25 @@ function KeybindSettings.new(app,bindSection)
 	end
 
 	function api.AddBindRow(label,getter,setter)
-		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},bindSection)
+		local row=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},bindSection)
 
-		local labelButton=New("TextButton",{
+		local labelButton=make("TextButton",{
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,-138,1,0),
 			Position=UDim2.fromOffset(0,0),
 			Text=string.upper(tostring(label or "")),
 			Font=Enum.Font.GothamMedium,
 			TextSize=12,
-			TextColor3=THEME.TEXT,
+			TextColor3=colors.text,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			AutoButtonColor=false,
 			ZIndex=6,
 			TextRole="TEXT",
 		},row)
 
-		local strike=New("Frame",{
+		local strike=make("Frame",{
 			AnchorPoint=Vector2.new(0,0.5),
-			BackgroundColor3=THEME.STROKE or THEME.GREEN,
+			BackgroundColor3=colors.stroke or colors.green,
 			BackgroundTransparency=0.18,
 			BorderSizePixel=0,
 			Position=UDim2.new(0,0,0.5,0),
@@ -198,8 +198,8 @@ function KeybindSettings.new(app,bindSection)
 		end
 
 		connect(labelButton.MouseEnter,function()
-			strike.BackgroundColor3=THEME.STROKE or THEME.GREEN
-			tweenLabel({TextColor3=THEME.STROKE or THEME.GREEN})
+			strike.BackgroundColor3=colors.stroke or colors.green
+			tweenLabel({TextColor3=colors.stroke or colors.green})
 			TweenService:Create(strike,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
 				Size=UDim2.fromOffset(strikeWidth(),1),
 				BackgroundTransparency=0.08,
@@ -207,7 +207,7 @@ function KeybindSettings.new(app,bindSection)
 		end)
 
 		connect(labelButton.MouseLeave,function()
-			tweenLabel({TextColor3=THEME.TEXT})
+			tweenLabel({TextColor3=colors.text})
 			TweenService:Create(strike,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
 				Size=UDim2.fromOffset(0,1),
 				BackgroundTransparency=0.18,
@@ -252,17 +252,17 @@ function KeybindSettings.new(app,bindSection)
 		for _,item in ipairs(bindRows) do
 			if not(activeCapture and activeCapture.button==item.button) then
 				item.button.Text=bindingToLabel(item.getter())
-				setWrappedButtonBg(item.button,THEME.BUTTON or THEME.BG)
-				item.button.TextColor3=THEME.TEXT
+				setWrappedButtonBg(item.button,colors.button or colors.bg)
+				item.button.TextColor3=colors.text
 			end
 
 			if item.label then
 				item.label.Text=item.displayLabel or string.upper(tostring(item.label.Text or ""))
-				item.label.TextColor3=THEME.TEXT
+				item.label.TextColor3=colors.text
 			end
 
 			if item.strike then
-				item.strike.BackgroundColor3=THEME.STROKE or THEME.GREEN
+				item.strike.BackgroundColor3=colors.stroke or colors.green
 			end
 		end
 	end
@@ -279,7 +279,7 @@ function KeybindSettings.new(app,bindSection)
 		api.Refresh()
 	end
 
-	inputConn=connect(UIS.InputBegan,function(inp)
+	inputConn=connect(inputService.InputBegan,function(inp)
 		if not activeCapture then return end
 
 		if inp.KeyCode==Enum.KeyCode.Escape then
@@ -312,4 +312,4 @@ function KeybindSettings.new(app,bindSection)
 	return api
 end
 
-return KeybindSettings
+return keybindSettings

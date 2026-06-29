@@ -1,15 +1,15 @@
 -- player highlights and ball-holder colors.
 
-local ESP={}
+local esp={}
 
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
-local UIS=game:GetService("UserInputService")
+local inputService=game:GetService("UserInputService")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 
 local me=Players.LocalPlayer
 
-local VALID_TEAM_IDS={
+local validTeamIds={
 	HomeTeam=true,
 	AwayTeam=true,
 }
@@ -117,7 +117,7 @@ local function getPlayerTeamID(player)
 end
 
 local function isValidGameTeamID(teamID)
-	return teamID~=nil and VALID_TEAM_IDS[teamID]==true
+	return teamID~=nil and validTeamIds[teamID]==true
 end
 
 local function getGameplayOffenseTeam()
@@ -151,18 +151,18 @@ local function makeNoop()
 	}
 end
 
-function ESP.new(app,parent)
+function esp.new(app,parent)
 	local safeDisconnect=app.safeDisconnect
 	local makeSection=app.makeSection
 	local buildToggleRow=app.buildToggleRow
 	local inputToBinding=app.inputToBinding
 	local state=app.State
-	local THEME=app.THEME
-	local UI_STYLE=app.UI_STYLE
-	local scheduler=app.Scheduler
+	local colors=app.colors
+	local style=app.style
+	local scheduler=app.schedulerApi
 	local services=app.Services or {}
-	local playerCache=services.PlayerCache or app.PlayerCache
-	local ballTracker=services.BallTracker or app.BallTracker
+	local playerCache=services.playerCacheApi or app.playerCacheApi
+	local ballTracker=services.ballTrackerApi or app.ballTrackerApi
 	local api={}
 	local sectionBody=nil
 	local sectionFrame=nil
@@ -175,8 +175,8 @@ function ESP.new(app,parent)
 	local activeMode=nil
 	local poll=0
 
-	local DefenseModule=app.ESPDefenseModule
-	local OffenseModule=app.ESPOffenseModule
+	local defenseModule=app.ESPDefenseModule
+	local offenseModule=app.ESPOffenseModule
 	local function currentPlayers()
 		if playerCache and type(playerCache.getPlayers)=="function" then
 			return playerCache:getPlayers()
@@ -203,18 +203,18 @@ function ESP.new(app,parent)
 		return getPlayerTeamID(player)
 	end
 
-	if DefenseModule and DefenseModule.new then
+	if defenseModule and defenseModule.new then
 		local ok,result=pcall(function()
-			return DefenseModule.new({THEME=THEME,UI_STYLE=UI_STYLE,State=state,safeDisconnect=safeDisconnect,Scheduler=scheduler,Services=services,PlayerCache=playerCache,BallTracker=ballTracker})
+			return defenseModule.new({colors=colors,style=style,State=state,safeDisconnect=safeDisconnect,schedulerApi=scheduler,Services=services,playerCacheApi=playerCache,ballTrackerApi=ballTracker})
 		end)
 		defenseApi=ok and result or makeNoop()
 	else
 		defenseApi=makeNoop()
 	end
 
-	if OffenseModule and OffenseModule.new then
+	if offenseModule and offenseModule.new then
 		local ok,result=pcall(function()
-			return OffenseModule.new({THEME=THEME,UI_STYLE=UI_STYLE,State=state,safeDisconnect=safeDisconnect,Scheduler=scheduler,Services=services,PlayerCache=playerCache,BallTracker=ballTracker})
+			return offenseModule.new({colors=colors,style=style,State=state,safeDisconnect=safeDisconnect,schedulerApi=scheduler,Services=services,playerCacheApi=playerCache,ballTrackerApi=ballTracker})
 		end)
 		offenseApi=ok and result or makeNoop()
 	else
@@ -263,7 +263,7 @@ function ESP.new(app,parent)
 	local function setStatus(text,color)
 		if statusLabel then
 			statusLabel.Text=text
-			statusLabel.TextColor3=color or THEME.MUTED
+			statusLabel.TextColor3=color or colors.muted
 		end
 	end
 
@@ -295,7 +295,7 @@ function ESP.new(app,parent)
 		if not gameplay then
 			state.actionStatusOn=false
 			stopBoth()
-			setStatus("game only",THEME.MUTED)
+			setStatus("game only",colors.muted)
 		elseif state.actionStatusOn then
 			local nextMode=mode or"defense"
 			local nextApi=nextMode=="defense" and defenseApi or offenseApi
@@ -307,10 +307,10 @@ function ESP.new(app,parent)
 			elseif nextApi and nextApi.Refresh then
 				pcall(nextApi.Refresh)
 			end
-			setStatus(nextMode=="defense" and "Defense active" or "Offense active",THEME.GREEN or THEME.TEXT)
+			setStatus(nextMode=="defense" and "Defense active" or "Offense active",colors.green or colors.text)
 		else
 			stopBoth()
-			setStatus("",THEME.MUTED)
+			setStatus("",colors.muted)
 		end
 
 		if sectionFrame then
@@ -404,7 +404,7 @@ function ESP.new(app,parent)
 		return false
 	end
 
-	keybindConn=UIS.InputBegan:Connect(function(input,processed)
+	keybindConn=inputService.InputBegan:Connect(function(input,processed)
 		if processed then return end
 		handleESPInput(input)
 	end)
@@ -426,4 +426,4 @@ function ESP.new(app,parent)
 	return api
 end
 
-return ESP
+return esp

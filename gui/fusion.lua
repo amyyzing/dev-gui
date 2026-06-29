@@ -1,6 +1,6 @@
 -- small reactive gui layer used by the panel.
 
-local Fusion={}
+local fusion={}
 
 local function makeKey(kind,name)
 	return{
@@ -10,12 +10,12 @@ local function makeKey(kind,name)
 	}
 end
 
-Fusion.Children=makeKey("Children","Children")
+fusion.Children=makeKey("Children","Children")
 
 local eventKeys={}
 local changeKeys={}
 
-function Fusion.OnEvent(name)
+function fusion.OnEvent(name)
 	name=tostring(name)
 	local key=eventKeys[name]
 	if not key then
@@ -25,7 +25,7 @@ function Fusion.OnEvent(name)
 	return key
 end
 
-function Fusion.OnChange(name)
+function fusion.OnChange(name)
 	name=tostring(name)
 	local key=changeKeys[name]
 	if not key then
@@ -46,7 +46,7 @@ local function peek(value)
 	return value
 end
 
-Fusion.peek=peek
+fusion.peek=peek
 
 local function cleanupOne(item)
 	if item==nil then
@@ -80,7 +80,7 @@ local function cleanupOne(item)
 	end
 end
 
-function Fusion.cleanup(items)
+function fusion.cleanup(items)
 	if type(items)~="table" then
 		cleanupOne(items)
 		return
@@ -92,7 +92,7 @@ function Fusion.cleanup(items)
 	end
 end
 
-function Fusion.Value(initial)
+function fusion.Value(initial)
 	local state={
 		__fusion_state=true,
 		__fusion_kind="Value",
@@ -139,8 +139,8 @@ function Fusion.Value(initial)
 	return state
 end
 
-function Fusion.Computed(fn)
-	local computed=Fusion.Value(nil)
+function fusion.Computed(fn)
+	local computed=fusion.Value(nil)
 	computed.__fusion_kind="Computed"
 	local cleanups={}
 	local running=false
@@ -150,7 +150,7 @@ function Fusion.Computed(fn)
 			return
 		end
 		running=true
-		Fusion.cleanup(cleanups)
+		fusion.cleanup(cleanups)
 
 		local used={}
 		local function use(state)
@@ -176,7 +176,7 @@ function Fusion.Computed(fn)
 	end
 
 	function computed:destroy()
-		Fusion.cleanup(cleanups)
+		fusion.cleanup(cleanups)
 		table.clear(self._listeners)
 	end
 
@@ -185,7 +185,7 @@ function Fusion.Computed(fn)
 	return computed
 end
 
-function Fusion.Observer(state)
+function fusion.Observer(state)
 	local observer={}
 
 	function observer:onChange(listener)
@@ -225,7 +225,7 @@ local function applyProps(scope,instance,properties)
 	local children=nil
 
 	for key,value in pairs(properties) do
-		if key==Fusion.Children then
+		if key==fusion.Children then
 			children=value
 		elseif key=="Parent" then
 			parent=value
@@ -287,18 +287,18 @@ local function newWithScope(scope,className)
 	end
 end
 
-function Fusion.New(className)
+function fusion.New(className)
 	return newWithScope(nil,className)
 end
 
-function Fusion.Hydrate(instance)
+function fusion.Hydrate(instance)
 	return function(properties)
 		return applyProps(nil,instance,properties)
 	end
 end
 
-function Fusion.scoped(base)
-	base=base or Fusion
+function fusion.scoped(base)
+	base=base or fusion
 	local scope={
 		_cleanups={},
 	}
@@ -310,7 +310,7 @@ function Fusion.scoped(base)
 		return item
 	end
 
-	function scope:New(className)
+	function scope:make(className)
 		return newWithScope(self,className)
 	end
 
@@ -333,7 +333,7 @@ function Fusion.scoped(base)
 	end
 
 	function scope:doCleanup()
-		Fusion.cleanup(self._cleanups)
+		fusion.cleanup(self._cleanups)
 	end
 
 	scope.OnEvent=base.OnEvent
@@ -344,4 +344,4 @@ function Fusion.scoped(base)
 	return scope
 end
 
-return Fusion
+return fusion

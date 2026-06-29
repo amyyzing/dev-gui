@@ -13,9 +13,9 @@ function shutdownTool()
 		end)
 	end
 
-	if MainFrame and MainFrame.Destroy then
+	if mainFrame and mainFrame.Destroy then
 		pcall(function()
-			MainFrame.Destroy()
+			mainFrame.Destroy()
 		end)
 	end
 
@@ -27,29 +27,29 @@ function shutdownTool()
 		disconnectRuntimeConnections()
 	end
 
-	if SG and SG.Parent then
-		SG:Destroy()
+	if screenGui and screenGui.Parent then
+		screenGui:Destroy()
 	end
 end
 
 trackRuntimeConnection(closeBtn.Activated:Connect(shutdownTool))
 
 function applyHitboxPreset(index)
-	local preset=PRESETS[index]
+	local preset=hitboxPresets[index]
 	if not preset or not preset.size then return end
 
 	local size=preset.size
-	PAGE1_STATE.sizeX=size.X
-	PAGE1_STATE.sizeY=size.Y
-	PAGE1_STATE.sizeZ=size.Z
+	mainPageState.sizeX=size.X
+	mainPageState.sizeY=size.Y
+	mainPageState.sizeZ=size.Z
 
-	if PAGE1_APIS.Hitbox and PAGE1_APIS.Hitbox.SetHitboxSize then
+	if mainPageApis.hitbox and mainPageApis.hitbox.SetHitboxSize then
 		pcall(function()
-			PAGE1_APIS.Hitbox.SetHitboxSize(size.X,size.Y,size.Z,true)
+			mainPageApis.hitbox.SetHitboxSize(size.X,size.Y,size.Z,true)
 		end)
-	elseif PAGE1_APIS.Hitbox and PAGE1_APIS.Hitbox.Refresh then
+	elseif mainPageApis.hitbox and mainPageApis.hitbox.Refresh then
 		syncPage1State()
-		pcall(PAGE1_APIS.Hitbox.Refresh)
+		pcall(mainPageApis.hitbox.Refresh)
 		requestPlayerAutosave()
 	else
 		syncPage1State()
@@ -85,20 +85,20 @@ function handleGlobalInput(inp,processed)
 
 	local bind=inputToBinding(inp)
 	local handled=false
-	if bind~=nil and bind==TOGGLE_UI_KEY and TOGGLE_UI_KEY~=Enum.KeyCode.Unknown then
+	if bind~=nil and bind==uiToggleKey and uiToggleKey~=Enum.KeyCode.Unknown then
 		setUIVisible(not uiVisible)
 		handled=true
 	end
 
-	if bind~=nil and bind==TOGGLE_ACTION_KEY and TOGGLE_ACTION_KEY~=Enum.KeyCode.Unknown then
-		if not(PAGE1_APIS.ESP and PAGE1_APIS.ESP.SetESPState) then
-			if CURRENT_MODE_KEY=="mode1" then
-				PAGE1_STATE.actionStatusOn=not PAGE1_STATE.actionStatusOn
+	if bind~=nil and bind==espToggleKey and espToggleKey~=Enum.KeyCode.Unknown then
+		if not(mainPageApis.esp and mainPageApis.esp.SetESPState) then
+			if currentModeKey=="mode1" then
+				mainPageState.actionStatusOn=not mainPageState.actionStatusOn
 				syncPage1State()
 				refreshActionStatus()
 				requestPlayerAutosave()
 			else
-				PAGE1_STATE.actionStatusOn=false
+				mainPageState.actionStatusOn=false
 				syncPage1State()
 				refreshActionStatus()
 			end
@@ -107,7 +107,7 @@ function handleGlobalInput(inp,processed)
 	end
 
 	if bind~=nil then
-		for i,preset in ipairs(PRESETS) do
+		for i,preset in ipairs(hitboxPresets) do
 			if preset.key and preset.key~=Enum.KeyCode.Unknown and bind==preset.key then
 				applyHitboxPreset(i)
 				handled=true
@@ -119,28 +119,28 @@ function handleGlobalInput(inp,processed)
 	return handled
 end
 
-trackRuntimeConnection(UIS.InputBegan:Connect(function(inp,processed)
+trackRuntimeConnection(inputService.InputBegan:Connect(function(inp,processed)
 	handleGlobalInput(inp,processed)
 end))
 
-local RUNTIME_ENV=(getfenv and getfenv()) or _G
-local PERSISTENT_GLOBAL_KEYS={
-	CURRENT_MODE_KEY=true,
-	CURRENT_MODE_LABEL=true,
-	TOGGLE_UI_KEY=true,
-	TOGGLE_HB_KEY=true,
-	TOGGLE_JB_KEY=true,
-	TOGGLE_AB_KEY=true,
-	TOGGLE_ACTION_KEY=true,
-	QB_AIM_LOCK_KEY=true,
-	QB_AIM_THROW_KEY=true,
-	QB_AIM_TOGGLE_KEY=true,
+local runtimeEnv=(getfenv and getfenv()) or _G
+local persistentKeys={
+	currentModeKey=true,
+	currentModeLabel=true,
+	uiToggleKey=true,
+	hitboxToggleKey=true,
+	boostToggleKey=true,
+	alwaysBoostToggleKey=true,
+	espToggleKey=true,
+	qbAimLockKey=true,
+	qbAimThrowKey=true,
+	qbAimToggleKey=true,
 }
-local PERSISTENT_STRING_DEFAULTS={
-	CURRENT_MODE_KEY="mode1",
-	CURRENT_MODE_LABEL="Gameplay",
+local persistentStringDefaults={
+	currentModeKey="mode1",
+	currentModeLabel="Gameplay",
 }
-local RUNTIME_REFRESH_APIS={
+local refreshApis={
 	"StrokeColourAPI",
 	"MapEditorAPI",
 	"AntiMaterialAPI",
@@ -148,32 +148,32 @@ local RUNTIME_REFRESH_APIS={
 	"MapCleanerAPI",
 	"DiscordAPI",
 }
-local RUNTIME_REFRESH_FNS={
+local refreshFunctions={
 	"refreshPage2UI",
 	"applyUIStrokeTheme",
 	"updateResponsiveLayout",
 	"refreshActionStatus",
 }
 function getPersistentValue(name,default)
-	if PAGE1_STATE and PAGE1_STATE[name]~=nil then return PAGE1_STATE[name] end
-	if PERSISTENT_GLOBAL_KEYS[name] and RUNTIME_ENV[name]~=nil then return RUNTIME_ENV[name] end
+	if mainPageState and mainPageState[name]~=nil then return mainPageState[name] end
+	if persistentKeys[name] and runtimeEnv[name]~=nil then return runtimeEnv[name] end
 	return default
 end
 
 function setPersistentValue(name,value)
-	if PAGE1_STATE and PAGE1_STATE[name]~=nil then
-		PAGE1_STATE[name]=value
+	if mainPageState and mainPageState[name]~=nil then
+		mainPageState[name]=value
 		syncPage1State()
 		return
 	end
 
-	local stringDefault=PERSISTENT_STRING_DEFAULTS[name]
+	local stringDefault=persistentStringDefaults[name]
 	if stringDefault then
 		value=tostring(value or stringDefault)
 	end
 
-	if PERSISTENT_GLOBAL_KEYS[name] then
-		RUNTIME_ENV[name]=value
+	if persistentKeys[name] then
+		runtimeEnv[name]=value
 	end
 end
 
@@ -181,23 +181,23 @@ function refreshAllUI()
 	if refreshRuntimePageControls then
 		pcall(refreshRuntimePageControls,"main")
 	else
-		for _,api in pairs(PAGE1_APIS) do
+		for _,api in pairs(mainPageApis) do
 			if api and api.Refresh then pcall(api.Refresh) end
 		end
 		syncPage1State()
 	end
 
 	if refreshRuntimeAPIs then
-		refreshRuntimeAPIs(RUNTIME_REFRESH_APIS)
+		refreshRuntimeAPIs(refreshApis)
 	end
 
-	for _,fnName in ipairs(RUNTIME_REFRESH_FNS) do
-		local fn=RUNTIME_ENV[fnName]
+	for _,fnName in ipairs(refreshFunctions) do
+		local fn=runtimeEnv[fnName]
 		if type(fn)=="function" then pcall(fn) end
 	end
 end
 
-local DATA_SAVE_STATE_SETTERS={
+local saveStateSetters={
 	setTransparency={"targetTransparency"},
 	setGravity={"gravityValue",false,"GameParams","SetGravityValue",true},
 	setHitboxLock={"hitboxOn",true},
@@ -227,7 +227,7 @@ local DATA_SAVE_STATE_SETTERS={
 }
 
 local function callPage1Api(apiName,method,...)
-	local api=PAGE1_APIS and PAGE1_APIS[apiName]
+	local api=mainPageApis and mainPageApis[apiName]
 	local fn=api and api[method]
 	if type(fn)=="function" then
 		pcall(fn,...)
@@ -235,9 +235,9 @@ local function callPage1Api(apiName,method,...)
 end
 
 local function setPage1Field(key,value,coerceBool)
-	PAGE1_STATE[key]=coerceBool and (value and true or false) or value
+	mainPageState[key]=coerceBool and (value and true or false) or value
 	syncPage1State()
-	return PAGE1_STATE[key]
+	return mainPageState[key]
 end
 
 local function refreshPage2RuntimeUI()
@@ -246,13 +246,13 @@ end
 
 local function attachDataSaveSetters(app)
 	app.setHitboxSize=function(x,y,z)
-		PAGE1_STATE.sizeX=x
-		PAGE1_STATE.sizeY=y
-		PAGE1_STATE.sizeZ=z
+		mainPageState.sizeX=x
+		mainPageState.sizeY=y
+		mainPageState.sizeZ=z
 		syncPage1State()
 	end
 
-	for setterName,spec in pairs(DATA_SAVE_STATE_SETTERS) do
+	for setterName,spec in pairs(saveStateSetters) do
 		app[setterName]=function(value)
 			local stateValue=setPage1Field(spec[1],value,spec[2])
 			if spec[3] then
@@ -267,16 +267,16 @@ local function attachDataSaveSetters(app)
 
 	app.setSpeedState=function(value)
 		local stateValue=setPage1Field("speedEnabled",value,true)
-		PAGE1_STATE.speedParamsEnabled=stateValue
-		PAGE1_STATE.speedSettingEnabled=stateValue
+		mainPageState.speedParamsEnabled=stateValue
+		mainPageState.speedSettingEnabled=stateValue
 		syncPage1State()
 		callPage1Api("GameParams","SetSpeedState",stateValue,false)
 	end
 
 	app.setGravityState=function(value)
 		local stateValue=setPage1Field("gravityEnabled",value,true)
-		PAGE1_STATE.gravityJumpParamsEnabled=stateValue
-		PAGE1_STATE.gravitySettingEnabled=stateValue
+		mainPageState.gravityJumpParamsEnabled=stateValue
+		mainPageState.gravitySettingEnabled=stateValue
 		syncPage1State()
 		callPage1Api("GameParams","SetGravityState",stateValue,false)
 	end
@@ -293,26 +293,26 @@ local function attachDataSaveSetters(app)
 
 	app.setSpeedParamsState=function(value)
 		local stateValue=setPage1Field("speedParamsEnabled",value,true)
-		PAGE1_STATE.speedEnabled=stateValue
-		PAGE1_STATE.speedSettingEnabled=stateValue
-		PAGE1_STATE.diveSettingEnabled=stateValue
+		mainPageState.speedEnabled=stateValue
+		mainPageState.speedSettingEnabled=stateValue
+		mainPageState.diveSettingEnabled=stateValue
 		syncPage1State()
 		callPage1Api("GameParams","SetParamsPageEnabled","speed",stateValue,false)
 	end
 
 	app.setGravityJumpParamsState=function(value)
 		local stateValue=setPage1Field("gravityJumpParamsEnabled",value,true)
-		PAGE1_STATE.gravityEnabled=stateValue
-		PAGE1_STATE.gravitySettingEnabled=stateValue
-		PAGE1_STATE.jumpPowerSettingEnabled=stateValue
+		mainPageState.gravityEnabled=stateValue
+		mainPageState.gravitySettingEnabled=stateValue
+		mainPageState.jumpPowerSettingEnabled=stateValue
 		syncPage1State()
 		callPage1Api("GameParams","SetParamsPageEnabled","gravity",stateValue,false)
 	end
 
 	app.setStaminaParamsState=function(value)
 		local stateValue=setPage1Field("staminaParamsEnabled",value,true)
-		PAGE1_STATE.staminaRegenSettingEnabled=stateValue
-		PAGE1_STATE.staminaDepleteSettingEnabled=stateValue
+		mainPageState.staminaRegenSettingEnabled=stateValue
+		mainPageState.staminaDepleteSettingEnabled=stateValue
 		syncPage1State()
 		callPage1Api("GameParams","SetParamsPageEnabled","stamina",stateValue,false)
 	end
@@ -320,13 +320,13 @@ local function attachDataSaveSetters(app)
 	local function setParamSettingState(stateKey,value)
 		local stateValue=setPage1Field(stateKey,value,true)
 		if stateKey=="speedSettingEnabled" then
-			PAGE1_STATE.speedEnabled=stateValue
+			mainPageState.speedEnabled=stateValue
 		elseif stateKey=="gravitySettingEnabled" then
-			PAGE1_STATE.gravityEnabled=stateValue
+			mainPageState.gravityEnabled=stateValue
 		end
-		PAGE1_STATE.speedParamsEnabled=PAGE1_STATE.speedSettingEnabled==true or PAGE1_STATE.diveSettingEnabled==true
-		PAGE1_STATE.gravityJumpParamsEnabled=PAGE1_STATE.gravitySettingEnabled==true or PAGE1_STATE.jumpPowerSettingEnabled==true
-		PAGE1_STATE.staminaParamsEnabled=PAGE1_STATE.staminaRegenSettingEnabled==true or PAGE1_STATE.staminaDepleteSettingEnabled==true
+		mainPageState.speedParamsEnabled=mainPageState.speedSettingEnabled==true or mainPageState.diveSettingEnabled==true
+		mainPageState.gravityJumpParamsEnabled=mainPageState.gravitySettingEnabled==true or mainPageState.jumpPowerSettingEnabled==true
+		mainPageState.staminaParamsEnabled=mainPageState.staminaRegenSettingEnabled==true or mainPageState.staminaDepleteSettingEnabled==true
 		syncPage1State()
 		callPage1Api("GameParams","SetParamSettingEnabled",stateKey,stateValue,false)
 	end
@@ -360,28 +360,28 @@ end
 
 function buildDataSaveContext()
 	return attachDataSaveSetters({
-		BOT_API=BOT_API,
+		botApi=botApi,
 		me=me,
 		playerId=tostring(me.UserId),
 		toolAlive=toolAlive,
-		Services=RuntimeServices,
-		Scheduler=RuntimeScheduler,
-		StateStore=RuntimeStateStore,
-		ThemeStore=RuntimeThemeStore,
-		Janitor=RuntimeJanitor,
+		Services=sharedRuntime,
+		schedulerApi=jobRunner,
+		StateStore=settingsStore,
+		ThemeStore=themeRuntime,
+		Janitor=cleanupBags,
 
-		State=PAGE1_STATE,
+		State=mainPageState,
 		Get=getPersistentValue,
 		Set=setPersistentValue,
 
-		PRESETS=PRESETS,
-		DEFAULT_PRESETS=DEFAULT_PRESETS,
-		OWNED_PRESETS=OWNED_PRESETS,
-		expandedOwned=PAGE2_EXPANDED_OWNED,
+		hitboxPresets=hitboxPresets,
+		defaultHitboxPresets=defaultHitboxPresets,
+		savedPresets=savedPresets,
+		expandedOwned=expandedOwnedPresets,
 
-		UI_STYLE=UI_STYLE,
-		UI_WINDOW=UI_WINDOW,
-		WORLD_SETTINGS=WORLD_SETTINGS,
+		style=style,
+		windowState=windowState,
+		mapSettings=mapSettings,
 		root=root,
 		getDefaultUIStyle=getDefaultUIStyle,
 
@@ -421,7 +421,7 @@ function rebuildDataSaveFromModule(loadRemoteData)
 			DataSaveAPI.LoadOwnedPresets()
 		end)
 
-		if WORLD_SETTINGS and WORLD_SETTINGS.SmoothPlastic and ensureRuntimePageBuilt then
+		if mapSettings and mapSettings.SmoothPlastic and ensureRuntimePageBuilt then
 			pcall(ensureRuntimePageBuilt,"maps")
 		end
 	end
@@ -431,9 +431,9 @@ function rebuildDataSaveFromModule(loadRemoteData)
 end
 
 rebuildDataSaveFromModule(true)
-loaderPhaseCurrent=(loaderPhaseCurrent or #STARTUP_MODULE_PATHS)+1
+loaderPhaseCurrent=(loaderPhaseCurrent or #startupModuleFiles)+1
 if setLoaderProgress then
-	setLoaderProgress("Restored saved state.",loaderPhaseCurrent,LOADER_TOTAL,false)
+	setLoaderProgress("Restored saved state.",loaderPhaseCurrent,loaderStepTotal,false)
 end
 
 local pagesReady=true
@@ -447,21 +447,21 @@ end
 
 if AnnouncementModule and AnnouncementModule.new then
 	if setLoaderProgress then
-		setLoaderProgress("Binding announcements.",LOADER_TOTAL-2,LOADER_TOTAL,false)
+		setLoaderProgress("Binding announcements.",loaderStepTotal-2,loaderStepTotal,false)
 	end
 
 	local ok,result=pcall(function()
 		return AnnouncementModule.new({
-			New=New,
-			Fusion=FusionModule,
-			Services=RuntimeServices,
-			Scheduler=RuntimeScheduler,
-			StateStore=RuntimeStateStore,
-			ThemeStore=RuntimeThemeStore,
-			Janitor=RuntimeJanitor,
-			THEME=THEME,
-			SG=SG,
-			BOT_API=BOT_API,
+			make=make,
+			fusion=FusionModule,
+			Services=sharedRuntime,
+			schedulerApi=jobRunner,
+			StateStore=settingsStore,
+			ThemeStore=themeRuntime,
+			Janitor=cleanupBags,
+			colors=colors,
+			screenGui=screenGui,
+			botApi=botApi,
 			playerId=tostring(me.UserId),
 			getSessionId=function() return playerSessionId end,
 			wrapTextButton=wrapTextButton,
@@ -483,11 +483,11 @@ sendPlayerSessionUpdate=function(final)
 	if not playerSessionId then return end
 
 	local ok,result=pcall(function()
-		return BOT_API.Post("/player/session",{
+		return botApi.Post("/player/session",{
 			playerId=tostring(me.UserId),
 			sessionId=playerSessionId,
-			modeKey=CURRENT_MODE_KEY,
-			modeLabel=CURRENT_MODE_LABEL,
+			modeKey=currentModeKey,
+			modeLabel=currentModeLabel,
 			final=final and true or false,
 		})
 	end)
@@ -519,12 +519,12 @@ function sendPlayerLog()
 		task.wait(1)
 
 		local ok,result=pcall(function()
-			return BOT_API.Post("/player/log",{
+			return botApi.Post("/player/log",{
 				playerId=tostring(me.UserId),
 				username=me.Name,
 				displayName=me.DisplayName,
-				modeKey=CURRENT_MODE_KEY,
-				modeLabel=CURRENT_MODE_LABEL,
+				modeKey=currentModeKey,
+				modeLabel=currentModeLabel,
 			})
 		end)
 
@@ -540,23 +540,23 @@ end
 
 setActivePage("main")
 if setLoaderProgress then
-	setLoaderProgress("applying theme",LOADER_TOTAL-1,LOADER_TOTAL,false)
+	setLoaderProgress("applying theme",loaderStepTotal-1,loaderStepTotal,false)
 end
 applyUIStrokeTheme()
 refreshAllUI()
 refreshActionStatus()
-if MainFrame and MainFrame.RefreshText then
-	MainFrame.RefreshText(Description)
+if mainFrame and mainFrame.RefreshText then
+	mainFrame.RefreshText(description)
 elseif modeSubtitle then
 	modeSubtitle.Text=getMainDescriptionText()
 end
 sendPlayerLog()
 initManualRefresh()
-if LOADER_MODULES_READY==false then
-	setLoaderProgress("modules failed. press update, then run again.",LOADER_TOTAL,LOADER_TOTAL,true)
-elseif pagesReady==false or #RUNTIME_BUILD_ERRORS>0 then
-	setLoaderProgress("some gui pages failed",LOADER_TOTAL,LOADER_TOTAL,true)
+if modulesLoadedAtBoot==false then
+	setLoaderProgress("modules failed. press update, then run again.",loaderStepTotal,loaderStepTotal,true)
+elseif pagesReady==false or #runtimeBuildErrors>0 then
+	setLoaderProgress("some gui pages failed",loaderStepTotal,loaderStepTotal,true)
 else
-	setLoaderProgress("ready. jobs: "..tostring(RuntimeScheduler.Count()),LOADER_TOTAL,LOADER_TOTAL,false)
+	setLoaderProgress("ready. jobs: "..tostring(jobRunner.Count()),loaderStepTotal,loaderStepTotal,false)
 	finishLoader()
 end

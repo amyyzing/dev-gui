@@ -1,10 +1,10 @@
 -- tracks held balls, live balls, and current quarterback.
 
-local BallTracker = {}
-BallTracker.__index = BallTracker
+local ballTrackerApi = {}
+ballTrackerApi.__index = ballTrackerApi
 
-local BALL_CACHE_SECONDS = 0.08
-local DEFAULT_HELD_DISTANCE = 35
+local ballCacheSeconds = 0.08
+local defaultHeldDistance = 35
 
 local function getRoot(character)
 	if not character then
@@ -51,7 +51,7 @@ local function validPartNear(part, rootPart, maxDistance)
 	return part and part:IsA("BasePart") and part.Parent and rootPart and (part.Position - rootPart.Position).Magnitude <= maxDistance
 end
 
-function BallTracker.new(playersService, workspaceService, playerCache, scope)
+function ballTrackerApi.new(playersService, workspaceService, playerCache, scope)
 	local self = setmetatable({
 		_playersService = playersService or game:GetService("Players"),
 		_workspace = workspaceService or game:GetService("Workspace"),
@@ -59,7 +59,7 @@ function BallTracker.new(playersService, workspaceService, playerCache, scope)
 		_scope = scope,
 		_ballCache = setmetatable({}, { __mode = "k" }),
 		_destroyed = false,
-	}, BallTracker)
+	}, ballTrackerApi)
 
 	if scope and type(scope.add) == "function" then
 		scope:add(self)
@@ -68,8 +68,8 @@ function BallTracker.new(playersService, workspaceService, playerCache, scope)
 	return self
 end
 
-function BallTracker:findFootballPart(container, rootPart, maxDistance)
-	maxDistance = tonumber(maxDistance) or DEFAULT_HELD_DISTANCE
+function ballTrackerApi:findFootballPart(container, rootPart, maxDistance)
+	maxDistance = tonumber(maxDistance) or defaultHeldDistance
 	if not (container and rootPart) then
 		return nil
 	end
@@ -98,7 +98,7 @@ function BallTracker:findFootballPart(container, rootPart, maxDistance)
 	return nil
 end
 
-function BallTracker:getCharacter(player)
+function ballTrackerApi:getCharacter(player)
 	if self._playerCache and type(self._playerCache.getCharacter) == "function" then
 		return self._playerCache:getCharacter(player)
 	end
@@ -106,7 +106,7 @@ function BallTracker:getCharacter(player)
 	return getLiveCharacter(self._workspace, player)
 end
 
-function BallTracker:getRoot(player)
+function ballTrackerApi:getRoot(player)
 	if self._playerCache and type(self._playerCache.getRoot) == "function" then
 		return self._playerCache:getRoot(player)
 	end
@@ -114,12 +114,12 @@ function BallTracker:getRoot(player)
 	return getRoot(self:getCharacter(player))
 end
 
-function BallTracker:getFootballPartFromPlayer(player, maxDistance)
+function ballTrackerApi:getFootballPartFromPlayer(player, maxDistance)
 	if not player then
 		return nil
 	end
 
-	maxDistance = tonumber(maxDistance) or DEFAULT_HELD_DISTANCE
+	maxDistance = tonumber(maxDistance) or defaultHeldDistance
 	local character = self:getCharacter(player)
 	local rootPart = self:getRoot(player)
 	if not (character and rootPart) then
@@ -129,7 +129,7 @@ function BallTracker:getFootballPartFromPlayer(player, maxDistance)
 
 	local cached = self._ballCache[player]
 	local now = os.clock()
-	if cached and now - cached.t <= BALL_CACHE_SECONDS and validPartNear(cached.part, rootPart, maxDistance) then
+	if cached and now - cached.t <= ballCacheSeconds and validPartNear(cached.part, rootPart, maxDistance) then
 		return cached.part
 	end
 
@@ -142,11 +142,11 @@ function BallTracker:getFootballPartFromPlayer(player, maxDistance)
 	return football
 end
 
-function BallTracker:getHeldBall(player, maxDistance)
+function ballTrackerApi:getHeldBall(player, maxDistance)
 	return self:getFootballPartFromPlayer(player or self._playersService.LocalPlayer, maxDistance)
 end
 
-function BallTracker:getCarrier(players)
+function ballTrackerApi:getCarrier(players)
 	local list = players
 	if not list then
 		if self._playerCache and type(self._playerCache.getPlayers) == "function" then
@@ -157,7 +157,7 @@ function BallTracker:getCarrier(players)
 	end
 
 	for _, player in ipairs(list) do
-		local footballPart = self:getFootballPartFromPlayer(player, DEFAULT_HELD_DISTANCE)
+		local footballPart = self:getFootballPartFromPlayer(player, defaultHeldDistance)
 		if footballPart then
 			return {
 				player = player,
@@ -169,7 +169,7 @@ function BallTracker:getCarrier(players)
 	return nil
 end
 
-function BallTracker:destroy()
+function ballTrackerApi:destroy()
 	if self._destroyed then
 		return
 	end
@@ -178,8 +178,8 @@ function BallTracker:destroy()
 	self._ballCache = setmetatable({}, { __mode = "k" })
 end
 
-function BallTracker:Destroy()
+function ballTrackerApi:Destroy()
 	self:destroy()
 end
 
-return BallTracker
+return ballTrackerApi

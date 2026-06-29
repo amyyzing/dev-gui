@@ -1,10 +1,10 @@
 -- projectile math only. no gui state belongs in this file.
 
-local QBAimMath={}
+local qbAimMath={}
 
-local BALL_G=28
-local G=Vector3.new(0,-BALL_G,0)
-local DEFAULT_BALL_SPEED=95
+local ballGravity=28
+local gravityVector=Vector3.new(0,-ballGravity,0)
+local defaultBallSpeed=95
 
 local function flat(v)
 	return Vector3.new(v.X,0,v.Z)
@@ -35,14 +35,14 @@ local function distXZ(a,b)
 end
 
 local function ballAt(originPosition,velocity,time)
-	return originPosition+velocity*time+0.5*G*time*time
+	return originPosition+velocity*time+0.5*gravityVector*time*time
 end
 
 local function landing(originPosition,velocity)
-	local discriminant=velocity.Y*velocity.Y+2*BALL_G*originPosition.Y
+	local discriminant=velocity.Y*velocity.Y+2*ballGravity*originPosition.Y
 	if discriminant<0 then return nil,nil end
 
-	local time=(velocity.Y+math.sqrt(discriminant))/BALL_G
+	local time=(velocity.Y+math.sqrt(discriminant))/ballGravity
 	if time<=0 then return nil,nil end
 
 	return ballAt(originPosition,velocity,time),time
@@ -67,7 +67,7 @@ local function interceptValue(params,originPosition,receiverStart,wrVel,qbVel,ba
 	local inheritance=params.qbInheritance or 0
 	local inheritedVelocity=flat(qbVel or Vector3.zero)*inheritance
 	local target=targetAtTime(params,receiverStart,wrVel,time)
-	local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
+	local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*gravityVector*time*time
 	return neededDisplacement:Dot(neededDisplacement)-ballSpeed*ballSpeed*time*time
 end
 
@@ -153,7 +153,7 @@ local function interceptCandidate(params,originPosition,receiverStart,wrVel,qbVe
 	local inheritance=params.qbInheritance or 0
 	local inheritedVelocity=flat(qbVel or Vector3.zero)*inheritance
 	local target,receiverLeadDelay=targetAtTime(params,receiverStart,wrVel,time)
-	local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*G*time*time
+	local neededDisplacement=target-originPosition-inheritedVelocity*time-0.5*gravityVector*time*time
 	local requiredVelocity=neededDisplacement/time
 	local requiredSpeed=requiredVelocity.Magnitude
 	if requiredSpeed<=1e-6 then return nil end
@@ -170,7 +170,7 @@ local function interceptCandidate(params,originPosition,receiverStart,wrVel,qbVe
 	local yError=math.abs(catchPosition.Y-catchY)
 	local speedError=math.abs(requiredSpeed-ballSpeed)
 	local residual=math.abs(interceptValue(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time))
-	local verticalVelocityAtCatch=worldVelocity.Y+G.Y*time
+	local verticalVelocityAtCatch=worldVelocity.Y+gravityVector.Y*time
 	local landingPosition,landingTime=landing(originPosition,worldVelocity)
 	local leadDistance=flat(wrVel).Magnitude*receiverLeadDelay
 
@@ -245,12 +245,12 @@ local function refineInterceptTime(params,originPosition,receiverStart,wrVel,qbV
 	return(low+high)*0.5
 end
 
-function QBAimMath.ballAt(originPosition,velocity,time)
+function qbAimMath.ballAt(originPosition,velocity,time)
 	return ballAt(originPosition,velocity,time)
 end
 
-function QBAimMath.solve(params)
-	local ballSpeed=params.ballPower or DEFAULT_BALL_SPEED
+function qbAimMath.solve(params)
+	local ballSpeed=params.ballPower or defaultBallSpeed
 	local qbReleaseOffset=params.qbReleaseOffset or 0
 	local receiverReleaseOffset=params.receiverReleaseOffset
 	if receiverReleaseOffset==nil then
@@ -325,4 +325,4 @@ function QBAimMath.solve(params)
 	return best
 end
 
-return QBAimMath
+return qbAimMath

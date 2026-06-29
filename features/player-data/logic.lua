@@ -1,6 +1,6 @@
 -- save/load/wipe controls for player settings.
 
-local PlayerData={}
+local playerData={}
 
 local function clearArray(t)
 	for i=#t,1,-1 do
@@ -8,12 +8,12 @@ local function clearArray(t)
 	end
 end
 
-function PlayerData.new(app,page,deps)
+function playerData.new(app,page,deps)
 	deps=deps or {}
 
-	local New=app.New
-	local THEME=app.THEME
-	local SG=app.SG
+	local make=app.New
+	local colors=app.colors
+	local screenGui=app.SG
 	local makeSection=app.makeSection
 	local wrapTextButton=app.wrapTextButton
 
@@ -45,22 +45,22 @@ function PlayerData.new(app,page,deps)
 	local function setStatus(text,color)
 		if statusLabel then
 			statusLabel.Text=text or ""
-			statusLabel.TextColor3=color or THEME.MUTED
+			statusLabel.TextColor3=color or colors.muted
 		end
 
 		if statusPill then
-			statusPill.BackgroundColor3=(color==THEME.GREEN or color==THEME.RED) and color or THEME.BG
+			statusPill.BackgroundColor3=(color==colors.green or color==colors.red) and color or colors.bg
 		end
 
 		if statusPillText then
 			statusPillText.Text=busy and "BUSY" or "READY"
-			statusPillText.TextColor3=(color==THEME.GREEN or color==THEME.RED) and Color3.fromRGB(0,0,0) or THEME.MUTED
+			statusPillText.TextColor3=(color==colors.green or color==colors.red) and Color3.fromRGB(0,0,0) or colors.muted
 		end
 	end
 
 	local function modalButton(parent,text,x,danger,bucket)
 		local function baseColor()
-			return danger and THEME.RED or (THEME.BUTTON or THEME.BG)
+			return danger and colors.red or (colors.button or colors.bg)
 		end
 
 		local function hoverColor()
@@ -71,8 +71,8 @@ function PlayerData.new(app,page,deps)
 		end
 
 		local normalBg=baseColor()
-		local textColor=danger and Color3.fromRGB(0,0,0) or THEME.TEXT
-		local button=New("TextButton",{
+		local textColor=danger and Color3.fromRGB(0,0,0) or colors.text
+		local button=make("TextButton",{
 			Position=UDim2.fromOffset(x,120),
 			Size=UDim2.fromOffset(104,30),
 			BackgroundColor3=normalBg,
@@ -110,13 +110,13 @@ function PlayerData.new(app,page,deps)
 			return
 		end
 
-		local modal=New("Frame",{
+		local modal=make("Frame",{
 			BackgroundColor3=Color3.fromRGB(0,0,0),
 			BackgroundTransparency=0.25,
 			BorderSizePixel=0,
 			Size=UDim2.new(1,0,1,0),
 			ZIndex=100,
-		},SG)
+		},screenGui)
 		local modalConnections={}
 		local function closeModal()
 			disconnectConnections(modalConnections)
@@ -125,30 +125,30 @@ function PlayerData.new(app,page,deps)
 			end
 		end
 
-		local box=New("Frame",{
+		local box=make("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
 			Position=UDim2.new(0.5,0,0.5,0),
 			Size=UDim2.fromOffset(390,170),
-			BackgroundColor3=THEME.BG,
+			BackgroundColor3=colors.bg,
 			BorderSizePixel=0,
 			ZIndex=101,
 		},modal)
 
-		New("UIStroke",{Color=THEME.STROKE,Thickness=2,Transparency=0},box)
+		make("UIStroke",{Color=colors.stroke,Thickness=2,Transparency=0},box)
 
-		New("TextLabel",{
+		make("TextLabel",{
 			BackgroundTransparency=1,
 			Position=UDim2.fromOffset(16,14),
 			Size=UDim2.new(1,-32,0,24),
 			Text=titleText,
 			Font=Enum.Font.GothamMedium,
 			TextSize=14,
-			TextColor3=THEME.TEXT,
+			TextColor3=colors.text,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			ZIndex=102,
 		},box)
 
-		New("TextLabel",{
+		make("TextLabel",{
 			BackgroundTransparency=1,
 			Position=UDim2.fromOffset(16,48),
 			Size=UDim2.new(1,-32,0,54),
@@ -156,7 +156,7 @@ function PlayerData.new(app,page,deps)
 			Font=Enum.Font.Gotham,
 			TextSize=12,
 			TextWrapped=true,
-			TextColor3=THEME.MUTED,
+			TextColor3=colors.muted,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			TextYAlignment=Enum.TextYAlignment.Top,
 			ZIndex=102,
@@ -183,8 +183,8 @@ function PlayerData.new(app,page,deps)
 	end
 
 	local function wipeLocal()
-		if app.OWNED_PRESETS then
-			clearArray(app.OWNED_PRESETS)
+		if app.savedPresets then
+			clearArray(app.savedPresets)
 		end
 
 		if app.expandedOwned then
@@ -199,8 +199,8 @@ function PlayerData.new(app,page,deps)
 			app.WorkspaceAPI.SetEnabled(false)
 		end
 
-		if deps.MapCleaner and deps.MapCleaner.SetEnabled then
-			deps.MapCleaner.SetEnabled(false)
+		if deps.mapCleaner and deps.mapCleaner.SetEnabled then
+			deps.mapCleaner.SetEnabled(false)
 		end
 
 		if app.resetMainPageDefaults then pcall(app.resetMainPageDefaults) end
@@ -214,31 +214,31 @@ function PlayerData.new(app,page,deps)
 	function api.Wipe()
 		if busy then return end
 		busy=true
-		setStatus("wiping...",THEME.MUTED)
+		setStatus("wiping...",colors.muted)
 
-		if app.BOT_API and app.BOT_API.Post then
+		if app.botApi and app.botApi.Post then
 			local ok,result=pcall(function()
-				return app.BOT_API.Post("/player/wipe",{
+				return app.botApi.Post("/player/wipe",{
 					playerId=getPlayerId(),
 				})
 			end)
 
 			if not ok then
 				busy=false
-				setStatus("wipe failed: "..tostring(result),THEME.RED)
+				setStatus("wipe failed: "..tostring(result),colors.red)
 				return
 			end
 
 			if not result or not result.ok then
 				busy=false
-				setStatus("wipe failed: "..tostring(result and result.error or "unknown"),THEME.RED)
+				setStatus("wipe failed: "..tostring(result and result.error or "unknown"),colors.red)
 				return
 			end
 		end
 
 		wipeLocal()
 		busy=false
-		setStatus("data wiped",THEME.GREEN or THEME.TEXT)
+		setStatus("data wiped",colors.green or colors.text)
 	end
 
 	function api.ShowConfirm()
@@ -266,52 +266,52 @@ function PlayerData.new(app,page,deps)
 		},
 	})
 
-	local statusRow=New("Frame",{
+	local statusRow=make("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,34),
 		ZIndex=5,
 	},dataSection)
 
-	New("TextLabel",{
+	make("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,-76,1,0),
 		Text="Cloud Profile",
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
-		TextColor3=THEME.TEXT,
+		TextColor3=colors.text,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
 	},statusRow)
 
-	statusPill=New("Frame",{
+	statusPill=make("Frame",{
 		Size=UDim2.fromOffset(64,22),
 		Position=UDim2.new(1,-64,0.5,-11),
-		BackgroundColor3=THEME.BG,
+		BackgroundColor3=colors.bg,
 		BorderSizePixel=0,
 		ZIndex=6,
 	},statusRow)
 
-	New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0},statusPill)
+	make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=0},statusPill)
 
-	statusPillText=New("TextLabel",{
+	statusPillText=make("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,1,0),
 		Text="READY",
 		Font=Enum.Font.GothamMedium,
 		TextSize=10,
-		TextColor3=THEME.MUTED,
+		TextColor3=colors.muted,
 		SkipTextRole=true,
 		TextXAlignment=Enum.TextXAlignment.Center,
 		ZIndex=7,
 	},statusPill)
 
-	statusLabel=New("TextLabel",{
+	statusLabel=make("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,18),
 		Text="",
 		Font=Enum.Font.Gotham,
 		TextSize=11,
-		TextColor3=THEME.MUTED,
+		TextColor3=colors.muted,
 		SkipTextRole=true,
 		TextWrapped=true,
 		TextXAlignment=Enum.TextXAlignment.Left,
@@ -322,4 +322,4 @@ function PlayerData.new(app,page,deps)
 	return api
 end
 
-return PlayerData
+return playerData

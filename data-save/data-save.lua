@@ -1,10 +1,10 @@
 -- saves and restores player settings without dropping old fields.
 
-local DataSave={}
+local dataSave={}
 
 local HttpService=game:GetService("HttpService")
 
-local FALLBACK_UI_STYLE={
+local defaultStyleValues={
 	PrimaryR=12,
 	PrimaryG=12,
 	PrimaryB=12,
@@ -101,7 +101,7 @@ local FALLBACK_UI_STYLE={
 	QBAimHighlightOutlineTransparency=0,
 }
 
-local UI_STYLE_NUMBER_FIELDS={
+local styleNumberFields={
 	{"primaryR","PrimaryR",0,255,28},
 	{"primaryG","PrimaryG",0,255,28},
 	{"primaryB","PrimaryB",0,255,28},
@@ -180,7 +180,7 @@ local UI_STYLE_NUMBER_FIELDS={
 	{"qbAimHighlightOutlineTransparency","QBAimHighlightOutlineTransparency",0,1,0},
 }
 
-local UI_STYLE_BOOL_FIELDS={
+local styleBoolFields={
 	{"strokeGradient","StrokeGradient"},
 	{"liquidStroke","LiquidStroke"},
 	{"espOffenseCustomColor","ESPOffenseCustomColor"},
@@ -193,7 +193,7 @@ local UI_STYLE_BOOL_FIELDS={
 	{"espDefenseClosedCustomColor","ESPDefenseClosedCustomColor"},
 }
 
-local APPLY_REFRESH_HOOKS={
+local refreshHookNames={
 	"RefreshAll",
 	"applyUIStrokeTheme",
 	"refreshSettingsUI",
@@ -230,13 +230,13 @@ local function getDefaultUIStyle(app)
 				copy[key]=value
 			end
 
-			copy.UILib=tostring(copy.UILib or FALLBACK_UI_STYLE.UILib)
+			copy.UILib=tostring(copy.UILib or defaultStyleValues.UILib)
 			return copy
 		end
 	end
 
 	local copy={}
-	for key,value in pairs(FALLBACK_UI_STYLE) do
+	for key,value in pairs(defaultStyleValues) do
 		copy[key]=value
 	end
 
@@ -468,7 +468,7 @@ local function setClamped(app,stateName,value,min,max,fallback)
 end
 
 local function getModeKey(app)
-	return tostring(getValue(app,"CURRENT_MODE_KEY",app.CURRENT_MODE_KEY or "mode1"))
+	return tostring(getValue(app,"CURRENT_MODE_KEY",app.currentModeKey or "mode1"))
 end
 
 local function getPlayerId(app)
@@ -481,7 +481,7 @@ end
 
 local function collectPresetEditor(app)
 	local output={}
-	local presets=app.PRESETS or {}
+	local presets=app.hitboxPresets or {}
 
 	for i=1,4 do
 		local p=presets[i] or {}
@@ -501,11 +501,11 @@ end
 local function collectUIStylePayload(uiStyle,defaultUIStyle)
 	local payload={}
 
-	for _,field in ipairs(UI_STYLE_NUMBER_FIELDS) do
+	for _,field in ipairs(styleNumberFields) do
 		payload[field[1]]=uiStyle[field[2]]
 	end
 
-	for _,field in ipairs(UI_STYLE_BOOL_FIELDS) do
+	for _,field in ipairs(styleBoolFields) do
 		payload[field[1]]=uiStyle[field[2]] and true or false
 	end
 
@@ -524,7 +524,7 @@ end
 local function applyPresetEditor(app,presetEditor)
 	if type(presetEditor)~="table" then return end
 
-	local presets=app.PRESETS or {}
+	local presets=app.hitboxPresets or {}
 
 	for i=1,4 do
 		local item=presetEditor[i] or {}
@@ -549,11 +549,11 @@ local function normalizePreset(preset)
 	if code=="" then return nil end
 
 	local name=tostring(preset.Name or preset.name or "Unnamed")
-	local editor=preset.presetEditor or preset.PresetEditor
+	local editor=preset.presetEditor or preset.presetEditor
 
 	if not editor then
 		local data=preset.Data or preset.data or {}
-		editor=data.PresetEditor or data.presetEditor or {}
+		editor=data.presetEditor or data.presetEditor or {}
 	end
 
 	local normalizedEditor={}
@@ -573,7 +573,7 @@ local function normalizePreset(preset)
 		Code=code,
 		Name=name,
 		Data={
-			PresetEditor=normalizedEditor,
+			presetEditor=normalizedEditor,
 		},
 		CreatedAt=preset.createdAt or preset.CreatedAt,
 		UpdatedAt=preset.updatedAt or preset.UpdatedAt,
@@ -594,11 +594,11 @@ local function makeLocalCode(name)
 	return base..tostring(math.random(100,999))
 end
 
-function DataSave.new(app)
+function dataSave.new(app)
 	app=app or {}
 
 	local api={}
-	local root=normalizeRoot(app.PLAYER_SETTINGS_ROOT)
+	local root=normalizeRoot(app.playerSettingsRoot)
 	local loading=false
 	local autosaveQueued=false
 	local autosaveDelay=app.autosaveDelay or 0.8
@@ -610,18 +610,18 @@ function DataSave.new(app)
 
 	function api.SetLoading(value)
 		loading=value and true or false
-		app.PLAYER_SETTINGS_LOADING=loading
+		app.playerSettingsLoading=loading
 	end
 
 	function api.GetRoot()
 		root=normalizeRoot(root)
-		app.PLAYER_SETTINGS_ROOT=root
+		app.playerSettingsRoot=root
 		return root
 	end
 
 	function api.SetRoot(nextRoot)
 		root=normalizeRoot(nextRoot)
-		app.PLAYER_SETTINGS_ROOT=root
+		app.playerSettingsRoot=root
 		return root
 	end
 
@@ -639,7 +639,7 @@ function DataSave.new(app)
 		r.updatedAt=os.time()
 		r.modes[modeKey]=currentSettings
 
-		app.PLAYER_SETTINGS_ROOT=r
+		app.playerSettingsRoot=r
 		return r
 	end
 
@@ -654,10 +654,10 @@ function DataSave.new(app)
 		local rootFrame=app.root
 		local pos=rootFrame and rootFrame.Position or UDim2.new(0.5,0,0,80)
 
-		local uiStyle=app.UI_STYLE or {}
+		local uiStyle=app.style or {}
 		local defaultUIStyle=getDefaultUIStyle(app)
-		local uiWindow=app.UI_WINDOW or {}
-		local worldSettings=app.WORLD_SETTINGS or {}
+		local uiWindow=app.windowState or {}
+		local worldSettings=app.mapSettings or {}
 
 		return{
 			version=1,
@@ -743,7 +743,7 @@ function DataSave.new(app)
 			uiStyle=collectUIStylePayload(uiStyle,defaultUIStyle),
 
 			workspace={
-				smoothPlastic=app.WORLD_SETTINGS and app.WORLD_SETTINGS.SmoothPlastic and true or false,
+				smoothPlastic=app.mapSettings and app.mapSettings.SmoothPlastic and true or false,
 			},
 
 			window={
@@ -885,75 +885,75 @@ function DataSave.new(app)
 			setValue(app,"TOGGLE_ACTION_KEY",decodeBinding(keybinds.toggleActionStatus))
 		end
 
-		applyPresetEditor(app,settings.presetEditor or settings.PresetEditor)
+		applyPresetEditor(app,settings.presetEditor or settings.presetEditor)
 
 		local uiStyle=type(settings.uiStyle)=="table" and settings.uiStyle or {}
 		local hasSavedUIStyle=hasAnyKey(uiStyle)
 
 		local defaultUIStyle=getDefaultUIStyle(app)
-		if app.UI_STYLE then
+		if app.style then
 			for key,value in pairs(defaultUIStyle) do
-				if not hasSavedUIStyle or app.UI_STYLE[key]==nil then
-					app.UI_STYLE[key]=value
+				if not hasSavedUIStyle or app.style[key]==nil then
+					app.style[key]=value
 				end
 			end
 
-			for _,field in ipairs(UI_STYLE_NUMBER_FIELDS) do
+			for _,field in ipairs(styleNumberFields) do
 				local savedKey,styleKey,min,max,fallback=field[1],field[2],field[3],field[4],field[5]
 				if uiStyle[savedKey]~=nil then
-					app.UI_STYLE[styleKey]=clampNumber(uiStyle[savedKey],min,max,app.UI_STYLE[styleKey] or fallback)
+					app.style[styleKey]=clampNumber(uiStyle[savedKey],min,max,app.style[styleKey] or fallback)
 				end
 			end
 
-			for _,field in ipairs(UI_STYLE_BOOL_FIELDS) do
+			for _,field in ipairs(styleBoolFields) do
 				if uiStyle[field[1]]~=nil then
-					app.UI_STYLE[field[2]]=uiStyle[field[1]] and true or false
+					app.style[field[2]]=uiStyle[field[1]] and true or false
 				end
 			end
 
-			if uiStyle.liquidStrokeDirection~=nil then app.UI_STYLE.LiquidStrokeDirection=tostring(uiStyle.liquidStrokeDirection) end
+			if uiStyle.liquidStrokeDirection~=nil then app.style.LiquidStrokeDirection=tostring(uiStyle.liquidStrokeDirection) end
 			local themeExpanded=uiStyle.themePanelExpanded
 			if themeExpanded==nil then themeExpanded=uiStyle.ThemePanelExpanded end
-			if themeExpanded~=nil then app.UI_STYLE.ThemePanelExpanded=themeExpanded and true or false end
+			if themeExpanded~=nil then app.style.ThemePanelExpanded=themeExpanded and true or false end
 
 			local coloursExpanded=uiStyle.coloursPanelExpanded
 			if coloursExpanded==nil then coloursExpanded=uiStyle.ColorsPanelExpanded end
 			if coloursExpanded==nil then coloursExpanded=uiStyle.ColoursPanelExpanded end
-			if coloursExpanded~=nil then app.UI_STYLE.ColoursPanelExpanded=coloursExpanded and true or false end
+			if coloursExpanded~=nil then app.style.ColoursPanelExpanded=coloursExpanded and true or false end
 
 			local highlightExpanded=uiStyle.highlightPanelExpanded
 			if highlightExpanded==nil then highlightExpanded=uiStyle.HighlightPanelExpanded end
-			if highlightExpanded~=nil then app.UI_STYLE.HighlightPanelExpanded=highlightExpanded and true or false end
+			if highlightExpanded~=nil then app.style.HighlightPanelExpanded=highlightExpanded and true or false end
 
 			if uiStyle.highlightSelectedMode~=nil then
-				app.UI_STYLE.HighlightSelectedMode=tostring(uiStyle.highlightSelectedMode)
+				app.style.HighlightSelectedMode=tostring(uiStyle.highlightSelectedMode)
 			elseif uiStyle.HighlightSelectedMode~=nil then
-				app.UI_STYLE.HighlightSelectedMode=tostring(uiStyle.HighlightSelectedMode)
+				app.style.HighlightSelectedMode=tostring(uiStyle.HighlightSelectedMode)
 			end
 
 			if uiStyle.highlightSelectedState~=nil then
-				app.UI_STYLE.HighlightSelectedState=tostring(uiStyle.highlightSelectedState)
+				app.style.HighlightSelectedState=tostring(uiStyle.highlightSelectedState)
 			elseif uiStyle.HighlightSelectedState~=nil then
-				app.UI_STYLE.HighlightSelectedState=tostring(uiStyle.HighlightSelectedState)
+				app.style.HighlightSelectedState=tostring(uiStyle.HighlightSelectedState)
 			end
 
 			if uiStyle.uiLib~=nil and tostring(uiStyle.uiLib)~="" then
-				app.UI_STYLE.UILib=tostring(uiStyle.uiLib)
+				app.style.UILib=tostring(uiStyle.uiLib)
 			else
-				app.UI_STYLE.UILib=tostring(defaultUIStyle.UILib or "original")
+				app.style.UILib=tostring(defaultUIStyle.UILib or "original")
 			end
-			app.UI_STYLE.CornerRadius=0
+			app.style.CornerRadius=0
 		end
 
 		local workspaceSettings=settings.workspace or settings.Workspace or {}
-		if app.WORLD_SETTINGS then
-			app.WORLD_SETTINGS.SmoothPlastic=workspaceSettings.smoothPlastic and true or false
+		if app.mapSettings then
+			app.mapSettings.SmoothPlastic=workspaceSettings.smoothPlastic and true or false
 		end
 
 		local window=settings.window or {}
-		if app.UI_WINDOW then
-			if window.w~=nil then app.UI_WINDOW.W=clampNumber(window.w,app.UI_WINDOW.MinW or 560,app.UI_WINDOW.MaxW or 1220,app.UI_WINDOW.W or 880) end
-			if window.h~=nil then app.UI_WINDOW.H=clampNumber(window.h,app.UI_WINDOW.MinH or 360,app.UI_WINDOW.MaxH or 820,app.UI_WINDOW.H or 540) end
+		if app.windowState then
+			if window.w~=nil then app.windowState.W=clampNumber(window.w,app.windowState.MinW or 560,app.windowState.MaxW or 1220,app.windowState.W or 880) end
+			if window.h~=nil then app.windowState.H=clampNumber(window.h,app.windowState.MinH or 360,app.windowState.MaxH or 820,app.windowState.H or 540) end
 		end
 
 		if app.root and window.posXScale~=nil then
@@ -967,7 +967,7 @@ function DataSave.new(app)
 
 		api.SetLoading(false)
 
-		for _,hookName in ipairs(APPLY_REFRESH_HOOKS) do
+		for _,hookName in ipairs(refreshHookNames) do
 			if app[hookName] then
 				pcall(app[hookName])
 			end
@@ -975,9 +975,9 @@ function DataSave.new(app)
 	end
 
 	function api.SaveNow()
-		if loading or app.PLAYER_SETTINGS_LOADING then return false,"loading" end
+		if loading or app.playerSettingsLoading then return false,"loading" end
 		if app.toolAlive==false then return false,"tool not alive" end
-		if not app.BOT_API or not app.BOT_API.Post then return false,"missing BOT_API.Post" end
+		if not app.botApi or not app.botApi.Post then return false,"bot api missing" end
 
 		local currentSettings=api.Collect()
 		local settingsRoot=api.BuildRootForSave(currentSettings)
@@ -993,7 +993,7 @@ function DataSave.new(app)
 		autosaveLastPayload=ok and encoded or nil
 
 		task.spawn(function()
-			local response=app.BOT_API.Post("/player/save",{
+			local response=app.botApi.Post("/player/save",{
 				playerId=getPlayerId(app),
 				settings=settingsRoot,
 			})
@@ -1007,7 +1007,7 @@ function DataSave.new(app)
 	end
 
 	function api.Schedule()
-		if loading or app.PLAYER_SETTINGS_LOADING then return end
+		if loading or app.playerSettingsLoading then return end
 		if app.toolAlive==false then return end
 		if autosaveQueued then return end
 
@@ -1020,7 +1020,7 @@ function DataSave.new(app)
 	end
 
 	function api.SetPresetSize(index,x,y,z,skipSave)
-		local presets=app.PRESETS or {}
+		local presets=app.hitboxPresets or {}
 		local i=tonumber(index)
 		local preset=i and presets[i]
 
@@ -1043,7 +1043,7 @@ function DataSave.new(app)
 	end
 
 	function api.SetPresetKey(index,binding,skipSave)
-		local presets=app.PRESETS or {}
+		local presets=app.hitboxPresets or {}
 		local i=tonumber(index)
 		local preset=i and presets[i]
 
@@ -1061,8 +1061,8 @@ function DataSave.new(app)
 	end
 
 	function api.ResetPreset(index,skipSave)
-		local presets=app.PRESETS or {}
-		local defaults=app.DEFAULT_PRESETS or {}
+		local presets=app.hitboxPresets or {}
+		local defaults=app.defaultHitboxPresets or {}
 		local i=tonumber(index)
 		local preset=i and presets[i]
 		local default=i and defaults[i]
@@ -1114,8 +1114,8 @@ function DataSave.new(app)
 		local editorForApi=encodePresetEditor(presetEditor or collectPresetEditor(app))
 		local preset=nil
 
-		if app.BOT_API and app.BOT_API.Post then
-			local response=app.BOT_API.Post("/preset/create",{
+		if app.botApi and app.botApi.Post then
+			local response=app.botApi.Post("/preset/create",{
 				playerId=getPlayerId(app),
 				name=cleanName,
 				presetEditor=editorForApi,
@@ -1142,8 +1142,8 @@ function DataSave.new(app)
 			return false,"preset save broke"
 		end
 
-		if app.OWNED_PRESETS then
-			table.insert(app.OWNED_PRESETS,preset)
+		if app.savedPresets then
+			table.insert(app.savedPresets,preset)
 		end
 
 		if app.refreshPage2UI then pcall(app.refreshPage2UI) end
@@ -1158,11 +1158,11 @@ function DataSave.new(app)
 			return false,"paste a preset code"
 		end
 
-		if not(app.BOT_API and app.BOT_API.Post) then
+		if not(app.botApi and app.botApi.Post) then
 			return false,"preset import needs bot"
 		end
 
-		local response=app.BOT_API.Post("/preset/load",{
+		local response=app.botApi.Post("/preset/load",{
 			playerId=getPlayerId(app),
 			code=cleanCode,
 		})
@@ -1171,13 +1171,13 @@ function DataSave.new(app)
 			return false,response and response.error or "import failed"
 		end
 
-		if response.presets and type(response.presets)=="table" and app.OWNED_PRESETS then
-			clearArray(app.OWNED_PRESETS)
+		if response.presets and type(response.presets)=="table" and app.savedPresets then
+			clearArray(app.savedPresets)
 
 			for _,rawPreset in ipairs(response.presets) do
 				local normalized=normalizePreset(rawPreset)
 				if normalized then
-					table.insert(app.OWNED_PRESETS,normalized)
+					table.insert(app.savedPresets,normalized)
 				end
 			end
 		else
@@ -1186,18 +1186,18 @@ function DataSave.new(app)
 				return false,"preset data broke"
 			end
 
-			if app.OWNED_PRESETS then
+			if app.savedPresets then
 				local replaced=false
-				for index,owned in ipairs(app.OWNED_PRESETS) do
+				for index,owned in ipairs(app.savedPresets) do
 					if tostring(owned.Code or owned.code or "")==tostring(preset.Code or preset.code or "") then
-						app.OWNED_PRESETS[index]=preset
+						app.savedPresets[index]=preset
 						replaced=true
 						break
 					end
 				end
 
 				if not replaced then
-					table.insert(app.OWNED_PRESETS,preset)
+					table.insert(app.savedPresets,preset)
 				end
 			end
 
@@ -1218,11 +1218,11 @@ function DataSave.new(app)
 			return false,"bad preset"
 		end
 
-		api.ApplyPresetEditor(normalized.Data.PresetEditor,true)
+		api.ApplyPresetEditor(normalized.Data.presetEditor,true)
 
-		if app.BOT_API and app.BOT_API.Post then
+		if app.botApi and app.botApi.Post then
 			task.spawn(function()
-				local response=app.BOT_API.Post("/preset/equip",{
+				local response=app.botApi.Post("/preset/equip",{
 					playerId=getPlayerId(app),
 					code=normalized.Code,
 				})
@@ -1243,39 +1243,39 @@ function DataSave.new(app)
 		local response=nil
 		local usedApi=false
 
-		if app.BOT_API and app.BOT_API.Post then
+		if app.botApi and app.botApi.Post then
 			usedApi=true
-			response=app.BOT_API.Post("/preset/delete",{
+			response=app.botApi.Post("/preset/delete",{
 				playerId=getPlayerId(app),
 				code=code,
 			})
 		end
 
-		if response and response.ok and type(response.presets)=="table" and app.OWNED_PRESETS then
-			clearArray(app.OWNED_PRESETS)
+		if response and response.ok and type(response.presets)=="table" and app.savedPresets then
+			clearArray(app.savedPresets)
 
 			for _,rawPreset in ipairs(response.presets) do
 				local normalized=normalizePreset(rawPreset)
 				if normalized then
-					table.insert(app.OWNED_PRESETS,normalized)
+					table.insert(app.savedPresets,normalized)
 				end
 			end
 		elseif usedApi then
 			warn("preset delete failed:",response and response.error or "unknown")
 			return false,response and response.error or "delete failed"
-		elseif app.OWNED_PRESETS then
+		elseif app.savedPresets then
 			local removed=false
 
-			for i=#app.OWNED_PRESETS,1,-1 do
-				local preset=app.OWNED_PRESETS[i]
+			for i=#app.savedPresets,1,-1 do
+				local preset=app.savedPresets[i]
 				if tostring(preset.Code or preset.code or "")==tostring(code or "") then
-					table.remove(app.OWNED_PRESETS,i)
+					table.remove(app.savedPresets,i)
 					removed=true
 				end
 			end
 
-			if not removed and index and app.OWNED_PRESETS[index] then
-				table.remove(app.OWNED_PRESETS,index)
+			if not removed and index and app.savedPresets[index] then
+				table.remove(app.savedPresets,index)
 			end
 		end
 
@@ -1290,12 +1290,12 @@ function DataSave.new(app)
 	end
 
 	function api.Load()
-		if not app.BOT_API or not app.BOT_API.Post then
+		if not app.botApi or not app.botApi.Post then
 			api.Apply(api.GetSavedSettingsForCurrentMode())
-			return false,"missing BOT_API.Post"
+			return false,"bot api missing"
 		end
 
-		local response=app.BOT_API.Post("/player/load",{
+		local response=app.botApi.Post("/player/load",{
 			playerId=getPlayerId(app),
 		})
 
@@ -1322,11 +1322,11 @@ function DataSave.new(app)
 	end
 
 	function api.LoadOwnedPresets()
-		if not app.BOT_API or not app.BOT_API.Post then
-			return false,"missing BOT_API.Post"
+		if not app.botApi or not app.botApi.Post then
+			return false,"bot api missing"
 		end
 
-		local response=app.BOT_API.Post("/preset/list-owned",{
+		local response=app.botApi.Post("/preset/list-owned",{
 			playerId=getPlayerId(app),
 		})
 
@@ -1335,13 +1335,13 @@ function DataSave.new(app)
 			return false,response and response.error or "unknown"
 		end
 
-		if app.OWNED_PRESETS then
-			clearArray(app.OWNED_PRESETS)
+		if app.savedPresets then
+			clearArray(app.savedPresets)
 
 			for _,preset in ipairs(response.presets or {}) do
 				local normalized=normalizePreset(preset)
 				if normalized then
-					table.insert(app.OWNED_PRESETS,normalized)
+					table.insert(app.savedPresets,normalized)
 				end
 			end
 		end
@@ -1361,7 +1361,7 @@ function DataSave.new(app)
 		return collectPresetEditor(app)
 	end
 
-	app.DataSave=api
+	app.dataSave=api
 	app.requestPlayerAutosave=function()
 		api.Schedule()
 	end
@@ -1369,4 +1369,4 @@ function DataSave.new(app)
 	return api
 end
 
-return DataSave
+return dataSave

@@ -1,15 +1,15 @@
 -- turns theme presets into the colors the gui uses.
 
 local env = (getfenv and getfenv()) or _G
-local Tokens = rawget(env, "DesignTokens") or rawget(env, "DesignTokensModule")
+local designTokens = rawget(env, "DesignTokens") or rawget(env, "DesignTokensModule")
 
-if not Tokens and script and script.Parent then
-	Tokens = require(script.Parent.tokens)
+if not designTokens and script and script.Parent then
+	designTokens = require(script.Parent.tokens)
 end
 
-assert(Tokens, "DesignTokens must load before DesignThemeResolver")
+assert(designTokens, "DesignTokens must load before DesignThemeResolver")
 
-local Resolver = {}
+local themeResolver = {}
 
 local function luminance(color)
 	return 0.2126 * color.R + 0.7152 * color.G + 0.0722 * color.B
@@ -26,27 +26,27 @@ local function clone(source)
 end
 
 local function resolveText(values)
-	local surface = values[Tokens.Color.Surface.Window] or Color3.fromRGB(12, 12, 12)
+	local surface = values[designTokens.Color.Surface.Window] or Color3.fromRGB(12, 12, 12)
 	local lum = luminance(surface)
 
 	if lum > 0.72 then
-		values[Tokens.Color.Text.Primary] = Color3.fromRGB(12, 12, 12)
-		values[Tokens.Color.Text.Muted] = Color3.fromRGB(76, 76, 76)
-		values[Tokens.Color.Text.Inverse] = Color3.fromRGB(245, 245, 245)
+		values[designTokens.Color.Text.Primary] = Color3.fromRGB(12, 12, 12)
+		values[designTokens.Color.Text.Muted] = Color3.fromRGB(76, 76, 76)
+		values[designTokens.Color.Text.Inverse] = Color3.fromRGB(245, 245, 245)
 	else
-		values[Tokens.Color.Text.Primary] = Color3.fromRGB(245, 245, 245)
-		values[Tokens.Color.Text.Muted] = Color3.fromRGB(184, 184, 184)
-		values[Tokens.Color.Text.Inverse] = Color3.fromRGB(12, 12, 12)
+		values[designTokens.Color.Text.Primary] = Color3.fromRGB(245, 245, 245)
+		values[designTokens.Color.Text.Muted] = Color3.fromRGB(184, 184, 184)
+		values[designTokens.Color.Text.Inverse] = Color3.fromRGB(12, 12, 12)
 	end
 
-	values[Tokens.Color.Text.Danger] = values[Tokens.Color.Text.Danger] or Color3.fromRGB(254, 94, 86)
-	values[Tokens.Color.Text.Success] = values[Tokens.Color.Text.Success] or values[Tokens.Color.Accent.Primary]
+	values[designTokens.Color.Text.Danger] = values[designTokens.Color.Text.Danger] or Color3.fromRGB(254, 94, 86)
+	values[designTokens.Color.Text.Success] = values[designTokens.Color.Text.Success] or values[designTokens.Color.Accent.Primary]
 end
 
-function Resolver.resolve(theme, overrides)
+function themeResolver.resolve(theme, overrides)
 	assert(type(theme) == "table", "Theme must be a table")
 
-	local values = clone(Tokens.Defaults)
+	local values = clone(designTokens.Defaults)
 
 	for token, value in pairs(theme.values or {}) do
 		values[token] = value
@@ -68,4 +68,4 @@ function Resolver.resolve(theme, overrides)
 	}
 end
 
-return Resolver
+return themeResolver

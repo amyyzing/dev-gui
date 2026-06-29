@@ -1,14 +1,14 @@
 -- cached player, character, root, and team lookup.
 
-local PlayerCache = {}
-PlayerCache.__index = PlayerCache
+local playerCacheApi = {}
+playerCacheApi.__index = playerCacheApi
 
-local VALID_TEAM_IDS = {
+local validTeamIds = {
 	HomeTeam = true,
 	AwayTeam = true,
 }
 
-local TEAM_CACHE_SECONDS = 0.5
+local teamCacheSeconds = 0.5
 
 local function safeDisconnect(connection)
 	if connection and typeof(connection) == "RBXScriptConnection" then
@@ -70,7 +70,7 @@ local function readTeamId(player)
 	return nil
 end
 
-function PlayerCache.new(playersService, workspaceService, scope)
+function playerCacheApi.new(playersService, workspaceService, scope)
 	local self = setmetatable({
 		_playersService = playersService or game:GetService("Players"),
 		_workspace = workspaceService or game:GetService("Workspace"),
@@ -79,7 +79,7 @@ function PlayerCache.new(playersService, workspaceService, scope)
 		_entries = {},
 		_connections = {},
 		_destroyed = false,
-	}, PlayerCache)
+	}, playerCacheApi)
 
 	if scope and type(scope.add) == "function" then
 		scope:add(self)
@@ -100,7 +100,7 @@ function PlayerCache.new(playersService, workspaceService, scope)
 	return self
 end
 
-function PlayerCache:_connect(signal, callback)
+function playerCacheApi:_connect(signal, callback)
 	if not signal or type(signal.Connect) ~= "function" then
 		return nil
 	end
@@ -117,7 +117,7 @@ function PlayerCache:_connect(signal, callback)
 	return nil
 end
 
-function PlayerCache:_bindPlayerSignals(player, entry)
+function playerCacheApi:_bindPlayerSignals(player, entry)
 	safeDisconnect(entry.characterAddedConnection)
 	safeDisconnect(entry.characterRemovingConnection)
 
@@ -132,7 +132,7 @@ function PlayerCache:_bindPlayerSignals(player, entry)
 	end)
 end
 
-function PlayerCache:_addPlayer(player)
+function playerCacheApi:_addPlayer(player)
 	if not player or self._entries[player] then
 		return
 	end
@@ -149,7 +149,7 @@ function PlayerCache:_addPlayer(player)
 	self:refreshPlayer(player)
 end
 
-function PlayerCache:_removePlayer(player)
+function playerCacheApi:_removePlayer(player)
 	local entry = self._entries[player]
 	if entry then
 		safeDisconnect(entry.characterAddedConnection)
@@ -165,7 +165,7 @@ function PlayerCache:_removePlayer(player)
 	end
 end
 
-function PlayerCache:refreshPlayer(player)
+function playerCacheApi:refreshPlayer(player)
 	local entry = self._entries[player]
 	if not entry then
 		return nil
@@ -178,11 +178,11 @@ function PlayerCache:refreshPlayer(player)
 	return entry
 end
 
-function PlayerCache:getPlayers()
+function playerCacheApi:getPlayers()
 	return self._players
 end
 
-function PlayerCache:getEntry(player)
+function playerCacheApi:getEntry(player)
 	if not player then
 		return nil
 	end
@@ -194,29 +194,29 @@ function PlayerCache:getEntry(player)
 	return self:refreshPlayer(player)
 end
 
-function PlayerCache:getCharacter(player)
+function playerCacheApi:getCharacter(player)
 	local entry = self:getEntry(player)
 	return entry and entry.character or nil
 end
 
-function PlayerCache:getRoot(player)
+function playerCacheApi:getRoot(player)
 	local entry = self:getEntry(player)
 	return entry and entry.root or nil
 end
 
-function PlayerCache:getHumanoid(player)
+function playerCacheApi:getHumanoid(player)
 	local entry = self:getEntry(player)
 	return entry and entry.humanoid or nil
 end
 
-function PlayerCache:getTeamId(player)
+function playerCacheApi:getTeamId(player)
 	local entry = self:getEntry(player)
 	if not entry then
 		return nil
 	end
 
 	local now = os.clock()
-	if now - (entry.teamReadAt or 0) >= TEAM_CACHE_SECONDS then
+	if now - (entry.teamReadAt or 0) >= teamCacheSeconds then
 		entry.teamId = readTeamId(player)
 		entry.teamReadAt = now
 	end
@@ -224,17 +224,17 @@ function PlayerCache:getTeamId(player)
 	return entry.teamId
 end
 
-function PlayerCache:isValidTeamId(teamId)
-	return teamId ~= nil and VALID_TEAM_IDS[teamId] == true
+function playerCacheApi:isValidTeamId(teamId)
+	return teamId ~= nil and validTeamIds[teamId] == true
 end
 
-function PlayerCache:isSameTeam(playerA, playerB)
+function playerCacheApi:isSameTeam(playerA, playerB)
 	local teamA = self:getTeamId(playerA)
 	local teamB = self:getTeamId(playerB)
 	return self:isValidTeamId(teamA) and self:isValidTeamId(teamB) and teamA == teamB
 end
 
-function PlayerCache:destroy()
+function playerCacheApi:destroy()
 	if self._destroyed then
 		return
 	end
@@ -254,8 +254,8 @@ function PlayerCache:destroy()
 	end
 end
 
-function PlayerCache:Destroy()
+function playerCacheApi:Destroy()
 	self:destroy()
 end
 
-return PlayerCache
+return playerCacheApi

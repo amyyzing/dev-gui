@@ -1,10 +1,10 @@
 -- moves the panel back to the screen center.
 
-local ResetPosition={}
+local resetPosition={}
 
-function ResetPosition.new(app,page)
-	local New=app.New
-	local THEME=app.THEME
+function resetPosition.new(app,page)
+	local make=app.New
+	local colors=app.colors
 	local makeSection=app.makeSection
 	local wrapTextButton=app.wrapTextButton
 
@@ -23,15 +23,15 @@ function ResetPosition.new(app,page)
 	local function setStatus(text,color)
 		if statusLabel then
 			statusLabel.Text=text or ""
-			statusLabel.TextColor3=color or THEME.MUTED
+			statusLabel.TextColor3=color or colors.muted
 		end
 	end
 
 	local function resetPosition()
 		local ok=false
 
-		if app.MainFrame and type(app.MainFrame.ResetPosition)=="function" then
-			ok=pcall(app.MainFrame.ResetPosition,true)
+		if app.mainFrame and type(app.mainFrame.resetPosition)=="function" then
+			ok=pcall(app.mainFrame.resetPosition,true)
 		elseif app.root then
 			ok=pcall(function()
 				local height=(app.root.AbsoluteSize and app.root.AbsoluteSize.Y) or 540
@@ -40,20 +40,20 @@ function ResetPosition.new(app,page)
 		end
 
 		if ok then
-			setStatus("position reset",THEME.GREEN)
-			if app.MainFrame and type(app.MainFrame.ShowToast)=="function" then
-				app.MainFrame.ShowToast("GUI position reset.", "success", 1.6)
+			setStatus("position reset",colors.green)
+			if app.mainFrame and type(app.mainFrame.ShowToast)=="function" then
+				app.mainFrame.ShowToast("GUI position reset.", "success", 1.6)
 			end
 			if type(app.scheduleSave)=="function" then
 				app.scheduleSave()
 			end
 		else
-			setStatus("reset failed",THEME.RED)
+			setStatus("reset failed",colors.red)
 		end
 	end
 
 	function api.Refresh()
-		setStatus("",THEME.MUTED)
+		setStatus("",colors.muted)
 	end
 
 	function api.Destroy()
@@ -67,7 +67,7 @@ function ResetPosition.new(app,page)
 
 	local section=makeSection(page,2,"GUI Position","Move the panel back to the default spot")
 	local function buttonBaseColor()
-		return THEME.BUTTON or THEME.BG
+		return colors.button or colors.bg
 	end
 
 	local function buttonHoverColor()
@@ -79,7 +79,7 @@ function ResetPosition.new(app,page)
 
 	local normalBg=buttonBaseColor()
 
-	button=New("TextButton",{
+	button=make("TextButton",{
 		BackgroundColor3=normalBg,
 		BorderSizePixel=0,
 		Size=UDim2.new(1,-20,0,30),
@@ -87,7 +87,7 @@ function ResetPosition.new(app,page)
 		Text="reset position",
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
-		TextColor3=THEME.TEXT,
+		TextColor3=colors.text,
 		AutoButtonColor=false,
 		Selectable=true,
 		ZIndex=6,
@@ -110,13 +110,13 @@ function ResetPosition.new(app,page)
 
 	connect(button.Activated,resetPosition)
 
-	statusLabel=New("TextLabel",{
+	statusLabel=make("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,18),
 		Text="",
 		Font=Enum.Font.Gotham,
 		TextSize=11,
-		TextColor3=THEME.MUTED,
+		TextColor3=colors.muted,
 		SkipTextRole=true,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
@@ -125,4 +125,4 @@ function ResetPosition.new(app,page)
 	return api
 end
 
-return ResetPosition
+return resetPosition

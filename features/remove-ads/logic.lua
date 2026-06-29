@@ -1,6 +1,6 @@
 -- hides billboard ads and puts them back when disabled.
 
-local RemoveAds={}
+local removeAds={}
 
 local function firstChild(parent)
 	if not parent then return nil end
@@ -16,8 +16,8 @@ local function destroyControl(control)
 	end
 end
 
-function RemoveAds.new(app,page)
-	local THEME=app.THEME
+function removeAds.new(app,page)
+	local colors=app.colors
 	local safeDisconnect=app.safeDisconnect
 	local makeSection=app.makeSection
 	local buildToggleRow=app.buildToggleRow
@@ -57,7 +57,7 @@ function RemoveAds.new(app,page)
 	local function setStatus(text,color)
 		if not statusLabel then return end
 		statusLabel.Text=text
-		statusLabel.TextColor3=color or THEME.MUTED
+		statusLabel.TextColor3=color or colors.muted
 	end
 
 	local function syncToggleVisual(value)
@@ -89,7 +89,7 @@ function RemoveAds.new(app,page)
 	local function removeCurrentAds()
 		local ads=getAdsFolder(false)
 		if not ads then
-			setStatus(isGameplay() and "no ads folder" or "game only",THEME.MUTED)
+			setStatus(isGameplay() and "no ads folder" or "game only",colors.muted)
 			return
 		end
 
@@ -97,7 +97,7 @@ function RemoveAds.new(app,page)
 			removeInstance(child,ads)
 		end
 
-		setStatus("removed "..tostring(#removed),THEME.GREEN)
+		setStatus("removed "..tostring(#removed),colors.green)
 	end
 
 	local function restoreAds()
@@ -141,7 +141,7 @@ function RemoveAds.new(app,page)
 					if enabled and child:IsA("Model") then
 						task.defer(function()
 							removeInstance(child,ads)
-							setStatus("removed "..tostring(#removed),THEME.GREEN)
+							setStatus("removed "..tostring(#removed),colors.green)
 						end)
 					end
 				end)
@@ -161,7 +161,7 @@ function RemoveAds.new(app,page)
 					local parent=inst.Parent
 					task.defer(function()
 						removeInstance(inst,parent)
-						setStatus("removed "..tostring(#removed),THEME.GREEN)
+						setStatus("removed "..tostring(#removed),colors.green)
 					end)
 				end
 			end)
@@ -178,7 +178,7 @@ function RemoveAds.new(app,page)
 		else
 			disconnectWatchers()
 			restoreAds()
-			setStatus(isGameplay() and "ads back" or "game only",THEME.MUTED)
+			setStatus(isGameplay() and "ads back" or "game only",colors.muted)
 		end
 
 		if fire~=false and app.onChanged then
@@ -198,7 +198,7 @@ function RemoveAds.new(app,page)
 			watchAdsFolder()
 			removeCurrentAds()
 		else
-			setStatus(isGameplay() and "" or "game only",THEME.MUTED)
+			setStatus(isGameplay() and "" or "game only",colors.muted)
 		end
 	end
 
@@ -232,4 +232,4 @@ function RemoveAds.new(app,page)
 	return api
 end
 
-return RemoveAds
+return removeAds

@@ -1,37 +1,37 @@
 -- applies speed, gravity, jump, stamina, and dive values.
 
-local GameParams={}
+local gameParams={}
 
 local Players=game:GetService("Players")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
-local UIS=game:GetService("UserInputService")
+local inputService=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
 
 local me=Players.LocalPlayer
-local DEFAULT_GRAVITY=196.2
-local DEFAULT_SPEED=18
-local SPEED_FORCE_INTERVAL=0.05
-local DEFAULT_SELECTED_PAGE="speed"
-local PARAMS={
+local defaultGravity=196.2
+local defaultSpeed=18
+local speedForceInterval=0.05
+local defaultSelectedPage="speed"
+local paramRows={
 	JumpPower="jumpPowerValue",
 	DivePower="divePowerValue",
 	SprintStaminaRegenRate="staminaRegenValue",
 	SprintStaminaDepleteRate="staminaDepleteValue",
 }
 
-local PARAM_STATE_PAGE={
+local paramStatePage={
 	jumpPowerValue="gravity",
 	divePowerValue="speed",
 	staminaRegenValue="stamina",
 	staminaDepleteValue="stamina",
 }
 
-local PAGE_ENABLED_KEY={
+local pageEnabledKey={
 	speed="speedParamsEnabled",
 	gravity="gravityJumpParamsEnabled",
 	stamina="staminaParamsEnabled",
 }
-local PARAM_ENABLED_KEY={
+local paramEnabledKey={
 	gravityValue="gravitySettingEnabled",
 	speedValue="speedSettingEnabled",
 	jumpPowerValue="jumpPowerSettingEnabled",
@@ -39,7 +39,7 @@ local PARAM_ENABLED_KEY={
 	staminaRegenValue="staminaRegenSettingEnabled",
 	staminaDepleteValue="staminaDepleteSettingEnabled",
 }
-local PAGE_SETTING_KEYS={
+local pageSettingKeys={
 	speed={"speedSettingEnabled","diveSettingEnabled"},
 	gravity={"gravitySettingEnabled","jumpPowerSettingEnabled"},
 	stamina={"staminaRegenSettingEnabled","staminaDepleteSettingEnabled"},
@@ -61,7 +61,7 @@ local function getMyHumanoid()
 end
 
 local function clampSpeed(value)
-	return math.clamp(tonumber(value) or DEFAULT_SPEED,0,100)
+	return math.clamp(tonumber(value) or defaultSpeed,0,100)
 end
 
 local function boolDefault(value,default)
@@ -73,7 +73,7 @@ local function boolDefault(value,default)
 end
 
 local function normalizePageKey(value)
-	local raw=tostring(value or DEFAULT_SELECTED_PAGE):lower():gsub("%s+","")
+	local raw=tostring(value or defaultSelectedPage):lower():gsub("%s+","")
 
 	if raw=="speed" or raw=="1" then
 		return"speed"
@@ -83,10 +83,10 @@ local function normalizePageKey(value)
 		return"stamina"
 	end
 
-	return DEFAULT_SELECTED_PAGE
+	return defaultSelectedPage
 end
 
-function GameParams.new(app)
+function gameParams.new(app)
 	app=app or {}
 	local safeDisconnect=app.safeDisconnect
 	local inputToBinding=app.inputToBinding
@@ -143,7 +143,7 @@ function GameParams.new(app)
 
 	local function isPageEnabled(pageKey)
 		pageKey=normalizePageKey(pageKey)
-		local keys=PAGE_SETTING_KEYS[pageKey]
+		local keys=pageSettingKeys[pageKey]
 		if keys then
 			for _,key in ipairs(keys) do
 				if isSettingEnabled(key) then
@@ -153,16 +153,16 @@ function GameParams.new(app)
 			return false
 		end
 
-		return state[PAGE_ENABLED_KEY[pageKey]]~=false
+		return state[pageEnabledKey[pageKey]]~=false
 	end
 
 	local function isStateKeyActive(stateKey)
-		local enabledKey=PARAM_ENABLED_KEY[stateKey]
+		local enabledKey=paramEnabledKey[stateKey]
 		if enabledKey then
 			return isSettingEnabled(enabledKey)
 		end
 
-		local pageKey=PARAM_STATE_PAGE[stateKey]
+		local pageKey=paramStatePage[stateKey]
 		return not pageKey or isPageEnabled(pageKey)
 	end
 
@@ -188,7 +188,7 @@ function GameParams.new(app)
 		state.staminaDepleteSettingEnabled=boolDefault(state.staminaDepleteSettingEnabled,state.staminaParamsEnabled)
 		state.speedEnabled=state.speedSettingEnabled
 		state.gravityEnabled=state.gravitySettingEnabled
-		state.gravityValue=clampNumber(state.gravityValue,0,1000,DEFAULT_GRAVITY)
+		state.gravityValue=clampNumber(state.gravityValue,0,1000,defaultGravity)
 		state.speedValue=clampSpeed(state.speedValue)
 		state.staminaRegenValue=clampNumber(state.staminaRegenValue,0,50,10)
 		state.staminaDepleteValue=clampStaminaDeplete(state.staminaDepleteValue)
@@ -205,7 +205,7 @@ function GameParams.new(app)
 	end
 
 	local function applyGravity(value)
-		local gravity=clampNumber(value,0,1000,DEFAULT_GRAVITY)
+		local gravity=clampNumber(value,0,1000,defaultGravity)
 		state.gravityValue=gravity
 		if isGravityActive() then
 			workspace.Gravity=gravity
@@ -227,12 +227,12 @@ function GameParams.new(app)
 		speedElapsed=0
 
 		if resetValue then
-			state.speedValue=DEFAULT_SPEED
+			state.speedValue=defaultSpeed
 		end
 
 		local hum=getMyHumanoid()
 		if hum then
-			hum.WalkSpeed=DEFAULT_SPEED
+			hum.WalkSpeed=defaultSpeed
 		end
 	end
 
@@ -257,7 +257,7 @@ function GameParams.new(app)
 			end
 
 			speedElapsed=speedElapsed+(dt or 0)
-			if speedElapsed<SPEED_FORCE_INTERVAL then
+			if speedElapsed<speedForceInterval then
 				return
 			end
 			speedElapsed=0
@@ -389,7 +389,7 @@ function GameParams.new(app)
 		table.insert(folderConns[gameParams],gameParams.ChildAdded:Connect(function(child)
 			if not isAlive() then return end
 
-			local stateKey=PARAMS[child.Name]
+			local stateKey=paramRows[child.Name]
 			if stateKey and child:IsA("NumberValue") and isStateKeyActive(stateKey) then
 				task.defer(function()
 					if isAlive() and isStateKeyActive(stateKey) and child.Parent then
@@ -416,7 +416,7 @@ function GameParams.new(app)
 			if gameParams then
 				watchGameParamsFolder(gameParams)
 
-				for paramName,stateKey in pairs(PARAMS) do
+				for paramName,stateKey in pairs(paramRows) do
 					applyNumberValue(gameParams,paramName,stateKey)
 				end
 			end
@@ -431,7 +431,7 @@ function GameParams.new(app)
 		end))
 
 		table.insert(rootConns,root.DescendantAdded:Connect(function(descendant)
-			local stateKey=PARAMS[descendant.Name]
+			local stateKey=paramRows[descendant.Name]
 			if descendant.Name=="GameParams" or (stateKey and isStateKeyActive(stateKey)) then
 				task.defer(applyGameParams)
 			end
@@ -499,7 +499,7 @@ function GameParams.new(app)
 		end
 		applyGameParams()
 		if not isGravityActive() then
-			workspace.Gravity=DEFAULT_GRAVITY
+			workspace.Gravity=defaultGravity
 		end
 
 		syncControls()
@@ -510,7 +510,7 @@ function GameParams.new(app)
 	end
 
 	function api.SetGravityValue(value,fire)
-		state.gravityValue=clampNumber(value,0,1000,DEFAULT_GRAVITY)
+		state.gravityValue=clampNumber(value,0,1000,defaultGravity)
 		applyGravity(state.gravityValue)
 		syncControls()
 
@@ -569,9 +569,9 @@ function GameParams.new(app)
 	function api.SetParamsPageEnabled(pageKey,value,fire)
 		pageKey=normalizePageKey(pageKey)
 		local enabled=value and true or false
-		state[PAGE_ENABLED_KEY[pageKey]]=enabled
+		state[pageEnabledKey[pageKey]]=enabled
 
-		for _,settingKey in ipairs(PAGE_SETTING_KEYS[pageKey] or {}) do
+		for _,settingKey in ipairs(pageSettingKeys[pageKey] or {}) do
 			state[settingKey]=enabled
 		end
 
@@ -590,7 +590,7 @@ function GameParams.new(app)
 				applyGravity(state.gravityValue)
 				applyGameParams()
 			else
-				workspace.Gravity=DEFAULT_GRAVITY
+				workspace.Gravity=defaultGravity
 			end
 		elseif pageKey=="stamina" then
 			applyGameParams()
@@ -606,7 +606,7 @@ function GameParams.new(app)
 	function api.SetParamSettingEnabled(settingKey,value,fire)
 		settingKey=tostring(settingKey or "")
 		local allowed=false
-		for _,keys in pairs(PAGE_SETTING_KEYS) do
+		for _,keys in pairs(pageSettingKeys) do
 			for _,key in ipairs(keys) do
 				if key==settingKey then
 					allowed=true
@@ -635,7 +635,7 @@ function GameParams.new(app)
 			if isGravityActive() then
 				applyGravity(state.gravityValue)
 			else
-				workspace.Gravity=DEFAULT_GRAVITY
+				workspace.Gravity=defaultGravity
 			end
 			applyGameParams()
 		else
@@ -656,7 +656,7 @@ function GameParams.new(app)
 		if isGravityActive() then
 			applyGravity(state.gravityValue)
 		else
-			workspace.Gravity=DEFAULT_GRAVITY
+			workspace.Gravity=defaultGravity
 		end
 		if isSpeedActive() then
 			ensureSpeedForcing()
@@ -719,7 +719,7 @@ function GameParams.new(app)
 		if isGravityActive() then
 			applyGravity(state.gravityValue)
 		else
-			workspace.Gravity=DEFAULT_GRAVITY
+			workspace.Gravity=defaultGravity
 		end
 		if isSpeedActive() then
 			ensureSpeedForcing()
@@ -731,7 +731,7 @@ function GameParams.new(app)
 
 	function api.Reset()
 		state.gameParamsEnabled=true
-		state.paramsSelectedPage=DEFAULT_SELECTED_PAGE
+		state.paramsSelectedPage=defaultSelectedPage
 		state.speedParamsEnabled=false
 		state.gravityJumpParamsEnabled=false
 		state.staminaParamsEnabled=false
@@ -742,9 +742,9 @@ function GameParams.new(app)
 		state.staminaRegenSettingEnabled=false
 		state.staminaDepleteSettingEnabled=false
 		state.gravityEnabled=false
-		state.gravityValue=DEFAULT_GRAVITY
+		state.gravityValue=defaultGravity
 		state.speedEnabled=false
-		state.speedValue=DEFAULT_SPEED
+		state.speedValue=defaultSpeed
 		state.staminaRegenValue=10
 		state.staminaDepleteValue=10
 		state.jumpPowerValue=53.5
@@ -768,4 +768,4 @@ function GameParams.new(app)
 	return api
 end
 
-return GameParams
+return gameParams

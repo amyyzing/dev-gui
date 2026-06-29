@@ -1,10 +1,10 @@
 -- color picker, theme presets, and highlight colors.
 
-local StrokeColour={}
+local strokeColour={}
 
 local TweenService=game:GetService("TweenService")
 
-local DEFAULTS={
+local styleDefaults={
 	PrimaryR=12,
 	PrimaryG=12,
 	PrimaryB=12,
@@ -125,13 +125,13 @@ local function boolOrDefault(v,default)
 	return v and true or false
 end
 
-local COLOR_FIELDS={
+local colorFields={
 	Primary={"PrimaryR","PrimaryG","PrimaryB"},
 	Stroke={"StrokeR","StrokeG","StrokeB"},
 	Gradient={"GradientR","GradientG","GradientB"},
 }
 
-local BOOL_FIELDS={
+local boolFields={
 	StrokeGradient=true,
 	LiquidStroke=true,
 	ThemePanelExpanded=true,
@@ -146,7 +146,7 @@ local BOOL_FIELDS={
 	ESPDefenseOpenCustomColor=true,
 	ESPDefenseClosedCustomColor=true,
 }
-local NUMBER_LIMITS={
+local numberLimits={
 	LiquidStrokeSpeed={0,2},
 	StrokeThickness={0,8},
 	StrokeTransparency={0,1},
@@ -168,31 +168,31 @@ local NUMBER_LIMITS={
 	QBAimHighlightOutlineTransparency={0,1},
 }
 
-local HIGHLIGHT_MODES={
+local highlightModes={
 	{Key="espOffense",Prefix="ESPOffense",Label="ESP Offense",Short="O",States={{Key="open",Suffix="Open",Label="Open"},{Key="closed",Suffix="Closed",Label="Guarded"}}},
 	{Key="espDefense",Prefix="ESPDefense",Label="ESP Defense",Short="D",States={{Key="holder",Suffix="Holder",Label="Holder"},{Key="open",Suffix="Open",Label="Open"},{Key="closed",Suffix="Closed",Label="Guarded"}}},
 	{Key="qbHighlight",Prefix="QBAimHighlight",Label="QB Highlight",Short="Q",States={{Key="target",Suffix="",Label="Target"}}},
 }
-local HIGHLIGHT_MODE_BY_KEY={}
-local HIGHLIGHT_STATE_BY_MODE={}
-for _,mode in ipairs(HIGHLIGHT_MODES) do
-	HIGHLIGHT_MODE_BY_KEY[mode.Key]=mode
-	HIGHLIGHT_STATE_BY_MODE[mode.Key]={}
+local highlightModeByKey={}
+local highlightStateByMode={}
+for _,mode in ipairs(highlightModes) do
+	highlightModeByKey[mode.Key]=mode
+	highlightStateByMode[mode.Key]={}
 	for _,state in ipairs(mode.States) do
-		HIGHLIGHT_STATE_BY_MODE[mode.Key][state.Key]=state
+		highlightStateByMode[mode.Key][state.Key]=state
 	end
 end
-local HIGHLIGHT_DIAL_W=96
-local HIGHLIGHT_DIAL_H=96
-local HIGHLIGHT_DIAL_INNER_RADIUS=0.22
-local HIGHLIGHT_DIAL_OUTER_RADIUS=0.43
-local HIGHLIGHT_DIAL_GAP_DEG=8
-local HIGHLIGHT_DIAL_GLOW_LAYERS={
+local highlightDialWidth=96
+local highlightDialHeight=96
+local highlightDialInnerRadius=0.22
+local highlightDialOuterRadius=0.43
+local highlightDialGapDegrees=8
+local highlightGlowLayers={
 	{pad=1,z=5},
 	{pad=4,z=4},
 	{pad=8,z=3},
 }
-local HIGHLIGHT_DIAL_SLICES={
+local highlightDialSlices={
 	{key="espDefense",assetKey="gravity",start=30,finish=150,fallbackIndex=1},
 	{key="espOffense",assetKey="speed",start=150,finish=270,fallbackIndex=2},
 	{key="qbHighlight",assetKey="stamina",start=270,finish=390,fallbackIndex=3},
@@ -220,8 +220,8 @@ local function atan2(y,x)
 end
 
 local function inAngleRange(angle,startAngle,finishAngle)
-	local start=startAngle+HIGHLIGHT_DIAL_GAP_DEG
-	local finish=finishAngle-HIGHLIGHT_DIAL_GAP_DEG
+	local start=startAngle+highlightDialGapDegrees
+	local finish=finishAngle-highlightDialGapDegrees
 
 	if finish>360 then
 		return angle>=start or angle<=(finish-360)
@@ -231,17 +231,17 @@ local function inAngleRange(angle,startAngle,finishAngle)
 end
 
 local function normalizedStyleValue(key,value,default)
-	if BOOL_FIELDS[key] then
+	if boolFields[key] then
 		return boolOrDefault(value,default)
 	elseif key=="LiquidStrokeDirection" then
 		return tostring(value or default)
 	elseif key=="CornerRadius" then
 		return 0
 	elseif key=="UILib" then
-		return DEFAULTS.UILib
+		return styleDefaults.UILib
 	elseif type(default)=="number" then
 		local n=numberOrDefault(value,default)
-		local limits=NUMBER_LIMITS[key]
+		local limits=numberLimits[key]
 		return limits and math.clamp(n,limits[1],limits[2]) or n
 	end
 
@@ -254,35 +254,35 @@ local function applyDefaultOverrides(style)
 	end
 
 	for key,value in pairs(style) do
-		if DEFAULTS[key]~=nil then
-			DEFAULTS[key]=value
+		if styleDefaults[key]~=nil then
+			styleDefaults[key]=value
 		end
 	end
 end
 
 local function ensureStyleDefaults(style)
-	for key,default in pairs(DEFAULTS) do
+	for key,default in pairs(styleDefaults) do
 		style[key]=normalizedStyleValue(key,style[key],default)
 	end
 end
 
 local function copyDefaultStyle(style)
-	style=style or DEFAULTS
+	style=style or styleDefaults
 
 	local copy={}
-	for key,default in pairs(DEFAULTS) do
+	for key,default in pairs(styleDefaults) do
 		copy[key]=normalizedStyleValue(key,style[key],default)
 	end
 	return copy
 end
 
 local function colorFromStyle(style,prefix)
-	local fields=COLOR_FIELDS[prefix] or COLOR_FIELDS.Stroke
+	local fields=colorFields[prefix] or colorFields.Stroke
 	return Color3.fromRGB(clampByte(style[fields[1]]),clampByte(style[fields[2]]),clampByte(style[fields[3]]))
 end
 
 local function writeColorToStyle(style,prefix,c)
-	local fields=COLOR_FIELDS[prefix] or COLOR_FIELDS.Stroke
+	local fields=colorFields[prefix] or colorFields.Stroke
 	style[fields[1]]=math.floor(c.R*255+0.5)
 	style[fields[2]]=math.floor(c.G*255+0.5)
 	style[fields[3]]=math.floor(c.B*255+0.5)
@@ -306,18 +306,18 @@ local function readableTextColor(color)
 	return Color3.fromRGB(18,18,18)
 end
 
-function StrokeColour.new(app,page)
-	local New=app.New
-	local THEME=app.THEME
-	local UI_STYLE=app.UI_STYLE
-	local UIS=app.UIS or game:GetService("UserInputService")
+function strokeColour.new(app,page)
+	local make=app.New
+	local colors=app.colors
+	local style=app.style
+	local inputService=app.inputService or game:GetService("UserInputService")
 	local GuiService=game:GetService("GuiService")
 	local buildSlider=app.buildSlider
 
-	applyDefaultOverrides(app.DEFAULT_UI_STYLE)
-	ensureStyleDefaults(UI_STYLE)
+	applyDefaultOverrides(app.defaultStyle)
+	ensureStyleDefaults(style)
 
-	local defaultStyle=copyDefaultStyle(app.DEFAULT_UI_STYLE or UI_STYLE)
+	local defaultStyle=copyDefaultStyle(app.defaultStyle or style)
 
 	local api={}
 	local prSlider,pgSlider,pbSlider
@@ -330,7 +330,7 @@ function StrokeColour.new(app,page)
 	local paintChoices=function() end
 	local syncPickerControls=function() paintChoices() end
 	local setPickerFromColor=function() end
-	local getActiveColor=function() return colorFromStyle(UI_STYLE,"Primary") end
+	local getActiveColor=function() return colorFromStyle(style,"Primary") end
 	local connections={}
 	local collapsiblePanels={}
 	local sharedSliderControls={}
@@ -351,7 +351,7 @@ function StrokeColour.new(app,page)
 			return position
 		end
 
-		return UIS:GetMouseLocation()
+		return inputService:GetMouseLocation()
 	end
 
 	local function guiInset()
@@ -418,7 +418,7 @@ function StrokeColour.new(app,page)
 			return app.getUIStrokeColor()
 		end
 
-		return colorFromStyle(UI_STYLE,"Stroke")
+		return colorFromStyle(style,"Stroke")
 	end
 
 	local function getUIStrokeGradientColor()
@@ -426,7 +426,7 @@ function StrokeColour.new(app,page)
 			return app.getUIStrokeGradientColor()
 		end
 
-		return colorFromStyle(UI_STYLE,"Gradient")
+		return colorFromStyle(style,"Gradient")
 	end
 
 	local function getUIPrimaryColor()
@@ -434,7 +434,7 @@ function StrokeColour.new(app,page)
 			return app.getUIPrimaryColor()
 		end
 
-		return colorFromStyle(UI_STYLE,"Primary")
+		return colorFromStyle(style,"Primary")
 	end
 
 	local function tintSlider(slider,color)
@@ -473,55 +473,55 @@ function StrokeColour.new(app,page)
 		updatePreview()
 
 		if app.onChanged then
-			pcall(app.onChanged,UI_STYLE)
+			pcall(app.onChanged,style)
 		end
 	end
 
 	local function setMainColour(c)
-		writeColorToStyle(UI_STYLE,"Stroke",c)
+		writeColorToStyle(style,"Stroke",c)
 	end
 
 	local function setPrimaryColour(c)
-		writeColorToStyle(UI_STYLE,"Primary",c)
+		writeColorToStyle(style,"Primary",c)
 	end
 
 	local function setGradientColour(c)
-		writeColorToStyle(UI_STYLE,"Gradient",c)
+		writeColorToStyle(style,"Gradient",c)
 	end
 
 	local function syncColourControls()
-		UI_STYLE.StrokeGradient=false
+		style.StrokeGradient=false
 
-		if prSlider then prSlider.set(UI_STYLE.PrimaryR) end
-		if pgSlider then pgSlider.set(UI_STYLE.PrimaryG) end
-		if pbSlider then pbSlider.set(UI_STYLE.PrimaryB) end
+		if prSlider then prSlider.set(style.PrimaryR) end
+		if pgSlider then pgSlider.set(style.PrimaryG) end
+		if pbSlider then pbSlider.set(style.PrimaryB) end
 
-		if rSlider then rSlider.set(UI_STYLE.StrokeR) end
-		if gSlider then gSlider.set(UI_STYLE.StrokeG) end
-		if bSlider then bSlider.set(UI_STYLE.StrokeB) end
+		if rSlider then rSlider.set(style.StrokeR) end
+		if gSlider then gSlider.set(style.StrokeG) end
+		if bSlider then bSlider.set(style.StrokeB) end
 
-		if grSlider then grSlider.set(UI_STYLE.GradientR) end
-		if ggSlider then ggSlider.set(UI_STYLE.GradientG) end
-		if gbSlider then gbSlider.set(UI_STYLE.GradientB) end
+		if grSlider then grSlider.set(style.GradientR) end
+		if ggSlider then ggSlider.set(style.GradientG) end
+		if gbSlider then gbSlider.set(style.GradientB) end
 
-		if speedSlider then speedSlider.set(UI_STYLE.LiquidStrokeSpeed) end
-		if thicknessSlider then thicknessSlider.set(UI_STYLE.StrokeThickness) end
-		if transparencySlider then transparencySlider.set(UI_STYLE.StrokeTransparency) end
+		if speedSlider then speedSlider.set(style.LiquidStrokeSpeed) end
+		if thicknessSlider then thicknessSlider.set(style.StrokeThickness) end
+		if transparencySlider then transparencySlider.set(style.StrokeTransparency) end
 
 		if gradientToggle then gradientToggle.set(false) end
-		if liquidToggle then liquidToggle.set(UI_STYLE.LiquidStroke) end
+		if liquidToggle then liquidToggle.set(style.LiquidStroke) end
 
-		tintSlider(prSlider,Color3.fromRGB(clampByte(UI_STYLE.PrimaryR),0,0))
-		tintSlider(pgSlider,Color3.fromRGB(0,clampByte(UI_STYLE.PrimaryG),0))
-		tintSlider(pbSlider,Color3.fromRGB(0,0,clampByte(UI_STYLE.PrimaryB)))
+		tintSlider(prSlider,Color3.fromRGB(clampByte(style.PrimaryR),0,0))
+		tintSlider(pgSlider,Color3.fromRGB(0,clampByte(style.PrimaryG),0))
+		tintSlider(pbSlider,Color3.fromRGB(0,0,clampByte(style.PrimaryB)))
 
-		tintSlider(rSlider,Color3.fromRGB(clampByte(UI_STYLE.StrokeR),0,0))
-		tintSlider(gSlider,Color3.fromRGB(0,clampByte(UI_STYLE.StrokeG),0))
-		tintSlider(bSlider,Color3.fromRGB(0,0,clampByte(UI_STYLE.StrokeB)))
+		tintSlider(rSlider,Color3.fromRGB(clampByte(style.StrokeR),0,0))
+		tintSlider(gSlider,Color3.fromRGB(0,clampByte(style.StrokeG),0))
+		tintSlider(bSlider,Color3.fromRGB(0,0,clampByte(style.StrokeB)))
 
-		tintSlider(grSlider,Color3.fromRGB(clampByte(UI_STYLE.GradientR),0,0))
-		tintSlider(ggSlider,Color3.fromRGB(0,clampByte(UI_STYLE.GradientG),0))
-		tintSlider(gbSlider,Color3.fromRGB(0,0,clampByte(UI_STYLE.GradientB)))
+		tintSlider(grSlider,Color3.fromRGB(clampByte(style.GradientR),0,0))
+		tintSlider(ggSlider,Color3.fromRGB(0,clampByte(style.GradientG),0))
+		tintSlider(gbSlider,Color3.fromRGB(0,0,clampByte(style.GradientB)))
 
 		tintSlider(speedSlider,getUIStrokeColor())
 		tintSlider(thicknessSlider,getUIStrokeColor())
@@ -538,7 +538,7 @@ function StrokeColour.new(app,page)
 		mainValue.Value=getUIStrokeColor()
 		gradientValue.Value=getUIStrokeGradientColor()
 
-		UI_STYLE.StrokeGradient=false
+		style.StrokeGradient=false
 
 		local function applyStep()
 			if token~=colourTweenToken then return end
@@ -593,10 +593,10 @@ function StrokeColour.new(app,page)
 
 	function api.Refresh()
 		colourTweenToken=colourTweenToken+1
-		ensureStyleDefaults(UI_STYLE)
+		ensureStyleDefaults(style)
 
 		for _,panelApi in ipairs(collapsiblePanels) do
-			panelApi.setExpanded(UI_STYLE[panelApi.stateKey],false,false)
+			panelApi.setExpanded(style[panelApi.stateKey],false,false)
 		end
 
 		syncColourControls()
@@ -627,7 +627,7 @@ function StrokeColour.new(app,page)
 
 	function api.Reset()
 		for key,value in pairs(defaultStyle) do
-			UI_STYLE[key]=value
+			style[key]=value
 		end
 
 		api.Refresh()
@@ -641,8 +641,8 @@ function StrokeColour.new(app,page)
 	end
 
 	function api.ApplyMainColour(c)
-		UI_STYLE.StrokeGradient=false
-		UI_STYLE.LiquidStroke=false
+		style.StrokeGradient=false
+		style.LiquidStroke=false
 
 		if gradientToggle then
 			gradientToggle.set(false)
@@ -658,8 +658,8 @@ function StrokeColour.new(app,page)
 	end
 
 	function api.ApplyGradient(c1,c2)
-		UI_STYLE.StrokeGradient=false
-		UI_STYLE.LiquidStroke=false
+		style.StrokeGradient=false
+		style.LiquidStroke=false
 
 		if gradientToggle then
 			gradientToggle.set(false)
@@ -682,7 +682,7 @@ function StrokeColour.new(app,page)
 	end
 
 	if not page:FindFirstChild("CustomizePagePadding") then
-		New("UIPadding",{
+		make("UIPadding",{
 			Name="CustomizePagePadding",
 			PaddingTop=UDim.new(0,2),
 			PaddingLeft=UDim.new(0,4),
@@ -723,7 +723,7 @@ function StrokeColour.new(app,page)
 	local paintHighlightDial=function() end
 
 	local function themeColor(role,fallback)
-		return THEME[role] or fallback
+		return colors[role] or fallback
 	end
 
 	local function addCorner(instance,role)
@@ -732,7 +732,7 @@ function StrokeColour.new(app,page)
 		end
 
 		instance:SetAttribute("CornerRole",role or "Control")
-		return New("UICorner",{CornerRadius=UDim.new(0,0)},instance)
+		return make("UICorner",{CornerRadius=UDim.new(0,0)},instance)
 	end
 
 	local function toHSV(color)
@@ -774,8 +774,8 @@ function StrokeColour.new(app,page)
 	end
 
 	local function makePanel(order,title,stateKey)
-		local panel=New("Frame",{
-			BackgroundColor3=themeColor("SECTION",THEME.CARD),
+		local panel=make("Frame",{
+			BackgroundColor3=themeColor("SECTION",colors.card),
 			BackgroundTransparency=0.12,
 			BorderSizePixel=0,
 			Size=UDim2.new(1,0,0,0),
@@ -787,39 +787,39 @@ function StrokeColour.new(app,page)
 		},page)
 		addCorner(panel,"Section")
 
-		New("UIPadding",{
+		make("UIPadding",{
 			PaddingTop=UDim.new(0,12),
 			PaddingLeft=UDim.new(0,14),
 			PaddingRight=UDim.new(0,14),
 			PaddingBottom=UDim.new(0,12),
 		},panel)
 
-		New("UIListLayout",{
+		make("UIListLayout",{
 			Padding=UDim.new(0,8),
 			SortOrder=Enum.SortOrder.LayoutOrder,
 		},panel)
 
-		local expanded=UI_STYLE[stateKey] and true or false
-		local header=New("Frame",{
+		local expanded=style[stateKey] and true or false
+		local header=make("Frame",{
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,0,0,24),
 			ZIndex=5,
 			LayoutOrder=1,
 		},panel)
 
-		local titleButton=New("TextButton",{
+		local titleButton=make("TextButton",{
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,0,1,0),
 			Text="",
 			Font=Enum.Font.GothamBold,
 			TextSize=13,
-			TextColor3=THEME.TEXT,
+			TextColor3=colors.text,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			AutoButtonColor=false,
 			ZIndex=6,
 		},header)
 
-		local body=New("Frame",{
+		local body=make("Frame",{
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,0,0,0),
 			AutomaticSize=expanded and Enum.AutomaticSize.Y or Enum.AutomaticSize.None,
@@ -829,7 +829,7 @@ function StrokeColour.new(app,page)
 			LayoutOrder=2,
 		},panel)
 
-		local bodyLayout=New("UIListLayout",{
+		local bodyLayout=make("UIListLayout",{
 			Padding=UDim.new(0,8),
 			SortOrder=Enum.SortOrder.LayoutOrder,
 		},body)
@@ -846,7 +846,7 @@ function StrokeColour.new(app,page)
 
 		local function paint()
 			titleButton.Text=(expanded and "[-] " or "[+] ")..title
-			panel.BackgroundColor3=expanded and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
+			panel.BackgroundColor3=expanded and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
 		end
 
 		local function targetHeight()
@@ -855,7 +855,7 @@ function StrokeColour.new(app,page)
 
 		local function setExpanded(nextExpanded,animate,fire)
 			expanded=nextExpanded and true or false
-			UI_STYLE[stateKey]=expanded
+			style[stateKey]=expanded
 			paint()
 			cancelTween()
 
@@ -905,7 +905,7 @@ function StrokeColour.new(app,page)
 			end
 
 			if fire and app.onChanged then
-				pcall(app.onChanged,UI_STYLE)
+				pcall(app.onChanged,style)
 			end
 		end
 
@@ -936,14 +936,14 @@ function StrokeColour.new(app,page)
 	end
 
 	local function makeFlatButton(parent,text,order,scale)
-		local button=New("TextButton",{
-			BackgroundColor3=themeColor("BUTTON",THEME.PANEL),
+		local button=make("TextButton",{
+			BackgroundColor3=themeColor("BUTTON",colors.panel),
 			BorderSizePixel=0,
 			ClipsDescendants=false,
 			Text=text,
 			Font=Enum.Font.GothamMedium,
 			TextSize=12,
-			TextColor3=THEME.TEXT,
+			TextColor3=colors.text,
 			AutoButtonColor=false,
 			Size=UDim2.new(scale or 0.333,-6,1,0),
 			ZIndex=6,
@@ -953,7 +953,7 @@ function StrokeColour.new(app,page)
 		},parent)
 		addCorner(button,"Control")
 
-		local marker=New("Frame",{
+		local marker=make("Frame",{
 			BackgroundColor3=getUIStrokeColor(),
 			BorderSizePixel=0,
 			Size=UDim2.new(1,0,0,3),
@@ -966,7 +966,7 @@ function StrokeColour.new(app,page)
 		addCorner(marker,"Slider")
 
 		trackConnection(button.MouseEnter:Connect(function()
-			button.BackgroundColor3=themeColor("SECTION",THEME.CARD)
+			button.BackgroundColor3=themeColor("SECTION",colors.card)
 		end))
 
 		trackConnection(button.MouseLeave:Connect(function()
@@ -978,26 +978,26 @@ function StrokeColour.new(app,page)
 
 	local function makeMiniSlider(parent,labelText,minVal,maxVal,startVal,decimals,fillColor,onChange)
 		local labelWidth=math.clamp((#tostring(labelText or "")*7)+12,34,64)
-		local row=New("Frame",{
+		local row=make("Frame",{
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,0,0,28),
 			ZIndex=5,
 		},parent)
 
-		New("TextLabel",{
+		make("TextLabel",{
 			BackgroundTransparency=1,
 			Position=UDim2.fromOffset(0,0),
 			Size=UDim2.fromOffset(labelWidth,28),
 			Text=labelText,
 			Font=Enum.Font.GothamBold,
 			TextSize=12,
-			TextColor3=THEME.TEXT,
+			TextColor3=colors.text,
 			TextXAlignment=Enum.TextXAlignment.Left,
 			ZIndex=6,
 		},row)
 
-		local valueBox=New("TextBox",{
-			BackgroundColor3=themeColor("INPUT",THEME.PANEL),
+		local valueBox=make("TextBox",{
+			BackgroundColor3=themeColor("INPUT",colors.panel),
 			BorderSizePixel=0,
 			ClearTextOnFocus=false,
 			Size=UDim2.fromOffset(48,24),
@@ -1005,7 +1005,7 @@ function StrokeColour.new(app,page)
 			Text=tostring(startVal),
 			Font=Enum.Font.GothamMedium,
 			TextSize=12,
-			TextColor3=THEME.TEXT,
+			TextColor3=colors.text,
 			TextXAlignment=Enum.TextXAlignment.Center,
 			ZIndex=6,
 			ThemeRole="INPUT",
@@ -1013,8 +1013,8 @@ function StrokeColour.new(app,page)
 		},row)
 		addCorner(valueBox,"Control")
 
-		local track=New("Frame",{
-			BackgroundColor3=themeColor("SLIDER_BG",THEME.BG),
+		local track=make("Frame",{
+			BackgroundColor3=themeColor("SLIDER_BG",colors.bg),
 			BorderSizePixel=0,
 			Position=UDim2.fromOffset(labelWidth+4,9),
 			Size=UDim2.new(1,-(labelWidth+64),0,10),
@@ -1025,7 +1025,7 @@ function StrokeColour.new(app,page)
 		},row)
 		addCorner(track,"Slider")
 
-		local fill=New("Frame",{
+		local fill=make("Frame",{
 			BackgroundColor3=fillColor or getUIStrokeColor(),
 			BorderSizePixel=0,
 			Size=UDim2.new(0,0,1,0),
@@ -1035,7 +1035,7 @@ function StrokeColour.new(app,page)
 		},track)
 		addCorner(fill,"Slider")
 
-		local hit=New("TextButton",{
+		local hit=make("TextButton",{
 			BackgroundTransparency=1,
 			Text="",
 			Size=UDim2.new(1,0,1,10),
@@ -1081,13 +1081,13 @@ function StrokeColour.new(app,page)
 			end
 		end))
 
-		trackConnection(UIS.InputChanged:Connect(function(input)
+		trackConnection(inputService.InputChanged:Connect(function(input)
 			if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then
 				setValue(valueFromMouse(input),true)
 			end
 		end))
 
-		trackConnection(UIS.InputEnded:Connect(function(input)
+		trackConnection(inputService.InputEnded:Connect(function(input)
 			if input.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=false
 			end
@@ -1114,8 +1114,8 @@ function StrokeColour.new(app,page)
 	end
 
 	local function normalizeHighlightMode(value)
-		local key=tostring(value or DEFAULTS.HighlightSelectedMode)
-		if HIGHLIGHT_MODE_BY_KEY[key] then
+		local key=tostring(value or styleDefaults.HighlightSelectedMode)
+		if highlightModeByKey[key] then
 			return key
 		end
 
@@ -1128,18 +1128,18 @@ function StrokeColour.new(app,page)
 			return"qbHighlight"
 		end
 
-		return DEFAULTS.HighlightSelectedMode
+		return styleDefaults.HighlightSelectedMode
 	end
 
 	local function activeHighlightMode()
-		UI_STYLE.HighlightSelectedMode=normalizeHighlightMode(UI_STYLE.HighlightSelectedMode)
-		return HIGHLIGHT_MODE_BY_KEY[UI_STYLE.HighlightSelectedMode] or HIGHLIGHT_MODE_BY_KEY[DEFAULTS.HighlightSelectedMode]
+		style.HighlightSelectedMode=normalizeHighlightMode(style.HighlightSelectedMode)
+		return highlightModeByKey[style.HighlightSelectedMode] or highlightModeByKey[styleDefaults.HighlightSelectedMode]
 	end
 
 	local function normalizeHighlightState(value,mode)
 		mode=mode or activeHighlightMode()
 		local key=tostring(value or ""):lower():gsub("%s+","")
-		local stateMap=HIGHLIGHT_STATE_BY_MODE[mode.Key] or {}
+		local stateMap=highlightStateByMode[mode.Key] or {}
 		if stateMap[key] then
 			return key
 		end
@@ -1150,8 +1150,8 @@ function StrokeColour.new(app,page)
 
 	local function activeHighlightState()
 		local mode=activeHighlightMode()
-		UI_STYLE.HighlightSelectedState=normalizeHighlightState(UI_STYLE.HighlightSelectedState,mode)
-		return (HIGHLIGHT_STATE_BY_MODE[mode.Key] or {})[UI_STYLE.HighlightSelectedState] or mode.States[1]
+		style.HighlightSelectedState=normalizeHighlightState(style.HighlightSelectedState,mode)
+		return (highlightStateByMode[mode.Key] or {})[style.HighlightSelectedState] or mode.States[1]
 	end
 
 	local function activeHighlightPrefix()
@@ -1170,25 +1170,25 @@ function StrokeColour.new(app,page)
 
 	local function highlightColor(channel)
 		return Color3.fromRGB(
-			clampByte(UI_STYLE[highlightField(channel,"R")]),
-			clampByte(UI_STYLE[highlightField(channel,"G")]),
-			clampByte(UI_STYLE[highlightField(channel,"B")])
+			clampByte(style[highlightField(channel,"R")]),
+			clampByte(style[highlightField(channel,"G")]),
+			clampByte(style[highlightField(channel,"B")])
 		)
 	end
 
 	local function writeHighlightColor(channel,color)
-		UI_STYLE[highlightField(channel,"R")]=math.floor(color.R*255+0.5)
-		UI_STYLE[highlightField(channel,"G")]=math.floor(color.G*255+0.5)
-		UI_STYLE[highlightField(channel,"B")]=math.floor(color.B*255+0.5)
-		UI_STYLE[highlightCustomField()]=true
+		style[highlightField(channel,"R")]=math.floor(color.R*255+0.5)
+		style[highlightField(channel,"G")]=math.floor(color.G*255+0.5)
+		style[highlightField(channel,"B")]=math.floor(color.B*255+0.5)
+		style[highlightCustomField()]=true
 	end
 
 	local function highlightTransparency(channel)
-		return math.clamp(tonumber(UI_STYLE[highlightField(channel,"Transparency")]) or DEFAULTS[highlightField(channel,"Transparency")] or 0,0,1)
+		return math.clamp(tonumber(style[highlightField(channel,"Transparency")]) or styleDefaults[highlightField(channel,"Transparency")] or 0,0,1)
 	end
 
 	local function writeHighlightTransparency(channel,value)
-		UI_STYLE[highlightField(channel,"Transparency")]=math.clamp(tonumber(value) or highlightTransparency(channel),0,1)
+		style[highlightField(channel,"Transparency")]=math.clamp(tonumber(value) or highlightTransparency(channel),0,1)
 	end
 
 	local function getActiveHighlightColor()
@@ -1259,14 +1259,14 @@ function StrokeColour.new(app,page)
 	end
 
 	local function setHighlightMode(modeKey)
-		UI_STYLE.HighlightSelectedMode=normalizeHighlightMode(modeKey)
-		UI_STYLE.HighlightSelectedState=normalizeHighlightState(UI_STYLE.HighlightSelectedState,activeHighlightMode())
+		style.HighlightSelectedMode=normalizeHighlightMode(modeKey)
+		style.HighlightSelectedState=normalizeHighlightState(style.HighlightSelectedState,activeHighlightMode())
 		setPickerFromColor(getActiveColor())
 		syncPickerControls()
 	end
 
 	local function setHighlightState(stateKey)
-		UI_STYLE.HighlightSelectedState=normalizeHighlightState(stateKey,activeHighlightMode())
+		style.HighlightSelectedState=normalizeHighlightState(stateKey,activeHighlightMode())
 		setPickerFromColor(getActiveColor())
 		syncPickerControls()
 	end
@@ -1278,47 +1278,47 @@ function StrokeColour.new(app,page)
 		syncPickerControls()
 	end
 
-	local introRow=New("Frame",{
+	local introRow=make("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,46),
 		ZIndex=5,
 		LayoutOrder=1,
 	},page)
 
-	New("TextLabel",{
+	make("TextLabel",{
 		BackgroundTransparency=1,
 		Position=UDim2.fromOffset(4,6),
 		Size=UDim2.new(1,-8,0,22),
 		Text="appearance",
 		Font=Enum.Font.GothamBold,
 		TextSize=18,
-		TextColor3=THEME.TEXT,
+		TextColor3=colors.text,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
 	},introRow)
 
-	New("TextLabel",{
+	make("TextLabel",{
 		BackgroundTransparency=1,
 		Position=UDim2.fromOffset(4,30),
 		Size=UDim2.new(1,-8,0,16),
 		Text="",
 		Font=Enum.Font.Gotham,
 		TextSize=12,
-		TextColor3=THEME.MUTED,
+		TextColor3=colors.muted,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
 	},introRow)
 
 	local themePanel=makePanel(2,"Theme","ThemePanelExpanded")
 
-	local themeGrid=New("Frame",{
+	local themeGrid=make("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,34),
 		ZIndex=5,
 		LayoutOrder=1,
 	},themePanel)
 
-	New("UIGridLayout",{
+	make("UIGridLayout",{
 		CellPadding=UDim2.fromOffset(6,0),
 		CellSize=UDim2.new(0.1666667,-5,0,34),
 		SortOrder=Enum.SortOrder.LayoutOrder,
@@ -1335,10 +1335,10 @@ function StrokeColour.new(app,page)
 
 	local function applyThemePreset(preset)
 		setPrimaryColour(preset.Primary)
-		UI_STYLE.StrokeGradient=false
-		UI_STYLE.LiquidStroke=false
-		UI_STYLE.StrokeThickness=1
-		UI_STYLE.StrokeTransparency=0.84
+		style.StrokeGradient=false
+		style.LiquidStroke=false
+		style.StrokeThickness=1
+		style.StrokeTransparency=0.84
 		syncColourControls()
 		updateEverything()
 		tweenStyleTo(preset.Stroke)
@@ -1348,7 +1348,7 @@ function StrokeColour.new(app,page)
 
 	for i,preset in ipairs(themePresets) do
 		local textColor=readableTextColor(preset.Primary)
-		local card=New("TextButton",{
+		local card=make("TextButton",{
 			BackgroundColor3=preset.Primary,
 			BorderSizePixel=0,
 			ClipsDescendants=false,
@@ -1360,7 +1360,7 @@ function StrokeColour.new(app,page)
 		},themeGrid)
 		addCorner(card,"Control")
 
-		local marker=New("Frame",{
+		local marker=make("Frame",{
 			BackgroundColor3=preset.Stroke,
 			BorderSizePixel=0,
 			Size=UDim2.new(1,0,0,2),
@@ -1372,7 +1372,7 @@ function StrokeColour.new(app,page)
 		},card)
 		addCorner(marker,"Slider")
 
-		local label=New("TextLabel",{
+		local label=make("TextLabel",{
 			BackgroundTransparency=1,
 			Position=UDim2.fromOffset(6,0),
 			Size=UDim2.new(1,-12,1,0),
@@ -1395,14 +1395,14 @@ function StrokeColour.new(app,page)
 
 	local colorPanel=makePanel(3,"Colours","ColoursPanelExpanded")
 
-	local targetRow=New("Frame",{
+	local targetRow=make("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,28),
 		ZIndex=5,
 		LayoutOrder=1,
 	},colorPanel)
 
-	New("UIListLayout",{
+	make("UIListLayout",{
 		FillDirection=Enum.FillDirection.Horizontal,
 		Padding=UDim.new(0,8),
 		SortOrder=Enum.SortOrder.LayoutOrder,
@@ -1417,14 +1417,14 @@ function StrokeColour.new(app,page)
 		targetButtons[target]={Button=button,Marker=marker}
 	end
 
-	local modeRow=New("Frame",{
+	local modeRow=make("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,28),
 		ZIndex=5,
 		LayoutOrder=2,
 	},colorPanel)
 
-	New("UIListLayout",{
+	make("UIListLayout",{
 		FillDirection=Enum.FillDirection.Horizontal,
 		Padding=UDim.new(0,8),
 		SortOrder=Enum.SortOrder.LayoutOrder,
@@ -1439,14 +1439,14 @@ function StrokeColour.new(app,page)
 		modeButtons[mode]={Button=button,Marker=marker}
 	end
 
-	local quickRow=New("Frame",{
+	local quickRow=make("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,26),
 		ZIndex=5,
 		LayoutOrder=3,
 	},colorPanel)
 
-	New("UIListLayout",{
+	make("UIListLayout",{
 		FillDirection=Enum.FillDirection.Horizontal,
 		Padding=UDim.new(0,7),
 		SortOrder=Enum.SortOrder.LayoutOrder,
@@ -1463,7 +1463,7 @@ function StrokeColour.new(app,page)
 		Color3.fromRGB(255,210,0),
 		Color3.fromRGB(0,210,210),
 	}) do
-		local swatch=New("TextButton",{
+		local swatch=make("TextButton",{
 			BackgroundColor3=color,
 			BorderSizePixel=0,
 			Text="",
@@ -1476,7 +1476,7 @@ function StrokeColour.new(app,page)
 		},quickRow)
 		addCorner(swatch,"Control")
 
-		local marker=New("Frame",{
+		local marker=make("Frame",{
 			BackgroundColor3=readableTextColor(color),
 			BorderSizePixel=0,
 			Size=UDim2.new(1,0,0,3),
@@ -1495,7 +1495,7 @@ function StrokeColour.new(app,page)
 		quickChoices[#quickChoices+1]={Color=color,Marker=marker}
 	end
 
-	local pickerBody=New("Frame",{
+	local pickerBody=make("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,128),
 		ZIndex=5,
@@ -1503,7 +1503,7 @@ function StrokeColour.new(app,page)
 	},colorPanel)
 
 	for _,mode in ipairs({"Square","RGB","HSV","Hex"}) do
-		modeBodies[mode]=New("Frame",{
+		modeBodies[mode]=make("Frame",{
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,0,1,0),
 			Visible=false,
@@ -1512,7 +1512,7 @@ function StrokeColour.new(app,page)
 	end
 
 	local squareBody=modeBodies.Square
-	local svSquare=New("Frame",{
+	local svSquare=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,0,0),
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset(0,8),
@@ -1523,7 +1523,7 @@ function StrokeColour.new(app,page)
 	svBase=svSquare
 	addCorner(svSquare,"Section")
 
-	local whiteOverlay=New("Frame",{
+	local whiteOverlay=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
 		BorderSizePixel=0,
 		Size=UDim2.new(1,0,1,0),
@@ -1531,14 +1531,14 @@ function StrokeColour.new(app,page)
 		ZIndex=7,
 	},svSquare)
 	addCorner(whiteOverlay,"Section")
-	New("UIGradient",{
+	make("UIGradient",{
 		Transparency=NumberSequence.new({
 			NumberSequenceKeypoint.new(0,0),
 			NumberSequenceKeypoint.new(1,1),
 		}),
 	},whiteOverlay)
 
-	local blackOverlay=New("Frame",{
+	local blackOverlay=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(0,0,0),
 		BorderSizePixel=0,
 		Size=UDim2.new(1,0,1,0),
@@ -1546,7 +1546,7 @@ function StrokeColour.new(app,page)
 		ZIndex=8,
 	},svSquare)
 	addCorner(blackOverlay,"Section")
-	New("UIGradient",{
+	make("UIGradient",{
 		Rotation=90,
 		Transparency=NumberSequence.new({
 			NumberSequenceKeypoint.new(0,1),
@@ -1554,7 +1554,7 @@ function StrokeColour.new(app,page)
 		}),
 	},blackOverlay)
 
-	svCursor=New("Frame",{
+	svCursor=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
 		BorderSizePixel=0,
 		Size=UDim2.fromOffset(8,8),
@@ -1562,9 +1562,9 @@ function StrokeColour.new(app,page)
 		ZIndex=9,
 	},svSquare)
 	addCorner(svCursor,"Control")
-	New("UIStroke",{Color=Color3.fromRGB(0,0,0),Thickness=1,Transparency=0.35,StrokeRole="Fixed"},svCursor)
+	make("UIStroke",{Color=Color3.fromRGB(0,0,0),Thickness=1,Transparency=0.35,StrokeRole="Fixed"},svCursor)
 
-	local hueStrip=New("Frame",{
+	local hueStrip=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset(158,8),
@@ -1573,7 +1573,7 @@ function StrokeColour.new(app,page)
 		ZIndex=6,
 	},squareBody)
 	addCorner(hueStrip,"Slider")
-	New("UIGradient",{
+	make("UIGradient",{
 		Rotation=90,
 		Color=ColorSequence.new({
 			ColorSequenceKeypoint.new(0,Color3.fromHSV(0,1,1)),
@@ -1586,7 +1586,7 @@ function StrokeColour.new(app,page)
 		}),
 	},hueStrip)
 
-	hueCursor=New("Frame",{
+	hueCursor=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
 		BorderSizePixel=0,
 		Size=UDim2.new(1,0,0,3),
@@ -1595,7 +1595,7 @@ function StrokeColour.new(app,page)
 	},hueStrip)
 	addCorner(hueCursor,"Slider")
 
-	colorPreview=New("Frame",{
+	colorPreview=make("Frame",{
 		BackgroundColor3=getActiveColor(),
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset(192,8),
@@ -1605,14 +1605,14 @@ function StrokeColour.new(app,page)
 	},squareBody)
 	addCorner(colorPreview,"Control")
 
-	previewHex=New("TextLabel",{
+	previewHex=make("TextLabel",{
 		BackgroundTransparency=1,
 		Position=UDim2.fromOffset(192,70),
 		Size=UDim2.fromOffset(92,18),
 		Text=colorToHex(getActiveColor()),
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
-		TextColor3=THEME.TEXT,
+		TextColor3=colors.text,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
 	},squareBody)
@@ -1644,32 +1644,32 @@ function StrokeColour.new(app,page)
 		end
 	end))
 
-	trackConnection(UIS.InputChanged:Connect(function(input)
+	trackConnection(inputService.InputChanged:Connect(function(input)
 		if colorDrag and input.UserInputType==Enum.UserInputType.MouseMovement then
 			updateColorDrag(input)
 		end
 	end))
 
-	trackConnection(UIS.InputEnded:Connect(function(input)
+	trackConnection(inputService.InputEnded:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 then
 			colorDrag=nil
 		end
 	end))
 
 	local rgbBody=modeBodies.RGB
-	New("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},rgbBody)
+	make("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},rgbBody)
 	rgbSliders.R=makeMiniSlider(rgbBody,"Red",0,255,0,0,Color3.fromRGB(255,0,0),function()
-		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.G.get(),rgbSliders.B.get()),false)
+		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.green.get(),rgbSliders.B.get()),false)
 	end)
-	rgbSliders.G=makeMiniSlider(rgbBody,"Green",0,255,0,0,Color3.fromRGB(0,255,0),function()
-		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.G.get(),rgbSliders.B.get()),false)
+	rgbSliders.green=makeMiniSlider(rgbBody,"Green",0,255,0,0,Color3.fromRGB(0,255,0),function()
+		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.green.get(),rgbSliders.B.get()),false)
 	end)
 	rgbSliders.B=makeMiniSlider(rgbBody,"Blue",0,255,0,0,Color3.fromRGB(0,120,255),function()
-		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.G.get(),rgbSliders.B.get()),false)
+		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.green.get(),rgbSliders.B.get()),false)
 	end)
 
 	local hsvBody=modeBodies.HSV
-	New("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},hsvBody)
+	make("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},hsvBody)
 	hsvSliders.H=makeMiniSlider(hsvBody,"Hue",0,360,0,0,getUIStrokeColor(),function()
 		pickerHue=math.clamp(hsvSliders.H.get()/360,0,1)
 		pickerSat=math.clamp(hsvSliders.S.get()/100,0,1)
@@ -1690,8 +1690,8 @@ function StrokeColour.new(app,page)
 	end)
 
 	local hexBody=modeBodies.Hex
-	hexBox=New("TextBox",{
-		BackgroundColor3=themeColor("INPUT",THEME.PANEL),
+	hexBox=make("TextBox",{
+		BackgroundColor3=themeColor("INPUT",colors.panel),
 		BorderSizePixel=0,
 		ClearTextOnFocus=false,
 		Position=UDim2.fromOffset(0,8),
@@ -1699,7 +1699,7 @@ function StrokeColour.new(app,page)
 		Text=colorToHex(getActiveColor()),
 		Font=Enum.Font.GothamMedium,
 		TextSize=11,
-		TextColor3=THEME.TEXT,
+		TextColor3=colors.text,
 		TextXAlignment=Enum.TextXAlignment.Center,
 		ZIndex=6,
 		ThemeRole="INPUT",
@@ -1707,15 +1707,15 @@ function StrokeColour.new(app,page)
 	},hexBody)
 	addCorner(hexBox,"Control")
 
-	local applyHex=New("TextButton",{
-		BackgroundColor3=themeColor("BUTTON",THEME.PANEL),
+	local applyHex=make("TextButton",{
+		BackgroundColor3=themeColor("BUTTON",colors.panel),
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset(128,8),
 		Size=UDim2.fromOffset(78,26),
 		Text="apply",
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
-		TextColor3=THEME.TEXT,
+		TextColor3=colors.text,
 		AutoButtonColor=false,
 		ZIndex=6,
 		ThemeRole="BUTTON",
@@ -1798,7 +1798,7 @@ function StrokeColour.new(app,page)
 		local fillColor=highlightColor("Fill")
 		local outlineColor=highlightColor("Outline")
 		local activeAccent=getUIStrokeColor()
-		local stateEnabled=UI_STYLE[highlightCustomField()]==true
+		local stateEnabled=style[highlightCustomField()]==true
 
 		if highlightModeLabel then
 			highlightModeLabel.Text=mode.Label.." / "..state.Label..(stateEnabled and " custom" or " default")
@@ -1829,12 +1829,12 @@ function StrokeColour.new(app,page)
 			entry.Key=visible and stateInfo.Key or nil
 			entry.Marker.Visible=visible and stateInfo.Key==state.Key
 			entry.Marker.BackgroundColor3=activeAccent
-			entry.Button.BackgroundColor3=(visible and stateInfo.Key==state.Key) and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
+			entry.Button.BackgroundColor3=(visible and stateInfo.Key==state.Key) and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
 		end
 
 		for key,entry in pairs(highlightTargetButtons) do
 			local selected=key==activeHighlightTarget
-			entry.Button.BackgroundColor3=selected and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
+			entry.Button.BackgroundColor3=selected and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=activeAccent
 		end
@@ -1852,19 +1852,19 @@ function StrokeColour.new(app,page)
 
 	local highlightPanel=makePanel(4,"Highlights","HighlightPanelExpanded")
 
-	local highlightModeRow=New("Frame",{
+	local highlightModeRow=make("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,98),
 		ZIndex=5,
 		LayoutOrder=1,
 	},highlightPanel)
 
-	highlightDialCanvas=New("Frame",{
+	highlightDialCanvas=make("Frame",{
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		ClipsDescendants=false,
 		Position=UDim2.fromOffset(0,1),
-		Size=UDim2.fromOffset(HIGHLIGHT_DIAL_W,HIGHLIGHT_DIAL_H),
+		Size=UDim2.fromOffset(highlightDialWidth,highlightDialHeight),
 		ZIndex=6,
 	},highlightModeRow)
 
@@ -1893,13 +1893,13 @@ function StrokeColour.new(app,page)
 		local glow=brightenColor(accent,0.38)
 		local muted=themeColor("MUTED",Color3.fromRGB(118,122,132))
 
-		for _,mode in ipairs(HIGHLIGHT_MODES) do
+		for _,mode in ipairs(highlightModes) do
 			local key=mode.Key
 			local isSelected=key==selected
 			local isHover=key==highlightHoverMode
-			local isCustom=UI_STYLE[mode.Prefix.."CustomColor"]==true
+			local isCustom=style[mode.Prefix.."CustomColor"]==true
 			for _,state in ipairs(mode.States or {}) do
-				if UI_STYLE[mode.Prefix..(state.Suffix or "").."CustomColor"]==true then
+				if style[mode.Prefix..(state.Suffix or "").."CustomColor"]==true then
 					isCustom=true
 					break
 				end
@@ -1973,7 +1973,7 @@ function StrokeColour.new(app,page)
 		end
 
 		if highlightDialCenterCap then
-			local centerColor=themeColor("INPUT",THEME.PANEL)
+			local centerColor=themeColor("INPUT",colors.panel)
 			if animate then
 				tweenHighlightDialObject(highlightDialCenterCap,{ImageColor3=centerColor})
 			else
@@ -1998,8 +1998,8 @@ function StrokeColour.new(app,page)
 		local dx=x-absoluteSize.X*0.5
 		local dy=y-absoluteSize.Y*0.5
 		local radius=math.sqrt(dx*dx+dy*dy)
-		local inner=size*HIGHLIGHT_DIAL_INNER_RADIUS
-		local outer=size*HIGHLIGHT_DIAL_OUTER_RADIUS
+		local inner=size*highlightDialInnerRadius
+		local outer=size*highlightDialOuterRadius
 
 		if radius<inner or radius>outer then
 			return nil
@@ -2010,7 +2010,7 @@ function StrokeColour.new(app,page)
 			angle=angle+360
 		end
 
-		for _,slice in ipairs(HIGHLIGHT_DIAL_SLICES) do
+		for _,slice in ipairs(highlightDialSlices) do
 			if inAngleRange(angle,slice.start,slice.finish) then
 				return slice.key
 			end
@@ -2021,7 +2021,7 @@ function StrokeColour.new(app,page)
 
 	local function setHighlightHoverMode(modeKey)
 		modeKey=modeKey and normalizeHighlightMode(modeKey) or nil
-		if modeKey and not HIGHLIGHT_MODE_BY_KEY[modeKey] then
+		if modeKey and not highlightModeByKey[modeKey] then
 			modeKey=nil
 		end
 
@@ -2036,13 +2036,13 @@ function StrokeColour.new(app,page)
 	local paramsDial=app.Page1GameParamsModule
 	local assets=paramsDial and type(paramsDial.GetDialSliceAssets)=="function" and paramsDial.GetDialSliceAssets() or nil
 
-	for _,slice in ipairs(HIGHLIGHT_DIAL_SLICES) do
+	for _,slice in ipairs(highlightDialSlices) do
 		local pageAssets=assets and assets[slice.assetKey]
 		if pageAssets and pageAssets.slice and pageAssets.glow then
 			highlightDialGlowImages[slice.key]={}
-			for _,layer in ipairs(HIGHLIGHT_DIAL_GLOW_LAYERS) do
+			for _,layer in ipairs(highlightGlowLayers) do
 				local pad=layer.pad
-				local glowImage=New("ImageLabel",{
+				local glowImage=make("ImageLabel",{
 					BackgroundTransparency=1,
 					Position=UDim2.new(0,-pad,0,-pad),
 					Size=UDim2.new(1,pad*2,1,pad*2),
@@ -2056,19 +2056,19 @@ function StrokeColour.new(app,page)
 				highlightDialGlowImages[slice.key][#highlightDialGlowImages[slice.key]+1]=glowImage
 			end
 
-			highlightDialImages[slice.key]=New("ImageLabel",{
+			highlightDialImages[slice.key]=make("ImageLabel",{
 				BackgroundTransparency=1,
 				Position=UDim2.fromScale(0,0),
 				Size=UDim2.fromScale(1,1),
 				Image=pageAssets.slice,
-				ImageColor3=themeColor("INPUT",THEME.PANEL),
+				ImageColor3=themeColor("INPUT",colors.panel),
 				ImageTransparency=0.74,
 				ResampleMode=Enum.ResamplerMode.Default,
 				ScaleType=Enum.ScaleType.Stretch,
 				ZIndex=6,
 			},highlightDialCanvas)
 
-			highlightDialHighlightImages[slice.key]=New("ImageLabel",{
+			highlightDialHighlightImages[slice.key]=make("ImageLabel",{
 				BackgroundTransparency=1,
 				Position=UDim2.fromScale(0,0),
 				Size=UDim2.fromScale(1,1),
@@ -2081,10 +2081,10 @@ function StrokeColour.new(app,page)
 			},highlightDialCanvas)
 		else
 			local index=slice.fallbackIndex
-			local fallback=New("TextButton",{
+			local fallback=make("TextButton",{
 				Position=UDim2.new((index-1)/3,1,0,8),
 				Size=UDim2.new(1/3,-2,1,-16),
-				BackgroundColor3=themeColor("INPUT",THEME.PANEL),
+				BackgroundColor3=themeColor("INPUT",colors.panel),
 				BackgroundTransparency=0.74,
 				BorderSizePixel=0,
 				Text="",
@@ -2099,14 +2099,14 @@ function StrokeColour.new(app,page)
 	end
 
 	if assets and assets._center then
-		local centerSize=math.floor(HIGHLIGHT_DIAL_W*HIGHLIGHT_DIAL_INNER_RADIUS*2+8)
-		highlightDialCenterCap=New("ImageLabel",{
+		local centerSize=math.floor(highlightDialWidth*highlightDialInnerRadius*2+8)
+		highlightDialCenterCap=make("ImageLabel",{
 			AnchorPoint=Vector2.new(0.5,0.5),
 			Position=UDim2.fromScale(0.5,0.5),
 			Size=UDim2.fromOffset(centerSize,centerSize),
 			BackgroundTransparency=1,
 			Image=assets._center,
-			ImageColor3=themeColor("INPUT",THEME.PANEL),
+			ImageColor3=themeColor("INPUT",colors.panel),
 			ImageTransparency=0.03,
 			ResampleMode=Enum.ResamplerMode.Default,
 			ScaleType=Enum.ScaleType.Stretch,
@@ -2114,7 +2114,7 @@ function StrokeColour.new(app,page)
 		},highlightDialCanvas)
 	end
 
-	local highlightDialHit=New("TextButton",{
+	local highlightDialHit=make("TextButton",{
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		Position=UDim2.fromScale(0,0),
@@ -2146,7 +2146,7 @@ function StrokeColour.new(app,page)
 		setHighlightHoverMode(nil)
 	end))
 
-	highlightPreview=New("Frame",{
+	highlightPreview=make("Frame",{
 		BackgroundColor3=highlightColor("Fill"),
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset(104,12),
@@ -2156,28 +2156,28 @@ function StrokeColour.new(app,page)
 		CornerRole="Control",
 	},highlightModeRow)
 	addCorner(highlightPreview,"Control")
-	highlightPreviewStroke=New("UIStroke",{Color=highlightColor("Outline"),Thickness=2,Transparency=highlightTransparency("Outline")},highlightPreview)
+	highlightPreviewStroke=make("UIStroke",{Color=highlightColor("Outline"),Thickness=2,Transparency=highlightTransparency("Outline")},highlightPreview)
 	highlightPreviewStroke:SetAttribute("StrokeRole","Fixed")
 
-	highlightModeLabel=New("TextLabel",{
+	highlightModeLabel=make("TextLabel",{
 		BackgroundTransparency=1,
 		Position=UDim2.fromOffset(104,66),
 		Size=UDim2.new(1,-108,0,20),
 		Text="",
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
-		TextColor3=THEME.MUTED,
+		TextColor3=colors.muted,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
 	},highlightModeRow)
 
-	local highlightStateRow=New("Frame",{
+	local highlightStateRow=make("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,28),
 		ZIndex=5,
 		LayoutOrder=2,
 	},highlightPanel)
-	New("UIListLayout",{
+	make("UIListLayout",{
 		FillDirection=Enum.FillDirection.Horizontal,
 		Padding=UDim.new(0,8),
 		SortOrder=Enum.SortOrder.LayoutOrder,
@@ -2194,13 +2194,13 @@ function StrokeColour.new(app,page)
 		highlightStateButtons[index]=entry
 	end
 
-	local highlightTargetRow=New("Frame",{
+	local highlightTargetRow=make("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,28),
 		ZIndex=5,
 		LayoutOrder=3,
 	},highlightPanel)
-	New("UIListLayout",{
+	make("UIListLayout",{
 		FillDirection=Enum.FillDirection.Horizontal,
 		Padding=UDim.new(0,8),
 		SortOrder=Enum.SortOrder.LayoutOrder,
@@ -2214,14 +2214,14 @@ function StrokeColour.new(app,page)
 		highlightTargetButtons[target]={Button=button,Marker=marker}
 	end
 
-	local highlightPickerBody=New("Frame",{
+	local highlightPickerBody=make("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,128),
 		ZIndex=5,
 		LayoutOrder=4,
 	},highlightPanel)
 
-	highlightSvBase=New("Frame",{
+	highlightSvBase=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,0,0),
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset(0,8),
@@ -2231,7 +2231,7 @@ function StrokeColour.new(app,page)
 	},highlightPickerBody)
 	addCorner(highlightSvBase,"Section")
 
-	local highlightWhiteOverlay=New("Frame",{
+	local highlightWhiteOverlay=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
 		BorderSizePixel=0,
 		Size=UDim2.new(1,0,1,0),
@@ -2239,14 +2239,14 @@ function StrokeColour.new(app,page)
 		ZIndex=7,
 	},highlightSvBase)
 	addCorner(highlightWhiteOverlay,"Section")
-	New("UIGradient",{
+	make("UIGradient",{
 		Transparency=NumberSequence.new({
 			NumberSequenceKeypoint.new(0,0),
 			NumberSequenceKeypoint.new(1,1),
 		}),
 	},highlightWhiteOverlay)
 
-	local highlightBlackOverlay=New("Frame",{
+	local highlightBlackOverlay=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(0,0,0),
 		BorderSizePixel=0,
 		Size=UDim2.new(1,0,1,0),
@@ -2254,7 +2254,7 @@ function StrokeColour.new(app,page)
 		ZIndex=8,
 	},highlightSvBase)
 	addCorner(highlightBlackOverlay,"Section")
-	New("UIGradient",{
+	make("UIGradient",{
 		Rotation=90,
 		Transparency=NumberSequence.new({
 			NumberSequenceKeypoint.new(0,1),
@@ -2262,7 +2262,7 @@ function StrokeColour.new(app,page)
 		}),
 	},highlightBlackOverlay)
 
-	highlightSvCursor=New("Frame",{
+	highlightSvCursor=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
 		BorderSizePixel=0,
 		Size=UDim2.fromOffset(8,8),
@@ -2270,9 +2270,9 @@ function StrokeColour.new(app,page)
 		ZIndex=9,
 	},highlightSvBase)
 	addCorner(highlightSvCursor,"Control")
-	New("UIStroke",{Color=Color3.fromRGB(0,0,0),Thickness=1,Transparency=0.35,StrokeRole="Fixed"},highlightSvCursor)
+	make("UIStroke",{Color=Color3.fromRGB(0,0,0),Thickness=1,Transparency=0.35,StrokeRole="Fixed"},highlightSvCursor)
 
-	local highlightHueStrip=New("Frame",{
+	local highlightHueStrip=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset(158,8),
@@ -2281,7 +2281,7 @@ function StrokeColour.new(app,page)
 		ZIndex=6,
 	},highlightPickerBody)
 	addCorner(highlightHueStrip,"Slider")
-	New("UIGradient",{
+	make("UIGradient",{
 		Rotation=90,
 		Color=ColorSequence.new({
 			ColorSequenceKeypoint.new(0,Color3.fromHSV(0,1,1)),
@@ -2294,7 +2294,7 @@ function StrokeColour.new(app,page)
 		}),
 	},highlightHueStrip)
 
-	highlightHueCursor=New("Frame",{
+	highlightHueCursor=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
 		BorderSizePixel=0,
 		Size=UDim2.new(1,0,0,3),
@@ -2303,7 +2303,7 @@ function StrokeColour.new(app,page)
 	},highlightHueStrip)
 	addCorner(highlightHueCursor,"Slider")
 
-	highlightPickerPreview=New("Frame",{
+	highlightPickerPreview=make("Frame",{
 		BackgroundColor3=getActiveHighlightColor(),
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset(192,8),
@@ -2313,14 +2313,14 @@ function StrokeColour.new(app,page)
 	},highlightPickerBody)
 	addCorner(highlightPickerPreview,"Control")
 
-	highlightPreviewHex=New("TextLabel",{
+	highlightPreviewHex=make("TextLabel",{
 		BackgroundTransparency=1,
 		Position=UDim2.fromOffset(192,70),
 		Size=UDim2.fromOffset(92,18),
 		Text=colorToHex(getActiveHighlightColor()),
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
-		TextColor3=THEME.TEXT,
+		TextColor3=colors.text,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
 	},highlightPickerBody)
@@ -2339,25 +2339,25 @@ function StrokeColour.new(app,page)
 		end
 	end))
 
-	trackConnection(UIS.InputChanged:Connect(function(input)
+	trackConnection(inputService.InputChanged:Connect(function(input)
 		if highlightColorDrag and input.UserInputType==Enum.UserInputType.MouseMovement then
 			updateHighlightColorDrag(input)
 		end
 	end))
 
-	trackConnection(UIS.InputEnded:Connect(function(input)
+	trackConnection(inputService.InputEnded:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 then
 			highlightColorDrag=nil
 		end
 	end))
 
-	local highlightTransparencyBody=New("Frame",{
+	local highlightTransparencyBody=make("Frame",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,101),
 		ZIndex=5,
 		LayoutOrder=5,
 	},highlightPanel)
-	New("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},highlightTransparencyBody)
+	make("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},highlightTransparencyBody)
 
 	highlightFillTransparencySlider=makeHighlightSlider(highlightTransparencyBody,"Fill Alpha",0,1,highlightTransparency("Fill"),2,highlightColor("Fill"),function(value)
 		writeHighlightTransparency("Fill",value)
@@ -2388,14 +2388,14 @@ function StrokeColour.new(app,page)
 
 		for key,entry in pairs(targetButtons) do
 			local selected=key==activeTarget
-			entry.Button.BackgroundColor3=selected and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
+			entry.Button.BackgroundColor3=selected and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=stroke
 		end
 
 		for key,entry in pairs(modeButtons) do
 			local selected=key==activeMode
-			entry.Button.BackgroundColor3=selected and themeColor("SECTION",THEME.CARD) or themeColor("BUTTON",THEME.PANEL)
+			entry.Button.BackgroundColor3=selected and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=stroke
 		end
@@ -2406,11 +2406,11 @@ function StrokeColour.new(app,page)
 		end
 
 		if applyHex then
-			applyHex.BackgroundColor3=themeColor("BUTTON",THEME.PANEL)
+			applyHex.BackgroundColor3=themeColor("BUTTON",colors.panel)
 		end
 
 		if hexBox then
-			hexBox.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
+			hexBox.BackgroundColor3=themeColor("INPUT",colors.panel)
 		end
 
 		if highlightModeLabel then
@@ -2452,7 +2452,7 @@ function StrokeColour.new(app,page)
 
 		if rgbSliders.R then
 			rgbSliders.R.set(clampByte(color.R*255),false)
-			rgbSliders.G.set(clampByte(color.G*255),false)
+			rgbSliders.green.set(clampByte(color.G*255),false)
 			rgbSliders.B.set(clampByte(color.B*255),false)
 		end
 
@@ -2479,4 +2479,4 @@ function StrokeColour.new(app,page)
 	return api
 end
 
-return StrokeColour
+return strokeColour

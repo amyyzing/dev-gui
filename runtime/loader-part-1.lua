@@ -2,7 +2,7 @@
 -- boot step 1: services, theme defaults, loader screen, and module fetch.
 
 Players=game:GetService("Players")
-UIS=game:GetService("UserInputService")
+inputService=game:GetService("UserInputService")
 TweenService=game:GetService("TweenService")
 RunService=game:GetService("RunService")
 HttpService=game:GetService("HttpService")
@@ -11,16 +11,57 @@ Workspace=game:GetService("Workspace")
 me=Players.LocalPlayer
 guiParent=me:WaitForChild("PlayerGui")
 
-THEME={BG=Color3.fromRGB(12,12,12), PANEL=Color3.fromRGB(24,24,24), CARD=Color3.fromRGB(31,31,31), ACC=Color3.fromRGB(32,202,106), TEXT=Color3.fromRGB(238,238,238), MUTED=Color3.fromRGB(182,180,180), STROKE=Color3.fromRGB(182,180,180), RED=Color3.fromRGB(254,94,86), BLUE=Color3.fromRGB(21,103,251), GREEN=Color3.fromRGB(32,202,106)}
+colorNames={
+	["BG"]="bg",
+	["PANEL"]="panel",
+	["CARD"]="card",
+	["ACC"]="accent",
+	["TEXT"]="text",
+	["MUTED"]="muted",
+	["STROKE"]="stroke",
+	["STROKE_SOFT"]="softStroke",
+	["TOPBAR"]="topbar",
+	["SECTION"]="section",
+	["BUTTON"]="button",
+	["INPUT"]="input",
+	["SLIDER_BG"]="sliderBg",
+	["SLIDER_FILL"]="sliderFill",
+	["RED"]="red",
+	["BLUE"]="blue",
+	["GREEN"]="green",
+}
 
-UI_STYLE={}
+colors=setmetatable({
+	bg=Color3.fromRGB(12,12,12),
+	panel=Color3.fromRGB(24,24,24),
+	card=Color3.fromRGB(31,31,31),
+	accent=Color3.fromRGB(32,202,106),
+	text=Color3.fromRGB(238,238,238),
+	muted=Color3.fromRGB(182,180,180),
+	stroke=Color3.fromRGB(182,180,180),
+	red=Color3.fromRGB(254,94,86),
+	blue=Color3.fromRGB(21,103,251),
+	green=Color3.fromRGB(32,202,106),
+},{
+	__index=function(t,key)
+		local alias=colorNames[key]
+		if alias then
+			return rawget(t,alias)
+		end
+	end,
+	__newindex=function(t,key,value)
+		rawset(t,colorNames[key] or key,value)
+	end,
+})
 
-UI_WINDOW={}
+style={}
 
-WORLD_SETTINGS={SmoothPlastic=false, OriginalMaterials=setmetatable({}, {__mode="k"})}
+windowState={}
 
-CURRENT_MODE_LABEL="Gameplay"
-CURRENT_MODE_KEY="mode1"
+mapSettings={SmoothPlastic=false, OriginalMaterials=setmetatable({}, {__mode="k"})}
+
+currentModeLabel="Gameplay"
+currentModeKey="mode1"
 uiVisible=true
 toolAlive=true
 
@@ -59,14 +100,14 @@ testingEnabled=false
 testingWREnabled=true
 testingQBEnabled=true
 
-TOGGLE_UI_KEY=Enum.KeyCode.Unknown
-TOGGLE_HB_KEY=Enum.KeyCode.Unknown
-TOGGLE_JB_KEY=Enum.KeyCode.Unknown
-TOGGLE_AB_KEY=Enum.KeyCode.Unknown
-TOGGLE_ACTION_KEY=Enum.KeyCode.Unknown
-QB_AIM_LOCK_KEY=Enum.KeyCode.H
-QB_AIM_THROW_KEY=Enum.KeyCode.T
-QB_AIM_TOGGLE_KEY=Enum.KeyCode.P
+uiToggleKey=Enum.KeyCode.Unknown
+hitboxToggleKey=Enum.KeyCode.Unknown
+boostToggleKey=Enum.KeyCode.Unknown
+alwaysBoostToggleKey=Enum.KeyCode.Unknown
+espToggleKey=Enum.KeyCode.Unknown
+qbAimLockKey=Enum.KeyCode.H
+qbAimThrowKey=Enum.KeyCode.T
+qbAimToggleKey=Enum.KeyCode.P
 qbAimTeamFilter=true
 qbAimShowArc=true
 qbAimSafeArc=true
@@ -76,55 +117,55 @@ qbAimPeakHeight=14.00
 qbAimQBDrift=0
 qbAimQBYDrift=0
 
-DEFAULT_PRESETS={{key=Enum.KeyCode.Unknown, size=Vector3.new(0.1, 0.1, 0.1)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.7, 5.8, 1.65)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(3.1, 5.8, 1.70)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.52, 5.4, 1.41)}}
+defaultHitboxPresets={{key=Enum.KeyCode.Unknown, size=Vector3.new(0.1, 0.1, 0.1)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.7, 5.8, 1.65)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(3.1, 5.8, 1.70)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.52, 5.4, 1.41)}}
 
-PRESETS={{key=Enum.KeyCode.Unknown, size=Vector3.new(0.1, 0.1, 0.1)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.7, 5.8, 1.65)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(3.1, 5.8, 1.70)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.52, 5.4, 1.41)}}
+hitboxPresets={{key=Enum.KeyCode.Unknown, size=Vector3.new(0.1, 0.1, 0.1)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.7, 5.8, 1.65)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(3.1, 5.8, 1.70)}, {key=Enum.KeyCode.Unknown, size=Vector3.new(2.52, 5.4, 1.41)}}
 
-OWNED_PRESETS={}
-UI_MAIN={}
+savedPresets={}
+mainUi={}
 
-BOX_WRAPPERS=setmetatable({}, {__mode="k"})
-BUTTON_WRAPPERS=setmetatable({}, {__mode="k"})
-THEMED_GUI_OBJECTS=setmetatable({}, {__mode="k"})
-THEMED_TEXT_OBJECTS=setmetatable({}, {__mode="k"})
-THEMED_STROKES=setmetatable({}, {__mode="k"})
-THEMED_CORNERS=setmetatable({}, {__mode="k"})
-LIQUID_STROKE_GRADIENTS=setmetatable({}, {__mode="k"})
-RUNTIME_CONNECTIONS={}
-RUNTIME_JOBS={}
-RUNTIME_JOB_ORDER={}
-RUNTIME_JOB_CONNECTIONS={}
-RUNTIME_BUILD_ERRORS={}
-RUNTIME_ROOT_SCOPE=nil
+boxWrappers=setmetatable({}, {__mode="k"})
+buttonWrappers=setmetatable({}, {__mode="k"})
+themeObjects=setmetatable({}, {__mode="k"})
+themeTextObjects=setmetatable({}, {__mode="k"})
+themeStrokes=setmetatable({}, {__mode="k"})
+themeCorners=setmetatable({}, {__mode="k"})
+strokeGradients=setmetatable({}, {__mode="k"})
+runtimeConnections={}
+runtimeJobs={}
+runtimeJobOrder={}
+runtimeJobConnections={}
+runtimeBuildErrors={}
+runtimeScope=nil
 
 function trackRuntimeConnection(connection)
 	if connection then
-		if RUNTIME_ROOT_SCOPE and RUNTIME_ROOT_SCOPE.add then
-			RUNTIME_ROOT_SCOPE:add(connection)
+		if runtimeScope and runtimeScope.add then
+			runtimeScope:add(connection)
 		end
-		table.insert(RUNTIME_CONNECTIONS,connection)
+		table.insert(runtimeConnections,connection)
 	end
 
 	return connection
 end
 
 function untrackRuntimeConnection(connection)
-	for index=#RUNTIME_CONNECTIONS,1,-1 do
-		if RUNTIME_CONNECTIONS[index]==connection then
-			table.remove(RUNTIME_CONNECTIONS,index)
+	for index=#runtimeConnections,1,-1 do
+		if runtimeConnections[index]==connection then
+			table.remove(runtimeConnections,index)
 			return
 		end
 	end
 end
 
 function disconnectRuntimeConnections()
-	if RUNTIME_ROOT_SCOPE and RUNTIME_ROOT_SCOPE.destroy then
+	if runtimeScope and runtimeScope.destroy then
 		pcall(function()
-			RUNTIME_ROOT_SCOPE:destroy()
+			runtimeScope:destroy()
 		end)
 	end
 
-	for _,connection in ipairs(RUNTIME_CONNECTIONS) do
+	for _,connection in ipairs(runtimeConnections) do
 		if typeof(connection)=="RBXScriptConnection" then
 			pcall(function()
 				connection:Disconnect()
@@ -134,13 +175,13 @@ function disconnectRuntimeConnections()
 		end
 	end
 
-	table.clear(RUNTIME_CONNECTIONS)
-	table.clear(RUNTIME_JOBS)
-	table.clear(RUNTIME_JOB_ORDER)
-	table.clear(RUNTIME_JOB_CONNECTIONS)
+	table.clear(runtimeConnections)
+	table.clear(runtimeJobs)
+	table.clear(runtimeJobOrder)
+	table.clear(runtimeJobConnections)
 
 	if CoreScope and CoreScope.new then
-		RUNTIME_ROOT_SCOPE=CoreScope.new("runtime",function(err,scopeName)
+		runtimeScope=CoreScope.new("runtime",function(err,scopeName)
 			warn("cleanup failed:",scopeName,err)
 		end)
 	end
@@ -150,15 +191,15 @@ function registerThemeObject(instance)
 	if not instance then return end
 
 	if instance:IsA("GuiObject") then
-		THEMED_GUI_OBJECTS[instance]=true
+		themeObjects[instance]=true
 	end
 
 	if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
-		THEMED_TEXT_OBJECTS[instance]=true
+		themeTextObjects[instance]=true
 	elseif instance:IsA("UIStroke") then
-		THEMED_STROKES[instance]=true
+		themeStrokes[instance]=true
 	elseif instance:IsA("UICorner") then
-		THEMED_CORNERS[instance]=true
+		themeCorners[instance]=true
 	end
 end
 
@@ -167,12 +208,12 @@ function colorClose(a,b)
 	return math.abs(a.R-b.R)<0.002 and math.abs(a.G-b.G)<0.002 and math.abs(a.B-b.B)<0.002
 end
 
-local THEME_ROLE_NAMES={"BG","PANEL","CARD","TEXT","MUTED","STROKE","GREEN","RED","BLUE","STROKE_SOFT","TOPBAR","SECTION","BUTTON","INPUT","SLIDER_BG","SLIDER_FILL"}
-local THEME_TEXT_ROLE_NAMES={"TEXT","MUTED","RED","GREEN","BLUE"}
+local themeRoleNames={"BG","PANEL","CARD","TEXT","MUTED","STROKE","GREEN","RED","BLUE","STROKE_SOFT","TOPBAR","SECTION","BUTTON","INPUT","SLIDER_BG","SLIDER_FILL"}
+local themeTextRoleNames={"TEXT","MUTED","RED","GREEN","BLUE"}
 
 local function findThemeRole(color,roles)
 	for _,role in ipairs(roles) do
-		if THEME[role] and colorClose(color,THEME[role]) then
+		if colors[role] and colorClose(color,colors[role]) then
 			return role
 		end
 	end
@@ -183,7 +224,7 @@ function markThemeRole(instance,color)
 	registerThemeObject(instance)
 	if instance:IsA("TextButton") and instance.Text=="" then return end
 
-	local role=findThemeRole(color,THEME_ROLE_NAMES)
+	local role=findThemeRole(color,themeRoleNames)
 	if role then
 		instance:SetAttribute("ThemeRole",role)
 	end
@@ -193,7 +234,7 @@ function markThemeTextRole(instance,color,defaultRole)
 	if not(instance and color) then return end
 	registerThemeObject(instance)
 
-	local role=findThemeRole(color,THEME_TEXT_ROLE_NAMES)
+	local role=findThemeRole(color,themeTextRoleNames)
 	if role or defaultRole then
 		instance:SetAttribute("ThemeTextRole",role or defaultRole)
 	end
@@ -204,7 +245,7 @@ function translateUIText(value)
 		return value
 	end
 
-	local description=Description or DescriptionModule
+	local description=description or DescriptionModule
 	if description and type(description.Text)=="function" then
 		local ok,result=pcall(description.Text,value)
 		if ok and result~=nil then
@@ -215,7 +256,7 @@ function translateUIText(value)
 	return value
 end
 
-function New(class, properties, parent)
+function make(class, properties, parent)
 	properties=properties or {}
 	local skipThemeRole=properties.SkipThemeRole
 	local skipTextRole=properties.SkipTextRole
@@ -237,7 +278,7 @@ function New(class, properties, parent)
 	end
 
 	if isTextClass then
-		if properties.TextColor3==nil then properties.TextColor3=THEME.TEXT end
+		if properties.TextColor3==nil then properties.TextColor3=colors.text end
 		if properties.Font==nil then properties.Font=Enum.Font.Gotham end
 		properties.TextStrokeTransparency=1
 		properties.TextStrokeColor3=Color3.fromRGB(0, 0, 0)
@@ -327,15 +368,15 @@ function safeDisconnect(connection)
 	end
 end
 
-RuntimeJanitor={new=function()
+cleanupBags={new=function()
 	return{Add=function(_,item) return item end,Cleanup=function() end,Destroy=function() end}
 end}
-RuntimeScheduler={Register=function() return false end,SetEnabled=function() end,Unregister=function() end,Count=function() return 0 end,Stats=function() return{} end,ResetStats=function() end}
-RuntimeStateStore={dirty=false,Get=function(_,_,default) return default end,Set=function(_,_,value) return value end}
-RuntimeThemeStore={Apply=function() end,RefreshObject=function() end}
-RuntimePlayerCache={getPlayers=function() return Players:GetPlayers() end,getCharacter=function(_,player) return player and (Workspace:FindFirstChild(player.Name) or player.Character) or nil end,getRoot=function(self,player) local character=self:getCharacter(player) return character and (character.PrimaryPart or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")) or nil end,getTeamId=function(_,player) local replicated=player and player:FindFirstChild("Replicated") local teamValue=replicated and replicated:FindFirstChild("TeamID") local ok,value=pcall(function() return teamValue and teamValue.Value end) return ok and value and tostring(value) or nil end}
-RuntimeBallTracker={getHeldBall=function() return nil end,getFootballPartFromPlayer=function() return nil end,getCarrier=function() return nil end}
-RuntimeServices={Janitor=RuntimeJanitor,Scheduler=RuntimeScheduler,StateStore=RuntimeStateStore,ThemeStore=RuntimeThemeStore,PlayerCache=RuntimePlayerCache,BallTracker=RuntimeBallTracker}
+jobRunner={Register=function() return false end,SetEnabled=function() end,Unregister=function() end,Count=function() return 0 end,Stats=function() return{} end,ResetStats=function() end}
+settingsStore={dirty=false,Get=function(_,_,default) return default end,Set=function(_,_,value) return value end}
+themeRuntime={Apply=function() end,RefreshObject=function() end}
+playerTracker={getPlayers=function() return Players:GetPlayers() end,getCharacter=function(_,player) return player and (Workspace:FindFirstChild(player.Name) or player.Character) or nil end,getRoot=function(self,player) local character=self:getCharacter(player) return character and (character.PrimaryPart or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")) or nil end,getTeamId=function(_,player) local replicated=player and player:FindFirstChild("Replicated") local teamValue=replicated and replicated:FindFirstChild("TeamID") local ok,value=pcall(function() return teamValue and teamValue.Value end) return ok and value and tostring(value) or nil end}
+ballTracker={getHeldBall=function() return nil end,getFootballPartFromPlayer=function() return nil end,getCarrier=function() return nil end}
+sharedRuntime={Janitor=cleanupBags,schedulerApi=jobRunner,StateStore=settingsStore,ThemeStore=themeRuntime,playerCacheApi=playerTracker,ballTrackerApi=ballTracker}
 
 function fmtNumber(n, decimals)
 	decimals=decimals or 2
@@ -411,16 +452,16 @@ function bindingToLabel(binding)
 end
 
 function getApiKey()
-	if type(BOOT_BOT_API)=="table" and type(BOOT_BOT_API.Key)=="string" then
-		return BOOT_BOT_API.Key
+	if type(bootApi)=="table" and type(bootApi.Key)=="string" then
+		return bootApi.Key
 	end
 
 	return nil
 end
 
-TRUSTED_API_URL="https://lint-bot-production.up.railway.app"
+trustedApiUrl="https://lint-bot-production.up.railway.app"
 
-API_ALLOWED_PATHS={
+allowedApiPaths={
 	["/module/get"]=true,
 	["/module/batch"]=true,
 	["/module/manifest"]=true,
@@ -439,12 +480,12 @@ API_ALLOWED_PATHS={
 	["/announcement/seen"]=true,
 }
 
-BOT_API={
-	Url=TRUSTED_API_URL,
+botApi={
+	Url=trustedApiUrl,
 	Key=getApiKey(),
 }
 
-function BOT_API.GetRequestFunction()
+function botApi.GetRequestFunction()
 	if typeof(syn)=="table" and type(syn.request)=="function" then return syn.request end
 	if type(request)=="function" then return request end
 	if type(http_request)=="function" then return http_request end
@@ -453,16 +494,16 @@ function BOT_API.GetRequestFunction()
 	return nil
 end
 
-function BOT_API.Post(path,body)
-	if type(path)~="string" or not API_ALLOWED_PATHS[path] then
+function botApi.Post(path,body)
+	if type(path)~="string" or not allowedApiPaths[path] then
 		return{ok=false,error="api path blocked: "..tostring(path)}
 	end
 
-	if BOT_API.Url~=TRUSTED_API_URL then
+	if botApi.Url~=trustedApiUrl then
 		return{ok=false,error="api url failed"}
 	end
 
-	if type(BOT_API.Key)~="string" or BOT_API.Key=="" then
+	if type(botApi.Key)~="string" or botApi.Key=="" then
 		return{ok=false,error="api key failed"}
 	end
 
@@ -478,17 +519,17 @@ function BOT_API.Post(path,body)
 		end
 	end
 
-	local requestFn=BOT_API.GetRequestFunction()
+	local requestFn=botApi.GetRequestFunction()
 	if not requestFn then
 		return{ok=false,error="no http request found"}
 	end
 
 	body=body or{}
-	body.apiKey=BOT_API.Key
+	body.apiKey=botApi.Key
 
 	local ok,response=pcall(function()
 		return requestFn({
-			Url=BOT_API.Url..path,
+			Url=botApi.Url..path,
 			Method="POST",
 			Headers={
 				["Content-Type"]="application/json",
@@ -517,9 +558,9 @@ function BOT_API.Post(path,body)
 	return decoded
 end
 
-MANUAL_REFRESH_RELOAD_PATH="loader.lua"
+manualReloadPath="loader.lua"
 
-MODULE_PATHS={
+modulePaths={
 	CoreScope="core/scope.lua",
 	CoreSignal="core/signal.lua",
 	CoreScheduler="core/scheduler.lua",
@@ -534,16 +575,16 @@ MODULE_PATHS={
 	DesignThemeCrimson="design/themes/crimson.lua",
 	DesignThemeEvergreen="design/themes/evergreen.lua",
 	DesignThemeSakura="design/themes/sakura.lua",
-	Announcement="announcement.lua",
+	announcement="announcement.lua",
 	GuiFusion="gui/fusion.lua",
-	GuiLogic="gui/gui-logic.lua",
-	MainFrame="gui/mainframe.lua",
-	Description="gui/description.lua",
-	HitboxPreset="features/hitbox-preset/gui.lua",
+	guiLogic="gui/gui-logic.lua",
+	mainFrame="gui/mainframe.lua",
+	description="gui/description.lua",
+	hitboxPreset="features/hitbox-preset/gui.lua",
 	HitboxPresetLogic="features/hitbox-preset/logic.lua",
-	KeybindSettings="features/keybind-settings/gui.lua",
+	keybindSettings="features/keybind-settings/gui.lua",
 	KeybindSettingsLogic="features/keybind-settings/logic.lua",
-	PresetEditor="features/preset-editor/gui.lua",
+	presetEditor="features/preset-editor/gui.lua",
 	PresetEditorLogic="features/preset-editor/logic.lua",
 	Page1Hitbox="features/hitbox/gui.lua",
 	Page1HitboxLogic="features/hitbox/logic.lua",
@@ -562,25 +603,25 @@ MODULE_PATHS={
 	Page1QBAimLogic="features/qb-aim/logic.lua",
 	Page1Testing="features/testing/gui.lua",
 	Page1TestingLogic="features/testing/logic.lua",
-	StrokeColour="features/stroke-colour/gui.lua",
+	strokeColour="features/stroke-colour/gui.lua",
 	StrokeColourLogic="features/stroke-colour/logic.lua",
-	MapEditor="features/map-editor/gui.lua",
+	mapEditor="features/map-editor/gui.lua",
 	MapEditorLogic="features/map-editor/logic.lua",
-	AntiMaterial="features/anti-material/gui.lua",
+	antiMaterial="features/anti-material/gui.lua",
 	AntiMaterialLogic="features/anti-material/logic.lua",
-	MapCleaner="features/map-cleaner/gui.lua",
+	mapCleaner="features/map-cleaner/gui.lua",
 	MapCleanerLogic="features/map-cleaner/logic.lua",
-	RemoveAds="features/remove-ads/gui.lua",
+	removeAds="features/remove-ads/gui.lua",
 	RemoveAdsLogic="features/remove-ads/logic.lua",
-	PlayerData="features/player-data/gui.lua",
+	playerData="features/player-data/gui.lua",
 	PlayerDataLogic="features/player-data/logic.lua",
-	ResetPosition="features/reset-position/gui.lua",
+	resetPosition="features/reset-position/gui.lua",
 	ResetPositionLogic="features/reset-position/logic.lua",
-	Discord="features/discord/gui.lua",
+	discord="features/discord/gui.lua",
 	DiscordLogic="features/discord/logic.lua",
-	DataSave="data-save/data-save.lua",
+	dataSave="data-save/data-save.lua",
 }
-MODULE_GLOBAL_NAMES={
+moduleGlobalNames={
 	CoreScope="CoreScope",
 	CoreSignal="CoreSignal",
 	CoreScheduler="CoreScheduler",
@@ -597,7 +638,7 @@ MODULE_GLOBAL_NAMES={
 	DesignThemeSakura="DesignThemeSakura",
 	GuiFusion="FusionModule"
 }
-STARTUP_MODULE_NAMES={
+startupModuleNames={
 	"CoreScope","CoreSignal","CoreScheduler","CorePlayerCache","CoreBallTracker",
 	"StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura",
 	"GuiFusion","GuiLogic","MainFrame","Description","Announcement",
@@ -610,14 +651,14 @@ STARTUP_MODULE_NAMES={
 	"PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord",
 	"DataSave",
 }
-OPTIONAL_MODULE_NAMES={"CorePlayerCache","CoreBallTracker"}
-MAP_RELOAD_NAMES={"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds"}
-CUSTOMIZE_RELOAD_NAMES={"StrokeColourLogic","StrokeColour"}
-PAGE2_RELOAD_NAMES={"HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor"}
-SETTINGS_RELOAD_NAMES={"PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord"}
+optionalModuleNames={"CorePlayerCache","CoreBallTracker"}
+mapReloadNames={"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds"}
+customizeReloadNames={"StrokeColourLogic","StrokeColour"}
+pageTwoReloadNames={"HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor"}
+settingsReloadNames={"PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord"}
 
 function moduleGlobalName(name)
-	return MODULE_GLOBAL_NAMES[name] or (tostring(name).."Module")
+	return moduleGlobalNames[name] or (tostring(name).."Module")
 end
 
 function setLoadedModule(name,loadedModule)
@@ -626,7 +667,7 @@ function setLoadedModule(name,loadedModule)
 end
 
 function setLoadedModuleByPath(path,loadedModule)
-	for name,modulePath in pairs(MODULE_PATHS) do
+	for name,modulePath in pairs(modulePaths) do
 		if modulePath==path then
 			return setLoadedModule(name,loadedModule)
 		end
@@ -639,7 +680,7 @@ function modulePathsFromNames(names)
 	local paths={}
 
 	for _,name in ipairs(names or {}) do
-		local path=MODULE_PATHS[name]
+		local path=modulePaths[name]
 		if path then
 			table.insert(paths,path)
 		end
@@ -648,43 +689,43 @@ function modulePathsFromNames(names)
 	return paths
 end
 
-APP_RUNTIME_PATH_SET={}
-if type(APP_RUNTIME_PATHS)=="table" then
-	for _,path in ipairs(APP_RUNTIME_PATHS) do
-		APP_RUNTIME_PATH_SET[path]=true
+runtimeFileSet={}
+if type(runtimeFilesFromLoader)=="table" then
+	for _,path in ipairs(runtimeFilesFromLoader) do
+		runtimeFileSet[path]=true
 	end
 end
-MODULE_PATH_SET={}
-for _,path in pairs(MODULE_PATHS) do
-	MODULE_PATH_SET[path]=true
+allowedModuleFiles={}
+for _,path in pairs(modulePaths) do
+	allowedModuleFiles[path]=true
 end
-MODULE_PATH_SET[MANUAL_REFRESH_RELOAD_PATH]=true
-for path in pairs(APP_RUNTIME_PATH_SET) do
-	MODULE_PATH_SET[path]=true
+allowedModuleFiles[manualReloadPath]=true
+for path in pairs(runtimeFileSet) do
+	allowedModuleFiles[path]=true
 end
-STARTUP_MODULE_PATHS=modulePathsFromNames(STARTUP_MODULE_NAMES)
-STARTUP_MODULE_PATH_SET={}
-for _,path in ipairs(STARTUP_MODULE_PATHS) do
-	STARTUP_MODULE_PATH_SET[path]=true
+startupModuleFiles=modulePathsFromNames(startupModuleNames)
+startupModuleFileSet={}
+for _,path in ipairs(startupModuleFiles) do
+	startupModuleFileSet[path]=true
 end
-DEFERRED_MODULE_PATH_SET={}
-for _,path in pairs(MODULE_PATHS) do
-	if not STARTUP_MODULE_PATH_SET[path] then
-		DEFERRED_MODULE_PATH_SET[path]=true
+deferredModuleFileSet={}
+for _,path in pairs(modulePaths) do
+	if not startupModuleFileSet[path] then
+		deferredModuleFileSet[path]=true
 	end
 end
-OPTIONAL_MODULE_PATH_SET={}
-for _,path in ipairs(modulePathsFromNames(OPTIONAL_MODULE_NAMES)) do
-	OPTIONAL_MODULE_PATH_SET[path]=true
+optionalModuleFileSet={}
+for _,path in ipairs(modulePathsFromNames(optionalModuleNames)) do
+	optionalModuleFileSet[path]=true
 end
-MAX_REMOTE_MODULE_BYTES=300000
-REMOTE_MODULE_MARKERS={[MANUAL_REFRESH_RELOAD_PATH]="HB_LOADER_V3"}
+maxModuleBytes=300000
+moduleMarkers={[manualReloadPath]="HB_LOADER_V3"}
 
-REMOTE_MODULE_CACHE={}
-REMOTE_MODULE_SOURCES={}
-if type(APP_RUNTIME_SOURCES)=="table" then
-	for path,source in pairs(APP_RUNTIME_SOURCES) do
-		REMOTE_MODULE_SOURCES[path]=source
+moduleCache={}
+moduleSources={}
+if type(runtimeSourcesFromLoader)=="table" then
+	for path,source in pairs(runtimeSourcesFromLoader) do
+		moduleSources[path]=source
 	end
 end
 rebuildPage1FromModules=nil
@@ -695,7 +736,7 @@ rebuildPage2FromModules=nil
 rebuildDataSaveFromModule=nil
 
 function isAllowedModulePath(modulePath)
-	return type(modulePath)=="string" and MODULE_PATH_SET[modulePath]==true
+	return type(modulePath)=="string" and allowedModuleFiles[modulePath]==true
 end
 
 function verifyRemoteModuleSource(modulePath,source)
@@ -707,11 +748,11 @@ function verifyRemoteModuleSource(modulePath,source)
 		return false,"module missing: "..tostring(modulePath)
 	end
 
-	if #source>MAX_REMOTE_MODULE_BYTES then
+	if #source>maxModuleBytes then
 		return false,"module too big: "..tostring(modulePath)
 	end
 
-	local marker=(type(APP_RUNTIME_MARKERS)=="table" and APP_RUNTIME_MARKERS[modulePath]) or REMOTE_MODULE_MARKERS[modulePath]
+	local marker=(type(runtimeMarkersFromLoader)=="table" and runtimeMarkersFromLoader[modulePath]) or moduleMarkers[modulePath]
 	if marker and not source:find(marker,1,true) then
 		return false,"module marker failed: "..tostring(modulePath)
 	end
@@ -722,13 +763,13 @@ end
 function loadModuleFromSource(modulePath,source)
 	local verified,verifyErr=verifyRemoteModuleSource(modulePath,source)
 	if not verified then
-		REMOTE_MODULE_SOURCES[modulePath]=false
+		moduleSources[modulePath]=false
 		return nil,verifyErr
 	end
 
 	local chunk,err=loadstring(source)
 	if not chunk then
-		REMOTE_MODULE_SOURCES[modulePath]=source
+		moduleSources[modulePath]=source
 		return nil,err
 	end
 
@@ -738,12 +779,12 @@ function loadModuleFromSource(modulePath,source)
 
 	local loadedOk,loadedModule=pcall(chunk)
 	if not loadedOk then
-		REMOTE_MODULE_SOURCES[modulePath]=source
+		moduleSources[modulePath]=source
 		return nil,loadedModule
 	end
 
-	REMOTE_MODULE_SOURCES[modulePath]=source
-	REMOTE_MODULE_CACHE[modulePath]=loadedModule
+	moduleSources[modulePath]=source
+	moduleCache[modulePath]=loadedModule
 	return loadedModule,nil
 end
 
@@ -753,14 +794,14 @@ function loadRemoteModule(modulePath)
 		return nil
 	end
 
-	if REMOTE_MODULE_CACHE[modulePath] then
-		return REMOTE_MODULE_CACHE[modulePath]
+	if moduleCache[modulePath] then
+		return moduleCache[modulePath]
 	end
 
-	local result=BOT_API.Post("/module/get",{path=modulePath})
+	local result=botApi.Post("/module/get",{path=modulePath})
 	if not result or not result.ok then
-		REMOTE_MODULE_SOURCES[modulePath]=false
-		if OPTIONAL_MODULE_PATH_SET[modulePath] then
+		moduleSources[modulePath]=false
+		if optionalModuleFileSet[modulePath] then
 			warn("optional module missing:",modulePath,result and result.error or"unknown")
 		else
 			warn("module load failed:",modulePath,result and result.error or"unknown")
@@ -782,9 +823,9 @@ function loadRemoteModuleBatch(paths)
 		return false,"no module paths"
 	end
 
-	setLoaderProgress("Fetching remote module batch...",0.2,LOADER_TOTAL,false)
+	setLoaderProgress("Fetching remote module batch...",0.2,loaderStepTotal,false)
 
-	local result=BOT_API.Post("/module/batch",{paths=paths})
+	local result=botApi.Post("/module/batch",{paths=paths})
 	if not(result and result.ok and type(result.modules)=="table") then
 		return false,result and result.error or "module batch missing"
 	end
@@ -807,8 +848,8 @@ function loadRemoteModuleBatch(paths)
 			setLoadedModuleByPath(modulePath,loadedModule)
 			loaded=loaded+1
 		else
-			REMOTE_MODULE_SOURCES[modulePath]=false
-			if OPTIONAL_MODULE_PATH_SET[modulePath] then
+			moduleSources[modulePath]=false
+			if optionalModuleFileSet[modulePath] then
 				warn("optional batch module missing:",modulePath,err)
 			else
 				failed=failed+1
@@ -817,21 +858,21 @@ function loadRemoteModuleBatch(paths)
 		end
 
 		if index%8==0 or index==#paths then
-			setLoaderProgress("module batch loaded ("..tostring(loaded).."/"..tostring(#paths)..")",math.min(index,LOADER_TOTAL),LOADER_TOTAL,failed>0)
+			setLoaderProgress("module batch loaded ("..tostring(loaded).."/"..tostring(#paths)..")",math.min(index,loaderStepTotal),loaderStepTotal,failed>0)
 		end
 	end
 
 	return failed==0,nil
 end
 
-SG_NAME="HitboxUI"
-for _,existingName in ipairs({"HitboxUI_DarkInfluenced_GUIOnly","1",SG_NAME}) do
+screenGuiName="HitboxUI"
+for _,existingName in ipairs({"HitboxUI_DarkInfluenced_GUIOnly","1",screenGuiName}) do
 	old=guiParent:FindFirstChild(existingName)
 	if old then old:Destroy() end
 end
 
-SG=New("ScreenGui", {Name=SG_NAME, ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, IgnoreGuiInset=true, DisplayOrder=1000}, guiParent)
-LOADER_Z=10000
+screenGui=make("ScreenGui", {Name=screenGuiName, ResetOnSpawn=false, ZIndexBehavior=Enum.ZIndexBehavior.Sibling, IgnoreGuiInset=true, DisplayOrder=1000}, guiParent)
+loaderLayer=10000
 loaderAlive=true
 
 function playLoaderKeyframes(sequence,asynchronous)
@@ -866,167 +907,167 @@ function playLoaderKeyframes(sequence,asynchronous)
 	end
 end
 
-LOADER_PAGE_BUILD_NAMES={"maps","customize","page2","settings","server"}
-LOADER_TOTAL=#STARTUP_MODULE_PATHS+#LOADER_PAGE_BUILD_NAMES+4
+loaderPageNames={"maps","customize","page2","settings","server"}
+loaderStepTotal=#startupModuleFiles+#loaderPageNames+4
 
 loaderCurrent=0
-loaderPhaseCurrent=#STARTUP_MODULE_PATHS
+loaderPhaseCurrent=#startupModuleFiles
 loaderPhaseItems={}
 loaderPhaseNames={"setup","modules","gui","ready"}
-loaderOverlay=New("Frame",{
+loaderOverlay=make("Frame",{
 	Name="Loader",
 	BackgroundColor3=Color3.fromRGB(8,10,18),
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	Size=UDim2.new(1,0,1,0),
-	ZIndex=LOADER_Z,
-},SG)
+	ZIndex=loaderLayer,
+},screenGui)
 
-loaderBackdropA=New("Frame",{
+loaderBackdropA=make("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,-112,0.5,-66),
 	Size=UDim2.fromOffset(2,2),
-	BackgroundColor3=THEME.GREEN,
+	BackgroundColor3=colors.green,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
-	ZIndex=LOADER_Z,
+	ZIndex=loaderLayer,
 },loaderOverlay)
-New("UICorner",{CornerRadius=UDim.new(0,0)},loaderBackdropA)
+make("UICorner",{CornerRadius=UDim.new(0,0)},loaderBackdropA)
 
-loaderBackdropB=New("Frame",{
+loaderBackdropB=make("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,128,0.5,82),
 	Size=UDim2.fromOffset(2,2),
-	BackgroundColor3=THEME.BLUE,
+	BackgroundColor3=colors.blue,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
-	ZIndex=LOADER_Z,
+	ZIndex=loaderLayer,
 },loaderOverlay)
-New("UICorner",{CornerRadius=UDim.new(0,0)},loaderBackdropB)
+make("UICorner",{CornerRadius=UDim.new(0,0)},loaderBackdropB)
 
-loaderBox=New("Frame",{
+loaderBox=make("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,0,0.5,0),
 	Size=UDim2.fromOffset(480,320),
-	BackgroundColor3=THEME.BG,
+	BackgroundColor3=colors.bg,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
-	ZIndex=LOADER_Z+1,
+	ZIndex=loaderLayer+1,
 },loaderOverlay)
 
-loaderBoxScale=New("UIScale",{Scale=0.92},loaderBox)
-loaderBoxStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=1},loaderBox)
-loaderBoxGradient=New("UIGradient",{
+loaderBoxScale=make("UIScale",{Scale=0.92},loaderBox)
+loaderBoxStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=1},loaderBox)
+loaderBoxGradient=make("UIGradient",{
 	Color=ColorSequence.new({
-		ColorSequenceKeypoint.new(0,THEME.TOPBAR or THEME.BG),
-		ColorSequenceKeypoint.new(1,THEME.BG),
+		ColorSequenceKeypoint.new(0,colors.topbar or colors.bg),
+		ColorSequenceKeypoint.new(1,colors.bg),
 	}),
 	Rotation=90,
 },loaderBox)
-New("UIPadding",{PaddingTop=UDim.new(0,20),PaddingLeft=UDim.new(0,18),PaddingRight=UDim.new(0,18),PaddingBottom=UDim.new(0,20)},loaderBox)
+make("UIPadding",{PaddingTop=UDim.new(0,20),PaddingLeft=UDim.new(0,18),PaddingRight=UDim.new(0,18),PaddingBottom=UDim.new(0,20)},loaderBox)
 
-loaderAccent=New("Frame",{
-	BackgroundColor3=THEME.GREEN,
+loaderAccent=make("Frame",{
+	BackgroundColor3=colors.green,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	Position=UDim2.new(0,0,0,0),
 	Size=UDim2.new(0,0,0,2),
-	ZIndex=LOADER_Z+2,
+	ZIndex=loaderLayer+2,
 },loaderBox)
 
-loaderPercentPill=New("Frame",{
+loaderPercentPill=make("Frame",{
 	AnchorPoint=Vector2.new(1,0),
 	Position=UDim2.new(1,0,0,18),
 	Size=UDim2.fromOffset(70,24),
-	BackgroundColor3=THEME.PANEL,
+	BackgroundColor3=colors.panel,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
-	ZIndex=LOADER_Z+2,
+	ZIndex=loaderLayer+2,
 },loaderBox)
-New("UICorner",{CornerRadius=UDim.new(0,0)},loaderPercentPill)
-loaderPercentPillStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=1},loaderPercentPill)
+make("UICorner",{CornerRadius=UDim.new(0,0)},loaderPercentPill)
+loaderPercentPillStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=1},loaderPercentPill)
 
-local titleText=New("TextLabel",{
+local titleText=make("TextLabel",{
 	BackgroundTransparency=1,
 	Position=UDim2.fromOffset(0,16),
 	Size=UDim2.new(1,-88,0,24),
 	Text="untitled gui",
 	Font=Enum.Font.GothamMedium,
 	TextSize=16,
-	TextColor3=THEME.TEXT,
+	TextColor3=colors.text,
 	TextTransparency=1,
 	TextXAlignment=Enum.TextXAlignment.Left,
-	ZIndex=LOADER_Z+2,
+	ZIndex=loaderLayer+2,
 },loaderBox)
 
-local subtitleText=New("TextLabel",{
+local subtitleText=make("TextLabel",{
 	BackgroundTransparency=1,
 	Position=UDim2.fromOffset(0,42),
 	Size=UDim2.new(1,-88,0,18),
 	Text="loading files and gui",
 	Font=Enum.Font.Gotham,
 	TextSize=11,
-	TextColor3=THEME.MUTED,
+	TextColor3=colors.muted,
 	TextTransparency=1,
 	TextXAlignment=Enum.TextXAlignment.Left,
-	ZIndex=LOADER_Z+2,
+	ZIndex=loaderLayer+2,
 },loaderBox)
 
-loaderStatus=New("TextLabel",{
+loaderStatus=make("TextLabel",{
 	BackgroundTransparency=1,
 	Position=UDim2.fromOffset(0,84),
 	Size=UDim2.new(1,0,0,46),
 	Text="loading modules...",
 	Font=Enum.Font.Gotham,
 	TextSize=12,
-	TextColor3=THEME.MUTED,
+	TextColor3=colors.muted,
 	TextTransparency=1,
 	TextWrapped=true,
 	TextXAlignment=Enum.TextXAlignment.Left,
-	ZIndex=LOADER_Z+2,
+	ZIndex=loaderLayer+2,
 },loaderBox)
 
-loaderTrack=New("Frame",{
+loaderTrack=make("Frame",{
 	Position=UDim2.fromOffset(0,148),
 	Size=UDim2.new(1,0,0,12),
-	BackgroundColor3=THEME.PANEL,
+	BackgroundColor3=colors.panel,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ClipsDescendants=true,
-	ZIndex=LOADER_Z+2,
+	ZIndex=loaderLayer+2,
 },loaderBox)
-New("UICorner",{CornerRadius=UDim.new(0,0)},loaderTrack)
+make("UICorner",{CornerRadius=UDim.new(0,0)},loaderTrack)
 
-loaderTrackStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=1},loaderTrack)
+loaderTrackStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=1},loaderTrack)
 
-loaderFill=New("Frame",{
+loaderFill=make("Frame",{
 	Size=UDim2.new(0,0,1,0),
-	BackgroundColor3=THEME.GREEN,
+	BackgroundColor3=colors.green,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
-	ZIndex=LOADER_Z+3,
+	ZIndex=loaderLayer+3,
 },loaderTrack)
-New("UICorner",{CornerRadius=UDim.new(0,0)},loaderFill)
+make("UICorner",{CornerRadius=UDim.new(0,0)},loaderFill)
 
-loaderFillGlow=New("Frame",{
+loaderFillGlow=make("Frame",{
 	Size=UDim2.new(0,0,1,0),
-	BackgroundColor3=THEME.GREEN,
+	BackgroundColor3=colors.green,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
-	ZIndex=LOADER_Z+2,
+	ZIndex=loaderLayer+2,
 },loaderTrack)
-New("UICorner",{CornerRadius=UDim.new(0,0)},loaderFillGlow)
+make("UICorner",{CornerRadius=UDim.new(0,0)},loaderFillGlow)
 
-loaderScan=New("Frame",{
+loaderScan=make("Frame",{
 	BackgroundColor3=Color3.fromRGB(255,255,255),
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	Position=UDim2.new(0,-72,0,0),
 	Size=UDim2.fromOffset(72,12),
-	ZIndex=LOADER_Z+4,
+	ZIndex=loaderLayer+4,
 },loaderTrack)
 
-New("UIGradient",{
+make("UIGradient",{
 	Transparency=NumberSequence.new({
 		NumberSequenceKeypoint.new(0,1),
 		NumberSequenceKeypoint.new(0.45,0.34),
@@ -1034,70 +1075,70 @@ New("UIGradient",{
 	}),
 },loaderScan)
 
-loaderPulse=New("Frame",{
+loaderPulse=make("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,0,0.5,0),
 	Size=UDim2.fromOffset(480,320),
-	BackgroundColor3=THEME.GREEN,
+	BackgroundColor3=colors.green,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
-	ZIndex=LOADER_Z,
+	ZIndex=loaderLayer,
 },loaderOverlay)
-New("UICorner",{CornerRadius=UDim.new(0,0)},loaderPulse)
+make("UICorner",{CornerRadius=UDim.new(0,0)},loaderPulse)
 
-loaderPercent=New("TextLabel",{
+loaderPercent=make("TextLabel",{
 	BackgroundTransparency=1,
 	Size=UDim2.new(1,0,1,0),
 	Text="0%",
 	Font=Enum.Font.GothamMedium,
 	TextSize=12,
-	TextColor3=THEME.TEXT,
+	TextColor3=colors.text,
 	TextTransparency=1,
 	TextXAlignment=Enum.TextXAlignment.Center,
-	ZIndex=LOADER_Z+3,
+	ZIndex=loaderLayer+3,
 },loaderPercentPill)
 
-loaderPhaseRow=New("Frame",{
+loaderPhaseRow=make("Frame",{
 	BackgroundTransparency=1,
 	Position=UDim2.fromOffset(0,190),
 	Size=UDim2.new(1,0,0,42),
-	ZIndex=LOADER_Z+2,
+	ZIndex=loaderLayer+2,
 },loaderBox)
 
 local phaseWidth=104
 local phaseGap=8
 for index,name in ipairs(loaderPhaseNames) do
-	local item=New("Frame",{
-		BackgroundColor3=THEME.PANEL,
+	local item=make("Frame",{
+		BackgroundColor3=colors.panel,
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset((index-1)*(phaseWidth+phaseGap),0),
 		Size=UDim2.fromOffset(phaseWidth,42),
-		ZIndex=LOADER_Z+2,
+		ZIndex=loaderLayer+2,
 	},loaderPhaseRow)
-	New("UICorner",{CornerRadius=UDim.new(0,0)},item)
-	local dot=New("Frame",{
+	make("UICorner",{CornerRadius=UDim.new(0,0)},item)
+	local dot=make("Frame",{
 		AnchorPoint=Vector2.new(0,0.5),
 		Position=UDim2.fromOffset(12,21),
 		Size=UDim2.fromOffset(8,8),
-		BackgroundColor3=THEME.MUTED,
+		BackgroundColor3=colors.muted,
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
-		ZIndex=LOADER_Z+3,
+		ZIndex=loaderLayer+3,
 	},item)
-	New("UICorner",{CornerRadius=UDim.new(0,0)},dot)
-	local label=New("TextLabel",{
+	make("UICorner",{CornerRadius=UDim.new(0,0)},dot)
+	local label=make("TextLabel",{
 		BackgroundTransparency=1,
 		Position=UDim2.fromOffset(30,0),
 		Size=UDim2.new(1,-38,1,0),
 		Text=name,
 		Font=Enum.Font.Gotham,
 		TextSize=11,
-		TextColor3=THEME.MUTED,
+		TextColor3=colors.muted,
 		TextTransparency=1,
 		SkipTextRole=true,
 		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=LOADER_Z+3,
+		ZIndex=loaderLayer+3,
 	},item)
 	loaderPhaseItems[index]={Frame=item,Dot=dot,Label=label}
 end
@@ -1123,7 +1164,7 @@ local function loaderPhaseFromStatus(text,current,total)
 		return 2
 	end
 
-	local pct=(tonumber(current) or 0)/math.max(tonumber(total) or LOADER_TOTAL,1)
+	local pct=(tonumber(current) or 0)/math.max(tonumber(total) or loaderStepTotal,1)
 	if pct>=0.94 then return 4 end
 	if pct>=0.46 then return 3 end
 	if pct>=0.12 then return 2 end
@@ -1132,14 +1173,14 @@ end
 
 local function setLoaderPhase(activeIndex,isProblem)
 	activeIndex=math.clamp(tonumber(activeIndex) or 1,1,#loaderPhaseNames)
-	local activeColor=isProblem and THEME.RED or THEME.GREEN
+	local activeColor=isProblem and colors.red or colors.green
 
 	for index,item in ipairs(loaderPhaseItems) do
 		local completed=index<activeIndex
 		local active=index==activeIndex
-		local itemBg=active and activeColor or THEME.PANEL
-		local dotBg=(completed or active) and activeColor or THEME.MUTED
-		local textColor=(completed or active) and THEME.TEXT or THEME.MUTED
+		local itemBg=active and activeColor or colors.panel
+		local dotBg=(completed or active) and activeColor or colors.muted
+		local textColor=(completed or active) and colors.text or colors.muted
 		local bgTransparency=active and 0.08 or 0.36
 		local dotTransparency=(completed or active) and 0 or 0.42
 
@@ -1199,28 +1240,28 @@ showLoader()
 function setLoaderProgress(text,current,total,isProblem)
 	if not loaderOverlay or not loaderOverlay.Parent then return end
 
-	current=math.clamp(tonumber(current) or 0,0,tonumber(total) or LOADER_TOTAL)
-	total=math.max(tonumber(total) or LOADER_TOTAL,1)
+	current=math.clamp(tonumber(current) or 0,0,tonumber(total) or loaderStepTotal)
+	total=math.max(tonumber(total) or loaderStepTotal,1)
 
 	local pct=math.clamp(current/total,0,1)
 	loaderStatus.Text=tostring(text or "loading...")
-	loaderStatus.TextColor3=isProblem and THEME.RED or THEME.MUTED
+	loaderStatus.TextColor3=isProblem and colors.red or colors.muted
 	loaderPercent.Text=math.floor(pct*100+0.5).."%"
-	loaderFill.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
-	loaderFillGlow.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
+	loaderFill.BackgroundColor3=isProblem and colors.red or colors.green
+	loaderFillGlow.BackgroundColor3=isProblem and colors.red or colors.green
 	if loaderPercentPillStroke then
-		TweenService:Create(loaderPercentPillStroke,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=isProblem and THEME.RED or THEME.STROKE,Transparency=isProblem and 0.08 or 0.35}):Play()
+		TweenService:Create(loaderPercentPillStroke,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=isProblem and colors.red or colors.stroke,Transparency=isProblem and 0.08 or 0.35}):Play()
 	end
 	TweenService:Create(loaderFill,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
 	TweenService:Create(loaderFillGlow,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
 	setLoaderPhase(loaderPhaseFromStatus(text,current,total),isProblem)
 
 	if loaderAccent then
-		loaderAccent.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
+		loaderAccent.BackgroundColor3=isProblem and colors.red or colors.green
 	end
 
 	if loaderPulse then
-		loaderPulse.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
+		loaderPulse.BackgroundColor3=isProblem and colors.red or colors.green
 		loaderPulse.BackgroundTransparency=0.95
 		loaderPulse.Size=UDim2.fromOffset(480,320)
 		TweenService:Create(loaderPulse,TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
@@ -1230,9 +1271,9 @@ function setLoaderProgress(text,current,total,isProblem)
 	end
 
 	if isProblem and loaderBoxStroke then
-		TweenService:Create(loaderBoxStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=THEME.RED,Transparency=0}):Play()
+		TweenService:Create(loaderBoxStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=colors.red,Transparency=0}):Play()
 	else
-		TweenService:Create(loaderBoxStroke,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=THEME.STROKE,Transparency=0}):Play()
+		TweenService:Create(loaderBoxStroke,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=colors.stroke,Transparency=0}):Play()
 	end
 end
 
@@ -1241,7 +1282,7 @@ function finishLoader()
 
 	titleText.Text="ready"
 	subtitleText.Text=""
-	setLoaderProgress("all loaded",LOADER_TOTAL,LOADER_TOTAL,false)
+	setLoaderProgress("all loaded",loaderStepTotal,loaderStepTotal,false)
 
 	playLoaderKeyframes({
 		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.18,{BackgroundTransparency=0.88,Size=UDim2.fromOffset(540,374)}},
@@ -1276,20 +1317,20 @@ end
 
 function loadRemoteModuleStep(name,path)
 	loaderCurrent=loaderCurrent+1
-	local cached=REMOTE_MODULE_CACHE[path]
+	local cached=moduleCache[path]
 	if cached then
-		setLoaderProgress("cached module loaded",loaderCurrent,LOADER_TOTAL,false)
+		setLoaderProgress("cached module loaded",loaderCurrent,loaderStepTotal,false)
 		return cached
 	end
 
-	setLoaderProgress("Fetching required module.",loaderCurrent-0.35,LOADER_TOTAL,false)
+	setLoaderProgress("Fetching required module.",loaderCurrent-0.35,loaderStepTotal,false)
 	local loadedModule=loadRemoteModule(path)
-	setLoaderProgress(loadedModule and "module loaded" or "module missing",loaderCurrent,LOADER_TOTAL,not loadedModule)
+	setLoaderProgress(loadedModule and "module loaded" or "module missing",loaderCurrent,loaderStepTotal,not loadedModule)
 	return loadedModule
 end
 
 function loadRemoteModuleStepByName(name)
-	local path=MODULE_PATHS[name]
+	local path=modulePaths[name]
 	if not path then
 		warn("module path missing:",name)
 		return nil
@@ -1304,60 +1345,60 @@ function loadDeferredModule(name,path,current)
 	end
 
 	local loadedModule=loadRemoteModule(path)
-	if not loadedModule and not OPTIONAL_MODULE_PATH_SET[path] then
+	if not loadedModule and not optionalModuleFileSet[path] then
 		warn("deferred module missing:",name,path)
 	end
 	return loadedModule
 end
 
-local batchLoaded,batchErr=loadRemoteModuleBatch(STARTUP_MODULE_PATHS)
+local batchLoaded,batchErr=loadRemoteModuleBatch(startupModuleFiles)
 if not batchLoaded then
 	warn("batch missing, loading one by one:",batchErr)
 end
 
-for _,name in ipairs(STARTUP_MODULE_NAMES) do
+for _,name in ipairs(startupModuleNames) do
 	loadRemoteModuleStepByName(name)
 end
 
 function installRuntimeArchitecture()
 	if CoreScope and CoreScope.new then
-		RUNTIME_ROOT_SCOPE=RUNTIME_ROOT_SCOPE or CoreScope.new("runtime",function(err,scopeName)
+		runtimeScope=runtimeScope or CoreScope.new("runtime",function(err,scopeName)
 			warn("cleanup failed:",scopeName,err)
 		end)
 
-		RuntimeJanitor={}
-		RuntimeJanitor.__index=RuntimeJanitor
+		cleanupBags={}
+		cleanupBags.__index=cleanupBags
 
-		function RuntimeJanitor.new(name)
+		function cleanupBags.new(name)
 			return setmetatable({_scope=CoreScope.new(name or "janitor",function(err,scopeName)
 				warn("janitor cleanup failed:",scopeName,err)
-			end)},RuntimeJanitor)
+			end)},cleanupBags)
 		end
 
-		function RuntimeJanitor:Add(item)
+		function cleanupBags:Add(item)
 			return self._scope:add(item)
 		end
 
-		function RuntimeJanitor:Cleanup()
+		function cleanupBags:Cleanup()
 			self._scope:cleanup()
 		end
 
-		function RuntimeJanitor:Destroy()
+		function cleanupBags:Destroy()
 			self._scope:destroy()
 		end
 	end
 
 	if CoreScheduler and CoreScheduler.new then
-		local scheduler=CoreScheduler.new(RunService,RUNTIME_ROOT_SCOPE)
+		local scheduler=CoreScheduler.new(RunService,runtimeScope)
 		local handles={}
 
-		RuntimeScheduler={}
+		jobRunner={}
 
 		local function schedulerKey(kind,id)
 			return tostring(kind or "Heartbeat")..":"..tostring(id or "")
 		end
 
-		function RuntimeScheduler.Register(kind,id,interval,fn)
+		function jobRunner.Register(kind,id,interval,fn)
 			kind=tostring(kind or "Heartbeat")
 			id=tostring(id or "")
 			interval=math.max(tonumber(interval) or 0,0)
@@ -1366,7 +1407,7 @@ function installRuntimeArchitecture()
 				return false
 			end
 
-			RuntimeScheduler.Unregister(kind,id)
+			jobRunner.Unregister(kind,id)
 
 			local key=schedulerKey(kind,id)
 			local state={enabled=true,elapsed=0}
@@ -1390,23 +1431,23 @@ function installRuntimeArchitecture()
 
 			local handle
 			if kind=="RenderStepped" then
-				handle=scheduler:onRender(key,0,run,RUNTIME_ROOT_SCOPE)
+				handle=scheduler:onRender(key,0,run,runtimeScope)
 			else
-				handle=scheduler:onHeartbeat(key,0,run,RUNTIME_ROOT_SCOPE)
+				handle=scheduler:onHeartbeat(key,0,run,runtimeScope)
 			end
 
 			handles[key]={handle=handle,state=state}
 			return true
 		end
 
-		function RuntimeScheduler.SetEnabled(kind,id,enabled)
+		function jobRunner.SetEnabled(kind,id,enabled)
 			local entry=handles[schedulerKey(kind,id)]
 			if entry then
 				entry.state.enabled=enabled and true or false
 			end
 		end
 
-		function RuntimeScheduler.Unregister(kind,id)
+		function jobRunner.Unregister(kind,id)
 			local key=schedulerKey(kind,id)
 			local entry=handles[key]
 			if entry then
@@ -1417,7 +1458,7 @@ function installRuntimeArchitecture()
 			end
 		end
 
-		function RuntimeScheduler.Count()
+		function jobRunner.Count()
 			local count=0
 			for _ in pairs(handles) do
 				count=count+1
@@ -1425,20 +1466,20 @@ function installRuntimeArchitecture()
 			return count
 		end
 
-		function RuntimeScheduler.Stats()
+		function jobRunner.Stats()
 			if scheduler and scheduler.stats then
 				return scheduler:stats()
 			end
 			return{}
 		end
 
-		function RuntimeScheduler.ResetStats()
+		function jobRunner.ResetStats()
 			if scheduler and scheduler.resetStats then
 				scheduler:resetStats()
 			end
 		end
 
-		function RuntimeScheduler.Destroy()
+		function jobRunner.Destroy()
 			for key,entry in pairs(handles) do
 				if entry.handle and entry.handle.cancel then
 					entry.handle:cancel()
@@ -1450,30 +1491,30 @@ function installRuntimeArchitecture()
 	end
 
 	if CorePlayerCache and CorePlayerCache.new then
-		RuntimePlayerCache=CorePlayerCache.new(Players,Workspace,RUNTIME_ROOT_SCOPE)
+		playerTracker=CorePlayerCache.new(Players,Workspace,runtimeScope)
 	end
 
 	if CoreBallTracker and CoreBallTracker.new then
-		RuntimeBallTracker=CoreBallTracker.new(Players,Workspace,RuntimePlayerCache,RUNTIME_ROOT_SCOPE)
+		ballTracker=CoreBallTracker.new(Players,Workspace,playerTracker,runtimeScope)
 	end
 
 	if StateStore and StateStore.new then
 		local store=StateStore.new()
-		RuntimeStateStore={dirty=false,Store=store}
+		settingsStore={dirty=false,storeApi=store}
 
-		function RuntimeStateStore.CreateSlice(config)
+		function settingsStore.CreateSlice(config)
 			return store:createSlice(config)
 		end
 
-		function RuntimeStateStore.GetSlice(name)
+		function settingsStore.GetSlice(name)
 			return store:getSlice(name)
 		end
 
-		function RuntimeStateStore.Snapshot()
+		function settingsStore.Snapshot()
 			return store:snapshot()
 		end
 
-		function RuntimeStateStore.Get(bucket,key,default)
+		function settingsStore.Get(bucket,key,default)
 			local root=getfenv()[bucket]
 			if type(root)=="table" and root[key]~=nil then
 				return root[key]
@@ -1481,11 +1522,11 @@ function installRuntimeArchitecture()
 			return default
 		end
 
-		function RuntimeStateStore.Set(bucket,key,value)
+		function settingsStore.Set(bucket,key,value)
 			local env=getfenv()
 			env[bucket]=type(env[bucket])=="table" and env[bucket] or {}
 			env[bucket][key]=value
-			RuntimeStateStore.dirty=true
+			settingsStore.dirty=true
 			if requestPlayerAutosave then
 				requestPlayerAutosave()
 			end
@@ -1493,9 +1534,9 @@ function installRuntimeArchitecture()
 		end
 	end
 
-	RuntimeThemeStore={
-		Tokens=DesignTokens,
-		Resolver=DesignThemeResolver,
+	themeRuntime={
+		designTokens=DesignTokens,
+		themeResolver=DesignThemeResolver,
 		Themes={
 			dark=DesignThemeDark,
 			light=DesignThemeLight,
@@ -1506,33 +1547,33 @@ function installRuntimeArchitecture()
 		}
 	}
 
-	function RuntimeThemeStore.Resolve(id,overrides)
-		local theme=RuntimeThemeStore.Themes and RuntimeThemeStore.Themes[tostring(id or "dark"):lower()]
+	function themeRuntime.Resolve(id,overrides)
+		local theme=themeRuntime.Themes and themeRuntime.Themes[tostring(id or "dark"):lower()]
 		if DesignThemeResolver and DesignThemeResolver.resolve and theme then
 			return DesignThemeResolver.resolve(theme,overrides)
 		end
 		return nil
 	end
 
-	function RuntimeThemeStore.Apply()
+	function themeRuntime.Apply()
 		if applyUIStrokeTheme then
 			pcall(applyUIStrokeTheme)
 		end
 	end
 
-	function RuntimeThemeStore.RefreshObject(instance)
+	function themeRuntime.RefreshObject(instance)
 		if instance and registerThemeObject then
 			registerThemeObject(instance)
 		end
 	end
 
-	RuntimeServices={
-		Janitor=RuntimeJanitor,
-		Scheduler=RuntimeScheduler,
-		StateStore=RuntimeStateStore,
-		ThemeStore=RuntimeThemeStore,
-		PlayerCache=RuntimePlayerCache,
-		BallTracker=RuntimeBallTracker
+	sharedRuntime={
+		Janitor=cleanupBags,
+		schedulerApi=jobRunner,
+		StateStore=settingsStore,
+		ThemeStore=themeRuntime,
+		playerCacheApi=playerTracker,
+		ballTrackerApi=ballTracker
 	}
 end
 
@@ -1541,8 +1582,8 @@ installRuntimeArchitecture()
 function runLoaderCheck()
 	local missing={}
 
-	for name,path in pairs(MODULE_PATHS) do
-		if STARTUP_MODULE_PATH_SET[path] and not OPTIONAL_MODULE_PATH_SET[path] and not REMOTE_MODULE_CACHE[path] then
+	for name,path in pairs(modulePaths) do
+		if startupModuleFileSet[path] and not optionalModuleFileSet[path] and not moduleCache[path] then
 			table.insert(missing,name.." ("..path..")")
 		end
 	end
@@ -1550,22 +1591,22 @@ function runLoaderCheck()
 	if #missing>0 then
 		table.sort(missing)
 		warn("missing modules:",table.concat(missing,", "))
-		setLoaderProgress("modules missing. press update, then run again.",LOADER_TOTAL,LOADER_TOTAL,true)
+		setLoaderProgress("modules missing. press update, then run again.",loaderStepTotal,loaderStepTotal,true)
 		return false
 	else
 		warn("loader check done: all modules loaded")
-		setLoaderProgress("Verified startup modules.",#STARTUP_MODULE_PATHS,LOADER_TOTAL,false)
+		setLoaderProgress("Verified startup modules.",#startupModuleFiles,loaderStepTotal,false)
 		return true
 	end
 end
 
-LOADER_MODULES_READY=runLoaderCheck()
+modulesLoadedAtBoot=runLoaderCheck()
 
 local function styleByte(name,fallback)
-	return math.clamp(math.floor((tonumber(UI_STYLE[name]) or fallback)+0.5),0,255)
+	return math.clamp(math.floor((tonumber(style[name]) or fallback)+0.5),0,255)
 end
 
-local STYLE_COLOR_DEFAULTS={Stroke={182,180,180},Gradient={182,180,180},Primary={12,12,12}}
+local styleColorDefaults={Stroke={182,180,180},Gradient={182,180,180},Primary={12,12,12}}
 
 local function styleColor(prefix,defaults)
 	return Color3.fromRGB(
@@ -1576,15 +1617,15 @@ local function styleColor(prefix,defaults)
 end
 
 function getUIStrokeColor()
-	return styleColor("Stroke",STYLE_COLOR_DEFAULTS.Stroke)
+	return styleColor("Stroke",styleColorDefaults.Stroke)
 end
 
 function getUIStrokeGradientColor()
-	return styleColor("Gradient",STYLE_COLOR_DEFAULTS.Gradient)
+	return styleColor("Gradient",styleColorDefaults.Gradient)
 end
 
 function getUIPrimaryColor()
-	return styleColor("Primary",STYLE_COLOR_DEFAULTS.Primary)
+	return styleColor("Primary",styleColorDefaults.Primary)
 end
 
 UILibOriginalModule={
@@ -1645,7 +1686,7 @@ UILibOriginalModule={
 		ESPDefenseClosedFillR=254,ESPDefenseClosedFillG=94,ESPDefenseClosedFillB=86,ESPDefenseClosedOutlineR=254,ESPDefenseClosedOutlineG=94,ESPDefenseClosedOutlineB=86,ESPDefenseClosedFillTransparency=0.5,ESPDefenseClosedOutlineTransparency=0,
 		QBAimHighlightFillR=21,QBAimHighlightFillG=103,QBAimHighlightFillB=251,QBAimHighlightOutlineR=32,QBAimHighlightOutlineG=202,QBAimHighlightOutlineB=106,QBAimHighlightFillTransparency=0.65,QBAimHighlightOutlineTransparency=0,
 	},
-	MainFrame={
+	mainFrame={
 		Window={W=880,H=540,MinW=560,MinH=360,MaxW=1220,MaxH=820,StartY=80,MinimizedH=68},
 		Layout={RootPadding=8,MainGap=8,PageGap=8,ColumnGap=8,FooterGap=8,HeaderHeight=52,PageBarHeight=30,PageTabWidth=106,PageTabHeight=28,FooterHeight=34,TopButtonSize=28,TopButtonGap=6,TopButtonOuter=10},
 	},
@@ -1680,7 +1721,7 @@ function getDefaultUIStyle()
 end
 
 function getDefaultUIWindow()
-	local window=UILibOriginalModule.MainFrame.Window
+	local window=UILibOriginalModule.mainFrame.Window
 	local result={}
 
 	for k,v in pairs(window) do
@@ -1691,7 +1732,7 @@ function getDefaultUIWindow()
 end
 
 function applyDefaultUIStyleFields(style,force)
-	style=style or UI_STYLE
+	style=style or style
 	local defaults=getDefaultUIStyle()
 
 	for k,v in pairs(defaults) do
@@ -1706,7 +1747,7 @@ function applyDefaultUIStyleFields(style,force)
 end
 
 function applyDefaultUIWindowFields(window,force)
-	window=window or UI_WINDOW
+	window=window or windowState
 	local defaults=getDefaultUIWindow()
 
 	for k,v in pairs(defaults) do
@@ -1718,8 +1759,8 @@ function applyDefaultUIWindowFields(window,force)
 	return window
 end
 
-applyDefaultUIStyleFields(UI_STYLE,false)
-applyDefaultUIWindowFields(UI_WINDOW,false)
+applyDefaultUIStyleFields(style,false)
+applyDefaultUIWindowFields(windowState,false)
 
 function refreshThemePalette()
 	local primary=getUIPrimaryColor()
@@ -1728,45 +1769,45 @@ function refreshThemePalette()
 	local away=lum<0.52 and Color3.new(0,0,0) or Color3.new(1,1,1)
 	local function applyReadableText(surfaceLum)
 		if surfaceLum<=0.16 then
-			THEME.TEXT=Color3.fromRGB(248,248,248)
-			THEME.MUTED=Color3.fromRGB(184,184,184)
+			colors.text=Color3.fromRGB(248,248,248)
+			colors.muted=Color3.fromRGB(184,184,184)
 		elseif surfaceLum>=0.78 then
-			THEME.TEXT=Color3.fromRGB(10,10,10)
-			THEME.MUTED=Color3.fromRGB(60,60,60)
+			colors.text=Color3.fromRGB(10,10,10)
+			colors.muted=Color3.fromRGB(60,60,60)
 		elseif surfaceLum<0.58 then
-			THEME.TEXT=Color3.fromRGB(236,238,246)
-			THEME.MUTED=Color3.fromRGB(176,176,184)
+			colors.text=Color3.fromRGB(236,238,246)
+			colors.muted=Color3.fromRGB(176,176,184)
 		else
-			THEME.TEXT=Color3.fromRGB(20,22,28)
-			THEME.MUTED=Color3.fromRGB(76,76,82)
+			colors.text=Color3.fromRGB(20,22,28)
+			colors.muted=Color3.fromRGB(76,76,82)
 		end
 	end
 
-	THEME.BG=primary
-	THEME.PANEL=primary:Lerp(toward,lum<0.52 and 0.07 or 0.09)
-	THEME.CARD=primary:Lerp(toward,lum<0.52 and 0.12 or 0.16)
+	colors.bg=primary
+	colors.panel=primary:Lerp(toward,lum<0.52 and 0.07 or 0.09)
+	colors.card=primary:Lerp(toward,lum<0.52 and 0.12 or 0.16)
 	applyReadableText(lum)
-	THEME.ACC=THEME.GREEN
+	colors.accent=colors.green
 
 	if lum>=0.72 then
-		THEME.PANEL=primary:Lerp(away,0.04)
-		THEME.CARD=primary:Lerp(away,0.08)
+		colors.panel=primary:Lerp(away,0.04)
+		colors.card=primary:Lerp(away,0.08)
 	end
 
-	THEME.TOPBAR=THEME.BG
-	THEME.SECTION=THEME.CARD
-	THEME.BUTTON=THEME.PANEL
-	THEME.INPUT=THEME.PANEL
-	THEME.SLIDER_BG=THEME.PANEL
-	THEME.SLIDER_FILL=THEME.STROKE
-	THEME.STROKE_SOFT=THEME.CARD:Lerp(toward,lum<0.52 and 0.18 or 0.12)
+	colors.topbar=colors.bg
+	colors.section=colors.card
+	colors.button=colors.panel
+	colors.input=colors.panel
+	colors.sliderBg=colors.panel
+	colors.sliderFill=colors.stroke
+	colors.softStroke=colors.card:Lerp(toward,lum<0.52 and 0.18 or 0.12)
 
-	local libId=tostring(UI_STYLE.UILib or "original"):lower()
+	local libId=tostring(style.UILib or "original"):lower()
 	local libStyle=getUILibRuntimeStyle(libId)
 	local libTheme=libStyle and libStyle.Theme or {}
 
 	for role,color in pairs(libTheme) do
-		THEME[role]=color
+		colors[role]=color
 	end
 
 	local tones=libStyle and libStyle.Tones
@@ -1780,63 +1821,63 @@ function refreshThemePalette()
 			return primary:Lerp(away,-amount)
 		end
 
-		THEME.BG=surface(0)
-		THEME.TOPBAR=surface(tones.topbar)
-		THEME.PANEL=surface(tones.panel)
-		THEME.CARD=surface(tones.card)
-		THEME.SECTION=surface(tones.section)
-		THEME.BUTTON=surface(tones.button)
-		THEME.INPUT=surface(tones.input)
-		THEME.SLIDER_BG=tones.sliderAccent and accent:Lerp(primary,tones.sliderBlend or 0.5) or surface(tones.sliderBg)
-		THEME.SLIDER_FILL=accent
-		THEME.STROKE_SOFT=surface(tones.strokeSoft)
+		colors.bg=surface(0)
+		colors.topbar=surface(tones.topbar)
+		colors.panel=surface(tones.panel)
+		colors.card=surface(tones.card)
+		colors.section=surface(tones.section)
+		colors.button=surface(tones.button)
+		colors.input=surface(tones.input)
+		colors.sliderBg=tones.sliderAccent and accent:Lerp(primary,tones.sliderBlend or 0.5) or surface(tones.sliderBg)
+		colors.sliderFill=accent
+		colors.softStroke=surface(tones.strokeSoft)
 
-		local textLum=(THEME.BG.R*0.2126)+(THEME.BG.G*0.7152)+(THEME.BG.B*0.0722)
+		local textLum=(colors.bg.R*0.2126)+(colors.bg.G*0.7152)+(colors.bg.B*0.0722)
 		applyReadableText(textLum)
 	end
 
-	THEME.ACC=THEME.SLIDER_FILL or THEME.GREEN
-	UI_STYLE.CornerRadius=(libStyle.Shape and libStyle.Shape.WindowRadius) or 0
+	colors.accent=colors.sliderFill or colors.green
+	style.CornerRadius=(libStyle.Shape and libStyle.Shape.WindowRadius) or 0
 end
 
 function applyUIPrimaryTheme()
 	refreshThemePalette()
 
-	if not SG then return end
+	if not screenGui then return end
 
-	for instance in pairs(THEMED_GUI_OBJECTS) do
+	for instance in pairs(themeObjects) do
 		if not instance.Parent then
-			THEMED_GUI_OBJECTS[instance]=nil
-		elseif instance:IsDescendantOf(SG) then
+			themeObjects[instance]=nil
+		elseif instance:IsDescendantOf(screenGui) then
 			local role=instance:GetAttribute("ThemeRole")
-			if role and THEME[role] then
-				instance.BackgroundColor3=THEME[role]
+			if role and colors[role] then
+				instance.BackgroundColor3=colors[role]
 			end
 		end
 	end
 
-	for instance in pairs(THEMED_TEXT_OBJECTS) do
+	for instance in pairs(themeTextObjects) do
 		if not instance.Parent then
-			THEMED_TEXT_OBJECTS[instance]=nil
-		elseif instance:IsDescendantOf(SG) then
+			themeTextObjects[instance]=nil
+		elseif instance:IsDescendantOf(screenGui) then
 			local textRole=instance:GetAttribute("ThemeTextRole")
 			if not textRole and not instance:GetAttribute("SkipTextRole") then
 				textRole="TEXT"
 				instance:SetAttribute("ThemeTextRole",textRole)
 			end
-			if textRole and THEME[textRole] and not instance:GetAttribute("SkipTextRole") then
-				instance.TextColor3=THEME[textRole]
+			if textRole and colors[textRole] and not instance:GetAttribute("SkipTextRole") then
+				instance.TextColor3=colors[textRole]
 			end
 		end
 	end
 end
 
 liquidStrokeConn=nil
-MainFrame=nil
+mainFrame=nil
 applyUIStrokeTheme=nil
 
 function destroyKnownGuiResidue()
-	local guiNames={"HitboxUI_DarkInfluenced_GUIOnly","1",SG_NAME or "HitboxUI"}
+	local guiNames={"HitboxUI_DarkInfluenced_GUIOnly","1",screenGuiName or "HitboxUI"}
 	local parents={guiParent}
 
 	for _,parent in ipairs(parents) do
@@ -1878,14 +1919,14 @@ end
 function cleanupForManualReload()
 	toolAlive=false
 
-	if PAGE1_APIS then
-		for key,api in pairs(PAGE1_APIS) do
+	if mainPageApis then
+		for key,api in pairs(mainPageApis) do
 			if api and api.Destroy then
 				pcall(function()
 					api.Destroy()
 				end)
 			end
-			PAGE1_APIS[key]=nil
+			mainPageApis[key]=nil
 		end
 	end
 
@@ -1916,9 +1957,9 @@ function cleanupForManualReload()
 		end)
 	end
 
-	if MainFrame and MainFrame.Destroy then
+	if mainFrame and mainFrame.Destroy then
 		pcall(function()
-			MainFrame.Destroy()
+			mainFrame.Destroy()
 		end)
 	end
 
@@ -1938,13 +1979,13 @@ function cleanupForManualReload()
 end
 
 function refreshRemoteModulesNow()
-	local result=BOT_API.Post("/module/get",{path=MANUAL_REFRESH_RELOAD_PATH})
+	local result=botApi.Post("/module/get",{path=manualReloadPath})
 	if not result or not result.ok or type(result.source)~="string" then
 		warn("update failed:",result and result.error or "unknown")
 		return false
 	end
 
-	local verified,verifyErr=verifyRemoteModuleSource(MANUAL_REFRESH_RELOAD_PATH,result.source)
+	local verified,verifyErr=verifyRemoteModuleSource(manualReloadPath,result.source)
 	if not verified then
 		warn("update blocked:",verifyErr)
 		return false
@@ -1972,12 +2013,12 @@ function exposeManualModuleRefresh()
 	local refresh=function()
 		return refreshRemoteModulesNow()
 	end
-	_G.HB_REFRESH_MODULES=refresh
+	_G.refreshModules=refresh
 
 	if type(getgenv)=="function" then
 		local ok,env=pcall(getgenv)
 		if ok and type(env)=="table" then
-			env.HB_REFRESH_MODULES=refresh
+			env.refreshModules=refresh
 		end
 	end
 end
@@ -1995,12 +2036,12 @@ function stopLiquidStrokeAnimation()
 end
 
 function updateLiquidStrokeAnimation()
-	if not UI_STYLE.LiquidStroke then
+	if not style.LiquidStroke then
 		stopLiquidStrokeAnimation()
 		return
 	end
 
-	local speed=tonumber(UI_STYLE.LiquidStrokeSpeed) or 1
+	local speed=tonumber(style.LiquidStrokeSpeed) or 1
 	if speed<=0 then
 		stopLiquidStrokeAnimation()
 		return
@@ -2014,12 +2055,12 @@ function updateLiquidStrokeAnimation()
 	local elapsed=0
 
 	liquidStrokeConn=trackRuntimeConnection(RunService.RenderStepped:Connect(function(dt)
-		if not toolAlive or not SG or not SG.Parent or not UI_STYLE.LiquidStroke then
+		if not toolAlive or not screenGui or not screenGui.Parent or not style.LiquidStroke then
 			stopLiquidStrokeAnimation()
 			return
 		end
 
-		local currentSpeed=tonumber(UI_STYLE.LiquidStrokeSpeed) or 1
+		local currentSpeed=tonumber(style.LiquidStrokeSpeed) or 1
 		if currentSpeed<=0 then
 			stopLiquidStrokeAnimation()
 			return
@@ -2034,13 +2075,13 @@ function updateLiquidStrokeAnimation()
 
 		elapsed=0
 
-		local direction=tostring(UI_STYLE.LiquidStrokeDirection or "Right")
+		local direction=tostring(style.LiquidStrokeDirection or "Right")
 		local wave=math.sin(math.rad(t*2))*0.25
 
-		for instance in pairs(LIQUID_STROKE_GRADIENTS) do
+		for instance in pairs(strokeGradients) do
 			if not instance.Parent then
-				LIQUID_STROKE_GRADIENTS[instance]=nil
-			elseif instance:IsDescendantOf(SG) and instance:IsA("UIGradient") and instance.Name=="StrokeGradient" then
+				strokeGradients[instance]=nil
+			elseif instance:IsDescendantOf(screenGui) and instance:IsA("UIGradient") and instance.Name=="StrokeGradient" then
 				if direction=="Right" then
 					instance.Rotation=0
 					instance.Offset=Vector2.new(wave,0)
@@ -2143,31 +2184,31 @@ applyUIStrokeTheme=function()
 	local color=getUIStrokeColor()
 	local color2=color
 	local strokeHideTransparency=0.86
-	UI_STYLE.StrokeGradient=false
-	THEME.STROKE=color
+	style.StrokeGradient=false
+	colors.stroke=color
 	applyUIPrimaryTheme()
 
-	if not SG then return end
+	if not screenGui then return end
 
-	local libShape=(getUILibRuntimeStyle(UI_STYLE.UILib) or {}).Shape or {}
+	local libShape=(getUILibRuntimeStyle(style.UILib) or {}).Shape or {}
 
-	for instance in pairs(THEMED_STROKES) do
+	for instance in pairs(themeStrokes) do
 		if not instance.Parent then
-			THEMED_STROKES[instance]=nil
-		elseif instance:IsDescendantOf(SG) then
+			themeStrokes[instance]=nil
+		elseif instance:IsDescendantOf(screenGui) then
 			local role=resolveStrokeRole(instance)
 			if role~="Fixed" then
 				local accentRole=role=="Window" or role=="Accent"
-				local softColor=THEME.STROKE_SOFT or (THEME.CARD and THEME.CARD:Lerp(THEME.TEXT or color,0.12)) or color
+				local softColor=colors.softStroke or (colors.card and colors.card:Lerp(colors.text or color,0.12)) or color
 
 				instance.Color=accentRole and color or softColor
-				instance.Thickness=math.clamp(tonumber(UI_STYLE.StrokeThickness) or instance.Thickness,0,8)
+				instance.Thickness=math.clamp(tonumber(style.StrokeThickness) or instance.Thickness,0,8)
 				if instance:GetAttribute("BaseStrokeTransparency")==nil then
 					instance:SetAttribute("BaseStrokeTransparency",instance.Transparency)
 				end
 
 				local baseTransparency=tonumber(instance:GetAttribute("BaseStrokeTransparency")) or instance.Transparency
-				local styleTransparency=tonumber(UI_STYLE.StrokeTransparency) or 0.84
+				local styleTransparency=tonumber(style.StrokeTransparency) or 0.84
 				instance.Transparency=strokeTransparencyForRole(role,libShape,baseTransparency,styleTransparency)
 				pcall(function()
 					instance.Enabled=instance.Transparency<strokeHideTransparency and instance.Thickness>0
@@ -2179,15 +2220,15 @@ applyUIStrokeTheme=function()
 
 				local gradient=instance:FindFirstChild("StrokeGradient")
 
-				if UI_STYLE.LiquidStroke and accentRole then
+				if style.LiquidStroke and accentRole then
 					if not gradient then
 						gradient=Instance.new("UIGradient")
 						gradient.Name="StrokeGradient"
 						gradient.Parent=instance
 					end
-					LIQUID_STROKE_GRADIENTS[gradient]=true
+					strokeGradients[gradient]=true
 
-					if UI_STYLE.LiquidStroke then
+					if style.LiquidStroke then
 						gradient.Color=ColorSequence.new({
 							ColorSequenceKeypoint.new(0,color),
 							ColorSequenceKeypoint.new(0.45,color2),
@@ -2204,7 +2245,7 @@ applyUIStrokeTheme=function()
 					end
 				else
 					if gradient then
-						LIQUID_STROKE_GRADIENTS[gradient]=nil
+						strokeGradients[gradient]=nil
 						gradient:Destroy()
 					end
 				end
@@ -2212,18 +2253,18 @@ applyUIStrokeTheme=function()
 		end
 	end
 
-	for instance in pairs(THEMED_CORNERS) do
+	for instance in pairs(themeCorners) do
 		if not instance.Parent then
-			THEMED_CORNERS[instance]=nil
-		elseif instance:IsDescendantOf(SG) then
+			themeCorners[instance]=nil
+		elseif instance:IsDescendantOf(screenGui) then
 			local role=instance.Parent and instance.Parent:GetAttribute("CornerRole") or "Control"
 			instance.CornerRadius=UDim.new(0,strokeRoleRadius(role,libShape))
 		end
 	end
 
-	if MainFrame and MainFrame.RefreshTheme then
+	if mainFrame and mainFrame.RefreshTheme then
 		pcall(function()
-			MainFrame.RefreshTheme()
+			mainFrame.RefreshTheme()
 		end)
 	end
 
@@ -2232,8 +2273,8 @@ end
 
 function setUIVisible(state)
 	uiVisible=state and true or false
-	if SG and SG.Parent then
-		SG.Enabled=uiVisible
+	if screenGui and screenGui.Parent then
+		screenGui.Enabled=uiVisible
 	end
 end
 
@@ -2245,5 +2286,5 @@ function requireGuiModule(name,path,loadedModule)
 	error("loader failed: "..name.." did not load: "..path)
 end
 
-GuiLogicModule=requireGuiModule("GuiLogic",MODULE_PATHS.GuiLogic,GuiLogicModule)
-MainFrameModule=requireGuiModule("MainFrame",MODULE_PATHS.MainFrame,MainFrameModule)
+GuiLogicModule=requireGuiModule("GuiLogic",modulePaths.guiLogic,GuiLogicModule)
+MainFrameModule=requireGuiModule("MainFrame",modulePaths.mainFrame,MainFrameModule)

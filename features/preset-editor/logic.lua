@@ -1,12 +1,12 @@
 -- edits preset sizes and preset hotkeys.
 
-local PresetEditor={}
+local presetEditor={}
 
-function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
-	local New=app.New
-	local THEME=app.THEME
-	local PRESETS=app.PRESETS
-	local DEFAULT_PRESETS=app.DEFAULT_PRESETS
+function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
+	local make=app.New
+	local colors=app.colors
+	local hitboxPresets=app.hitboxPresets
+	local defaultHitboxPresets=app.defaultHitboxPresets
 	local fmtNumber=app.fmtNumber
 	local bindingToLabel=app.bindingToLabel
 	local wrapTextBox=app.wrapTextBox
@@ -48,7 +48,7 @@ function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
 			end
 		end
 
-		local p=PRESETS[index]
+		local p=hitboxPresets[index]
 		if not p then return end
 
 		p.size=Vector3.new(
@@ -76,8 +76,8 @@ function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
 			end
 		end
 
-		if PRESETS[index] then
-			PRESETS[index].key=binding or Enum.KeyCode.Unknown
+		if hitboxPresets[index] then
+			hitboxPresets[index].key=binding or Enum.KeyCode.Unknown
 		end
 
 		if app.requestPlayerAutosave then
@@ -99,9 +99,9 @@ function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
 			end
 		end
 
-		if PRESETS[index] and DEFAULT_PRESETS[index] then
-			PRESETS[index].key=DEFAULT_PRESETS[index].key
-			PRESETS[index].size=DEFAULT_PRESETS[index].size
+		if hitboxPresets[index] and defaultHitboxPresets[index] then
+			hitboxPresets[index].key=defaultHitboxPresets[index].key
+			hitboxPresets[index].size=defaultHitboxPresets[index].size
 		end
 
 		if app.requestPlayerAutosave then
@@ -114,18 +114,18 @@ function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
 			return app.makeBox(parent,w,textValue,placeholder)
 		end
 
-		local normalBg=THEME.INPUT or THEME.PANEL
-		local b=New("TextBox",{Size=UDim2.fromOffset(w,28),BackgroundColor3=normalBg,BorderSizePixel=0,ClearTextOnFocus=false,Text=textValue or"",PlaceholderText=placeholder or"",Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,PlaceholderColor3=THEME.MUTED,ZIndex=6,ThemeRole="INPUT"},parent)
+		local normalBg=colors.input or colors.panel
+		local b=make("TextBox",{Size=UDim2.fromOffset(w,28),BackgroundColor3=normalBg,BorderSizePixel=0,ClearTextOnFocus=false,Text=textValue or"",PlaceholderText=placeholder or"",Font=Enum.Font.Gotham,TextSize=13,TextColor3=colors.text,PlaceholderColor3=colors.muted,ZIndex=6,ThemeRole="INPUT"},parent)
 		local wrap,stroke=wrapTextBox(b,normalBg,2)
 		wrap:SetAttribute("ThemeRole","INPUT")
 
 		connect(b.Focused,function()
-			wrap.BackgroundColor3=THEME.INPUT or THEME.PANEL
+			wrap.BackgroundColor3=colors.input or colors.panel
 			stroke.Thickness=2
 		end)
 
 		connect(b.FocusLost,function()
-			wrap.BackgroundColor3=THEME.INPUT or THEME.PANEL
+			wrap.BackgroundColor3=colors.input or colors.panel
 			stroke.Thickness=2
 		end)
 
@@ -136,7 +136,7 @@ function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
 		local savedPresets={}
 
 		for i=1,4 do
-			local p=PRESETS[i]
+			local p=hitboxPresets[i]
 			table.insert(savedPresets,{
 				x=p.size.X,
 				y=p.size.Y,
@@ -148,7 +148,7 @@ function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
 		return savedPresets
 	end
 
-	local saveRow=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},editorSection)
+	local saveRow=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},editorSection)
 	local saveBtn=keybinds.MakeBindButton(saveRow,0,0,150)
 	placeWrappedButton(saveBtn,UDim2.new(1,-150,0,0))
 	saveBtn.Text="save"
@@ -164,9 +164,9 @@ function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
 	end)
 
 	local function buildPresetRow(i)
-		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,62),ZIndex=5},editorSection)
+		local row=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,62),ZIndex=5},editorSection)
 
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text="preset "..i,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
+		make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text="preset "..i,Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
 
 		local keyBtn=keybinds.MakeBindButton(row,0,18,78)
 
@@ -184,11 +184,11 @@ function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
 		resetBtn.Text="reset"
 
 		local function applyPresetSize()
-			local p=PRESETS[i]
+			local p=hitboxPresets[i]
 			if not p then return end
 
 			setPresetSize(i,xBox.Text,yBox.Text,zBox.Text)
-			p=PRESETS[i]
+			p=hitboxPresets[i]
 
 			xBox.Text=fmtNumber(p.size.X,2)
 			yBox.Text=fmtNumber(p.size.Y,2)
@@ -215,7 +215,7 @@ function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
 			end
 
 			keybinds.StartCapture(keyBtn,function()
-				return PRESETS[i].key
+				return hitboxPresets[i].key
 			end,function(v)
 				setPresetKey(i,v)
 			end)
@@ -249,13 +249,13 @@ function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
 
 	function api.Refresh()
 		for i,item in ipairs(presetRows) do
-			local p=PRESETS[i]
+			local p=hitboxPresets[i]
 			local active=keybinds.GetActiveCapture and keybinds.GetActiveCapture()
 
 			if not(active and active.button==item.keyBtn) then
 				item.keyBtn.Text=bindingToLabel(p.key)
-				setWrappedButtonBg(item.keyBtn,THEME.BUTTON or THEME.BG)
-				item.keyBtn.TextColor3=THEME.TEXT
+				setWrappedButtonBg(item.keyBtn,colors.button or colors.bg)
+				item.keyBtn.TextColor3=colors.text
 			end
 
 			item.xBox.Text=fmtNumber(p.size.X,2)
@@ -278,4 +278,4 @@ function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
 	return api
 end
 
-return PresetEditor
+return presetEditor

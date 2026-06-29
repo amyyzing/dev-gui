@@ -1,42 +1,42 @@
 -- HB_RUNTIME_PART_2
 -- boot step 2: saved settings, page one helpers, and restore setup.
 
-GuiLogic=GuiLogicModule.new({
-	New=New,
-	Fusion=FusionModule,
-	THEME=THEME,
-	UI_STYLE=UI_STYLE,
-	UIS=UIS,
+guiLogic=GuiLogicModule.new({
+	make=make,
+	fusion=FusionModule,
+	colors=colors,
+	style=style,
+	inputService=inputService,
 	TweenService=TweenService,
 	fmtNumber=fmtNumber,
-	BOX_WRAPPERS=BOX_WRAPPERS,
-	BUTTON_WRAPPERS=BUTTON_WRAPPERS,
+	boxWrappers=boxWrappers,
+	buttonWrappers=buttonWrappers,
 	markThemeRole=markThemeRole,
 	getUILibRuntimeStyle=getUILibRuntimeStyle,
 })
 
-attachHover=GuiLogic.attachHover
-wrapTextBox=GuiLogic.wrapTextBox
-placeWrappedBox=GuiLogic.placeWrappedBox
-wrapTextButton=GuiLogic.wrapTextButton
-placeWrappedButton=GuiLogic.placeWrappedButton
-setWrappedButtonBg=GuiLogic.setWrappedButtonBg
-makeSection=GuiLogic.makeSection
-makeBox=GuiLogic.makeBox
-buildSlider=GuiLogic.buildSlider
-buildToggleLabel=GuiLogic.buildToggleLabel
-buildToggleRow=GuiLogic.buildToggleRow
-objectLocalPointer=GuiLogic.objectLocalPointer
-HITBOX_ORIGINALS=HITBOX_ORIGINALS or {
+attachHover=guiLogic.attachHover
+wrapTextBox=guiLogic.wrapTextBox
+placeWrappedBox=guiLogic.placeWrappedBox
+wrapTextButton=guiLogic.wrapTextButton
+placeWrappedButton=guiLogic.placeWrappedButton
+setWrappedButtonBg=guiLogic.setWrappedButtonBg
+makeSection=guiLogic.makeSection
+makeBox=guiLogic.makeBox
+buildSlider=guiLogic.buildSlider
+buildToggleLabel=guiLogic.buildToggleLabel
+buildToggleRow=guiLogic.buildToggleRow
+objectLocalPointer=guiLogic.objectLocalPointer
+hitboxOriginals=hitboxOriginals or {
 	Transparency=setmetatable({}, {__mode="k"}),
 	Size=setmetatable({}, {__mode="k"}),
 }
 
-Description=DescriptionModule or {}
+description=DescriptionModule or {}
 rawMakeSection=makeSection
 function makeSection(parent,order,titleText,subtitleText,options)
-	if Description and type(Description.Section)=="function" then
-		local ok,newTitle,newSubtitle=pcall(Description.Section,titleText,subtitleText)
+	if description and type(description.Section)=="function" then
+		local ok,newTitle,newSubtitle=pcall(description.Section,titleText,subtitleText)
 		if ok then
 			titleText=newTitle
 			subtitleText=newSubtitle
@@ -46,23 +46,23 @@ function makeSection(parent,order,titleText,subtitleText,options)
 	return rawMakeSection(parent,order,titleText,subtitleText,options)
 end
 
-LAZY_PAGE_BUILDERS={}
-LAZY_PAGE_BUILT={}
+lazyPageBuilders={}
+lazyPageBuilt={}
 function ensureRuntimePageBuilt(name)
 	name=tostring(name or "main")
-	local builder=LAZY_PAGE_BUILDERS[name]
-	if not builder or LAZY_PAGE_BUILT[name] then
+	local builder=lazyPageBuilders[name]
+	if not builder or lazyPageBuilt[name] then
 		if refreshRuntimePageControls then
 			pcall(refreshRuntimePageControls,name,false)
 		end
 		return true
 	end
 
-	LAZY_PAGE_BUILT[name]=true
+	lazyPageBuilt[name]=true
 	local built=false
 	local ok,err=pcall(builder)
 	if not ok then
-		LAZY_PAGE_BUILT[name]=false
+		lazyPageBuilt[name]=false
 		warn("page build failed:",name,err)
 	else
 		built=true
@@ -75,16 +75,16 @@ function ensureRuntimePageBuilt(name)
 	return ok and built
 end
 
-MainFrame=MainFrameModule.new({
-	New=New,
-	Fusion=FusionModule,
-	THEME=THEME,
-	Description=Description,
-	UI_WINDOW=UI_WINDOW,
-	UI_PROFILE=getCurrentUILibProfile and getCurrentUILibProfile() or nil,
+mainFrame=MainFrameModule.new({
+	make=make,
+	fusion=FusionModule,
+	colors=colors,
+	description=description,
+	windowState=windowState,
+	uiProfile=getCurrentUILibProfile and getCurrentUILibProfile() or nil,
 	getCurrentUILibProfile=getCurrentUILibProfile,
-	SG=SG,
-	UIS=UIS,
+	screenGui=screenGui,
+	inputService=inputService,
 	TweenService=TweenService,
 	RunService=RunService,
 	safeDisconnect=safeDisconnect,
@@ -97,64 +97,64 @@ MainFrame=MainFrameModule.new({
 		return toolAlive
 	end,
 	getModeLabel=function()
-		return CURRENT_MODE_LABEL
+		return currentModeLabel
 	end,
 	onPageActivated=ensureRuntimePageBuilt,
 })
 
-root=MainFrame.root
-uiScale=MainFrame.uiScale
-main=MainFrame.main
-header=MainFrame.header
-modeSubtitle=MainFrame.modeSubtitle
-closeBtn=MainFrame.closeBtn
-resetBtn=MainFrame.resetBtn
-pageBar=MainFrame.pageBar
-pageHost=MainFrame.pageHost
-settingsPage=MainFrame.settingsPage
-futurePage=MainFrame.futurePage
-uiSettingsPage=MainFrame.uiSettingsPage
-mapPage=MainFrame.mapPage
-serverPage=MainFrame.serverPage
-actualSettingsPage=MainFrame.actualSettingsPage
-leftCol=MainFrame.leftCol
-rightCol=MainFrame.rightCol
-footer=MainFrame.footer
+root=mainFrame.root
+uiScale=mainFrame.uiScale
+main=mainFrame.main
+header=mainFrame.header
+modeSubtitle=mainFrame.modeSubtitle
+closeBtn=mainFrame.closeBtn
+resetBtn=mainFrame.resetBtn
+pageBar=mainFrame.pageBar
+pageHost=mainFrame.pageHost
+settingsPage=mainFrame.settingsPage
+futurePage=mainFrame.futurePage
+uiSettingsPage=mainFrame.uiSettingsPage
+mapPage=mainFrame.mapPage
+serverPage=mainFrame.serverPage
+actualSettingsPage=mainFrame.actualSettingsPage
+leftCol=mainFrame.leftCol
+rightCol=mainFrame.rightCol
+footer=mainFrame.footer
 
 function getMainDescriptionText()
-	if Description and type(Description.Get)=="function" then
-		local ok,value=pcall(Description.Get,"Main.Description",CURRENT_MODE_LABEL.." loaded")
+	if description and type(description.Get)=="function" then
+		local ok,value=pcall(description.Get,"Main.Description",currentModeLabel.." loaded")
 		if ok and value~=nil then
 			return value
 		end
 	end
 
-	return CURRENT_MODE_LABEL.." loaded"
+	return currentModeLabel.." loaded"
 end
 
 function setActivePage(name)
-	if MainFrame and MainFrame.SetActivePage then
-		MainFrame.SetActivePage(name)
+	if mainFrame and mainFrame.SetActivePage then
+		mainFrame.SetActivePage(name)
 	end
 end
 
 function getActivePageName()
-	if MainFrame and MainFrame.GetActivePageName then
-		return MainFrame.GetActivePageName()
+	if mainFrame and mainFrame.GetActivePageName then
+		return mainFrame.GetActivePageName()
 	end
 
 	return "main"
 end
 
 updateResponsiveLayout=function()
-	if MainFrame and MainFrame.UpdateResponsiveLayout then
-		MainFrame.UpdateResponsiveLayout()
+	if mainFrame and mainFrame.UpdateResponsiveLayout then
+		mainFrame.UpdateResponsiveLayout()
 	end
 end
 
 refreshFooterResetButton=function()
-	if MainFrame and MainFrame.RefreshFooterResetButton then
-		MainFrame.RefreshFooterResetButton()
+	if mainFrame and mainFrame.RefreshFooterResetButton then
+		mainFrame.RefreshFooterResetButton()
 	end
 end
 
@@ -182,7 +182,7 @@ function setPresetSizeFromDataSave(index,x,y,z)
 		return DataSaveAPI.SetPresetSize(index,x,y,z)
 	end
 
-	local preset=PRESETS[index]
+	local preset=hitboxPresets[index]
 	if not preset then return false,"missing preset" end
 
 	local oldSize=preset.size or Vector3.new(1,1,1)
@@ -201,7 +201,7 @@ function setPresetKeyFromDataSave(index,binding)
 		return DataSaveAPI.SetPresetKey(index,binding)
 	end
 
-	local preset=PRESETS[index]
+	local preset=hitboxPresets[index]
 	if not preset then return false,"missing preset" end
 
 	preset.key=binding or Enum.KeyCode.Unknown
@@ -214,8 +214,8 @@ function resetPresetFromDataSave(index)
 		return DataSaveAPI.ResetPreset(index)
 	end
 
-	local preset=PRESETS[index]
-	local default=DEFAULT_PRESETS[index]
+	local preset=hitboxPresets[index]
+	local default=defaultHitboxPresets[index]
 	if not preset or not default then return false,"missing preset" end
 
 	preset.key=default.key
@@ -231,9 +231,9 @@ function applyPresetEditorFromDataSave(editor)
 
 	for i=1,4 do
 		local item=editor and editor[i]
-		if item and PRESETS[i] then
-			PRESETS[i].key=item.key or item.Key or item.binding or item.Binding or Enum.KeyCode.Unknown
-			PRESETS[i].size=Vector3.new(tonumber(item.x or item.X) or 1,tonumber(item.y or item.Y) or 1,tonumber(item.z or item.Z) or 1)
+		if item and hitboxPresets[i] then
+			hitboxPresets[i].key=item.key or item.Key or item.binding or item.Binding or Enum.KeyCode.Unknown
+			hitboxPresets[i].size=Vector3.new(tonumber(item.x or item.X) or 1,tonumber(item.y or item.Y) or 1,tonumber(item.z or item.Z) or 1)
 		end
 	end
 
@@ -249,8 +249,8 @@ function createOwnedPresetFromDataSave(name,editor)
 	local cleanName=tostring(name or ""):gsub("^%s*(.-)%s*$","%1")
 	if cleanName=="" then return false,"name missing" end
 
-	local preset={Code=makeLocalPresetCode(cleanName),Name=cleanName,Data={PresetEditor=editor or {}}}
-	table.insert(OWNED_PRESETS,preset)
+	local preset={Code=makeLocalPresetCode(cleanName),Name=cleanName,Data={presetEditor=editor or {}}}
+	table.insert(savedPresets,preset)
 	requestPlayerAutosave()
 	return true,preset
 end
@@ -269,9 +269,9 @@ function equipOwnedPresetFromDataSave(preset)
 	end
 
 	local data=preset and (preset.Data or preset.data) or {}
-	local editor=data.PresetEditor or data.presetEditor
+	local editor=data.presetEditor or data.presetEditor
 	if not editor and preset then
-		editor=preset.presetEditor or preset.PresetEditor
+		editor=preset.presetEditor or preset.presetEditor
 	end
 
 	return applyPresetEditorFromDataSave(editor or {})
@@ -282,21 +282,21 @@ function deleteOwnedPresetFromDataSave(code,index)
 		return DataSaveAPI.DeleteOwnedPreset(code,index)
 	end
 
-	for i=#OWNED_PRESETS,1,-1 do
-		if tostring(OWNED_PRESETS[i].Code or OWNED_PRESETS[i].code or "")==tostring(code or "") then
-			table.remove(OWNED_PRESETS,i)
+	for i=#savedPresets,1,-1 do
+		if tostring(savedPresets[i].Code or savedPresets[i].code or "")==tostring(code or "") then
+			table.remove(savedPresets,i)
 			return true
 		end
 	end
 
-	if index and OWNED_PRESETS[index] then
-		table.remove(OWNED_PRESETS,index)
+	if index and savedPresets[index] then
+		table.remove(savedPresets,index)
 	end
 
 	return true
 end
 
-PAGE1_DEFAULTS={
+mainPageDefaults={
 	hitboxOn=false,
 	sizeX=2.52,
 	sizeY=5.4,
@@ -342,16 +342,16 @@ PAGE1_DEFAULTS={
 	testingQBEnabled=true,
 }
 
-PAGE1_STATE={}
-for key,default in pairs(PAGE1_DEFAULTS) do
+mainPageState={}
+for key,default in pairs(mainPageDefaults) do
 	local value=getfenv()[key]
-	PAGE1_STATE[key]=value~=nil and value or default
+	mainPageState[key]=value~=nil and value or default
 end
 
 function syncPage1State()
 	local env=getfenv()
-	for key in pairs(PAGE1_DEFAULTS) do
-		env[key]=PAGE1_STATE[key]
+	for key in pairs(mainPageDefaults) do
+		env[key]=mainPageState[key]
 	end
 end
 
@@ -360,7 +360,7 @@ function refreshRuntimePageControls(name,forceTheme)
 
 	if name=="main" then
 		syncPage1State()
-		for _,api in pairs(PAGE1_APIS) do
+		for _,api in pairs(mainPageApis) do
 			if api and api.Refresh then
 				pcall(api.Refresh)
 			end
@@ -370,8 +370,8 @@ function refreshRuntimePageControls(name,forceTheme)
 			pcall(refreshActionStatus)
 		end
 	elseif name=="maps" then
-		if refreshRuntimeAPIs and MAP_API_NAMES then
-			pcall(refreshRuntimeAPIs,MAP_API_NAMES)
+		if refreshRuntimeAPIs and mapApiNames then
+			pcall(refreshRuntimeAPIs,mapApiNames)
 		end
 	elseif name=="customize" then
 		if StrokeColourAPI and StrokeColourAPI.Refresh then
@@ -398,27 +398,27 @@ function refreshRuntimePageControls(name,forceTheme)
 	end
 end
 
-PAGE1_APIS={}
+mainPageApis={}
 refreshActionStatus=function() end
 
 function makePage1Ctx()
 	return{
-		New=New,
-		Fusion=FusionModule,
-		Services=RuntimeServices,
-		Scheduler=RuntimeScheduler,
-		StateStore=RuntimeStateStore,
-		ThemeStore=RuntimeThemeStore,
-		Janitor=RuntimeJanitor,
-		THEME=THEME,
-		UI_STYLE=UI_STYLE,
-		State=PAGE1_STATE,
+		make=make,
+		fusion=FusionModule,
+		Services=sharedRuntime,
+		schedulerApi=jobRunner,
+		StateStore=settingsStore,
+		ThemeStore=themeRuntime,
+		Janitor=cleanupBags,
+		colors=colors,
+		style=style,
+		State=mainPageState,
 		makeSection=makeSection,
 		buildSlider=buildSlider,
 		buildToggleLabel=buildToggleLabel,
 		buildToggleRow=buildToggleRow,
 		objectLocalPointer=objectLocalPointer,
-		HITBOX_ORIGINALS=HITBOX_ORIGINALS,
+		hitboxOriginals=hitboxOriginals,
 		fmtNumber=fmtNumber,
 		safeDisconnect=safeDisconnect,
 		inputToBinding=inputToBinding,
@@ -431,38 +431,38 @@ function makePage1Ctx()
 		Page1QBAimMathModule=Page1QBAimMathModule,
 		Page1QBAimLogicModule=Page1QBAimLogicModule,
 		Page1TestingLogicModule=Page1TestingLogicModule,
-		getCurrentModeKey=function() return CURRENT_MODE_KEY end,
-		getHitboxToggleKey=function() return TOGGLE_HB_KEY end,
-		getJumpBoostToggleKey=function() return TOGGLE_JB_KEY end,
-		getAlwaysBoostToggleKey=function() return TOGGLE_AB_KEY end,
-		getESPToggleKey=function() return TOGGLE_ACTION_KEY end,
-		getQBAimLockKey=function() return QB_AIM_LOCK_KEY end,
-		getQBAimThrowKey=function() return QB_AIM_THROW_KEY end,
-		getQBAimToggleKey=function() return QB_AIM_TOGGLE_KEY end,
-		Description=Description,
+		getCurrentModeKey=function() return currentModeKey end,
+		getHitboxToggleKey=function() return hitboxToggleKey end,
+		getJumpBoostToggleKey=function() return boostToggleKey end,
+		getAlwaysBoostToggleKey=function() return alwaysBoostToggleKey end,
+		getESPToggleKey=function() return espToggleKey end,
+		getQBAimLockKey=function() return qbAimLockKey end,
+		getQBAimThrowKey=function() return qbAimThrowKey end,
+		getQBAimToggleKey=function() return qbAimToggleKey end,
+		description=description,
 		ESPDefenseModule=Page1ESPDefenseLogicModule,
 		ESPOffenseModule=Page1ESPOffenseLogicModule,
 		refreshESPStatus=function(state,available)
-			PAGE1_STATE.actionStatusOn=state and available~=false
-			actionStatusOn=PAGE1_STATE.actionStatusOn
+			mainPageState.actionStatusOn=state and available~=false
+			actionStatusOn=mainPageState.actionStatusOn
 			refreshActionStatus()
 		end,
 		setCurrentMode=function(key,label)
-			CURRENT_MODE_KEY=tostring(key or"mode1")
-			CURRENT_MODE_LABEL=tostring(label or"Gameplay")
-			if MainFrame and MainFrame.RefreshText then
-				MainFrame.RefreshText(Description)
+			currentModeKey=tostring(key or"mode1")
+			currentModeLabel=tostring(label or"Gameplay")
+			if mainFrame and mainFrame.RefreshText then
+				mainFrame.RefreshText(description)
 			elseif modeSubtitle then
 				modeSubtitle.Text=getMainDescriptionText()
 			end
-			if PAGE1_APIS.GameParams and PAGE1_APIS.GameParams.Refresh then
-				pcall(PAGE1_APIS.GameParams.Refresh)
+			if mainPageApis.gameParams and mainPageApis.gameParams.Refresh then
+				pcall(mainPageApis.gameParams.Refresh)
 			end
-			if PAGE1_APIS.ESP and PAGE1_APIS.ESP.Refresh then
-				pcall(PAGE1_APIS.ESP.Refresh)
+			if mainPageApis.esp and mainPageApis.esp.Refresh then
+				pcall(mainPageApis.esp.Refresh)
 			end
-			if PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.Refresh then
-				pcall(PAGE1_APIS.QBAim.Refresh)
+			if mainPageApis.QBAim and mainPageApis.QBAim.Refresh then
+				pcall(mainPageApis.QBAim.Refresh)
 			end
 			refreshActionStatus()
 		end,
@@ -475,12 +475,12 @@ function makePage1Ctx()
 end
 
 function addPage1Error(parent,order,title,path)
-	table.insert(RUNTIME_BUILD_ERRORS,"Main/"..tostring(title)..": "..tostring(path))
+	table.insert(runtimeBuildErrors,"Main/"..tostring(title)..": "..tostring(path))
 	local section=makeSection(parent,order,title,"module did not load")
-	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),Text=path.." did not load.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),Text=path.." did not load.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.red,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 end
 
-PAGE1_MODULE_SPECS={
+mainPageModules={
 	{api="Hitbox",name="Page1Hitbox",column="left",order=1,title="Hitbox"},
 	{api="GameParams",name="Page1GameParams",column="left",order=2,title="Game Params"},
 	{api="Boost",name="Page1Boost",column="right",order=2,title="Boost"},
@@ -502,19 +502,19 @@ function buildPage1Module(spec,app)
 			return featureModule.new(app,parent)
 		end)
 		if ok then
-			PAGE1_APIS[spec.api]=result
+			mainPageApis[spec.api]=result
 		else
 			addPage1Error(parent,spec.order,spec.title,tostring(result))
 		end
 	else
-		addPage1Error(parent,spec.order,spec.title,MODULE_PATHS[spec.name] or tostring(spec.name))
+		addPage1Error(parent,spec.order,spec.title,modulePaths[spec.name] or tostring(spec.name))
 	end
 end
 
 function buildPage1()
 	local app=makePage1Ctx()
 
-	for _,spec in ipairs(PAGE1_MODULE_SPECS) do
+	for _,spec in ipairs(mainPageModules) do
 		buildPage1Module(spec,app)
 	end
 
@@ -533,13 +533,13 @@ function clearPage1Column(column)
 end
 
 rebuildPage1FromModules=function()
-	for _,api in pairs(PAGE1_APIS) do
+	for _,api in pairs(mainPageApis) do
 		if api and api.Destroy then
 			pcall(api.Destroy)
 		end
 	end
 
-	PAGE1_APIS={}
+	mainPageApis={}
 	clearPage1Column(leftCol)
 	clearPage1Column(rightCol)
 	buildPage1()
@@ -552,11 +552,11 @@ end
 buildPage1()
 
 function resetMainPageDefaults()
-	for key,value in pairs(PAGE1_DEFAULTS) do
-		PAGE1_STATE[key]=value
+	for key,value in pairs(mainPageDefaults) do
+		mainPageState[key]=value
 	end
 
-	for _,api in pairs(PAGE1_APIS) do
+	for _,api in pairs(mainPageApis) do
 		if api and api.Refresh then
 			pcall(api.Refresh)
 		end

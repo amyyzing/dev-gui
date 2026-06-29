@@ -1,15 +1,15 @@
 -- builds the shell: tabs, body, reset row, and page containers.
 
-local MainFrame={}
+local mainFrame={}
 
-function MainFrame.new(app)
-	local New=app.New
-	local Fusion=app.Fusion
-	local THEME=app.THEME
-	local Description=app.Description or {}
-	local UI_WINDOW=app.UI_WINDOW
-	local SG=app.SG
-	local UIS=app.UIS
+function mainFrame.new(app)
+	local make=app.New
+	local fusion=app.Fusion
+	local colors=app.colors
+	local description=app.Description or {}
+	local windowState=app.windowState
+	local screenGui=app.SG
+	local inputService=app.inputService
 	local TweenService=app.TweenService
 	local RunService=app.RunService
 	local ContextActionService=game:GetService("ContextActionService")
@@ -18,10 +18,10 @@ function MainFrame.new(app)
 	local attachHover=app.attachHover
 	local isAlive=app.isAlive or function() return true end
 	local getModeLabel=app.getModeLabel or function() return "Gameplay" end
-	local getUIStrokeColor=app.getUIStrokeColor or function() return THEME.STROKE end
+	local getUIStrokeColor=app.getUIStrokeColor or function() return colors.stroke end
 	local getCurrentUILibProfile=app.getCurrentUILibProfile
 	local onPageActivated=app.onPageActivated
-	local uiProfile=type(app.UI_PROFILE)=="table" and app.UI_PROFILE or {}
+	local uiProfile=type(app.uiProfile)=="table" and app.uiProfile or {}
 	local mainFrameProfile={}
 	local windowProfile={}
 	local layoutProfile={}
@@ -32,7 +32,7 @@ function MainFrame.new(app)
 
 	local function loadProfile(profile)
 		uiProfile=type(profile)=="table" and profile or {}
-		mainFrameProfile=type(uiProfile.MainFrame)=="table" and uiProfile.MainFrame or {}
+		mainFrameProfile=type(uiProfile.mainFrame)=="table" and uiProfile.mainFrame or {}
 		windowProfile=type(mainFrameProfile.Window)=="table" and mainFrameProfile.Window or {}
 		layoutProfile=type(mainFrameProfile.Layout)=="table" and mainFrameProfile.Layout or {}
 		componentProfile=type(uiProfile.Components)=="table" and uiProfile.Components or {}
@@ -63,12 +63,12 @@ function MainFrame.new(app)
 		return value
 	end
 
-	UI_WINDOW.W=tonumber(UI_WINDOW.W) or layoutNumber(windowProfile,"W",880)
-	UI_WINDOW.H=tonumber(UI_WINDOW.H) or layoutNumber(windowProfile,"H",540)
-	UI_WINDOW.MinW=tonumber(UI_WINDOW.MinW) or layoutNumber(windowProfile,"MinW",560)
-	UI_WINDOW.MinH=tonumber(UI_WINDOW.MinH) or layoutNumber(windowProfile,"MinH",360)
-	UI_WINDOW.MaxW=tonumber(UI_WINDOW.MaxW) or layoutNumber(windowProfile,"MaxW",1220)
-	UI_WINDOW.MaxH=tonumber(UI_WINDOW.MaxH) or layoutNumber(windowProfile,"MaxH",820)
+	windowState.W=tonumber(windowState.W) or layoutNumber(windowProfile,"W",880)
+	windowState.H=tonumber(windowState.H) or layoutNumber(windowProfile,"H",540)
+	windowState.MinW=tonumber(windowState.MinW) or layoutNumber(windowProfile,"MinW",560)
+	windowState.MinH=tonumber(windowState.MinH) or layoutNumber(windowProfile,"MinH",360)
+	windowState.MaxW=tonumber(windowState.MaxW) or layoutNumber(windowProfile,"MaxW",1220)
+	windowState.MaxH=tonumber(windowState.MaxH) or layoutNumber(windowProfile,"MaxH",820)
 
 	local rootStartY=80
 	local minimizedRootH=68
@@ -179,8 +179,8 @@ function MainFrame.new(app)
 	end
 
 	local function desc(path,fallback)
-		if Description and type(Description.Get)=="function" then
-			local ok,value=pcall(Description.Get,path,fallback)
+		if description and type(description.Get)=="function" then
+			local ok,value=pcall(description.Get,path,fallback)
 			if ok and value~=nil then
 				return value
 			end
@@ -190,8 +190,8 @@ function MainFrame.new(app)
 	end
 
 	local function text(raw)
-		if Description and type(Description.Text)=="function" then
-			local ok,value=pcall(Description.Text,raw)
+		if description and type(description.Text)=="function" then
+			local ok,value=pcall(description.Text,raw)
 			if ok and value~=nil then
 				return value
 			end
@@ -247,8 +247,8 @@ function MainFrame.new(app)
 	end
 
 	local fusionScope=nil
-	if type(Fusion)=="table" and type(Fusion.scoped)=="function" then
-		fusionScope=Fusion.scoped(Fusion)
+	if type(fusion)=="table" and type(fusion.scoped)=="function" then
+		fusionScope=fusion.scoped(fusion)
 		trackCleanup(function()
 			fusionScope:doCleanup()
 		end)
@@ -280,7 +280,7 @@ function MainFrame.new(app)
 		end
 	end
 
-	local root=New("Frame",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,rootStartY),Size=UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),AutomaticSize=Enum.AutomaticSize.None,ClipsDescendants=true,BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=2,Visible=true,CornerRole="Window"},SG)
+	local root=make("Frame",{AnchorPoint=Vector2.new(0.5,0),Position=UDim2.new(0.5,0,0,rootStartY),Size=UDim2.fromOffset(windowState.W,windowState.H),AutomaticSize=Enum.AutomaticSize.None,ClipsDescendants=true,BackgroundColor3=colors.bg,BorderSizePixel=0,ZIndex=2,Visible=true,CornerRole="Window"},screenGui)
 	local uiMinimized=false
 	local uiMinimizedValue=makeFusionValue(uiMinimized)
 	local descriptionVersionValue=makeFusionValue(0)
@@ -293,11 +293,11 @@ function MainFrame.new(app)
 			return false
 		end
 
-		if SG and SG.Enabled==false then
+		if screenGui and screenGui.Enabled==false then
 			return false
 		end
 
-		local mouse=UIS:GetMouseLocation()
+		local mouse=inputService:GetMouseLocation()
 		local pos=root.AbsolutePosition
 		local size=root.AbsoluteSize
 		return mouse.X>=pos.X and mouse.X<=pos.X+size.X and mouse.Y>=pos.Y and mouse.Y<=pos.Y+size.Y
@@ -333,13 +333,13 @@ function MainFrame.new(app)
 		return rootSizeTween
 	end
 
-	New("UICorner",{CornerRadius=UDim.new(0,0)},root)
-	local rootStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=rootStrokeTransparency},root)
+	make("UICorner",{CornerRadius=UDim.new(0,0)},root)
+	local rootStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=rootStrokeTransparency},root)
 	rootStroke:SetAttribute("BaseStrokeTransparency",rootStrokeTransparency)
 	rootStroke:SetAttribute("StrokeRole","Hidden")
-	local rootPad=New("UIPadding",{PaddingTop=UDim.new(0,rootPadding),PaddingLeft=UDim.new(0,rootPadding),PaddingRight=UDim.new(0,rootPadding),PaddingBottom=UDim.new(0,rootPadding)},root)
+	local rootPad=make("UIPadding",{PaddingTop=UDim.new(0,rootPadding),PaddingLeft=UDim.new(0,rootPadding),PaddingRight=UDim.new(0,rootPadding),PaddingBottom=UDim.new(0,rootPadding)},root)
 
-	local uiScale=New("UIScale",{Scale=1},root)
+	local uiScale=make("UIScale",{Scale=1},root)
 	local updateResponsiveLayout
 
 	local function updateScale()
@@ -362,31 +362,31 @@ function MainFrame.new(app)
 		end
 	end)
 
-	local main=New("Frame",{Size=UDim2.new(1,0,1,0),AutomaticSize=Enum.AutomaticSize.None,BackgroundTransparency=1,ClipsDescendants=true,ZIndex=3},root)
-	local mainLayout=New("UIListLayout",{Padding=UDim.new(0,mainGap),SortOrder=Enum.SortOrder.LayoutOrder},main)
+	local main=make("Frame",{Size=UDim2.new(1,0,1,0),AutomaticSize=Enum.AutomaticSize.None,BackgroundTransparency=1,ClipsDescendants=true,ZIndex=3},root)
+	local mainLayout=make("UIListLayout",{Padding=UDim.new(0,mainGap),SortOrder=Enum.SortOrder.LayoutOrder},main)
 
 	attachHover=attachHover or function() end
 
-	local header=New("Frame",{Size=UDim2.new(1,0,0,headerHeight),BackgroundColor3=THEME.TOPBAR or THEME.BG,BorderSizePixel=0,ZIndex=4,LayoutOrder=1,ThemeRole="TOPBAR",CornerRole="Section"},main)
-	New("UICorner",{CornerRadius=UDim.new(0,0)},header)
-	local headerStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=headerStrokeTransparency},header)
+	local header=make("Frame",{Size=UDim2.new(1,0,0,headerHeight),BackgroundColor3=colors.topbar or colors.bg,BorderSizePixel=0,ZIndex=4,LayoutOrder=1,ThemeRole="TOPBAR",CornerRole="Section"},main)
+	make("UICorner",{CornerRadius=UDim.new(0,0)},header)
+	local headerStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=headerStrokeTransparency},header)
 	headerStroke:SetAttribute("BaseStrokeTransparency",headerStrokeTransparency)
-	local titleText=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerTitleY),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=headerTitleSize,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+	local titleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerTitleY),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=headerTitleSize,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
 
-	local subtitleText=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerSubtitleY),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
+	local subtitleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerSubtitleY),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
 
 	local function makeTopButton(text,xOffset)
-		local b=New("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text=text,Font=controlFont,TextSize=17,TextColor3=THEME.TEXT,AutoButtonColor=false,Selectable=true,ZIndex=6,ThemeRole="BUTTON"},header)
-		local wrap=wrapTextButton(b,THEME.BUTTON or THEME.BG,2)
+		local b=make("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=colors.button or colors.bg,BorderSizePixel=0,Text=text,Font=controlFont,TextSize=17,TextColor3=colors.text,AutoButtonColor=false,Selectable=true,ZIndex=6,ThemeRole="BUTTON"},header)
+		local wrap=wrapTextButton(b,colors.button or colors.bg,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 		wrap:SetAttribute("CornerRole","Control")
 
 		connect(b.MouseEnter,function()
-			wrap.BackgroundColor3=THEME.CARD
+			wrap.BackgroundColor3=colors.card
 		end)
 
 		connect(b.MouseLeave,function()
-			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
+			wrap.BackgroundColor3=colors.button or colors.bg
 		end)
 
 		return b,wrap
@@ -409,11 +409,11 @@ function MainFrame.new(app)
 		end),
 	})
 
-	local headerSearch=New("Frame",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-headerSearchInset(),0.5,0),Size=UDim2.fromOffset(headerSearchWidth,headerSearchHeight),BackgroundColor3=THEME.INPUT or THEME.PANEL,BorderSizePixel=0,ZIndex=5,Visible=headerSearchVisible,ThemeRole="INPUT",CornerRole="Control"},header)
-	New("UICorner",{CornerRadius=UDim.new(0,0)},headerSearch)
-	local headerSearchStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.78},headerSearch)
+	local headerSearch=make("Frame",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-headerSearchInset(),0.5,0),Size=UDim2.fromOffset(headerSearchWidth,headerSearchHeight),BackgroundColor3=colors.input or colors.panel,BorderSizePixel=0,ZIndex=5,Visible=headerSearchVisible,ThemeRole="INPUT",CornerRole="Control"},header)
+	make("UICorner",{CornerRadius=UDim.new(0,0)},headerSearch)
+	local headerSearchStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=0.78},headerSearch)
 	headerSearchStroke:SetAttribute("BaseStrokeTransparency",0.78)
-	local headerSearchLabel=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(12,0),Size=UDim2.new(1,-24,1,0),Text=headerSearchPlaceholder,Font=textFont,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6,TextRole="MUTED"},headerSearch)
+	local headerSearchLabel=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(12,0),Size=UDim2.new(1,-24,1,0),Text=headerSearchPlaceholder,Font=textFont,TextSize=12,TextColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6,TextRole="MUTED"},headerSearch)
 
 	hydrateFusion(titleText,{
 		Text=makeFusionComputed(function(use)
@@ -492,8 +492,8 @@ function MainFrame.new(app)
 	local pageBarSize=UDim2.new(1,0,0,pageBarHeight)
 
 	if navIsLeft then
-		pageArea=New("Frame",{Size=UDim2.new(1,0,0,384),BackgroundTransparency=1,ZIndex=3,LayoutOrder=2},main)
-		New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,navGap),SortOrder=Enum.SortOrder.LayoutOrder,VerticalAlignment=Enum.VerticalAlignment.Top},pageArea)
+		pageArea=make("Frame",{Size=UDim2.new(1,0,0,384),BackgroundTransparency=1,ZIndex=3,LayoutOrder=2},main)
+		make("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,navGap),SortOrder=Enum.SortOrder.LayoutOrder,VerticalAlignment=Enum.VerticalAlignment.Top},pageArea)
 		pageParent=pageArea
 		pageViewportParent=pageArea
 		pageBarLayoutOrder=1
@@ -501,56 +501,56 @@ function MainFrame.new(app)
 		pageBarSize=UDim2.fromOffset(navWidth,384)
 	end
 
-	local pageBar=New("Frame",{Size=pageBarSize,BackgroundTransparency=1,ClipsDescendants=true,ZIndex=4,LayoutOrder=pageBarLayoutOrder},pageParent)
-	local pageShell=New("Frame",{Size=navIsLeft and UDim2.new(1,0,1,0) or UDim2.fromOffset(pageShellWidth,pageBarHeight),BackgroundColor3=THEME.TOPBAR or THEME.BG,BackgroundTransparency=pageShellTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=5,ThemeRole="TOPBAR",CornerRole="Section"},pageBar)
-	local pageShellScale=New("UIScale",{Scale=1},pageShell)
-	New("UICorner",{CornerRadius=UDim.new(0,0)},pageShell)
-	local pageShellStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=pageShellStrokeTransparency},pageShell)
+	local pageBar=make("Frame",{Size=pageBarSize,BackgroundTransparency=1,ClipsDescendants=true,ZIndex=4,LayoutOrder=pageBarLayoutOrder},pageParent)
+	local pageShell=make("Frame",{Size=navIsLeft and UDim2.new(1,0,1,0) or UDim2.fromOffset(pageShellWidth,pageBarHeight),BackgroundColor3=colors.topbar or colors.bg,BackgroundTransparency=pageShellTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=5,ThemeRole="TOPBAR",CornerRole="Section"},pageBar)
+	local pageShellScale=make("UIScale",{Scale=1},pageShell)
+	make("UICorner",{CornerRadius=UDim.new(0,0)},pageShell)
+	local pageShellStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=pageShellStrokeTransparency},pageShell)
 	pageShellStroke:SetAttribute("BaseStrokeTransparency",pageShellStrokeTransparency)
 
-	local pageSlider=New("Frame",{Size=tabSize(),Position=tabPosition(1),BackgroundColor3=THEME.BUTTON or THEME.CARD,BackgroundTransparency=pageSliderTransparency,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON",CornerRole="Control"},pageShell)
-	New("UICorner",{CornerRadius=UDim.new(0,0)},pageSlider)
-	local pageSliderStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=pageSliderStrokeTransparency},pageSlider)
+	local pageSlider=make("Frame",{Size=tabSize(),Position=tabPosition(1),BackgroundColor3=colors.button or colors.card,BackgroundTransparency=pageSliderTransparency,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON",CornerRole="Control"},pageShell)
+	make("UICorner",{CornerRadius=UDim.new(0,0)},pageSlider)
+	local pageSliderStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=pageSliderStrokeTransparency},pageSlider)
 	pageSliderStroke:SetAttribute("BaseStrokeTransparency",pageSliderStrokeTransparency)
 	pageSlider.Visible=pageSliderVisible
 
-	local settingsTab=New("TextButton",{Size=tabSize(),Position=tabPosition(1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Main","MAIN"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
-	local mapsPageTab=New("TextButton",{Size=tabSize(),Position=tabPosition(2),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Maps","MAPS"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
-	local serverPageTab=New("TextButton",{Size=tabSize(),Position=tabPosition(3),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Server","SERVER"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
-	local uiSettingsTab=New("TextButton",{Size=tabSize(),Position=tabPosition(4),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Customize","CUSTOMIZE"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
-	local futureTab=New("TextButton",{Size=tabSize(),Position=tabPosition(5),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Keybinds","KEYBINDS"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
-	local settingsPageTab=New("TextButton",{Size=tabSize(),Position=tabPosition(6),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Settings","SETTINGS"),Font=controlFont,TextSize=11,TextColor3=THEME.TEXT,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
+	local settingsTab=make("TextButton",{Size=tabSize(),Position=tabPosition(1),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Main","MAIN"),Font=controlFont,TextSize=11,TextColor3=colors.text,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
+	local mapsPageTab=make("TextButton",{Size=tabSize(),Position=tabPosition(2),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Maps","MAPS"),Font=controlFont,TextSize=11,TextColor3=colors.text,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
+	local serverPageTab=make("TextButton",{Size=tabSize(),Position=tabPosition(3),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Server","SERVER"),Font=controlFont,TextSize=11,TextColor3=colors.text,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
+	local uiSettingsTab=make("TextButton",{Size=tabSize(),Position=tabPosition(4),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Customize","CUSTOMIZE"),Font=controlFont,TextSize=11,TextColor3=colors.text,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
+	local futureTab=make("TextButton",{Size=tabSize(),Position=tabPosition(5),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Keybinds","KEYBINDS"),Font=controlFont,TextSize=11,TextColor3=colors.text,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
+	local settingsPageTab=make("TextButton",{Size=tabSize(),Position=tabPosition(6),BackgroundTransparency=1,BorderSizePixel=0,Text=desc("Pages.Settings","SETTINGS"),Font=controlFont,TextSize=11,TextColor3=colors.text,TextXAlignment=tabTextXAlignment,AutoButtonColor=false,ZIndex=7},pageShell)
 
 	if navIsLeft then
 		for _,tab in ipairs({settingsTab,mapsPageTab,serverPageTab,uiSettingsTab,futureTab,settingsPageTab}) do
-			New("UIPadding",{Name="NavPadding",PaddingLeft=UDim.new(0,10),PaddingRight=UDim.new(0,8)},tab)
+			make("UIPadding",{Name="NavPadding",PaddingLeft=UDim.new(0,10),PaddingRight=UDim.new(0,8)},tab)
 		end
 	end
 
 	local pageTabs={settingsTab,mapsPageTab,serverPageTab,uiSettingsTab,futureTab,settingsPageTab}
 
-	local pageViewport=New("Frame",{Size=navIsLeft and UDim2.new(1,-(navWidth+navGap),1,0) or UDim2.new(1,0,0,384),BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=3,LayoutOrder=pageViewportLayoutOrder},pageViewportParent)
-	local pageHost=New("ScrollingFrame",{Size=UDim2.new(1,0,1,0),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=3},pageViewport)
-	New("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},pageHost)
-	New("UIPadding",{PaddingTop=UDim.new(0,2),PaddingLeft=UDim.new(0,3),PaddingRight=UDim.new(0,7),PaddingBottom=UDim.new(0,2)},pageHost)
+	local pageViewport=make("Frame",{Size=navIsLeft and UDim2.new(1,-(navWidth+navGap),1,0) or UDim2.new(1,0,0,384),BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=3,LayoutOrder=pageViewportLayoutOrder},pageViewportParent)
+	local pageHost=make("ScrollingFrame",{Size=UDim2.new(1,0,1,0),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=3},pageViewport)
+	make("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},pageHost)
+	make("UIPadding",{PaddingTop=UDim.new(0,2),PaddingLeft=UDim.new(0,3),PaddingRight=UDim.new(0,7),PaddingBottom=UDim.new(0,2)},pageHost)
 
-	local settingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=true,ZIndex=3,LayoutOrder=1},pageHost)
-	New("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},settingsPage)
+	local settingsPage=make("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=true,ZIndex=3,LayoutOrder=1},pageHost)
+	make("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},settingsPage)
 
-	local mapPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=2},pageHost)
-	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},mapPage)
+	local mapPage=make("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=2},pageHost)
+	make("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},mapPage)
 
-	local serverPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=3},pageHost)
-	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},serverPage)
+	local serverPage=make("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=3},pageHost)
+	make("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},serverPage)
 
-	local uiSettingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=4},pageHost)
-	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},uiSettingsPage)
+	local uiSettingsPage=make("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=4},pageHost)
+	make("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},uiSettingsPage)
 
-	local futurePage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=5},pageHost)
-	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},futurePage)
+	local futurePage=make("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=5},pageHost)
+	make("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},futurePage)
 
-	local actualSettingsPage=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=6},pageHost)
-	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},actualSettingsPage)
+	local actualSettingsPage=make("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=6},pageHost)
+	make("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},actualSettingsPage)
 
 	local activePageName="main"
 	local activePageValue=makeFusionValue(activePageName)
@@ -568,7 +568,7 @@ function MainFrame.new(app)
 	local function activeTabColor(name)
 		return makeFusionComputed(function(use)
 			use(profileVersionValue)
-			return use(activePageValue)==name and THEME.TEXT or THEME.MUTED
+			return use(activePageValue)==name and colors.text or colors.muted
 		end)
 	end
 
@@ -616,7 +616,7 @@ function MainFrame.new(app)
 
 		if enabled then
 			if not existing then
-				New("UIPadding",{Name="NavPadding",PaddingLeft=UDim.new(0,10),PaddingRight=UDim.new(0,8)},tab)
+				make("UIPadding",{Name="NavPadding",PaddingLeft=UDim.new(0,10),PaddingRight=UDim.new(0,8)},tab)
 			end
 		elseif existing then
 			existing:Destroy()
@@ -628,8 +628,8 @@ function MainFrame.new(app)
 
 		if navIsLeft then
 			if not pageArea or not pageArea.Parent then
-				pageArea=New("Frame",{Size=UDim2.new(1,0,0,384),BackgroundTransparency=1,ZIndex=3,LayoutOrder=2},main)
-				New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,navGap),SortOrder=Enum.SortOrder.LayoutOrder,VerticalAlignment=Enum.VerticalAlignment.Top},pageArea)
+				pageArea=make("Frame",{Size=UDim2.new(1,0,0,384),BackgroundTransparency=1,ZIndex=3,LayoutOrder=2},main)
+				make("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,navGap),SortOrder=Enum.SortOrder.LayoutOrder,VerticalAlignment=Enum.VerticalAlignment.Top},pageArea)
 			end
 
 			pageBar.Parent=pageArea
@@ -667,7 +667,7 @@ function MainFrame.new(app)
 			local active=activePageName==spec.page
 			local button=spec.button
 			button:SetAttribute("ThemeTextRole",active and "TEXT" or "MUTED")
-			button.TextColor3=active and THEME.TEXT or THEME.MUTED
+			button.TextColor3=active and colors.text or colors.muted
 			button.Font=active and titleFont or controlFont
 		end
 	end
@@ -739,25 +739,25 @@ function MainFrame.new(app)
 	activate(futureTab,function() setActivePage("page2") end)
 	activate(settingsPageTab,function() setActivePage("settings") end)
 
-	local contentWrap=New("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,ZIndex=3,LayoutOrder=1},settingsPage)
-	local contentLayout=New("UIListLayout",{Padding=UDim.new(0,columnGap),SortOrder=Enum.SortOrder.LayoutOrder,FillDirection=Enum.FillDirection.Horizontal},contentWrap)
+	local contentWrap=make("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,ZIndex=3,LayoutOrder=1},settingsPage)
+	local contentLayout=make("UIListLayout",{Padding=UDim.new(0,columnGap),SortOrder=Enum.SortOrder.LayoutOrder,FillDirection=Enum.FillDirection.Horizontal},contentWrap)
 
 	local columnHalfGap=columnGap/2
-	local leftCol=New("Frame",{Size=UDim2.new(0.5,-columnHalfGap,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ZIndex=3,LayoutOrder=1},contentWrap)
-	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},leftCol)
+	local leftCol=make("Frame",{Size=UDim2.new(0.5,-columnHalfGap,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ZIndex=3,LayoutOrder=1},contentWrap)
+	make("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},leftCol)
 
-	local rightCol=New("Frame",{Size=UDim2.new(0.5,-columnHalfGap,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ZIndex=3,LayoutOrder=2},contentWrap)
-	New("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},rightCol)
+	local rightCol=make("Frame",{Size=UDim2.new(0.5,-columnHalfGap,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ZIndex=3,LayoutOrder=2},contentWrap)
+	make("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},rightCol)
 
 	updateResponsiveLayout=function()
 		local cam=workspace.CurrentCamera
 		local vp=cam and cam.ViewportSize or Vector2.new(1920,1080)
 
-		UI_WINDOW.W=math.clamp(UI_WINDOW.W,UI_WINDOW.MinW,math.min(UI_WINDOW.MaxW,math.max(560,vp.X-40)))
-		UI_WINDOW.H=math.clamp(UI_WINDOW.H,UI_WINDOW.MinH,math.min(UI_WINDOW.MaxH,math.max(360,vp.Y-120)))
-		root.Size=UDim2.fromOffset(UI_WINDOW.W,uiMinimized and minimizedRootH or UI_WINDOW.H)
+		windowState.W=math.clamp(windowState.W,windowState.MinW,math.min(windowState.MaxW,math.max(560,vp.X-40)))
+		windowState.H=math.clamp(windowState.H,windowState.MinH,math.min(windowState.MaxH,math.max(360,vp.Y-120)))
+		root.Size=UDim2.fromOffset(windowState.W,uiMinimized and minimizedRootH or windowState.H)
 
-		local contentHeight=math.max(0,UI_WINDOW.H-(rootPadding*2))
+		local contentHeight=math.max(0,windowState.H-(rootPadding*2))
 		local usedHeight=headerHeight+footerHeight+(mainGap*2)
 		if not navIsLeft then
 			usedHeight=usedHeight+pageBarHeight+mainGap
@@ -775,10 +775,10 @@ function MainFrame.new(app)
 			pageShell.Size=UDim2.fromOffset(pageShellWidth,pageBarHeight)
 			pageViewport.Size=UDim2.new(1,0,0,pageHeight)
 			pageHost.Size=UDim2.new(1,0,1,0)
-			pageShellScale.Scale=math.min(1,math.max(0.72,(UI_WINDOW.W-16)/pageShellWidth))
+			pageShellScale.Scale=math.min(1,math.max(0.72,(windowState.W-16)/pageShellWidth))
 		end
 
-		local compact=UI_WINDOW.W<720 or vp.X<1100
+		local compact=windowState.W<720 or vp.X<1100
 		if compact then
 			contentLayout.FillDirection=Enum.FillDirection.Vertical
 			leftCol.Size=UDim2.new(1,0,0,0)
@@ -792,24 +792,24 @@ function MainFrame.new(app)
 
 	updateResponsiveLayout()
 
-	local footer=New("Frame",{BackgroundColor3=THEME.BG,BackgroundTransparency=0,Size=UDim2.new(1,0,0,footerHeight),ZIndex=8,LayoutOrder=4,ThemeRole="BG"},main)
-	New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,footerGap),SortOrder=Enum.SortOrder.LayoutOrder,HorizontalAlignment=Enum.HorizontalAlignment.Right,VerticalAlignment=Enum.VerticalAlignment.Center},footer)
+	local footer=make("Frame",{BackgroundColor3=colors.bg,BackgroundTransparency=0,Size=UDim2.new(1,0,0,footerHeight),ZIndex=8,LayoutOrder=4,ThemeRole="BG"},main)
+	make("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,footerGap),SortOrder=Enum.SortOrder.LayoutOrder,HorizontalAlignment=Enum.HorizontalAlignment.Right,VerticalAlignment=Enum.VerticalAlignment.Center},footer)
 
 	function api.RefreshESPStatus() end
 	function api.RefreshActionStatus() end
 
 	local function makeFooterBtn(text,width)
-		local b=New("TextButton",{Size=UDim2.fromOffset(width or 96,30),BackgroundColor3=THEME.BUTTON or THEME.BG,Text=string.upper(text),TextColor3=THEME.TEXT,Font=controlFont,TextSize=12,AutoButtonColor=false,Selectable=true,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON"},footer)
-		local wrap=wrapTextButton(b,THEME.BUTTON or THEME.BG,2)
+		local b=make("TextButton",{Size=UDim2.fromOffset(width or 96,30),BackgroundColor3=colors.button or colors.bg,Text=string.upper(text),TextColor3=colors.text,Font=controlFont,TextSize=12,AutoButtonColor=false,Selectable=true,BorderSizePixel=0,ZIndex=6,ThemeRole="BUTTON"},footer)
+		local wrap=wrapTextButton(b,colors.button or colors.bg,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 		wrap:SetAttribute("CornerRole","Control")
 
 		connect(b.MouseEnter,function()
-			wrap.BackgroundColor3=THEME.CARD
+			wrap.BackgroundColor3=colors.card
 		end)
 
 		connect(b.MouseLeave,function()
-			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
+			wrap.BackgroundColor3=colors.button or colors.bg
 		end)
 
 		return b,wrap
@@ -839,7 +839,7 @@ function MainFrame.new(app)
 
 	refreshFooterResetButton()
 
-	local toastHost=New("Frame",{
+	local toastHost=make("Frame",{
 		Name="ToastHost",
 		AnchorPoint=Vector2.new(1,1),
 		Position=UDim2.new(1,-18,1,-18),
@@ -847,8 +847,8 @@ function MainFrame.new(app)
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		ZIndex=80,
-	},SG)
-	New("UIListLayout",{
+	},screenGui)
+	make("UIListLayout",{
 		FillDirection=Enum.FillDirection.Vertical,
 		Padding=UDim.new(0,8),
 		SortOrder=Enum.SortOrder.LayoutOrder,
@@ -862,17 +862,17 @@ function MainFrame.new(app)
 		variant=tostring(variant or "info"):lower()
 		duration=tonumber(duration) or 2.2
 
-		local color=THEME.BUTTON or THEME.BG
-		local textColor=THEME.TEXT
+		local color=colors.button or colors.bg
+		local textColor=colors.text
 		if variant=="error" or variant=="danger" then
-			color=THEME.RED
+			color=colors.red
 			textColor=Color3.fromRGB(0,0,0)
 		elseif variant=="success" then
-			color=THEME.GREEN
+			color=colors.green
 			textColor=Color3.fromRGB(0,0,0)
 		end
 
-		local toast=New("Frame",{
+		local toast=make("Frame",{
 			BackgroundColor3=color,
 			BackgroundTransparency=0.04,
 			BorderSizePixel=0,
@@ -882,10 +882,10 @@ function MainFrame.new(app)
 			SkipThemeRole=true,
 			CornerRole="Control",
 		},toastHost)
-		New("UICorner",{CornerRadius=UDim.new(0,0)},toast)
-		local toastStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=0.35},toast)
+		make("UICorner",{CornerRadius=UDim.new(0,0)},toast)
+		local toastStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=0.35},toast)
 		toastStroke:SetAttribute("BaseStrokeTransparency",0.35)
-		New("TextLabel",{
+		make("TextLabel",{
 			BackgroundTransparency=1,
 			Position=UDim2.fromOffset(12,0),
 			Size=UDim2.new(1,-24,1,0),
@@ -933,9 +933,9 @@ function MainFrame.new(app)
 		end)
 	end
 
-	resizeHandle=New("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=getUIStrokeColor(),BackgroundTransparency=0.18,BorderSizePixel=0,Text="",Visible=resizeHandleVisible,ZIndex=30,SkipThemeRole=true},root)
-	New("UICorner",{CornerRadius=UDim.new(0,0)},resizeHandle)
-	local resizeStroke=New("UIStroke",{Color=THEME.BG,Thickness=1,Transparency=0.25},resizeHandle)
+	resizeHandle=make("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=getUIStrokeColor(),BackgroundTransparency=0.18,BorderSizePixel=0,Text="",Visible=resizeHandleVisible,ZIndex=30,SkipThemeRole=true},root)
+	make("UICorner",{CornerRadius=UDim.new(0,0)},resizeHandle)
+	local resizeStroke=make("UIStroke",{Color=colors.bg,Thickness=1,Transparency=0.25},resizeHandle)
 
 	local resizeHovering=false
 	local resizing=false
@@ -951,7 +951,7 @@ function MainFrame.new(app)
 		}):Play()
 
 		TweenService:Create(resizeStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
-			Color=held and (THEME.TEXT or Color3.new(1,1,1)) or (THEME.BG or Color3.new()),
+			Color=held and (colors.text or Color3.new(1,1,1)) or (colors.bg or Color3.new()),
 			Thickness=1,
 			Transparency=(held or resizeHovering) and 0.08 or 0.25,
 		}):Play()
@@ -985,26 +985,26 @@ function MainFrame.new(app)
 
 			resizing=true
 			paintResizeHandle(true)
-			startMouse=UIS:GetMouseLocation()
-			startW,startH=UI_WINDOW.W,UI_WINDOW.H
+			startMouse=inputService:GetMouseLocation()
+			startW,startH=windowState.W,windowState.H
 			startPos=root.Position
 			safeDisconnect(resizeMoveConn)
 
-			resizeMoveConn=connect(UIS.InputChanged,function(changed)
+			resizeMoveConn=connect(inputService.InputChanged,function(changed)
 				if not resizing or not isAlive() then return end
 				if changed.UserInputType~=Enum.UserInputType.MouseMovement then return end
 
-				local cur=UIS:GetMouseLocation()
+				local cur=inputService:GetMouseLocation()
 				local scale=uiScale.Scale
 				if scale<=0 then scale=1 end
 
 				local dx=(cur.X-startMouse.X)/scale
 				local dy=(cur.Y-startMouse.Y)/scale
 
-				UI_WINDOW.W=math.clamp(startW-dx,UI_WINDOW.MinW,UI_WINDOW.MaxW)
-				UI_WINDOW.H=math.clamp(startH+dy,UI_WINDOW.MinH,UI_WINDOW.MaxH)
+				windowState.W=math.clamp(startW-dx,windowState.MinW,windowState.MaxW)
+				windowState.H=math.clamp(startH+dy,windowState.MinH,windowState.MaxH)
 
-				local usedDx=startW-UI_WINDOW.W
+				local usedDx=startW-windowState.W
 				root.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+(usedDx*0.5),startPos.Y.Scale,startPos.Y.Offset)
 
 				if updateResponsiveLayout then
@@ -1013,7 +1013,7 @@ function MainFrame.new(app)
 			end)
 		end)
 
-		connect(UIS.InputEnded,function(input)
+		connect(inputService.InputEnded,function(input)
 			if input.UserInputType==Enum.UserInputType.MouseButton1 then
 				stopResize()
 			end
@@ -1041,7 +1041,7 @@ function MainFrame.new(app)
 		root.Visible=true
 		setBodyVisible(true)
 
-		local tween=tweenRootSize(UDim2.fromOffset(UI_WINDOW.W,minimizedRootH),0.22)
+		local tween=tweenRootSize(UDim2.fromOffset(windowState.W,minimizedRootH),0.22)
 		tween.Completed:Connect(function()
 			if uiMinimized then
 				setBodyVisible(false)
@@ -1058,7 +1058,7 @@ function MainFrame.new(app)
 		miniBtn.Text="-"
 		root.Visible=true
 		setBodyVisible(true)
-		tweenRootSize(UDim2.fromOffset(UI_WINDOW.W,UI_WINDOW.H),0.22)
+		tweenRootSize(UDim2.fromOffset(windowState.W,windowState.H),0.22)
 	end
 
 	activate(miniBtn,function()
@@ -1089,7 +1089,7 @@ function MainFrame.new(app)
 				return
 			end
 
-			local cur=UIS:GetMouseLocation()
+			local cur=inputService:GetMouseLocation()
 			local scale=uiScale.Scale
 			if scale<=0 then scale=1 end
 
@@ -1109,7 +1109,7 @@ function MainFrame.new(app)
 		connect(header.InputBegan,function(i)
 			if i.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=true
-				startMouse=UIS:GetMouseLocation()
+				startMouse=inputService:GetMouseLocation()
 				startPos=root.Position
 				lastDragTween=0
 				lastDragTarget=nil
@@ -1124,7 +1124,7 @@ function MainFrame.new(app)
 			end
 		end)
 
-		connect(UIS.InputEnded,function(i)
+		connect(inputService.InputEnded,function(i)
 			if i.UserInputType==Enum.UserInputType.MouseButton1 and dragging then
 				stopDrag()
 			end
@@ -1147,8 +1147,8 @@ function MainFrame.new(app)
 		updateResponsiveLayout()
 	end
 
-	function api.ResetPosition(animate)
-		local rootHeight=(root and root.AbsoluteSize and root.AbsoluteSize.Y) or UI_WINDOW.H or 540
+	function api.resetPosition(animate)
+		local rootHeight=(root and root.AbsoluteSize and root.AbsoluteSize.Y) or windowState.H or 540
 		local defaultPosition=UDim2.new(0.5,0,0.5,-math.floor(rootHeight/2))
 		if animate==false then
 			if rootPositionTween then
@@ -1175,12 +1175,12 @@ function MainFrame.new(app)
 		loadProfile(profile or currentProfile())
 		loadLayoutNumbers()
 
-		UI_WINDOW.MinW=layoutNumber(windowProfile,"MinW",UI_WINDOW.MinW or 560)
-		UI_WINDOW.MinH=layoutNumber(windowProfile,"MinH",UI_WINDOW.MinH or 360)
-		UI_WINDOW.MaxW=layoutNumber(windowProfile,"MaxW",UI_WINDOW.MaxW or 1220)
-		UI_WINDOW.MaxH=layoutNumber(windowProfile,"MaxH",UI_WINDOW.MaxH or 820)
-		UI_WINDOW.W=math.clamp(UI_WINDOW.W,UI_WINDOW.MinW,UI_WINDOW.MaxW)
-		UI_WINDOW.H=math.clamp(UI_WINDOW.H,UI_WINDOW.MinH,UI_WINDOW.MaxH)
+		windowState.MinW=layoutNumber(windowProfile,"MinW",windowState.MinW or 560)
+		windowState.MinH=layoutNumber(windowProfile,"MinH",windowState.MinH or 360)
+		windowState.MaxW=layoutNumber(windowProfile,"MaxW",windowState.MaxW or 1220)
+		windowState.MaxH=layoutNumber(windowProfile,"MaxH",windowState.MaxH or 820)
+		windowState.W=math.clamp(windowState.W,windowState.MinW,windowState.MaxW)
+		windowState.H=math.clamp(windowState.H,windowState.MinH,windowState.MaxH)
 
 		columnHalfGap=columnGap/2
 		rootPad.PaddingTop=UDim.new(0,rootPadding)
@@ -1212,7 +1212,7 @@ function MainFrame.new(app)
 	end
 
 	function api.RefreshText(newDescription)
-		Description=newDescription or Description
+		description=newDescription or description
 		bumpFusionValue(descriptionVersionValue)
 		titleText.Text=text(desc("Main.Title","untitled gui"))
 		subtitleText.Text=text(desc("Main.Description",getModeLabel().." loaded"))
@@ -1263,4 +1263,4 @@ function MainFrame.new(app)
 	return api
 end
 
-return MainFrame
+return mainFrame

@@ -1,32 +1,32 @@
 -- marks open receivers while you are the quarterback.
 
-local ESPOffense={}
+local espOffense={}
 
 local Players=game:GetService("Players")
 local RunService=game:GetService("RunService")
 
 local me=Players.LocalPlayer
 
-local VALID_TEAM_IDS={
+local validTeamIds={
 	HomeTeam=true,
 	AwayTeam=true,
 }
 
-local ESP_HIGHLIGHT_NAME="MyESPHighlight"
-local QB_AIM_HIGHLIGHT_NAME="QBAimTargetHighlight"
-local BALL_G=28
-local G=Vector3.new(0,-BALL_G,0)
-local MODEL_BALL_SPEED=95
-local DEFAULT_THROW_Y=14
-local MIN_THROW_ANGLE=-5
-local MAX_THROW_ANGLE=55
-local DEFENDER_SPEED_STUDS=21
-local DEFENDER_REACTION_BUFFER=0.05
-local CATCH_HEIGHT_TOLERANCE=0.25
-local PASS_SAMPLE_DT=0.08
-local PASS_SAMPLE_MAX=28
-local ESP_REFRESH_INTERVAL=0.12
-local ESP_TEAM_CACHE_INTERVAL=0.50
+local espHighlightName="MyESPHighlight"
+local qbTargetHighlightName="QBAimTargetHighlight"
+local ballGravity=28
+local gravityVector=Vector3.new(0,-ballGravity,0)
+local modelBallSpeed=95
+local defaultThrowY=14
+local minThrowAngle=-5
+local maxThrowAngle=55
+local defenderSpeed=21
+local defenderReactionBuffer=0.05
+local catchHeightTolerance=0.25
+local passSampleStep=0.08
+local passSampleMax=28
+local espRefreshInterval=0.12
+local espTeamCacheInterval=0.50
 local teamCache=setmetatable({}, {__mode="k"})
 
 local function clampByte(value,fallback)
@@ -61,7 +61,7 @@ local function styleColor(style,prefix,legacyPrefix,channel,fallback)
 end
 
 local function highlightStyle(app,stateKey,fallbackColor)
-	local style=app and app.UI_STYLE
+	local style=app and app.style
 	local prefix=stateKey=="closed" and "ESPOffenseClosed" or "ESPOffenseOpen"
 	return{
 		fill=styleColor(style,prefix,"ESPOffense","Fill",fallbackColor),
@@ -142,7 +142,7 @@ local function getPlayerTeamID(player)
 
 	local now=os.clock()
 	local cached=teamCache[player]
-	if cached and now-cached.t<ESP_TEAM_CACHE_INTERVAL then
+	if cached and now-cached.t<espTeamCacheInterval then
 		return cached.value
 	end
 
@@ -170,7 +170,7 @@ local function getPlayerTeamID(player)
 end
 
 local function isValidGameTeamID(teamID)
-	return teamID~=nil and VALID_TEAM_IDS[teamID]==true
+	return teamID~=nil and validTeamIds[teamID]==true
 end
 
 local function isSameTeam(playerA,playerB)
@@ -220,7 +220,7 @@ local function getConfiguredThrowY(app)
 		return math.clamp(value,8,24)
 	end
 
-	return DEFAULT_THROW_Y
+	return defaultThrowY
 end
 
 local function getThrowOrigin(qbRoot,footballPart,throwY)
@@ -238,15 +238,15 @@ local function getReceiverTarget(receiverRoot,catchY)
 end
 
 local function ballAt(origin,velocity,time)
-	return origin+velocity*time+0.5*G*time*time
+	return origin+velocity*time+0.5*gravityVector*time*time
 end
 
 local function solveStationaryThrow(origin,target)
 	local delta=target-origin
 	local xz2=delta.X*delta.X+delta.Z*delta.Z
 	local y=delta.Y
-	local a=0.25*BALL_G*BALL_G
-	local b=y*BALL_G-MODEL_BALL_SPEED*MODEL_BALL_SPEED
+	local a=0.25*ballGravity*ballGravity
+	local b=y*ballGravity-modelBallSpeed*modelBallSpeed
 	local c=xz2+y*y
 	local discriminant=b*b-4*a*c
 	if discriminant<0 then
@@ -263,17 +263,17 @@ local function solveStationaryThrow(origin,target)
 	}) do
 		if timeSquared and timeSquared>1e-6 then
 			local time=math.sqrt(timeSquared)
-			local velocity=(target-origin-0.5*G*time*time)/time
+			local velocity=(target-origin-0.5*gravityVector*time*time)/time
 			local speed=velocity.Magnitude
 			if speed>1e-6 then
 				local direction=velocity.Unit
 				local angle=math.deg(math.asin(math.clamp(direction.Y,-1,1)))
-				if angle>=MIN_THROW_ANGLE and angle<=MAX_THROW_ANGLE then
+				if angle>=minThrowAngle and angle<=maxThrowAngle then
 					local candidate={
 						time=time,
 						origin=origin,
 						target=target,
-						velocity=direction*MODEL_BALL_SPEED,
+						velocity=direction*modelBallSpeed,
 						angle=angle,
 					}
 
@@ -307,14 +307,14 @@ local function defenderCanReachBall(defenderRoot,ballPosition,elapsed,catchY)
 		return false
 	end
 
-	if ballPosition.Y>catchY+CATCH_HEIGHT_TOLERANCE then
+	if ballPosition.Y>catchY+catchHeightTolerance then
 		return false
 	end
 
 	local distanceXZ=(flat(defenderRoot.Position)-flat(ballPosition)).Magnitude
-	local reachTime=distanceXZ/DEFENDER_SPEED_STUDS
+	local reachTime=distanceXZ/defenderSpeed
 
-	return reachTime<=elapsed+DEFENDER_REACTION_BUFFER
+	return reachTime<=elapsed+defenderReactionBuffer
 end
 
 local function passCanBeIntercepted(plan,defenderRoots,catchY)
@@ -328,7 +328,7 @@ local function passCanBeIntercepted(plan,defenderRoots,catchY)
 		end
 	end
 
-	local sampleCount=math.clamp(math.ceil(plan.time/PASS_SAMPLE_DT),4,PASS_SAMPLE_MAX)
+	local sampleCount=math.clamp(math.ceil(plan.time/passSampleStep),4,passSampleMax)
 	for sampleIndex=1,sampleCount do
 		local time=plan.time*sampleIndex/sampleCount
 		local ballPosition=ballAt(plan.origin,plan.velocity,time)
@@ -356,7 +356,7 @@ local function isReceiverClosed(receiverPlayer,origin,defenderRoots,catchY)
 end
 
 local function getOurHighlight(character)
-	local highlight=character and character:FindFirstChild(ESP_HIGHLIGHT_NAME)
+	local highlight=character and character:FindFirstChild(espHighlightName)
 	if highlight and highlight:IsA("Highlight") then
 		return highlight
 	end
@@ -365,7 +365,7 @@ local function getOurHighlight(character)
 end
 
 local function hasActiveQBAimHighlight(character)
-	local highlight=character and character:FindFirstChild(QB_AIM_HIGHLIGHT_NAME)
+	local highlight=character and character:FindFirstChild(qbTargetHighlightName)
 	return highlight and highlight:IsA("Highlight") and highlight.Enabled==true
 end
 
@@ -374,7 +374,7 @@ local function ensureOwnedHighlight(character)
 	if highlight then return highlight end
 
 	highlight=Instance.new("Highlight")
-	highlight.Name=ESP_HIGHLIGHT_NAME
+	highlight.Name=espHighlightName
 	highlight.Parent=character
 	return highlight
 end
@@ -400,13 +400,13 @@ local function destroyOwnedHighlight(character)
 	end
 end
 
-function ESPOffense.new(app)
-	local THEME=app.THEME
+function espOffense.new(app)
+	local colors=app.colors
 	local safeDisconnect=app.safeDisconnect
-	local scheduler=app.Scheduler
+	local scheduler=app.schedulerApi
 	local services=app.Services or {}
-	local playerCache=services.PlayerCache or app.PlayerCache
-	local ballTracker=services.BallTracker or app.BallTracker
+	local playerCache=services.playerCacheApi or app.playerCacheApi
+	local ballTracker=services.ballTrackerApi or app.ballTrackerApi
 	local api={}
 	local heartbeatConn=nil
 	local heartbeatElapsed=0
@@ -470,8 +470,8 @@ function ESPOffense.new(app)
 		local catchY=getConfiguredThrowY(app)
 		local origin=getThrowOrigin(qbRoot,nil,catchY)
 		local defenderRoots=collectDefenderRoots(players)
-		local red=THEME.RED or Color3.fromRGB(210,70,70)
-		local green=THEME.GREEN or Color3.fromRGB(90,200,90)
+		local red=colors.red or Color3.fromRGB(210,70,70)
+		local green=colors.green or Color3.fromRGB(90,200,90)
 
 		for _,player in ipairs(players) do
 			if player~=me then
@@ -500,7 +500,7 @@ function ESPOffense.new(app)
 		heartbeatConn=nil
 		heartbeatElapsed=0
 		if scheduler and scheduler.Register then
-			scheduler.Register("Heartbeat",schedulerJobId,ESP_REFRESH_INTERVAL,function()
+			scheduler.Register("Heartbeat",schedulerJobId,espRefreshInterval,function()
 				if running then
 					rebuild()
 				end
@@ -508,7 +508,7 @@ function ESPOffense.new(app)
 		else
 			heartbeatConn=RunService.Heartbeat:Connect(function(dt)
 				heartbeatElapsed=heartbeatElapsed+(dt or 0)
-				if heartbeatElapsed<ESP_REFRESH_INTERVAL then return end
+				if heartbeatElapsed<espRefreshInterval then return end
 				heartbeatElapsed=0
 				rebuild()
 			end)
@@ -539,4 +539,4 @@ function ESPOffense.new(app)
 	return api
 end
 
-return ESPOffense
+return espOffense

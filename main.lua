@@ -3,12 +3,12 @@
 
 local HttpService=game:GetService("HttpService")
 
-local BOT_URL="https://lint-bot-production.up.railway.app"
-local MODULE_GET="/module/get"
-local LOADER_PATH="loader.lua"
-local LOADER_MARKER="HB_LOADER_V3"
-local API_KEY="thekeytoheaven"
-local MAX_LOADER_SIZE=160000
+local botUrl="https://lint-bot-production.up.railway.app"
+local moduleGetPath="/module/get"
+local loaderPath="loader.lua"
+local loaderMarker="HB_LOADER_V3"
+local apiKey="thekeytoheaven"
+local maxLoaderBytes=160000
 
 local function typeOf(value)
 	if typeof then
@@ -49,13 +49,13 @@ local function fetchLoader()
 	end
 
 	local body=HttpService:JSONEncode({
-		path=LOADER_PATH,
-		apiKey=API_KEY
+		path=loaderPath,
+		apiKey=apiKey
 	})
 
 	local ok,response=pcall(function()
 		return requestFn({
-			Url=BOT_URL..MODULE_GET,
+			Url=botUrl..moduleGetPath,
 			Method="POST",
 			Headers={
 				["Content-Type"]="application/json"
@@ -93,11 +93,11 @@ if not source then
 	error("loader fetch failed: "..tostring(fetchError))
 end
 
-if #source>MAX_LOADER_SIZE then
+if #source>maxLoaderBytes then
 	error("loader too big")
 end
 
-if not source:find(LOADER_MARKER,1,true) then
+if not source:find(loaderMarker,1,true) then
 	error("loader marker missing")
 end
 

@@ -1,40 +1,40 @@
 -- main control factory. sliders, toggles, sections, and the odd custom widget live here.
 
-local GuiLogic={}
+local guiLogic={}
 
-function GuiLogic.new(app)
-	local New=app.New
-	local Fusion=app.Fusion
-	local THEME=app.THEME
-	local UI_STYLE=app.UI_STYLE or {}
-	local UIS=app.UIS
+function guiLogic.new(app)
+	local make=app.New
+	local fusion=app.Fusion
+	local colors=app.colors
+	local style=app.style or {}
+	local inputService=app.inputService
 	local GuiService=app.GuiService or game:GetService("GuiService")
 	local TweenService=app.TweenService
 	local fmtNumber=app.fmtNumber
-	local BOX_WRAPPERS=app.BOX_WRAPPERS or setmetatable({}, {__mode="k"})
-	local BUTTON_WRAPPERS=app.BUTTON_WRAPPERS or setmetatable({}, {__mode="k"})
+	local boxWrappers=app.boxWrappers or setmetatable({}, {__mode="k"})
+	local buttonWrappers=app.buttonWrappers or setmetatable({}, {__mode="k"})
 	local markThemeRole=app.markThemeRole or function() end
 	local getUILibRuntimeStyle=app.getUILibRuntimeStyle
 
 	local api={}
-	local WRAP_INSET=0
-	local EMPTY_TABLE={}
-	local DEFAULT_SHAPE={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original"}
-	local TOGGLE_TICK_ALPHAS={0.25,0.5,0.75}
-	local TOGGLE_SOFT_TWEEN=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
-	local TOGGLE_SNAP_TWEEN=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
-	local BUILTIN_PROFILES={
+	local wrapInset=0
+	local emptyTable={}
+	local defaultShape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original"}
+	local toggleTickAlphas={0.25,0.5,0.75}
+	local toggleSoftTween=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+	local toggleSnapTween=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+	local builtInProfiles={
 		windui={Shape={WindowRadius=12,SectionRadius=10,ControlRadius=8,SliderRadius=10,SliderHeight=24,SliderStyle="windui"}},
 		rayfield={Shape={WindowRadius=6,SectionRadius=5,ControlRadius=4,SliderRadius=4,SliderHeight=26,SliderStyle="rayfield"}},
 		linoria={Shape={WindowRadius=3,SectionRadius=2,ControlRadius=2,SliderRadius=2,SliderHeight=22,SliderStyle="thin"}},
 		obsidian={Shape={WindowRadius=9,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=24,SliderStyle="glow"}},
 		visual={Shape={WindowRadius=8,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=28,SliderStyle="pill"}},
-		original={Shape=DEFAULT_SHAPE},
+		original={Shape=defaultShape},
 	}
 
 	local function makeFusionValue(initial)
-		if type(Fusion)=="table" and type(Fusion.Value)=="function" then
-			return Fusion.Value(initial)
+		if type(fusion)=="table" and type(fusion.Value)=="function" then
+			return fusion.Value(initial)
 		end
 		return nil
 	end
@@ -52,7 +52,7 @@ function GuiLogic.new(app)
 	end
 
 	local function currentLib()
-		return tostring(UI_STYLE.UILib or "original"):lower()
+		return tostring(style.UILib or "original"):lower()
 	end
 
 	local function profile()
@@ -65,17 +65,17 @@ function GuiLogic.new(app)
 			end
 		end
 
-		return BUILTIN_PROFILES[lib] or BUILTIN_PROFILES.original
+		return builtInProfiles[lib] or builtInProfiles.original
 	end
 
 	local function shape()
 		local style=profile()
-		return type(style.Shape)=="table" and style.Shape or DEFAULT_SHAPE
+		return type(style.Shape)=="table" and style.Shape or defaultShape
 	end
 
 	local function components()
 		local style=profile()
-		return type(style.Components)=="table" and style.Components or EMPTY_TABLE
+		return type(style.Components)=="table" and style.Components or emptyTable
 	end
 
 	local function componentValue(key,fallback)
@@ -104,16 +104,16 @@ function GuiLogic.new(app)
 		if not instance then return nil end
 
 		instance:SetAttribute("CornerRole",role or "Control")
-		return New("UICorner",{CornerRadius=UDim.new(0,0)},instance)
+		return make("UICorner",{CornerRadius=UDim.new(0,0)},instance)
 	end
 
 	local function themeColor(role,fallback)
-		return THEME[role] or fallback
+		return colors[role] or fallback
 	end
 
 	local function themeRoleColor(role,fallback)
-		if type(role)=="string" and THEME[role] then
-			return THEME[role]
+		if type(role)=="string" and colors[role] then
+			return colors[role]
 		end
 
 		return fallback
@@ -136,7 +136,7 @@ function GuiLogic.new(app)
 	end
 
 	local function hoverColor(base,amount)
-		base=base or THEME.BUTTON or THEME.BG
+		base=base or colors.button or colors.bg
 		amount=tonumber(amount) or 0.08
 		local toward=luminance(base)<0.55 and Color3.new(1,1,1) or Color3.new(0,0,0)
 		return base:Lerp(toward,amount)
@@ -157,7 +157,7 @@ function GuiLogic.new(app)
 			return position
 		end
 
-		return UIS:GetMouseLocation()
+		return inputService:GetMouseLocation()
 	end
 
 	local function guiInset()
@@ -225,9 +225,9 @@ function GuiLogic.new(app)
 		zIndex=zIndex or 6
 
 		local onRole=tostring(c.ToggleOnRole or "SLIDER_FILL")
-		local accent=themeRoleColor(onRole,themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(32,202,106)))
-		local input=themeColor("SLIDER_BG",themeColor("INPUT",THEME.PANEL or Color3.fromRGB(18,18,24)))
-		local muted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
+		local accent=themeRoleColor(onRole,themeColor("SLIDER_FILL",colors.green or Color3.fromRGB(32,202,106)))
+		local input=themeColor("SLIDER_BG",themeColor("INPUT",colors.panel or Color3.fromRGB(18,18,24)))
+		local muted=themeColor("MUTED",colors.muted or Color3.fromRGB(145,145,155))
 		local tickHeight=math.max(6,height-10)
 		local state=startState and true or false
 		local stateValue=makeFusionValue(state)
@@ -240,7 +240,7 @@ function GuiLogic.new(app)
 			return connection
 		end
 
-		local wrap=New("Frame",{
+		local wrap=make("Frame",{
 			Size=UDim2.fromOffset(width,height),
 			BackgroundColor3=input,
 			BorderSizePixel=0,
@@ -251,7 +251,7 @@ function GuiLogic.new(app)
 		},parent)
 		addCorner(wrap,"Control")
 
-		local fillClip=New("Frame",{
+		local fillClip=make("Frame",{
 			AnchorPoint=Vector2.new(0,0.5),
 			Position=UDim2.fromScale(0,0.5),
 			Size=UDim2.new(0,0,1,0),
@@ -261,7 +261,7 @@ function GuiLogic.new(app)
 			ZIndex=zIndex+1,
 		},wrap)
 
-		local fill=New("Frame",{
+		local fill=make("Frame",{
 			AnchorPoint=Vector2.new(0,0.5),
 			Position=UDim2.fromScale(0,0.5),
 			Size=UDim2.new(1,0,1,0),
@@ -273,7 +273,7 @@ function GuiLogic.new(app)
 		},fillClip)
 		addCorner(fill,"Control")
 
-		local tickHolder=New("Frame",{
+		local tickHolder=make("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
 			Position=UDim2.fromScale(0.5,0.5),
 			Size=UDim2.new(1,-10,1,0),
@@ -283,8 +283,8 @@ function GuiLogic.new(app)
 		},wrap)
 
 		local ticks={}
-		for _,alpha in ipairs(TOGGLE_TICK_ALPHAS) do
-			local tick=New("Frame",{
+		for _,alpha in ipairs(toggleTickAlphas) do
+			local tick=make("Frame",{
 				AnchorPoint=Vector2.new(0.5,0.5),
 				Position=UDim2.fromScale(alpha,0.5),
 				Size=UDim2.fromOffset(1,tickHeight),
@@ -298,7 +298,7 @@ function GuiLogic.new(app)
 			table.insert(ticks,tick)
 		end
 
-		local hit=New("TextButton",{
+		local hit=make("TextButton",{
 			BackgroundTransparency=1,
 			Text="",
 			Size=UDim2.new(1,0,1,0),
@@ -327,9 +327,9 @@ function GuiLogic.new(app)
 		local function applyVisuals(animate)
 			cancelTweens()
 
-			local currentAccent=themeRoleColor(onRole,themeColor("SLIDER_FILL",THEME.GREEN or Color3.fromRGB(32,202,106)))
-			local currentBg=themeColor("SLIDER_BG",themeColor("INPUT",THEME.PANEL or Color3.fromRGB(18,18,24)))
-			local currentMuted=themeColor("MUTED",THEME.MUTED or Color3.fromRGB(145,145,155))
+			local currentAccent=themeRoleColor(onRole,themeColor("SLIDER_FILL",colors.green or Color3.fromRGB(32,202,106)))
+			local currentBg=themeColor("SLIDER_BG",themeColor("INPUT",colors.panel or Color3.fromRGB(18,18,24)))
+			local currentMuted=themeColor("MUTED",colors.muted or Color3.fromRGB(145,145,155))
 			local onTextColor=readableOn(currentAccent)
 			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
 			local fillTransparency=0
@@ -349,12 +349,12 @@ function GuiLogic.new(app)
 				return
 			end
 
-			tween(wrap,TOGGLE_SOFT_TWEEN,{BackgroundColor3=bgColor})
-			tween(fillClip,TOGGLE_SNAP_TWEEN,{Size=fillSize})
-			tween(fill,TOGGLE_SOFT_TWEEN,{BackgroundColor3=currentAccent,BackgroundTransparency=fillTransparency})
+			tween(wrap,toggleSoftTween,{BackgroundColor3=bgColor})
+			tween(fillClip,toggleSnapTween,{Size=fillSize})
+			tween(fill,toggleSoftTween,{BackgroundColor3=currentAccent,BackgroundTransparency=fillTransparency})
 
 			for _,tick in ipairs(ticks) do
-				tween(tick,TOGGLE_SOFT_TWEEN,{BackgroundColor3=state and onTextColor or currentMuted,BackgroundTransparency=state and 0.74 or 0.86})
+				tween(tick,toggleSoftTween,{BackgroundColor3=state and onTextColor or currentMuted,BackgroundTransparency=state and 0.74 or 0.86})
 			end
 		end
 
@@ -406,7 +406,7 @@ function GuiLogic.new(app)
 		local headerTween=nil
 		local destroyed=false
 
-		local holder=New("Frame",{
+		local holder=make("Frame",{
 			AnchorPoint=Vector2.new(1,0.5),
 			Size=UDim2.fromOffset(width,height),
 			BackgroundTransparency=1,
@@ -472,11 +472,11 @@ function GuiLogic.new(app)
 	end
 
 	local function insetSize(size)
-		return UDim2.new(size.X.Scale,size.X.Offset-(WRAP_INSET*2),size.Y.Scale,size.Y.Offset-(WRAP_INSET*2))
+		return UDim2.new(size.X.Scale,size.X.Offset-(wrapInset*2),size.Y.Scale,size.Y.Offset-(wrapInset*2))
 	end
 
 	local function insetPosition(position)
-		return UDim2.new(position.X.Scale,position.X.Offset+WRAP_INSET,position.Y.Scale,position.Y.Offset+WRAP_INSET)
+		return UDim2.new(position.X.Scale,position.X.Offset+wrapInset,position.Y.Scale,position.Y.Offset+wrapInset)
 	end
 
 	function api.attachHover(button,normalBg,hoverBg,normalText,hoverText)
@@ -494,7 +494,7 @@ function GuiLogic.new(app)
 			end
 
 			if button:IsA("TextButton") or button:IsA("TextLabel") then
-				button.TextColor3=resolve(hoverText) or resolve(normalText) or THEME.TEXT
+				button.TextColor3=resolve(hoverText) or resolve(normalText) or colors.text
 			end
 		end)
 
@@ -504,7 +504,7 @@ function GuiLogic.new(app)
 			end
 
 			if button:IsA("TextButton") or button:IsA("TextLabel") then
-				button.TextColor3=resolve(normalText) or THEME.TEXT
+				button.TextColor3=resolve(normalText) or colors.text
 			end
 		end)
 	end
@@ -515,7 +515,7 @@ function GuiLogic.new(app)
 		local wrap=Instance.new("Frame")
 
 		wrap.Name=box.Name~="" and (box.Name.."_Wrap") or "TextBoxWrap"
-		wrap.BackgroundColor3=bgColor or THEME.PANEL
+		wrap.BackgroundColor3=bgColor or colors.panel
 		wrap.BorderSizePixel=0
 		wrap.ClipsDescendants=false
 		wrap.Active=true
@@ -529,7 +529,7 @@ function GuiLogic.new(app)
 		addCorner(wrap,"Control")
 
 		local strokeTransparency=componentNumber("ControlStrokeTransparency",0.78)
-		local stroke=New("UIStroke",{Color=THEME.STROKE,Thickness=math.min(strokeThickness or 1,1),Transparency=strokeTransparency},wrap)
+		local stroke=make("UIStroke",{Color=colors.stroke,Thickness=math.min(strokeThickness or 1,1),Transparency=strokeTransparency},wrap)
 		stroke:SetAttribute("BaseStrokeTransparency",strokeTransparency)
 
 		box.Parent=wrap
@@ -540,12 +540,12 @@ function GuiLogic.new(app)
 		box.AnchorPoint=Vector2.new(0,0)
 		box.ZIndex=wrap.ZIndex+1
 
-		BOX_WRAPPERS[box]={wrap=wrap,stroke=stroke}
+		boxWrappers[box]={wrap=wrap,stroke=stroke}
 		return wrap,stroke
 	end
 
 	function api.placeWrappedBox(box,position,size)
-		local entry=BOX_WRAPPERS[box]
+		local entry=boxWrappers[box]
 		if not entry then return end
 		if size then entry.wrap.Size=insetSize(size) end
 		if position then entry.wrap.Position=insetPosition(position) end
@@ -556,7 +556,7 @@ function GuiLogic.new(app)
 		local wrap=Instance.new("Frame")
 
 		wrap.Name=button.Name~="" and (button.Name.."_Wrap") or "ButtonWrap"
-		wrap.BackgroundColor3=bgColor or THEME.BG
+		wrap.BackgroundColor3=bgColor or colors.bg
 		wrap.BorderSizePixel=0
 		wrap.ClipsDescendants=false
 		wrap.Active=true
@@ -570,7 +570,7 @@ function GuiLogic.new(app)
 		addCorner(wrap,"Control")
 
 		local strokeTransparency=componentNumber("ControlStrokeTransparency",0.78)
-		local stroke=New("UIStroke",{Color=THEME.STROKE,Thickness=math.min(strokeThickness or 1,1),Transparency=strokeTransparency},wrap)
+		local stroke=make("UIStroke",{Color=colors.stroke,Thickness=math.min(strokeThickness or 1,1),Transparency=strokeTransparency},wrap)
 		stroke:SetAttribute("BaseStrokeTransparency",strokeTransparency)
 
 		button.Parent=wrap
@@ -581,19 +581,19 @@ function GuiLogic.new(app)
 		button.AnchorPoint=Vector2.new(0,0)
 		button.ZIndex=wrap.ZIndex+1
 
-		BUTTON_WRAPPERS[button]={wrap=wrap,stroke=stroke}
+		buttonWrappers[button]={wrap=wrap,stroke=stroke}
 		return wrap,stroke
 	end
 
 	function api.placeWrappedButton(button,position,size)
-		local entry=BUTTON_WRAPPERS[button]
+		local entry=buttonWrappers[button]
 		if not entry then return end
 		if size then entry.wrap.Size=insetSize(size) end
 		if position then entry.wrap.Position=insetPosition(position) end
 	end
 
 	function api.setWrappedButtonBg(button,color)
-		local entry=BUTTON_WRAPPERS[button]
+		local entry=buttonWrappers[button]
 		if entry then
 			entry.wrap.BackgroundColor3=color
 		else
@@ -607,14 +607,14 @@ function GuiLogic.new(app)
 		local sectionMode=tostring(c.SectionMode or "card"):lower()
 		local descriptionOnly=options.compact==true or options.headerOnly==true
 		local hasBody=not descriptionOnly
-		local sec=New("Frame",{BackgroundColor3=themeColor("SECTION",THEME.CARD),BackgroundTransparency=componentNumber("SectionBackgroundTransparency",0),BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ClipsDescendants=true,ZIndex=4,LayoutOrder=order,ThemeRole="SECTION",CornerRole="Section"},parent)
+		local sec=make("Frame",{BackgroundColor3=themeColor("SECTION",colors.card),BackgroundTransparency=componentNumber("SectionBackgroundTransparency",0),BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ClipsDescendants=true,ZIndex=4,LayoutOrder=order,ThemeRole="SECTION",CornerRole="Section"},parent)
 
 		addCorner(sec,"Section")
 		local sectionStrokeTransparency=componentNumber("SectionStrokeTransparency",0.84)
-		local sectionStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=sectionStrokeTransparency},sec)
+		local sectionStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=sectionStrokeTransparency},sec)
 		sectionStroke:SetAttribute("BaseStrokeTransparency",sectionStrokeTransparency)
-		New("UIPadding",{PaddingTop=UDim.new(0,componentNumber("SectionPaddingY",10)),PaddingLeft=UDim.new(0,componentNumber("SectionPaddingX",12)),PaddingRight=UDim.new(0,componentNumber("SectionPaddingX",12)),PaddingBottom=UDim.new(0,componentNumber("SectionPaddingY",10))},sec)
-		New("UIListLayout",{Padding=UDim.new(0,componentNumber("SectionGap",6)),SortOrder=Enum.SortOrder.LayoutOrder},sec)
+		make("UIPadding",{PaddingTop=UDim.new(0,componentNumber("SectionPaddingY",10)),PaddingLeft=UDim.new(0,componentNumber("SectionPaddingX",12)),PaddingRight=UDim.new(0,componentNumber("SectionPaddingX",12)),PaddingBottom=UDim.new(0,componentNumber("SectionPaddingY",10))},sec)
+		make("UIListLayout",{Padding=UDim.new(0,componentNumber("SectionGap",6)),SortOrder=Enum.SortOrder.LayoutOrder},sec)
 
 		local collapsed=false
 		local headerToggleWidth=componentNumber("HeaderToggleWidth",88)
@@ -630,7 +630,7 @@ function GuiLogic.new(app)
 			headerHeight=math.max(headerHeight,headerCustomHeight)
 		end
 
-		local header=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,headerHeight),ClipsDescendants=true,ZIndex=5,LayoutOrder=1},sec)
+		local header=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,headerHeight),ClipsDescendants=true,ZIndex=5,LayoutOrder=1},sec)
 		local controls={section=sec}
 		local sectionConnections={}
 		local sectionDestroyed=false
@@ -653,7 +653,7 @@ function GuiLogic.new(app)
 		local customReserve=headerCustomOptions and (headerCustomWidth+8) or 0
 		local titleReserve=toggleReserve+customReserve+(headerButtonOptions and (headerButtonWidth+8) or 0)
 		local usesPrefix=componentValue("SectionPrefix",true)~=false
-		local titleButton=New("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-titleReserve,1,0),Text=(usesPrefix and "[-] " or "")..titleText,Font=componentFont("TitleFont",Enum.Font.GothamBold),TextSize=componentNumber("SectionTitleSize",14),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,Selectable=true,ZIndex=5},header)
+		local titleButton=make("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-titleReserve,1,0),Text=(usesPrefix and "[-] " or "")..titleText,Font=componentFont("TitleFont",Enum.Font.GothamBold),TextSize=componentNumber("SectionTitleSize",14),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,Selectable=true,ZIndex=5},header)
 		local headerRightOffset=0
 
 		if sectionMode=="groupbox" then
@@ -662,7 +662,7 @@ function GuiLogic.new(app)
 			titleButton.AnchorPoint=Vector2.new(0.5,0)
 			titleButton.Position=UDim2.new(0.5,0,0,componentNumber("SectionTitleOffsetY",-2))
 			titleButton.Size=UDim2.fromOffset(titleWidth,titleHeight)
-			titleButton.BackgroundColor3=themeColor("SECTION",THEME.CARD)
+			titleButton.BackgroundColor3=themeColor("SECTION",colors.card)
 			titleButton.BackgroundTransparency=componentNumber("SectionTitleBackgroundTransparency",0)
 			titleButton.TextXAlignment=Enum.TextXAlignment.Center
 			titleButton:SetAttribute("ThemeRole","SECTION")
@@ -678,7 +678,7 @@ function GuiLogic.new(app)
 		end
 
 		if headerCustomOptions then
-			local holder=New("Frame",{
+			local holder=make("Frame",{
 				Size=UDim2.fromOffset(headerCustomWidth,headerCustomHeight),
 				Position=UDim2.new(1,-headerRightOffset-headerCustomWidth,0.5,-headerCustomHeight/2),
 				BackgroundTransparency=1,
@@ -699,15 +699,15 @@ function GuiLogic.new(app)
 			local customBg=headerButtonOptions.backgroundColor or headerButtonOptions.BackgroundColor3
 			local explicitHoverBg=headerButtonOptions.hoverBackgroundColor or headerButtonOptions.HoverBackgroundColor3
 			local function headerButtonBg()
-				return customBg or (headerButtonOptions.danger and THEME.RED) or themeColor("BUTTON",THEME.BG)
+				return customBg or (headerButtonOptions.danger and colors.red) or themeColor("BUTTON",colors.bg)
 			end
 			local function headerButtonHoverBg()
 				return explicitHoverBg or hoverColor(headerButtonBg(),headerButtonOptions.danger and 0.18 or 0.08)
 			end
 			local normalBg=headerButtonBg()
-			local textColor=headerButtonOptions.textColor or headerButtonOptions.TextColor3 or (headerButtonOptions.danger and Color3.fromRGB(0,0,0)) or THEME.TEXT
+			local textColor=headerButtonOptions.textColor or headerButtonOptions.TextColor3 or (headerButtonOptions.danger and Color3.fromRGB(0,0,0)) or colors.text
 			local headerButtonHeight=componentNumber("HeaderButtonHeight",22)
-			local button=New("TextButton",{Size=UDim2.fromOffset(headerButtonWidth,headerButtonHeight),Position=UDim2.new(1,-headerRightOffset-headerButtonWidth,0.5,-headerButtonHeight/2),BackgroundColor3=normalBg,BorderSizePixel=0,Text=headerButtonOptions.text or headerButtonOptions.Text or "ACTION",Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=11,TextColor3=textColor,SkipTextRole=headerButtonOptions.danger or headerButtonOptions.textColor~=nil or headerButtonOptions.TextColor3~=nil,AutoButtonColor=false,Selectable=true,ZIndex=6},header)
+			local button=make("TextButton",{Size=UDim2.fromOffset(headerButtonWidth,headerButtonHeight),Position=UDim2.new(1,-headerRightOffset-headerButtonWidth,0.5,-headerButtonHeight/2),BackgroundColor3=normalBg,BorderSizePixel=0,Text=headerButtonOptions.text or headerButtonOptions.Text or "ACTION",Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=11,TextColor3=textColor,SkipTextRole=headerButtonOptions.danger or headerButtonOptions.textColor~=nil or headerButtonOptions.TextColor3~=nil,AutoButtonColor=false,Selectable=true,ZIndex=6},header)
 			local buttonWrap=api.wrapTextButton(button,normalBg,2)
 			buttonWrap.BackgroundColor3=normalBg
 			if headerButtonOptions.themeRole or headerButtonOptions.ThemeRole then
@@ -739,15 +739,15 @@ function GuiLogic.new(app)
 
 		local subtitleLabel=nil
 		if subtitleText and subtitleText~="" then
-			subtitleLabel=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text=subtitleText,Font=componentFont("TextFont",Enum.Font.Gotham),TextSize=componentNumber("SectionSubtitleSize",11),TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,LayoutOrder=2},sec)
+			subtitleLabel=make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text=subtitleText,Font=componentFont("TextFont",Enum.Font.Gotham),TextSize=componentNumber("SectionSubtitleSize",11),TextColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,LayoutOrder=2},sec)
 		end
 
 		local body=nil
 		local bodyLayout=nil
 		if hasBody then
-			body=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,Visible=true,ZIndex=5,LayoutOrder=3,ClipsDescendants=true},sec)
-			New("UIPadding",{PaddingTop=UDim.new(0,componentNumber("SectionBodyInset",2)),PaddingLeft=UDim.new(0,componentNumber("SectionBodyInset",2)),PaddingRight=UDim.new(0,componentNumber("SectionBodyInset",2)),PaddingBottom=UDim.new(0,componentNumber("SectionBodyInset",2))},body)
-			bodyLayout=New("UIListLayout",{Padding=UDim.new(0,componentNumber("SectionBodyGap",6)),SortOrder=Enum.SortOrder.LayoutOrder},body)
+			body=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,Visible=true,ZIndex=5,LayoutOrder=3,ClipsDescendants=true},sec)
+			make("UIPadding",{PaddingTop=UDim.new(0,componentNumber("SectionBodyInset",2)),PaddingLeft=UDim.new(0,componentNumber("SectionBodyInset",2)),PaddingRight=UDim.new(0,componentNumber("SectionBodyInset",2)),PaddingBottom=UDim.new(0,componentNumber("SectionBodyInset",2))},body)
+			bodyLayout=make("UIListLayout",{Padding=UDim.new(0,componentNumber("SectionBodyGap",6)),SortOrder=Enum.SortOrder.LayoutOrder},body)
 		end
 		local bodyTween=nil
 		local lastBodyHeight=0
@@ -761,7 +761,7 @@ function GuiLogic.new(app)
 		local function tweenTitle()
 			titleButton.TextTransparency=0.18
 			TweenService:Create(titleButton,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
-			TweenService:Create(sec,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundColor3=themeColor("SECTION",THEME.CARD)}):Play()
+			TweenService:Create(sec,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundColor3=themeColor("SECTION",colors.card)}):Play()
 		end
 
 		local function cancelBodyTween()
@@ -912,8 +912,8 @@ function GuiLogic.new(app)
 	end
 
 	function api.makeBox(parent,w,textValue,placeholder)
-		local b=New("TextBox",{Size=UDim2.fromOffset(w,componentNumber("TextBoxHeight",28)),BackgroundColor3=themeColor("INPUT",THEME.PANEL),BorderSizePixel=0,ClearTextOnFocus=false,Text=textValue,PlaceholderText=placeholder or "",Font=componentFont("TextFont",Enum.Font.Gotham),TextSize=componentNumber("InputTextSize",13),TextColor3=THEME.TEXT,PlaceholderColor3=THEME.MUTED,ZIndex=6,ThemeRole="INPUT"},parent)
-		local wrap,stroke=api.wrapTextBox(b,themeColor("INPUT",THEME.PANEL),2)
+		local b=make("TextBox",{Size=UDim2.fromOffset(w,componentNumber("TextBoxHeight",28)),BackgroundColor3=themeColor("INPUT",colors.panel),BorderSizePixel=0,ClearTextOnFocus=false,Text=textValue,PlaceholderText=placeholder or "",Font=componentFont("TextFont",Enum.Font.Gotham),TextSize=componentNumber("InputTextSize",13),TextColor3=colors.text,PlaceholderColor3=colors.muted,ZIndex=6,ThemeRole="INPUT"},parent)
+		local wrap,stroke=api.wrapTextBox(b,themeColor("INPUT",colors.panel),2)
 		wrap:SetAttribute("ThemeRole","INPUT")
 		local boxConnections={}
 		local function connectBox(signal,fn)
@@ -931,12 +931,12 @@ function GuiLogic.new(app)
 		end
 
 		connectBox(b.Focused,function()
-			wrap.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
+			wrap.BackgroundColor3=themeColor("INPUT",colors.panel)
 			stroke.Thickness=1
 		end)
 
 		connectBox(b.FocusLost,function()
-			wrap.BackgroundColor3=themeColor("INPUT",THEME.PANEL)
+			wrap.BackgroundColor3=themeColor("INPUT",colors.panel)
 			stroke.Thickness=1
 		end)
 
@@ -999,42 +999,42 @@ function GuiLogic.new(app)
 		local sliderGlowStrokeActiveTransparency=componentNumber("SliderGlowStrokeActiveTransparency",0.24)
 		local sliderFillTransparency=componentNumber("SliderFillTransparency",0)
 		local sliderTrackTransparency=componentNumber("SliderTrackTransparency",0.04)
-		local container=New("Frame",{BackgroundColor3=themeColor(containerRole,themeColor("SECTION",THEME.CARD)),BackgroundTransparency=componentNumber("SliderContainerTransparency",1),BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole=containerRole,CornerRole=containerCorner},parent)
+		local container=make("Frame",{BackgroundColor3=themeColor(containerRole,themeColor("SECTION",colors.card)),BackgroundTransparency=componentNumber("SliderContainerTransparency",1),BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole=containerRole,CornerRole=containerCorner},parent)
 		addCorner(container,containerCorner)
 		local containerStrokeTransparency=componentNumber("SliderContainerStrokeTransparency",1)
-		local containerStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=containerStrokeTransparency},container)
+		local containerStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=containerStrokeTransparency},container)
 		containerStroke:SetAttribute("BaseStrokeTransparency",containerStrokeTransparency)
-		New("TextLabel",{BackgroundTransparency=1,Position=labelPosition,Size=labelSize,Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false,Visible=hasLabel},container)
+		make("TextLabel",{BackgroundTransparency=1,Position=labelPosition,Size=labelSize,Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false,Visible=hasLabel},container)
 
-		local track=New("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor(trackRole,THEME.PANEL),BackgroundTransparency=sliderTrackTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=6,ThemeRole=trackRole,CornerRole="Slider"},container)
+		local track=make("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor(trackRole,colors.panel),BackgroundTransparency=sliderTrackTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=6,ThemeRole=trackRole,CornerRole="Slider"},container)
 		addCorner(track,"Slider")
 		local trackStrokeTransparency=componentNumber("SliderTrackStrokeTransparency",0.78)
-		local trackStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=trackStrokeTransparency},track)
+		local trackStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=trackStrokeTransparency},track)
 		trackStroke:SetAttribute("BaseStrokeTransparency",trackStrokeTransparency)
 
-		local fillGlow=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",THEME.STROKE),BackgroundTransparency=sliderGlowIdleTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=7,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
+		local fillGlow=make("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",colors.stroke),BackgroundTransparency=sliderGlowIdleTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=7,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
 		addCorner(fillGlow,"Slider")
 
-		local fill=New("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",THEME.STROKE),BackgroundTransparency=sliderFillTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=8,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
+		local fill=make("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",colors.stroke),BackgroundTransparency=sliderFillTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=8,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
 		addCorner(fill,"Slider")
-		local fillStroke=New("UIStroke",{Color=themeColor("SLIDER_FILL",THEME.STROKE),Thickness=componentNumber("SliderGlowStrokeThickness",2),Transparency=sliderGlowStrokeIdleTransparency},fill)
+		local fillStroke=make("UIStroke",{Color=themeColor("SLIDER_FILL",colors.stroke),Thickness=componentNumber("SliderGlowStrokeThickness",2),Transparency=sliderGlowStrokeIdleTransparency},fill)
 		fillStroke:SetAttribute("StrokeRole","Accent")
 		fillStroke:SetAttribute("BaseStrokeTransparency",sliderGlowStrokeIdleTransparency)
 
 		local knobVisible=componentValue("SliderKnobVisible",false)==true
 		local knobWidth=knobVisible and (s.SliderStyle=="windui" and 10 or (s.SliderStyle=="thin" and 2 or 3)) or 0
-		local knob=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(knobWidth,sliderHeight),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=themeColor("SLIDER_FILL",THEME.STROKE),BackgroundTransparency=knobVisible and 0 or 1,BorderSizePixel=0,Visible=knobVisible,ZIndex=9,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
+		local knob=make("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(knobWidth,sliderHeight),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=themeColor("SLIDER_FILL",colors.stroke),BackgroundTransparency=knobVisible and 0 or 1,BorderSizePixel=0,Visible=knobVisible,ZIndex=9,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
 		if knobVisible then
 			addCorner(knob,"Slider")
 		end
 
-		local hit=New("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=12,AutoButtonColor=false,Selectable=true},track)
+		local hit=make("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=12,AutoButtonColor=false,Selectable=true},track)
 		local valueBoxHeight=componentNumber("SliderValueBoxHeight",math.max(componentNumber("TextBoxHeight",24),sliderHeight))
-		local valueBox=New("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor(valueRole,THEME.PANEL),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole=valueRole,CornerRole="Control",Selectable=true},container)
+		local valueBox=make("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor(valueRole,colors.panel),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole=valueRole,CornerRole="Control",Selectable=true},container)
 		valueBox.Visible=valueBoxVisible
 		addCorner(valueBox,"Control")
 		local valueStrokeTransparency=componentNumber("SliderValueBoxStrokeTransparency",componentNumber("ControlStrokeTransparency",0.78))
-		local valueStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=valueStrokeTransparency},valueBox)
+		local valueStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=valueStrokeTransparency},valueBox)
 		valueStroke:SetAttribute("BaseStrokeTransparency",valueStrokeTransparency)
 		local value=startVal
 		local valueState=makeFusionValue(value)
@@ -1152,9 +1152,9 @@ function GuiLogic.new(app)
 
 		local function keyboardStep()
 			local step=10^(-(tonumber(decimals) or 0))
-			if UIS:IsKeyDown(Enum.KeyCode.LeftShift) or UIS:IsKeyDown(Enum.KeyCode.RightShift) then
+			if inputService:IsKeyDown(Enum.KeyCode.LeftShift) or inputService:IsKeyDown(Enum.KeyCode.RightShift) then
 				step=step*10
-			elseif UIS:IsKeyDown(Enum.KeyCode.LeftControl) or UIS:IsKeyDown(Enum.KeyCode.RightControl) then
+			elseif inputService:IsKeyDown(Enum.KeyCode.LeftControl) or inputService:IsKeyDown(Enum.KeyCode.RightControl) then
 				step=step/10
 			end
 
@@ -1194,7 +1194,7 @@ function GuiLogic.new(app)
 		connect(track.InputBegan,handleInputBegan)
 		connect(fill.InputBegan,handleInputBegan)
 
-		connect(UIS.InputChanged,function(i)
+		connect(inputService.InputChanged,function(i)
 			if not dragging then
 				return
 			end
@@ -1208,7 +1208,7 @@ function GuiLogic.new(app)
 			end
 		end)
 
-		connect(UIS.InputEnded,function(i)
+		connect(inputService.InputEnded,function(i)
 			if i.UserInputType==dragInputType or i.UserInputType==Enum.UserInputType.MouseButton1 then
 				dragging=false
 				dragInputType=nil
@@ -1255,7 +1255,7 @@ function GuiLogic.new(app)
 		local textFont=componentFont("ToggleLabelFont",Enum.Font.GothamBold)
 		local textSize=componentNumber("ToggleLabelTextSize",14)
 
-		local row=New("TextButton",{
+		local row=make("TextButton",{
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
 			ClipsDescendants=true,
@@ -1267,14 +1267,14 @@ function GuiLogic.new(app)
 			SkipThemeRole=true,
 		},parent)
 
-		local label=New("TextLabel",{
+		local label=make("TextLabel",{
 			BackgroundTransparency=1,
 			Position=UDim2.fromOffset(padX,0),
 			Size=UDim2.new(1,-(padX*2),1,0),
 			Text=labelText,
 			Font=textFont,
 			TextSize=textSize,
-			TextColor3=themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235)),
+			TextColor3=themeColor("TEXT",colors.text or Color3.fromRGB(235,235,235)),
 			TextTransparency=0.08,
 			TextStrokeTransparency=1,
 			TextXAlignment=Enum.TextXAlignment.Left,
@@ -1290,11 +1290,11 @@ function GuiLogic.new(app)
 		end
 
 		local function offColor()
-			return themeColor("TEXT",THEME.TEXT or Color3.fromRGB(235,235,235))
+			return themeColor("TEXT",colors.text or Color3.fromRGB(235,235,235))
 		end
 
 		local function onColor()
-			local active=themeColor("STROKE",THEME.STROKE or themeColor("SLIDER_FILL",THEME.ACC or Color3.fromRGB(90,190,255)))
+			local active=themeColor("STROKE",colors.stroke or themeColor("SLIDER_FILL",colors.accent or Color3.fromRGB(90,190,255)))
 			local inactive=offColor()
 
 			if math.abs(luminance(active)-luminance(inactive))<0.18 then
@@ -1431,8 +1431,8 @@ function GuiLogic.new(app)
 		local toggleW=componentNumber("ToggleWidth",48)
 		local toggleH=componentNumber("ToggleHeight",20)
 		local rowHeight=componentNumber("ToggleRowHeight",math.max(30,toggleH+8))
-		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5},parent)
-		local label=New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-(toggleW+16),1,0),Text=labelText,Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("ToggleLabelSize",12),TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
+		local row=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5},parent)
+		local label=make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-(toggleW+16),1,0),Text=labelText,Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("ToggleLabelSize",12),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
 		if label.Text=="" then
 			label.Visible=false
 		end
@@ -1448,10 +1448,10 @@ function GuiLogic.new(app)
 		return control
 	end
 
-	api.BOX_WRAPPERS=BOX_WRAPPERS
-	api.BUTTON_WRAPPERS=BUTTON_WRAPPERS
+	api.boxWrappers=boxWrappers
+	api.buttonWrappers=buttonWrappers
 
 	return api
 end
 
-return GuiLogic
+return guiLogic

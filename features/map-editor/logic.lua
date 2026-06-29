@@ -1,12 +1,12 @@
 -- applies map editor settings after the map is ready.
 
-local MapEditor={}
+local mapEditor={}
 
-function MapEditor.new(app,parent)
+function mapEditor.new(app,parent)
 	return{
 		Refresh=function() end,
 		Destroy=function() end,
 	}
 end
 
-return MapEditor
+return mapEditor

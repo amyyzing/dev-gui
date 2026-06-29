@@ -3,12 +3,12 @@
 
 local HttpService = game:GetService( "HttpService" )
 
-local BOT_URL = "https://lint-bot-production.up.railway.app"
-local MODULE_GET="/module/get"
-local API_KEY = "thekeytoheaven"
-local MAX_SOURCE_SIZE=300000
+local botUrl = "https://lint-bot-production.up.railway.app"
+local moduleGetPath="/module/get"
+local apiKey = "thekeytoheaven"
+local maxSourceBytes=300000
 
-local RUNTIME_PATHS = {
+local runtimeFiles = {
 	"runtime/loader-part-1.lua",
 	"runtime/loader-part-2.lua",
 	"runtime/loader-part-3.lua",
@@ -16,17 +16,17 @@ local RUNTIME_PATHS = {
 	"runtime/loader-part-5.lua" ,
 }
 
-local RUNTIME_MARKERS={
-	[RUNTIME_PATHS[1]] = "HB_RUNTIME_PART_1",
-	[RUNTIME_PATHS[2]]="HB_RUNTIME_PART_2",
-	[RUNTIME_PATHS[3]] = "HB_RUNTIME_PART_3",
-	[RUNTIME_PATHS[4]]="HB_RUNTIME_PART_4",
-	[RUNTIME_PATHS[5]] = "HB_RUNTIME_PART_5",
+local runtimeMarkers={
+	[runtimeFiles[1]] = "HB_RUNTIME_PART_1",
+	[runtimeFiles[2]]="HB_RUNTIME_PART_2",
+	[runtimeFiles[3]] = "HB_RUNTIME_PART_3",
+	[runtimeFiles[4]]="HB_RUNTIME_PART_4",
+	[runtimeFiles[5]] = "HB_RUNTIME_PART_5",
 }
 
-local ALLOWED_PATHS={}
-for _, path in ipairs(RUNTIME_PATHS) do
-	ALLOWED_PATHS[path] = true
+local allowedRuntimeFiles={}
+for _, path in ipairs(runtimeFiles) do
+	allowedRuntimeFiles[path] = true
 end
 
 local function typeOf(value)
@@ -55,7 +55,7 @@ local function clientRequest()
 end
 
 local function fetchModule(path)
-	if not ALLOWED_PATHS[path] then
+	if not allowedRuntimeFiles[path] then
 		return nil, "Runtime path blocked: " .. tostring(path)
 	end
 
@@ -66,14 +66,14 @@ local function fetchModule(path)
 
 	local apiBody={
 		path = path,
-		apiKey=API_KEY,
+		apiKey=apiKey,
 	}
 
 	local body = HttpService:JSONEncode(apiBody)
 
 	local ok, response = pcall(function()
 		return requestFn({
-			Url = BOT_URL .. MODULE_GET,
+			Url = botUrl .. moduleGetPath,
 			Method="POST",
 			Headers={ ["Content-Type"] = "application/json" },
 			Body = body,
@@ -109,11 +109,11 @@ local function validateSource(path, source)
 		return false, "runtime missing"
 	end
 
-	if #source > MAX_SOURCE_SIZE then
+	if #source > maxSourceBytes then
 		return false,"runtime too big"
 	end
 
-	local marker = RUNTIME_MARKERS[path]
+	local marker = runtimeMarkers[path]
 	if marker and not source:find(marker, 1, true) then
 		return false, "runtime marker failed"
 	end
@@ -133,18 +133,18 @@ if type(getgenv) == "function" then
 end
 
 local runtimeEnv = setmetatable({
-	APP_RUNTIME_PATHS = RUNTIME_PATHS,
-	APP_RUNTIME_SOURCES=runtimeSources,
-	APP_RUNTIME_MARKERS = RUNTIME_MARKERS,
-	BOOT_BOT_API={
-		Url=BOT_URL,
-		Key = API_KEY,
+	runtimeFilesFromLoader = runtimeFiles,
+	runtimeSourcesFromLoader=runtimeSources,
+	runtimeMarkersFromLoader = runtimeMarkers,
+	bootApi={
+		Url=botUrl,
+		Key = apiKey,
 	},
 }, { __index = parentEnv })
 
 runtimeEnv._G = runtimeEnv
 
-for _,path in ipairs(RUNTIME_PATHS) do
+for _,path in ipairs(runtimeFiles) do
 	local source, fetchError = fetchModule(path)
 	if not source then
 		error("loader fetch failed "..path..": "..tostring(fetchError))
@@ -170,6 +170,6 @@ for _,path in ipairs(RUNTIME_PATHS) do
 	end
 end
 
-if debugEnv.HB_LOADER_DEBUG == true then
-	warn("loader done: "..tostring(#RUNTIME_PATHS).." chunks")
+if debugEnv.loaderDebug == true then
+	warn("loader done: "..tostring(#runtimeFiles).." chunks")
 end

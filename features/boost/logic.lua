@@ -1,24 +1,24 @@
 -- applies auto boost when the ball is close enough.
 
-local Boost={}
+local boost={}
 
 local Players=game:GetService("Players")
-local UIS=game:GetService("UserInputService")
+local inputService=game:GetService("UserInputService")
 local Debris=game:GetService("Debris")
 local RunService=game:GetService("RunService")
 
 local me=Players.LocalPlayer
 
-local DEFAULT_FORCE_Y=32
-local DEFAULT_COOLDOWN=5
-local DEFAULT_CHANCE=100
-local DEFAULT_RADIUS=10
-local FOOTBALL_CACHE_INTERVAL=0.20
-local BOOST_SCAN_INTERVAL=0.05
-local BOOST_CONTACT_RADIUS=4.5
-local BOOST_SCAN_JOB_ID="AutoBoostContactScan"
-local TOGGLE_JB_KEY=Enum.KeyCode.Unknown
-local TOGGLE_AB_KEY=Enum.KeyCode.Unknown
+local defaultBoostForce=32
+local defaultBoostCooldown=5
+local defaultBoostChance=100
+local defaultBoostRadius=10
+local footballCacheInterval=0.20
+local boostScanInterval=0.05
+local boostContactRadius=4.5
+local boostScanJobId="AutoBoostContactScan"
+local boostToggleKey=Enum.KeyCode.Unknown
+local alwaysBoostToggleKey=Enum.KeyCode.Unknown
 
 local function clampNumber(value,min,max,fallback)
 	local n=tonumber(value)
@@ -98,14 +98,14 @@ local function getFootball()
 	return nil
 end
 
-function Boost.new(app,parent)
+function boost.new(app,parent)
 	local safeDisconnect=app.safeDisconnect
 	local inputToBinding=app.inputToBinding
 	local makeSection=app.makeSection
 	local buildSlider=app.buildSlider
 	local buildToggleRow=app.buildToggleRow
 	local state=app.State
-	local scheduler=app.Scheduler
+	local scheduler=app.schedulerApi
 	local api={}
 	local jumpBoostToggle=nil
 	local jumpBoostModeToggle=nil
@@ -130,10 +130,10 @@ function Boost.new(app,parent)
 	local function normalizeState()
 		state.jumpBoostOn=state.jumpBoostOn and true or false
 		state.jumpBoostTradeMode=state.jumpBoostTradeMode and true or false
-		state.boostForceY=clampNumber(state.boostForceY,10,100,DEFAULT_FORCE_Y)
-		state.boostCooldown=clampNumber(state.boostCooldown,0,60,DEFAULT_COOLDOWN)
-		state.boostChance=clampNumber(state.boostChance,0,100,DEFAULT_CHANCE)
-		state.ballDetectionRadius=clampNumber(state.ballDetectionRadius,1,50,DEFAULT_RADIUS)
+		state.boostForceY=clampNumber(state.boostForceY,10,100,defaultBoostForce)
+		state.boostCooldown=clampNumber(state.boostCooldown,0,60,defaultBoostCooldown)
+		state.boostChance=clampNumber(state.boostChance,0,100,defaultBoostChance)
+		state.ballDetectionRadius=clampNumber(state.ballDetectionRadius,1,50,defaultBoostRadius)
 	end
 
 	local function syncControls()
@@ -196,7 +196,7 @@ function Boost.new(app,parent)
 		end
 
 		footballCache=getFootball()
-		footballCacheExpires=now+FOOTBALL_CACHE_INTERVAL
+		footballCacheExpires=now+footballCacheInterval
 		return footballCache
 	end
 
@@ -210,7 +210,7 @@ function Boost.new(app,parent)
 			if otherChar and otherChar~=character then
 				local humanoid=otherChar:FindFirstChildOfClass("Humanoid")
 				local otherRoot=characterRoot(otherChar)
-				if humanoid and humanoid.Health>0 and otherRoot and (otherRoot.Position-root.Position).Magnitude<=BOOST_CONTACT_RADIUS then
+				if humanoid and humanoid.Health>0 and otherRoot and (otherRoot.Position-root.Position).Magnitude<=boostContactRadius then
 					return true
 				end
 			end
@@ -235,7 +235,7 @@ function Boost.new(app,parent)
 
 	local function clearJumpBoostScanConnection()
 		if jumpBoostScanScheduled and scheduler and type(scheduler.Unregister)=="function" then
-			pcall(scheduler.Unregister,"Heartbeat",BOOST_SCAN_JOB_ID)
+			pcall(scheduler.Unregister,"Heartbeat",boostScanJobId)
 		end
 
 		jumpBoostScanScheduled=false
@@ -270,7 +270,7 @@ function Boost.new(app,parent)
 		end
 
 		if scheduler and type(scheduler.Register)=="function" then
-			local ok,result=pcall(scheduler.Register,"Heartbeat",BOOST_SCAN_JOB_ID,BOOST_SCAN_INTERVAL,scanJumpBoostContact)
+			local ok,result=pcall(scheduler.Register,"Heartbeat",boostScanJobId,boostScanInterval,scanJumpBoostContact)
 			if ok and result then
 				jumpBoostScanScheduled=true
 				return
@@ -280,7 +280,7 @@ function Boost.new(app,parent)
 		local elapsed=0
 		jumpBoostScanConn=RunService.Heartbeat:Connect(function(dt)
 			elapsed=elapsed+(dt or 0)
-			if elapsed<BOOST_SCAN_INTERVAL then
+			if elapsed<boostScanInterval then
 				return
 			end
 
@@ -363,7 +363,7 @@ function Boost.new(app,parent)
 	end
 
 	function api.SetBoostForceY(value,fire)
-		state.boostForceY=clampNumber(value,10,100,DEFAULT_FORCE_Y)
+		state.boostForceY=clampNumber(value,10,100,defaultBoostForce)
 		syncControls()
 
 		if fire~=false then
@@ -372,7 +372,7 @@ function Boost.new(app,parent)
 	end
 
 	function api.SetBoostChance(value,fire)
-		state.boostChance=clampNumber(value,0,100,DEFAULT_CHANCE)
+		state.boostChance=clampNumber(value,0,100,defaultBoostChance)
 		syncControls()
 
 		if fire~=false then
@@ -381,7 +381,7 @@ function Boost.new(app,parent)
 	end
 
 	function api.SetBallDetectionRadius(value,fire)
-		state.ballDetectionRadius=clampNumber(value,1,50,DEFAULT_RADIUS)
+		state.ballDetectionRadius=clampNumber(value,1,50,defaultBoostRadius)
 		syncControls()
 
 		if fire~=false then
@@ -432,10 +432,10 @@ function Boost.new(app,parent)
 	function api.Reset()
 		state.jumpBoostOn=false
 		state.jumpBoostTradeMode=false
-		state.boostForceY=DEFAULT_FORCE_Y
-		state.boostCooldown=DEFAULT_COOLDOWN
-		state.boostChance=DEFAULT_CHANCE
-		state.ballDetectionRadius=DEFAULT_RADIUS
+		state.boostForceY=defaultBoostForce
+		state.boostCooldown=defaultBoostCooldown
+		state.boostChance=defaultBoostChance
+		state.ballDetectionRadius=defaultBoostRadius
 		api.SetJumpBoostState(false,false)
 		syncControls()
 		changed()
@@ -471,8 +471,8 @@ function Boost.new(app,parent)
 	end)
 
 	local function handleBoostInput(input)
-		local jumpBoostKey=TOGGLE_JB_KEY
-		local alwaysBoostKey=TOGGLE_AB_KEY
+		local jumpBoostKey=boostToggleKey
+		local alwaysBoostKey=alwaysBoostToggleKey
 
 		if app.getJumpBoostToggleKey then
 			jumpBoostKey=app.getJumpBoostToggleKey() or Enum.KeyCode.Unknown
@@ -499,7 +499,7 @@ function Boost.new(app,parent)
 		return true
 	end
 
-	inputConn=UIS.InputBegan:Connect(function(input,processed)
+	inputConn=inputService.InputBegan:Connect(function(input,processed)
 		if processed then return end
 		handleBoostInput(input)
 	end)
@@ -515,4 +515,4 @@ function Boost.new(app,parent)
 	return api
 end
 
-return Boost
+return boost

@@ -1,16 +1,16 @@
 -- shared state bucket. most gui weirdness starts here if this gets clever.
 
 local env = (getfenv and getfenv()) or _G
-local Signal = rawget(env, "CoreSignal") or rawget(env, "CoreSignalModule")
+local signalApi = rawget(env, "CoreSignal") or rawget(env, "CoreSignalModule")
 
-if not Signal and script and script.Parent and script.Parent.Parent then
-	Signal = require(script.Parent.Parent.core.signal)
+if not signalApi and script and script.Parent and script.Parent.Parent then
+	signalApi = require(script.Parent.Parent.core.signal)
 end
 
-assert(Signal, "CoreSignal must load before StateStore")
+assert(signalApi, "CoreSignal must load before StateStore")
 
-local Store = {}
-Store.__index = Store
+local storeApi = {}
+storeApi.__index = storeApi
 
 local function shallowCopy(source)
 	local result = {}
@@ -48,13 +48,13 @@ local function valuesEqual(a, b)
 	return true
 end
 
-function Store.new()
+function storeApi.new()
 	return setmetatable({
 		_slices = {},
-	}, Store)
+	}, storeApi)
 end
 
-function Store:createSlice(config)
+function storeApi:createSlice(config)
 	assert(type(config) == "table", "Slice config must be a table")
 	assert(type(config.name) == "string" and config.name ~= "", "Slice needs a name")
 
@@ -62,7 +62,7 @@ function Store:createSlice(config)
 		name = config.name,
 		version = config.version or 1,
 		_state = shallowCopy(config.initialState),
-		_changed = Signal.new(),
+		_changed = signalApi.new(),
 		_actions = {},
 	}
 
@@ -131,11 +131,11 @@ function Store:createSlice(config)
 	return slice
 end
 
-function Store:getSlice(name)
+function storeApi:getSlice(name)
 	return self._slices[name]
 end
 
-function Store:snapshot()
+function storeApi:snapshot()
 	local result = {}
 
 	for name, slice in pairs(self._slices) do
@@ -148,4 +148,4 @@ function Store:snapshot()
 	return result
 end
 
-return Store
+return storeApi

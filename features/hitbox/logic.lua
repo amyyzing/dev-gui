@@ -1,17 +1,17 @@
 -- tackle hitbox sizing, alpha, presets, and keybind toggle.
 
-local Hitbox={}
+local hitbox={}
 
 local Players=game:GetService("Players")
-local UIS=game:GetService("UserInputService")
+local inputService=game:GetService("UserInputService")
 
 local me=Players.LocalPlayer
-local ZERO=Vector3.new(0,0,0)
-local DEFAULT_SIZE_X=2.52
-local DEFAULT_SIZE_Y=5.4
-local DEFAULT_SIZE_Z=1.41
-local DEFAULT_TRANSPARENCY=0.7
-local TOGGLE_HB_KEY=Enum.KeyCode.Unknown
+local zeroVector=Vector3.new(0,0,0)
+local defaultSizeX=2.52
+local defaultSizeY=5.4
+local defaultSizeZ=1.41
+local defaultTransparency=0.7
+local hitboxToggleKey=Enum.KeyCode.Unknown
 
 local function clampNumber(value,min,max,fallback)
 	local n=tonumber(value)
@@ -37,11 +37,11 @@ local function folderHasAnyDescendants(folder)
 	return #folder:GetDescendants()>0
 end
 
-function Hitbox.new(app,parent)
+function hitbox.new(app,parent)
 	local safeDisconnect=app.safeDisconnect
 	local inputToBinding=app.inputToBinding
-	local New=app.New
-	local THEME=app.THEME
+	local make=app.New
+	local colors=app.colors
 	local makeSection=app.makeSection
 	local buildSlider=app.buildSlider
 	local fmtNumber=app.fmtNumber
@@ -61,7 +61,7 @@ function Hitbox.new(app,parent)
 	local currentModeKey="mode1"
 	local currentModeLabel="Gameplay"
 	local watchers=setmetatable({}, {__mode="k"})
-	local originalParts=app.HITBOX_ORIGINALS or {
+	local originalParts=app.hitboxOriginals or {
 		Transparency=setmetatable({}, {__mode="k"}),
 		Size=setmetatable({}, {__mode="k"}),
 	}
@@ -86,10 +86,10 @@ function Hitbox.new(app,parent)
 
 	local function normalizeState()
 		state.hitboxOn=state.hitboxOn and true or false
-		state.sizeX=clampNumber(state.sizeX,0.2,50,DEFAULT_SIZE_X)
-		state.sizeY=clampNumber(state.sizeY,0.2,50,DEFAULT_SIZE_Y)
-		state.sizeZ=clampNumber(state.sizeZ,0.2,50,DEFAULT_SIZE_Z)
-		state.targetTransparency=clampNumber(state.targetTransparency,0,1,DEFAULT_TRANSPARENCY)
+		state.sizeX=clampNumber(state.sizeX,0.2,50,defaultSizeX)
+		state.sizeY=clampNumber(state.sizeY,0.2,50,defaultSizeY)
+		state.sizeZ=clampNumber(state.sizeZ,0.2,50,defaultSizeZ)
+		state.targetTransparency=clampNumber(state.targetTransparency,0,1,defaultTransparency)
 	end
 
 	local function targetSize()
@@ -163,7 +163,7 @@ function Hitbox.new(app,parent)
 					end
 
 					local size=targetSize()
-					if size~=ZERO and part.Size~=size then
+					if size~=zeroVector and part.Size~=size then
 						part.Size=size
 					end
 				else
@@ -205,7 +205,7 @@ function Hitbox.new(app,parent)
 				if isAlive() and state.hitboxOn then
 					local size=targetSize()
 
-					if size~=ZERO and part.Size~=size then
+					if size~=zeroVector and part.Size~=size then
 						part.Size=size
 					end
 				end
@@ -229,7 +229,7 @@ function Hitbox.new(app,parent)
 			part.Transparency=state.targetTransparency
 
 			local size=targetSize()
-			if size~=ZERO then
+			if size~=zeroVector then
 				part.Size=size
 			end
 		end
@@ -502,9 +502,9 @@ function Hitbox.new(app,parent)
 	end
 
 	function api.SetHitboxSize(x,y,z,fire)
-		state.sizeX=clampNumber(x,0.2,50,DEFAULT_SIZE_X)
-		state.sizeY=clampNumber(y,0.2,50,DEFAULT_SIZE_Y)
-		state.sizeZ=clampNumber(z,0.2,50,DEFAULT_SIZE_Z)
+		state.sizeX=clampNumber(x,0.2,50,defaultSizeX)
+		state.sizeY=clampNumber(y,0.2,50,defaultSizeY)
+		state.sizeZ=clampNumber(z,0.2,50,defaultSizeZ)
 
 		if state.hitboxOn then
 			forEachWatcherPartsApply(true)
@@ -518,7 +518,7 @@ function Hitbox.new(app,parent)
 	end
 
 	function api.SetTransparency(value,fire)
-		state.targetTransparency=clampNumber(value,0,1,DEFAULT_TRANSPARENCY)
+		state.targetTransparency=clampNumber(value,0,1,defaultTransparency)
 
 		if state.hitboxOn then
 			forEachWatcherPartsApply(true)
@@ -550,10 +550,10 @@ function Hitbox.new(app,parent)
 
 	function api.Reset()
 		api.SetHitboxLock(false,false)
-		state.sizeX=DEFAULT_SIZE_X
-		state.sizeY=DEFAULT_SIZE_Y
-		state.sizeZ=DEFAULT_SIZE_Z
-		state.targetTransparency=DEFAULT_TRANSPARENCY
+		state.sizeX=defaultSizeX
+		state.sizeY=defaultSizeY
+		state.sizeZ=defaultSizeZ
+		state.targetTransparency=defaultTransparency
 		api.Refresh()
 		changed()
 	end
@@ -588,27 +588,27 @@ function Hitbox.new(app,parent)
 	})
 	toggle=sectionControls and sectionControls.toggle
 
-	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="HITBOX SIZE",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="HITBOX SIZE",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 
-	local sizeReadout=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),ZIndex=5},section)
-	New("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder,HorizontalAlignment=Enum.HorizontalAlignment.Left},sizeReadout)
+	local sizeReadout=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),ZIndex=5},section)
+	make("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder,HorizontalAlignment=Enum.HorizontalAlignment.Left},sizeReadout)
 
 	local function makeReadout(prefix)
-		return New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(0.333,0,1,0),Text=prefix,Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},sizeReadout)
+		return make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(0.333,0,1,0),Text=prefix,Font=Enum.Font.Gotham,TextSize=13,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6},sizeReadout)
 	end
 
 	boxX=makeReadout("X: "..fmtNumber(state.sizeX,2))
 	boxY=makeReadout("Y: "..fmtNumber(state.sizeY,2))
 	boxZ=makeReadout("Z: "..fmtNumber(state.sizeZ,2))
 
-	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="TRANSPARENCY",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="TRANSPARENCY",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 
 	transparencySlider=buildSlider(section,"Alpha",0,1,state.targetTransparency,2,function(value)
 		api.SetTransparency(value,true)
 	end)
 
 	local function handleToggleInput(input)
-		local hitboxKey=TOGGLE_HB_KEY
+		local hitboxKey=hitboxToggleKey
 		if app.getHitboxToggleKey then
 			hitboxKey=app.getHitboxToggleKey() or Enum.KeyCode.Unknown
 		end
@@ -624,7 +624,7 @@ function Hitbox.new(app,parent)
 		return false
 	end
 
-	inputConn=UIS.InputBegan:Connect(function(input,processed)
+	inputConn=inputService.InputBegan:Connect(function(input,processed)
 		if processed then return end
 		handleToggleInput(input)
 	end)
@@ -649,4 +649,4 @@ function Hitbox.new(app,parent)
 	return api
 end
 
-return Hitbox
+return hitbox

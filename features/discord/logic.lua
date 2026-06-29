@@ -1,10 +1,10 @@
 -- loads, copies, and opens the community invite.
 
-local Discord={}
+local discord={}
 
-function Discord.new(app,page)
-	local New=app.New
-	local THEME=app.THEME
+function discord.new(app,page)
+	local make=app.New
+	local colors=app.colors
 	local makeSection=app.makeSection
 	local wrapTextButton=app.wrapTextButton
 
@@ -32,7 +32,7 @@ function Discord.new(app,page)
 	local function setStatus(text,color)
 		if statusLabel then
 			statusLabel.Text=text or ""
-			statusLabel.TextColor3=color or THEME.MUTED
+			statusLabel.TextColor3=color or colors.muted
 		end
 	end
 
@@ -41,51 +41,51 @@ function Discord.new(app,page)
 
 		if inviteLink and inviteLink~="" then
 			linkButton.Text=inviteLink
-			linkButton.TextColor3=THEME.TEXT
-			if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
-			setStatus("click to copy",THEME.MUTED)
+			linkButton.TextColor3=colors.text
+			if linkWrap then linkWrap.BackgroundColor3=colors.bg end
+			setStatus("click to copy",colors.muted)
 		else
 			linkButton.Text="no invite link set"
-			linkButton.TextColor3=THEME.MUTED
-			if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
-			setStatus("no invite yet",THEME.MUTED)
+			linkButton.TextColor3=colors.muted
+			if linkWrap then linkWrap.BackgroundColor3=colors.bg end
+			setStatus("no invite yet",colors.muted)
 		end
 	end
 
 	local function copyInvite()
 		if not inviteLink or inviteLink=="" then
-			setStatus("no invite yet",THEME.RED)
+			setStatus("no invite yet",colors.red)
 			return
 		end
 
 		local setter=getClipboardSetter()
 		if not setter then
-			setStatus("clipboard not here",THEME.RED)
+			setStatus("clipboard not here",colors.red)
 			return
 		end
 
 		local ok,err=pcall(setter,inviteLink)
 		if ok then
-			setStatus("copied",THEME.GREEN)
+			setStatus("copied",colors.green)
 		else
-			setStatus("copy failed: "..tostring(err),THEME.RED)
+			setStatus("copy failed: "..tostring(err),colors.red)
 		end
 	end
 
 	function api.Refresh()
-		if not(app.BOT_API and app.BOT_API.Post) then
+		if not(app.botApi and app.botApi.Post) then
 			paint()
 			return
 		end
 
 		local ok,result=pcall(function()
-			return app.BOT_API.Post("/invite-link/get",{})
+			return app.botApi.Post("/invite-link/get",{})
 		end)
 
 		if ok and result and result.ok then
 			inviteLink=result.inviteLink
 		else
-			setStatus("invite failed",THEME.RED)
+			setStatus("invite failed",colors.red)
 		end
 
 		paint()
@@ -103,15 +103,15 @@ function Discord.new(app,page)
 
 	local section=makeSection(page,3,"Discord","Community invite")
 
-	linkButton=New("TextButton",{
-		BackgroundColor3=THEME.BG,
+	linkButton=make("TextButton",{
+		BackgroundColor3=colors.bg,
 		BorderSizePixel=0,
 		Size=UDim2.new(1,-10,0,30),
 		Position=UDim2.fromOffset(5,0),
 		Text="loading invite...",
 		Font=Enum.Font.Gotham,
 		TextSize=12,
-		TextColor3=THEME.MUTED,
+		TextColor3=colors.muted,
 		SkipTextRole=true,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		TextTruncate=Enum.TextTruncate.AtEnd,
@@ -120,19 +120,19 @@ function Discord.new(app,page)
 		ZIndex=6,
 	},section)
 
-	linkWrap=wrapTextButton(linkButton,THEME.BG,2)
+	linkWrap=wrapTextButton(linkButton,colors.bg,2)
 	linkButton.Position=UDim2.fromOffset(10,0)
 	linkButton.Size=UDim2.new(1,-20,1,0)
 
 	connect(linkButton.MouseEnter,function()
-		if linkWrap then linkWrap.BackgroundColor3=THEME.CARD end
+		if linkWrap then linkWrap.BackgroundColor3=colors.card end
 		if inviteLink and inviteLink~="" then
-			setStatus("copy",THEME.GREEN)
+			setStatus("copy",colors.green)
 		end
 	end)
 
 	connect(linkButton.MouseLeave,function()
-		if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
+		if linkWrap then linkWrap.BackgroundColor3=colors.bg end
 		if statusLabel and statusLabel.Text=="copy" then
 			paint()
 		end
@@ -140,13 +140,13 @@ function Discord.new(app,page)
 
 	connect(linkButton.Activated,copyInvite)
 
-	statusLabel=New("TextLabel",{
+	statusLabel=make("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,18),
 		Text="getting invite...",
 		Font=Enum.Font.Gotham,
 		TextSize=11,
-		TextColor3=THEME.MUTED,
+		TextColor3=colors.muted,
 		SkipTextRole=true,
 		TextXAlignment=Enum.TextXAlignment.Left,
 		ZIndex=6,
@@ -166,4 +166,4 @@ function Discord.new(app,page)
 	return api
 end
 
-return Discord
+return discord

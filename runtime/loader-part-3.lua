@@ -38,7 +38,7 @@ end
 
 function loadDeferredModuleByName(name)
 	local env=getfenv()
-	return setLoadedModule(name,loadDeferredModule(name,MODULE_PATHS[name],rawget(env,moduleGlobalName(name))))
+	return setLoadedModule(name,loadDeferredModule(name,modulePaths[name],rawget(env,moduleGlobalName(name))))
 end
 
 function loadDeferredModuleNames(names)
@@ -48,9 +48,9 @@ function loadDeferredModuleNames(names)
 end
 
 function addRuntimeModuleError(parent,order,title,text)
-	table.insert(RUNTIME_BUILD_ERRORS,tostring(title)..": "..tostring(text))
+	table.insert(runtimeBuildErrors,tostring(title)..": "..tostring(text))
 	local section=makeSection(parent,order,title,"module did not load")
-	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.red,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 end
 
 function refreshRuntimeAPIs(apiNames)
@@ -81,7 +81,7 @@ function buildRuntimeModule(spec,app,parent,...)
 		end
 		addRuntimeModuleError(parent,spec.order or 1,spec.title,spec.title.." module failed: "..tostring(result))
 	else
-		addRuntimeModuleError(parent,spec.order or 1,spec.title,"missing module: "..tostring(MODULE_PATHS[spec.name] or spec.name))
+		addRuntimeModuleError(parent,spec.order or 1,spec.title,"missing module: "..tostring(modulePaths[spec.name] or spec.name))
 	end
 
 	return nil
@@ -96,18 +96,18 @@ end
 
 function makeCustomizeCtx()
 	return{
-		New=New,
-		Fusion=FusionModule,
-		Services=RuntimeServices,
-		Scheduler=RuntimeScheduler,
-		StateStore=RuntimeStateStore,
-		ThemeStore=RuntimeThemeStore,
-		Janitor=RuntimeJanitor,
-		THEME=THEME,
-		UI_STYLE=UI_STYLE,
-		UIS=UIS,
-		DEFAULT_UI_STYLE=getDefaultUIStyle and getDefaultUIStyle() or UI_STYLE,
-		SG=SG,
+		make=make,
+		fusion=FusionModule,
+		Services=sharedRuntime,
+		schedulerApi=jobRunner,
+		StateStore=settingsStore,
+		ThemeStore=themeRuntime,
+		Janitor=cleanupBags,
+		colors=colors,
+		style=style,
+		inputService=inputService,
+		defaultStyle=getDefaultUIStyle and getDefaultUIStyle() or style,
+		screenGui=screenGui,
 		StrokeColourLogicModule=StrokeColourLogicModule,
 		Page1GameParamsModule=Page1GameParamsModule,
 		makeSection=makeSection,
@@ -122,11 +122,11 @@ function makeCustomizeCtx()
 		tintSlider=tintSlider,
 		onChanged=function()
 			applyUIStrokeTheme()
-			if PAGE1_APIS and PAGE1_APIS.ESP and PAGE1_APIS.ESP.Refresh then
-				pcall(PAGE1_APIS.ESP.Refresh)
+			if mainPageApis and mainPageApis.esp and mainPageApis.esp.Refresh then
+				pcall(mainPageApis.esp.Refresh)
 			end
-			if PAGE1_APIS and PAGE1_APIS.QBAim and PAGE1_APIS.QBAim.Refresh then
-				pcall(PAGE1_APIS.QBAim.Refresh)
+			if mainPageApis and mainPageApis.QBAim and mainPageApis.QBAim.Refresh then
+				pcall(mainPageApis.QBAim.Refresh)
 			end
 			requestPlayerAutosave()
 		end,
@@ -137,7 +137,7 @@ function buildCustomizePage()
 	destroyRuntimeAPIs({"StrokeColourAPI"})
 	resetCustomizePageDefaults=function() end
 	clearCustomizePage()
-	loadDeferredModuleNames(CUSTOMIZE_RELOAD_NAMES)
+	loadDeferredModuleNames(customizeReloadNames)
 
 	StrokeColourAPI=buildRuntimeModule({name="StrokeColour",api="StrokeColourAPI",order=1,title="Stroke Colour"},makeCustomizeCtx(),uiSettingsPage)
 	if StrokeColourAPI then
@@ -156,7 +156,7 @@ end
 
 rebuildCustomizeFromModules=function()
 	if getActivePageName and getActivePageName()=="customize" then
-		LAZY_PAGE_BUILT.customize=false
+		lazyPageBuilt.customize=false
 		ensureRuntimePageBuilt("customize")
 		return
 	end
@@ -164,17 +164,17 @@ rebuildCustomizeFromModules=function()
 	destroyRuntimeAPIs({"StrokeColourAPI"})
 	resetCustomizePageDefaults=function() end
 	clearCustomizePage()
-	LAZY_PAGE_BUILT.customize=false
+	lazyPageBuilt.customize=false
 end
 
-LAZY_PAGE_BUILDERS.customize=buildCustomizePage
+lazyPageBuilders.customize=buildCustomizePage
 
 MapEditorAPI=nil
 AntiMaterialAPI=nil
 MapCleanerAPI=nil
 RemoveAdsAPI=nil
-MAP_API_NAMES={"MapEditorAPI","AntiMaterialAPI","MapCleanerAPI","RemoveAdsAPI"}
-MAP_MODULE_SPECS={
+mapApiNames={"MapEditorAPI","AntiMaterialAPI","MapCleanerAPI","RemoveAdsAPI"}
+mapPageModules={
 	{name="MapEditor",api="MapEditorAPI",order=0,title="Map Editor"},
 	{name="AntiMaterial",api="AntiMaterialAPI",order=1,title="Anti Material"},
 	{name="MapCleaner",api="MapCleanerAPI",order=2,title="Map Cleaner"},
@@ -186,28 +186,28 @@ function clearMapPage()
 end
 
 function ensureWorldSettings()
-	if WORLD_SETTINGS.SmoothPlastic==nil then
-		WORLD_SETTINGS.SmoothPlastic=false
+	if mapSettings.SmoothPlastic==nil then
+		mapSettings.SmoothPlastic=false
 	end
 
-	if type(WORLD_SETTINGS.OriginalMaterials)~="table" then
-		WORLD_SETTINGS.OriginalMaterials=setmetatable({}, {__mode="k"})
+	if type(mapSettings.OriginalMaterials)~="table" then
+		mapSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
 	end
 end
 
 function resetMapRuntimeState()
-	if destroyRuntimeAPIs and MAP_API_NAMES then
-		pcall(destroyRuntimeAPIs,MAP_API_NAMES)
+	if destroyRuntimeAPIs and mapApiNames then
+		pcall(destroyRuntimeAPIs,mapApiNames)
 	end
 
 	ensureWorldSettings()
 
-	if WORLD_SETTINGS.Conn then
-		safeDisconnect(WORLD_SETTINGS.Conn)
-		WORLD_SETTINGS.Conn=nil
+	if mapSettings.Conn then
+		safeDisconnect(mapSettings.Conn)
+		mapSettings.Conn=nil
 	end
 
-	for part,material in pairs(WORLD_SETTINGS.OriginalMaterials or {}) do
+	for part,material in pairs(mapSettings.OriginalMaterials or {}) do
 		if part and part.Parent and part:IsA("BasePart") then
 			pcall(function()
 				part.Material=material
@@ -215,28 +215,28 @@ function resetMapRuntimeState()
 		end
 	end
 
-	WORLD_SETTINGS.SmoothPlastic=false
-	WORLD_SETTINGS.OriginalMaterials=setmetatable({}, {__mode="k"})
+	mapSettings.SmoothPlastic=false
+	mapSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
 	potatoMode=false
 end
 
 function makeMapCtx(name)
 	local app={
-		New=New,
-		Fusion=FusionModule,
-		Services=RuntimeServices,
-		Scheduler=RuntimeScheduler,
-		StateStore=RuntimeStateStore,
-		ThemeStore=RuntimeThemeStore,
-		Janitor=RuntimeJanitor,
-		THEME=THEME,
+		make=make,
+		fusion=FusionModule,
+		Services=sharedRuntime,
+		schedulerApi=jobRunner,
+		StateStore=settingsStore,
+		ThemeStore=themeRuntime,
+		Janitor=cleanupBags,
+		colors=colors,
 		makeSection=makeSection,
 		buildSlider=buildSlider,
 		buildToggleRow=buildToggleRow,
 		wrapTextButton=wrapTextButton,
 		safeDisconnect=safeDisconnect,
 		getCurrentModeKey=function()
-			return CURRENT_MODE_KEY
+			return currentModeKey
 		end,
 		onChanged=function()
 			requestPlayerAutosave()
@@ -246,12 +246,12 @@ function makeMapCtx(name)
 	if name=="MapEditor" then
 		app.MapEditorLogicModule=MapEditorLogicModule
 	elseif name=="AntiMaterial" then
-		app.WORLD_SETTINGS=WORLD_SETTINGS
+		app.mapSettings=mapSettings
 		app.AntiMaterialLogicModule=AntiMaterialLogicModule
 		app.onChanged=function(state)
 			potatoMode=state and true or false
-			if WORLD_SETTINGS then
-				WORLD_SETTINGS.SmoothPlastic=potatoMode
+			if mapSettings then
+				mapSettings.SmoothPlastic=potatoMode
 			end
 			requestPlayerAutosave()
 		end
@@ -265,12 +265,12 @@ function makeMapCtx(name)
 end
 
 function buildMapPage()
-	destroyRuntimeAPIs(MAP_API_NAMES)
+	destroyRuntimeAPIs(mapApiNames)
 	clearMapPage()
 	ensureWorldSettings()
-	loadDeferredModuleNames(MAP_RELOAD_NAMES)
+	loadDeferredModuleNames(mapReloadNames)
 
-	for _,spec in ipairs(MAP_MODULE_SPECS) do
+	for _,spec in ipairs(mapPageModules) do
 		buildRuntimeModule(spec,makeMapCtx(spec.name),mapPage)
 	end
 
@@ -281,48 +281,48 @@ rebuildMapFromModules=function()
 	resetMapRuntimeState()
 
 	if getActivePageName and getActivePageName()=="maps" then
-		LAZY_PAGE_BUILT.maps=false
+		lazyPageBuilt.maps=false
 		ensureRuntimePageBuilt("maps")
 		return
 	end
 
 	clearMapPage()
-	LAZY_PAGE_BUILT.maps=false
+	lazyPageBuilt.maps=false
 end
 
-LAZY_PAGE_BUILDERS.maps=buildMapPage
+lazyPageBuilders.maps=buildMapPage
 
-PRELOAD_RUNTIME_PAGE_NAMES=LOADER_PAGE_BUILD_NAMES or {"maps","customize","page2","settings","server"}
+pagesToPreload=loaderPageNames or {"maps","customize","page2","settings","server"}
 function buildAllRuntimePages()
 	local okAll=true
-	local pageCount=#PRELOAD_RUNTIME_PAGE_NAMES
-	loaderPhaseCurrent=#STARTUP_MODULE_PATHS
+	local pageCount=#pagesToPreload
+	loaderPhaseCurrent=#startupModuleFiles
 
-	for _,pageName in ipairs(PRELOAD_RUNTIME_PAGE_NAMES) do
+	for _,pageName in ipairs(pagesToPreload) do
 		if ensureRuntimePageBuilt then
-			loaderPhaseCurrent=(loaderPhaseCurrent or #STARTUP_MODULE_PATHS)+1
+			loaderPhaseCurrent=(loaderPhaseCurrent or #startupModuleFiles)+1
 			if setLoaderProgress then
-				setLoaderProgress("Building interface page.",loaderPhaseCurrent,LOADER_TOTAL,false)
+				setLoaderProgress("Building interface page.",loaderPhaseCurrent,loaderStepTotal,false)
 			end
 
 			local ok,result=pcall(ensureRuntimePageBuilt,pageName)
 			if not ok or result==false then
 				okAll=false
 				if setLoaderProgress then
-					setLoaderProgress("gui page failed",loaderPhaseCurrent,LOADER_TOTAL,true)
+					setLoaderProgress("gui page failed",loaderPhaseCurrent,loaderStepTotal,true)
 				end
 				warn("page build failed:",pageName,ok and result or result)
 			end
 		end
 	end
 
-	if #RUNTIME_BUILD_ERRORS>0 then
+	if #runtimeBuildErrors>0 then
 		okAll=false
 		if setLoaderProgress then
-			setLoaderProgress("some gui pages failed",LOADER_TOTAL,LOADER_TOTAL,true)
+			setLoaderProgress("some gui pages failed",loaderStepTotal,loaderStepTotal,true)
 		end
 	elseif okAll and setLoaderProgress then
-		setLoaderProgress("Built all GUI pages.",#STARTUP_MODULE_PATHS+pageCount,LOADER_TOTAL,false)
+		setLoaderProgress("Built all GUI pages.",#startupModuleFiles+pageCount,loaderStepTotal,false)
 	end
 
 	return okAll
