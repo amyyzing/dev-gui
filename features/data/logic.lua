@@ -16,9 +16,7 @@ function playerData.new(app,page,deps)
 	local wrapTextButton=app.wrapTextButton
 
 	local api={}
-	local statusLabel=nil
-	local statusPill=nil
-	local statusPillText=nil
+	local wipeButton=nil
 	local busy=false
 	local connections={}
 
@@ -40,20 +38,25 @@ function playerData.new(app,page,deps)
 		table.clear(bucket)
 	end
 
-	local function setStatus(text,color)
-		if statusLabel then
-			statusLabel.Text=text or ""
-			statusLabel.TextColor3=color or colors.muted
+	local function canWipe()
+		return type(app.botApi)=="table" and type(app.botApi.Post)=="function"
+	end
+
+	local function updateWipeButton()
+		if not wipeButton then
+			return
 		end
 
-		if statusPill then
-			statusPill.BackgroundColor3=(color==colors.green or color==colors.red) and color or colors.bg
+		if busy then
+			wipeButton.Text="wiping..."
+		elseif canWipe() then
+			wipeButton.Text="wipe"
+		else
+			wipeButton.Text="not ready..."
 		end
 
-		if statusPillText then
-			statusPillText.Text=busy and "BUSY" or "READY"
-			statusPillText.TextColor3=(color==colors.green or color==colors.red) and Color3.fromRGB(0,0,0) or colors.muted
-		end
+		wipeButton.Active=not busy and canWipe()
+		wipeButton.Selectable=wipeButton.Active
 	end
 
 	local function modalButton(parent,text,x,danger,bucket)
@@ -211,35 +214,38 @@ function playerData.new(app,page,deps)
 
 	function api.Wipe()
 		if busy then return end
+		if not canWipe() then
+			updateWipeButton()
+			return
+		end
+
 		busy=true
-		setStatus("wiping...",colors.muted)
+		updateWipeButton()
 
-		if app.botApi and app.botApi.Post then
-			local ok,result=pcall(function()
-				return app.botApi.Post("/player/wipe",{
-					playerId=getPlayerId(),
-				})
-			end)
+		local ok,result=pcall(function()
+			return app.botApi.Post("/player/wipe",{
+				playerId=getPlayerId(),
+			})
+		end)
 
-			if not ok then
-				busy=false
-				setStatus("wipe failed: "..tostring(result),colors.red)
-				return
-			end
-
-			if not result or not result.ok then
-				busy=false
-				setStatus("wipe failed: "..tostring(result and result.error or "unknown"),colors.red)
-				return
-			end
+		if not ok or not result or not result.ok then
+			busy=false
+			updateWipeButton()
+			return
 		end
 
 		wipeLocal()
 		busy=false
-		setStatus("data wiped",colors.green or colors.text)
+		updateWipeButton()
 	end
 
 	function api.ShowConfirm()
+		if busy then return end
+		if not canWipe() then
+			updateWipeButton()
+			return
+		end
+
 		showConfirmModal(
 			"Wipe your data?",
 			"This WILL delete your data across all gamemodes. Continue?",
@@ -255,67 +261,17 @@ function playerData.new(app,page,deps)
 		disconnectConnections(connections)
 	end
 
-	local dataSection=makeSection(page,2,"Player Data","",{
+	local dataSection,sectionControls=makeSection(page,2,"Player Data","",{
 		headerButton={
-			text="WIPE DATA",
-			width=92,
+			text="wipe",
+			width=104,
 			danger=true,
 			onClick=api.ShowConfirm,
 		},
 	})
 
-	local statusRow=make("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,34),
-		ZIndex=5,
-	},dataSection)
-
-	make("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,-76,1,0),
-		Text="Cloud Profile",
-		Font=Enum.Font.GothamMedium,
-		TextSize=12,
-		TextColor3=colors.text,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},statusRow)
-
-	statusPill=make("Frame",{
-		Size=UDim2.fromOffset(64,22),
-		Position=UDim2.new(1,-64,0.5,-11),
-		BackgroundColor3=colors.bg,
-		BorderSizePixel=0,
-		ZIndex=6,
-	},statusRow)
-
-	make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=0},statusPill)
-
-	statusPillText=make("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,1,0),
-		Text="READY",
-		Font=Enum.Font.GothamMedium,
-		TextSize=10,
-		TextColor3=colors.muted,
-		SkipTextRole=true,
-		TextXAlignment=Enum.TextXAlignment.Center,
-		ZIndex=7,
-	},statusPill)
-
-	statusLabel=make("TextLabel",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,18),
-		Text="",
-		Font=Enum.Font.Gotham,
-		TextSize=11,
-		TextColor3=colors.muted,
-		SkipTextRole=true,
-		TextWrapped=true,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		TextYAlignment=Enum.TextYAlignment.Top,
-		ZIndex=6,
-	},dataSection)
+	wipeButton=sectionControls and sectionControls.headerButton
+	updateWipeButton()
 
 	return api
 end
