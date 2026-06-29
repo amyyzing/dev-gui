@@ -90,6 +90,8 @@ local throwReleaseWait=0.26666666666666666
 local throwRemoteLeadTime=0.00 -- fire wait
 local livePreviewDuringThrow=false -- freeze arc
 local fireThrowImmediately=false
+local noAnimationThrowFallback=true
+local noAnimationReleaseWait=0
 local throwInputCooldown=0.85
 local releaseConfirmTimeout=1.75
 local releaseConfirmStableTime=0.08
@@ -2210,10 +2212,16 @@ function qbAim.new(app,parent)
 		}
 	end
 
-	local function buildReleasePlan(receiver,ballPower,releaseBall)
-		if not fireThrowImmediately and throwReleaseWait>0 then
-			local endAt=os.clock()+throwReleaseWait
-			local fireAt=endAt-math.clamp(throwRemoteLeadTime,0,throwReleaseWait)
+	local function buildReleasePlan(receiver,ballPower,releaseBall,releaseWaitOverride)
+		local releaseWait=releaseWaitOverride
+		if releaseWait==nil then
+			releaseWait=throwReleaseWait
+		end
+		releaseWait=math.max(0,tonumber(releaseWait) or 0)
+
+		if not fireThrowImmediately and releaseWait>0 then
+			local endAt=os.clock()+releaseWait
+			local fireAt=endAt-math.clamp(throwRemoteLeadTime,0,releaseWait)
 
 			while os.clock()<fireAt do
 				if livePreviewDuringThrow then
@@ -2268,8 +2276,9 @@ function qbAim.new(app,parent)
 		return true,nil
 	end
 
-	local function throwTo(receiver)
+	local function throwTo(receiver,options)
 		if not(enabled and isAvailable()) then return end
+		options=options or {}
 
 		if throwBlocked() then
 			setStatus("already throwing")
@@ -2314,9 +2323,18 @@ function qbAim.new(app,parent)
 			previewPlan(previewReleasePlan)
 		end
 
-		qbAim._playThrowAnimation()
+		local skipAnimation=options.skipAnimation==true or options.noAnimation==true
+		local animationPlayed=false
+		if not skipAnimation then
+			animationPlayed=qbAim._playThrowAnimation()
+		end
 
-		local plan,_,reason=buildReleasePlan(receiver,power,heldBall)
+		local releaseWait=throwReleaseWait
+		if skipAnimation or (noAnimationThrowFallback and not animationPlayed) then
+			releaseWait=noAnimationReleaseWait
+		end
+
+		local plan,_,reason=buildReleasePlan(receiver,power,heldBall,releaseWait)
 		if not plan then
 			releaseThrowLock()
 			setStatus(reason or "no throw")
@@ -2705,18 +2723,33 @@ function qbAim.new(app,parent)
 		addConnection(runService.RenderStepped:Connect(previewStep))
 	end
 
-	local function handleQBAimInput(input)
-		if not isAvailable() then return false end
+	local function hasFocusedTextBox()
+		local ok,focused=pcall(function()
+			return inputService:GetFocusedTextBox()
+		end)
+		return ok and focused~=nil
+	end
 
-		if bindingMatches("getQBAimToggleKey",input,Enum.KeyCode.P) then
+	local function shouldHandleProcessedQBAimInput(input)
+		if hasFocusedTextBox() then return false end
+		if not enabled then return false end
+		return bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T)
+	end
+
+	local function handleQBAimInput(input,processed)
+		if not isAvailable() then return false end
+		local inputWasProcessed=processed==true
+
+		if not inputWasProcessed and bindingMatches("getQBAimToggleKey",input,Enum.KeyCode.P) then
 			setEnabled(not enabled)
 			return true
 		end
 
 		if not enabled then return false end
 
-		local wantsLock=bindingMatches("getQBAimLockKey",input,Enum.KeyCode.H)
+		local wantsLock=not inputWasProcessed and bindingMatches("getQBAimLockKey",input,Enum.KeyCode.H)
 		local wantsThrow=bindingMatches("getQBAimThrowKey",input,Enum.KeyCode.T)
+		if inputWasProcessed and not wantsThrow then return false end
 		if not(wantsLock or wantsThrow) then return false end
 
 		if wantsLock then
@@ -2736,7 +2769,9 @@ function qbAim.new(app,parent)
 
 		if wantsThrow then
 			if trackedReceiver then
-				throwTo(trackedReceiver)
+				throwTo(trackedReceiver,{
+					noAnimation=inputWasProcessed,
+				})
 			else
 				setStatus("no wr")
 			end
@@ -2746,8 +2781,8 @@ function qbAim.new(app,parent)
 	end
 
 	addConnection(inputService.InputBegan:Connect(function(input,processed)
-		if processed then return end
-		handleQBAimInput(input)
+		if processed and not shouldHandleProcessedQBAimInput(input) then return end
+		handleQBAimInput(input,processed)
 	end))
 
 	cleanupC3InfoGui()
