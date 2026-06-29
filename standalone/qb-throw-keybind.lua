@@ -3,16 +3,16 @@
 -- Standalone Practice / Quarterback Gauntlet hitbox toggle.
 -- Toggle locally expands gauntlet TouchDetect hitboxes for easier overlap.
 
-local Players=game:GetService("Players")
+local players=game:GetService("Players")
 local inputService=game:GetService("UserInputService")
-local RunService=game:GetService("RunService")
-local ReplicatedStorage=game:GetService("ReplicatedStorage")
-local Workspace=game:GetService("Workspace")
-local CoreGui=game:GetService("CoreGui")
-local TweenService=game:GetService("TweenService")
-local CollectionService=game:GetService("CollectionService")
+local runService=game:GetService("RunService")
+local replicatedStorage=game:GetService("ReplicatedStorage")
+local workspace=game:GetService("Workspace")
+local coreGui=game:GetService("CoreGui")
+local tweenService=game:GetService("TweenService")
+local collectionService=game:GetService("CollectionService")
 
-local localPlayer=Players.LocalPlayer
+local localPlayer=players.LocalPlayer
 local runtimeName="StandalonePracticeQBGauntlet"
 local oldRuntimeNames={
 	"StandaloneQBThrowKeybindGui",
@@ -140,7 +140,7 @@ local function pathOf(instance)
 end
 
 local function rootOfLocalPlayer()
-	local character=localPlayer.Character or Workspace:FindFirstChild(localPlayer.Name)
+	local character=localPlayer.Character or workspace:FindFirstChild(localPlayer.Name)
 	return character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
 end
 
@@ -152,7 +152,7 @@ local function heldFootball()
 		local part=cachedPracticeBall:FindFirstChildWhichIsA("BasePart",true)
 		if part then return part end
 	end
-	local character=localPlayer.Character or Workspace:FindFirstChild(localPlayer.Name)
+	local character=localPlayer.Character or workspace:FindFirstChild(localPlayer.Name)
 	if not character then return nil end
 	for _,child in ipairs(character:GetChildren()) do
 		if child.Name:lower():find("football") then
@@ -180,7 +180,7 @@ local function firstChildFolder(parent)
 end
 
 local function findPracticeWorkspace()
-	local miniGames=Workspace:FindFirstChild("MiniGames")
+	local miniGames=workspace:FindFirstChild("MiniGames")
 	if not miniGames then return nil end
 	for _,child in ipairs(miniGames:GetChildren()) do
 		local replicated=child:FindFirstChild("Replicated")
@@ -192,7 +192,7 @@ local function findPracticeWorkspace()
 end
 
 local function findPracticeRemote(workspaceGame)
-	local miniGames=ReplicatedStorage:FindFirstChild("MiniGames")
+	local miniGames=replicatedStorage:FindFirstChild("MiniGames")
 	local direct=miniGames and workspaceGame and miniGames:FindFirstChild(workspaceGame.Name)
 	local event=direct and direct:FindFirstChild("ReEvent")
 	if event and event:IsA("RemoteEvent") then
@@ -206,7 +206,7 @@ local function findPracticeRemote(workspaceGame)
 			end
 		end
 	end
-	event=ReplicatedStorage:FindFirstChild("ReEvent")
+	event=replicatedStorage:FindFirstChild("ReEvent")
 	if event and event:IsA("RemoteEvent") then
 		return event
 	end
@@ -561,22 +561,22 @@ local function startBallDetection(event,ball)
 	local params=OverlapParams.new()
 	params.MaxParts=40
 	params.FilterType=Enum.RaycastFilterType.Include
-	params.FilterDescendantsInstances=CollectionService:GetTagged("FootballCanHit")
+	params.FilterDescendantsInstances=collectionService:GetTagged("FootballCanHit")
 
 	local hit=false
 	local lastSent={}
 	local sentCount=0
 	local firstNearAt=nil
 	local lastNearAt=nil
-	ballHitConn=RunService.Heartbeat:Connect(function()
+	ballHitConn=runService.Heartbeat:Connect(function()
 		if hit or not ball or not ball.Parent then
 			stopBallDetection()
 			return
 		end
 
-		local tagged=CollectionService:GetTagged("FootballCanHit")
+		local tagged=collectionService:GetTagged("FootballCanHit")
 		params.FilterDescendantsInstances=tagged
-		local parts=Workspace:GetPartBoundsInRadius(ball.Position,radius,params)
+		local parts=workspace:GetPartBoundsInRadius(ball.Position,radius,params)
 		local closest,closestDist=closestTaggedTouch(ball.Position,tagged)
 		local closestCanHit=canHitState(closest)
 		local sawOverlap=false
@@ -695,7 +695,7 @@ local function ensurePreview()
 	clearPreview()
 	previewFolder=Instance.new("Folder")
 	previewFolder.Name="PracticeGauntletPreview"
-	previewFolder.Parent=Workspace
+	previewFolder.Parent=workspace
 
 	local function marker(name,size,color,transparency)
 		local part=Instance.new("Part")
@@ -935,10 +935,10 @@ local function makeButton(parent,text,callback)
 	},parent)
 	new("UIStroke",{Color=Color3.fromRGB(70,70,70),Thickness=1},button)
 	connect(button.MouseEnter,function()
-		TweenService:Create(button,TweenInfo.new(0.12),{BackgroundColor3=Color3.fromRGB(42,42,42)}):Play()
+		tweenService:Create(button,TweenInfo.new(0.12),{BackgroundColor3=Color3.fromRGB(42,42,42)}):Play()
 	end)
 	connect(button.MouseLeave,function()
-		TweenService:Create(button,TweenInfo.new(0.12),{BackgroundColor3=Color3.fromRGB(32,32,32)}):Play()
+		tweenService:Create(button,TweenInfo.new(0.12),{BackgroundColor3=Color3.fromRGB(32,32,32)}):Play()
 	end)
 	connect(button.MouseButton1Click,callback)
 	return button
@@ -949,7 +949,7 @@ local function buildGui()
 	screenGui.Name=runtimeName
 	screenGui.ResetOnSpawn=false
 	screenGui.IgnoreGuiInset=true
-	pcall(function() screenGui.Parent=CoreGui end)
+	pcall(function() screenGui.Parent=coreGui end)
 	if not screenGui.Parent then
 		screenGui.Parent=localPlayer:WaitForChild("PlayerGui")
 	end
@@ -1045,7 +1045,7 @@ end
 buildGui()
 bindPracticeEvent()
 
-connect(RunService.RenderStepped,function()
+connect(runService.RenderStepped,function()
 	bindPracticeEvent()
 	refreshTargets(false)
 	if hitboxEnabled then

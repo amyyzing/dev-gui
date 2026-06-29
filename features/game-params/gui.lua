@@ -2,7 +2,7 @@
 
 local gameParamsGui={}
 
-local TweenService=game:GetService("TweenService")
+local tweenService=game:GetService("TweenService")
 
 local defaultSelectedPage="speed"
 
@@ -362,7 +362,7 @@ function gameParamsGui.new(app,parent)
 			end)
 		end
 
-		local tween=TweenService:Create(object,tweenInfo or paintTween,goal)
+		local tween=tweenService:Create(object,tweenInfo or paintTween,goal)
 		paintTweens[object]=tween
 		tween.Completed:Connect(function()
 			if paintTweens[object]==tween then
@@ -482,8 +482,8 @@ function gameParamsGui.new(app,parent)
 		oldFrame.Position=UDim2.fromScale(0,0)
 		newFrame.Position=UDim2.fromScale(dir,0)
 
-		local oldTween=TweenService:Create(oldFrame,pageTween,{Position=UDim2.fromScale(-dir,0)})
-		local newTween=TweenService:Create(newFrame,pageTween,{Position=UDim2.fromScale(0,0)})
+		local oldTween=tweenService:Create(oldFrame,pageTween,{Position=UDim2.fromScale(-dir,0)})
+		local newTween=tweenService:Create(newFrame,pageTween,{Position=UDim2.fromScale(0,0)})
 		table.insert(pageTweens,oldTween)
 		table.insert(pageTweens,newTween)
 		oldTween:Play()

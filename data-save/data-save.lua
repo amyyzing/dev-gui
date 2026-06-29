@@ -2,7 +2,7 @@
 
 local dataSave={}
 
-local HttpService=game:GetService("HttpService")
+local httpService=game:GetService("HttpService")
 
 local defaultStyleValues={
 	PrimaryR=12,
@@ -983,7 +983,7 @@ function dataSave.new(app)
 		local settingsRoot=api.BuildRootForSave(currentSettings)
 
 		local ok,encoded=pcall(function()
-			return HttpService:JSONEncode(settingsRoot)
+			return httpService:JSONEncode(settingsRoot)
 		end)
 
 		if ok and encoded==autosaveLastPayload then

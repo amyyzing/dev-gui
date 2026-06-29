@@ -2,12 +2,12 @@
 
 local boost={}
 
-local Players=game:GetService("Players")
+local players=game:GetService("Players")
 local inputService=game:GetService("UserInputService")
-local Debris=game:GetService("Debris")
-local RunService=game:GetService("RunService")
+local debris=game:GetService("Debris")
+local runService=game:GetService("RunService")
 
-local me=Players.LocalPlayer
+local me=players.LocalPlayer
 
 local defaultBoostForce=32
 local defaultBoostCooldown=5
@@ -155,7 +155,7 @@ function boost.new(app,parent)
 		bv.P=5000
 		bv.Parent=rootPart
 
-		Debris:AddItem(bv,0.2)
+		debris:AddItem(bv,0.2)
 	end
 
 	local function rollBoostChance()
@@ -205,7 +205,7 @@ function boost.new(app,parent)
 	end
 
 	local function hasNearbyBoostTarget(character,root)
-		for _,player in ipairs(Players:GetPlayers()) do
+		for _,player in ipairs(players:GetPlayers()) do
 			local otherChar=player~=me and player.Character
 			if otherChar and otherChar~=character then
 				local humanoid=otherChar:FindFirstChildOfClass("Humanoid")
@@ -278,7 +278,7 @@ function boost.new(app,parent)
 		end
 
 		local elapsed=0
-		jumpBoostScanConn=RunService.Heartbeat:Connect(function(dt)
+		jumpBoostScanConn=runService.Heartbeat:Connect(function(dt)
 			elapsed=elapsed+(dt or 0)
 			if elapsed<boostScanInterval then
 				return

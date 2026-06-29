@@ -2,7 +2,7 @@
 
 local strokeColour={}
 
-local TweenService=game:GetService("TweenService")
+local tweenService=game:GetService("TweenService")
 
 local styleDefaults={
 	PrimaryR=12,
@@ -169,17 +169,17 @@ local numberLimits={
 }
 
 local highlightModes={
-	{Key="espOffense",Prefix="ESPOffense",Label="ESP Offense",Short="O",States={{Key="open",Suffix="Open",Label="Open"},{Key="closed",Suffix="Closed",Label="Guarded"}}},
-	{Key="espDefense",Prefix="ESPDefense",Label="ESP Defense",Short="D",States={{Key="holder",Suffix="Holder",Label="Holder"},{Key="open",Suffix="Open",Label="Open"},{Key="closed",Suffix="Closed",Label="Guarded"}}},
-	{Key="qbHighlight",Prefix="QBAimHighlight",Label="QB Highlight",Short="Q",States={{Key="target",Suffix="",Label="Target"}}},
+	{key="espOffense",prefix="ESPOffense",label="ESP Offense",short="O",states={{key="open",suffix="Open",label="Open"},{key="closed",suffix="Closed",label="Guarded"}}},
+	{key="espDefense",prefix="ESPDefense",label="ESP Defense",short="D",states={{key="holder",suffix="Holder",label="Holder"},{key="open",suffix="Open",label="Open"},{key="closed",suffix="Closed",label="Guarded"}}},
+	{key="qbHighlight",prefix="QBAimHighlight",label="QB Highlight",short="Q",states={{key="target",suffix="",label="Target"}}},
 }
 local highlightModeByKey={}
 local highlightStateByMode={}
 for _,mode in ipairs(highlightModes) do
-	highlightModeByKey[mode.Key]=mode
-	highlightStateByMode[mode.Key]={}
-	for _,state in ipairs(mode.States) do
-		highlightStateByMode[mode.Key][state.Key]=state
+	highlightModeByKey[mode.key]=mode
+	highlightStateByMode[mode.key]={}
+	for _,state in ipairs(mode.states) do
+		highlightStateByMode[mode.key][state.key]=state
 	end
 end
 local highlightDialWidth=96
@@ -311,7 +311,7 @@ function strokeColour.new(app,page)
 	local colors=app.colors
 	local style=app.style
 	local inputService=app.inputService or game:GetService("UserInputService")
-	local GuiService=game:GetService("GuiService")
+	local guiService=game:GetService("GuiService")
 	local buildSlider=app.buildSlider
 
 	applyDefaultOverrides(app.defaultStyle)
@@ -356,7 +356,7 @@ function strokeColour.new(app,page)
 
 	local function guiInset()
 		local ok,inset=pcall(function()
-			return GuiService:GetGuiInset()
+			return guiService:GetGuiInset()
 		end)
 
 		if ok and typeof(inset)=="Vector2" then
@@ -569,8 +569,8 @@ function strokeColour.new(app,page)
 		trackValueConnection(gradientValue.Changed:Connect(applyStep))
 
 		local info=TweenInfo.new(0.24,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
-		local mainColourTween=TweenService:Create(mainValue,info,{Value=c1})
-		local gradientColourTween=TweenService:Create(gradientValue,info,{Value=c1})
+		local mainColourTween=tweenService:Create(mainValue,info,{Value=c1})
+		local gradientColourTween=tweenService:Create(gradientValue,info,{Value=c1})
 
 		trackValueConnection(gradientColourTween.Completed:Connect(function()
 			if token==colourTweenToken then
@@ -871,7 +871,7 @@ function strokeColour.new(app,page)
 					lastHeight=height
 
 					if animate then
-						bodyTween=TweenService:Create(body,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(1,0,0,height)})
+						bodyTween=tweenService:Create(body,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(1,0,0,height)})
 						bodyTween:Play()
 						bodyTween.Completed:Connect(function()
 							if expanded and body.Parent then
@@ -891,7 +891,7 @@ function strokeColour.new(app,page)
 				body.Size=UDim2.new(1,0,0,lastHeight)
 
 				if animate then
-					bodyTween=TweenService:Create(body,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Size=UDim2.new(1,0,0,0)})
+					bodyTween=tweenService:Create(body,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Size=UDim2.new(1,0,0,0)})
 					bodyTween:Play()
 					bodyTween.Completed:Connect(function()
 						if not expanded and body.Parent then
@@ -1139,25 +1139,25 @@ function strokeColour.new(app,page)
 	local function normalizeHighlightState(value,mode)
 		mode=mode or activeHighlightMode()
 		local key=tostring(value or ""):lower():gsub("%s+","")
-		local stateMap=highlightStateByMode[mode.Key] or {}
+		local stateMap=highlightStateByMode[mode.key] or {}
 		if stateMap[key] then
 			return key
 		end
 
-		local first=mode.States and mode.States[1]
-		return first and first.Key or "target"
+		local first=mode.states and mode.states[1]
+		return first and first.key or "target"
 	end
 
 	local function activeHighlightState()
 		local mode=activeHighlightMode()
 		style.HighlightSelectedState=normalizeHighlightState(style.HighlightSelectedState,mode)
-		return (highlightStateByMode[mode.Key] or {})[style.HighlightSelectedState] or mode.States[1]
+		return (highlightStateByMode[mode.key] or {})[style.HighlightSelectedState] or mode.states[1]
 	end
 
 	local function activeHighlightPrefix()
 		local mode=activeHighlightMode()
 		local state=activeHighlightState()
-		return mode.Prefix..(state.Suffix or "")
+		return mode.prefix..(state.suffix or "")
 	end
 
 	local function highlightField(channel,suffix)
@@ -1390,7 +1390,7 @@ function strokeColour.new(app,page)
 			applyThemePreset(preset)
 		end))
 
-		themeCards[#themeCards+1]={Preset=preset,Card=card,Marker=marker,Label=label}
+		themeCards[#themeCards+1]={Preset=preset,Card=card,Marker=marker,label=label}
 	end
 
 	local colorPanel=makePanel(3,"Colours","ColoursPanelExpanded")
@@ -1414,7 +1414,7 @@ function strokeColour.new(app,page)
 			setActiveTarget(target)
 		end))
 
-		targetButtons[target]={Button=button,Marker=marker}
+		targetButtons[target]={button=button,Marker=marker}
 	end
 
 	local modeRow=make("Frame",{
@@ -1436,7 +1436,7 @@ function strokeColour.new(app,page)
 			setActiveMode(mode)
 		end))
 
-		modeButtons[mode]={Button=button,Marker=marker}
+		modeButtons[mode]={button=button,Marker=marker}
 	end
 
 	local quickRow=make("Frame",{
@@ -1801,7 +1801,7 @@ function strokeColour.new(app,page)
 		local stateEnabled=style[highlightCustomField()]==true
 
 		if highlightModeLabel then
-			highlightModeLabel.Text=mode.Label.." / "..state.Label..(stateEnabled and " custom" or " default")
+			highlightModeLabel.Text=mode.label.." / "..state.label..(stateEnabled and " custom" or " default")
 		end
 
 		if highlightPreview then
@@ -1818,23 +1818,23 @@ function strokeColour.new(app,page)
 
 		paintHighlightDial(false)
 
-		local states=mode.States or {}
+		local states=mode.states or {}
 		local stateCount=math.max(#states,1)
 		for index,entry in ipairs(highlightStateButtons) do
 			local stateInfo=states[index]
 			local visible=stateInfo~=nil
-			entry.Button.Visible=visible
-			entry.Button.Size=UDim2.new(visible and (1/stateCount) or 0,visible and -6 or 0,1,0)
-			entry.Button.Text=visible and stateInfo.Label or ""
-			entry.Key=visible and stateInfo.Key or nil
-			entry.Marker.Visible=visible and stateInfo.Key==state.Key
+			entry.button.Visible=visible
+			entry.button.Size=UDim2.new(visible and (1/stateCount) or 0,visible and -6 or 0,1,0)
+			entry.button.Text=visible and stateInfo.label or ""
+			entry.key=visible and stateInfo.key or nil
+			entry.Marker.Visible=visible and stateInfo.key==state.key
 			entry.Marker.BackgroundColor3=activeAccent
-			entry.Button.BackgroundColor3=(visible and stateInfo.Key==state.Key) and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
+			entry.button.BackgroundColor3=(visible and stateInfo.key==state.key) and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
 		end
 
 		for key,entry in pairs(highlightTargetButtons) do
 			local selected=key==activeHighlightTarget
-			entry.Button.BackgroundColor3=selected and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
+			entry.button.BackgroundColor3=selected and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=activeAccent
 		end
@@ -1875,7 +1875,7 @@ function strokeColour.new(app,page)
 			previous:Cancel()
 		end
 
-		local tween=TweenService:Create(object,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),goal)
+		local tween=tweenService:Create(object,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),goal)
 		highlightDialPaintTweens[object]=tween
 		tween.Completed:Connect(function()
 			if highlightDialPaintTweens[object]==tween then
@@ -1886,7 +1886,7 @@ function strokeColour.new(app,page)
 	end
 
 	paintHighlightDial=function(animate)
-		local selected=activeHighlightMode().Key
+		local selected=activeHighlightMode().key
 		local accent=getUIStrokeColor()
 		local core=brightenColor(accent,0.10)
 		local hover=brightenColor(accent,0.24)
@@ -1894,12 +1894,12 @@ function strokeColour.new(app,page)
 		local muted=themeColor("MUTED",Color3.fromRGB(118,122,132))
 
 		for _,mode in ipairs(highlightModes) do
-			local key=mode.Key
+			local key=mode.key
 			local isSelected=key==selected
 			local isHover=key==highlightHoverMode
-			local isCustom=style[mode.Prefix.."CustomColor"]==true
-			for _,state in ipairs(mode.States or {}) do
-				if style[mode.Prefix..(state.Suffix or "").."CustomColor"]==true then
+			local isCustom=style[mode.prefix.."CustomColor"]==true
+			for _,state in ipairs(mode.states or {}) do
+				if style[mode.prefix..(state.suffix or "").."CustomColor"]==true then
 					isCustom=true
 					break
 				end
@@ -2185,10 +2185,10 @@ function strokeColour.new(app,page)
 
 	for index=1,3 do
 		local button,marker=makeFlatButton(highlightStateRow,"",index,0.333)
-		local entry={Button=button,Marker=marker,Key=nil}
+		local entry={button=button,Marker=marker,key=nil}
 		trackConnection(button.Activated:Connect(function()
-			if entry.Key then
-				setHighlightState(entry.Key)
+			if entry.key then
+				setHighlightState(entry.key)
 			end
 		end))
 		highlightStateButtons[index]=entry
@@ -2211,7 +2211,7 @@ function strokeColour.new(app,page)
 		trackConnection(button.Activated:Connect(function()
 			setHighlightTarget(target)
 		end))
-		highlightTargetButtons[target]={Button=button,Marker=marker}
+		highlightTargetButtons[target]={button=button,Marker=marker}
 	end
 
 	local highlightPickerBody=make("Frame",{
@@ -2383,19 +2383,19 @@ function strokeColour.new(app,page)
 			entry.Card.BackgroundColor3=selected and preset.Primary:Lerp(readableTextColor(preset.Primary),0.06) or preset.Primary
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=preset.Stroke
-			entry.Label.TextColor3=readableTextColor(entry.Card.BackgroundColor3)
+			entry.label.TextColor3=readableTextColor(entry.Card.BackgroundColor3)
 		end
 
 		for key,entry in pairs(targetButtons) do
 			local selected=key==activeTarget
-			entry.Button.BackgroundColor3=selected and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
+			entry.button.BackgroundColor3=selected and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=stroke
 		end
 
 		for key,entry in pairs(modeButtons) do
 			local selected=key==activeMode
-			entry.Button.BackgroundColor3=selected and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
+			entry.button.BackgroundColor3=selected and themeColor("SECTION",colors.card) or themeColor("BUTTON",colors.panel)
 			entry.Marker.Visible=selected
 			entry.Marker.BackgroundColor3=stroke
 		end

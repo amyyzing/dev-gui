@@ -8,8 +8,8 @@ function guiLogic.new(app)
 	local colors=app.colors
 	local style=app.style or {}
 	local inputService=app.inputService
-	local GuiService=app.GuiService or game:GetService("GuiService")
-	local TweenService=app.TweenService
+	local guiService=app.GuiService or game:GetService("GuiService")
+	local tweenService=app.TweenService
 	local fmtNumber=app.fmtNumber
 	local boxWrappers=app.boxWrappers or setmetatable({}, {__mode="k"})
 	local buttonWrappers=app.buttonWrappers or setmetatable({}, {__mode="k"})
@@ -162,7 +162,7 @@ function guiLogic.new(app)
 
 	local function guiInset()
 		local ok,inset=pcall(function()
-			return GuiService:GetGuiInset()
+			return guiService:GetGuiInset()
 		end)
 
 		if ok and typeof(inset)=="Vector2" then
@@ -318,7 +318,7 @@ function guiLogic.new(app)
 		end
 
 		local function tween(object,info,goal)
-			local tw=TweenService:Create(object,info,goal)
+			local tw=tweenService:Create(object,info,goal)
 			table.insert(activeTweens,tw)
 			tw:Play()
 			return tw
@@ -432,7 +432,7 @@ function guiLogic.new(app)
 
 			local targetSize=UDim2.fromOffset(width,railHeight)
 			if animate~=false then
-				headerTween=TweenService:Create(control.wrap,tweenInfo,{Size=targetSize})
+				headerTween=tweenService:Create(control.wrap,tweenInfo,{Size=targetSize})
 				headerTween:Play()
 			else
 				control.wrap.Size=targetSize
@@ -760,8 +760,8 @@ function guiLogic.new(app)
 
 		local function tweenTitle()
 			titleButton.TextTransparency=0.18
-			TweenService:Create(titleButton,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
-			TweenService:Create(sec,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundColor3=themeColor("SECTION",colors.card)}):Play()
+			tweenService:Create(titleButton,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
+			tweenService:Create(sec,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundColor3=themeColor("SECTION",colors.card)}):Play()
 		end
 
 		local function cancelBodyTween()
@@ -795,7 +795,7 @@ function guiLogic.new(app)
 			end
 
 			if animate then
-				local tween=TweenService:Create(subtitleLabel,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=visible and 0 or 1})
+				local tween=tweenService:Create(subtitleLabel,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=visible and 0 or 1})
 				tween:Play()
 				tween.Completed:Connect(function()
 					if subtitleLabel and subtitleLabel.Parent and not visible then
@@ -832,7 +832,7 @@ function guiLogic.new(app)
 				return
 			end
 
-			bodyTween=TweenService:Create(body,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Size=UDim2.new(1,0,0,0)})
+			bodyTween=tweenService:Create(body,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Size=UDim2.new(1,0,0,0)})
 			bodyTween:Play()
 			bodyTween.Completed:Connect(function()
 				if collapsed and body and body.Parent then
@@ -864,7 +864,7 @@ function guiLogic.new(app)
 					return
 				end
 
-				bodyTween=TweenService:Create(body,TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(1,0,0,target)})
+				bodyTween=tweenService:Create(body,TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(1,0,0,target)})
 				bodyTween:Play()
 				bodyTween.Completed:Connect(function()
 					if not collapsed and body and body.Parent then
@@ -1090,15 +1090,15 @@ function guiLogic.new(app)
 
 			if animate then
 				cancelSliderTweens()
-				fillTween=TweenService:Create(fill,sliderTweenInfo,{Size=fillSize})
-				fillGlowTween=TweenService:Create(fillGlow,sliderTweenInfo,{Size=fillSize,BackgroundTransparency=sliderGlowActiveTransparency})
-				fillStrokeTween=TweenService:Create(fillStroke,sliderGlowInfo,{Transparency=sliderGlowStrokeActiveTransparency})
+				fillTween=tweenService:Create(fill,sliderTweenInfo,{Size=fillSize})
+				fillGlowTween=tweenService:Create(fillGlow,sliderTweenInfo,{Size=fillSize,BackgroundTransparency=sliderGlowActiveTransparency})
+				fillStrokeTween=tweenService:Create(fillStroke,sliderGlowInfo,{Transparency=sliderGlowStrokeActiveTransparency})
 				fillTween:Play()
 				fillGlowTween:Play()
 				fillStrokeTween:Play()
 
 				if knobVisible then
-					knobTween=TweenService:Create(knob,sliderTweenInfo,{Position=knobPosition})
+					knobTween=tweenService:Create(knob,sliderTweenInfo,{Position=knobPosition})
 					knobTween:Play()
 				end
 
@@ -1108,9 +1108,9 @@ function guiLogic.new(app)
 					if sliderDestroyed or thisGlow~=glowSerial or not fillGlow.Parent then
 						return
 					end
-					fillGlowFadeTween=TweenService:Create(fillGlow,sliderGlowInfo,{BackgroundTransparency=sliderGlowIdleTransparency})
+					fillGlowFadeTween=tweenService:Create(fillGlow,sliderGlowInfo,{BackgroundTransparency=sliderGlowIdleTransparency})
 					fillGlowFadeTween:Play()
-					fillStrokeTween=TweenService:Create(fillStroke,sliderGlowInfo,{Transparency=sliderGlowStrokeIdleTransparency})
+					fillStrokeTween=tweenService:Create(fillStroke,sliderGlowInfo,{Transparency=sliderGlowStrokeIdleTransparency})
 					fillStrokeTween:Play()
 				end)
 			else
@@ -1333,7 +1333,7 @@ function guiLogic.new(app)
 				return
 			end
 
-			textTween=TweenService:Create(label,tweenInfo,properties)
+			textTween=tweenService:Create(label,tweenInfo,properties)
 
 			local thisTween=textTween
 

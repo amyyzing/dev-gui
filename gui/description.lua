@@ -71,10 +71,10 @@ description.Categories={
 	},
 
 	Labels={
-		ActionStatus=blank,
-		Reset=blank,
-		Ready=blank,
-		Busy=blank,
+		actionStatus=blank,
+		reset=blank,
+		ready=blank,
+		busy=blank,
 	},
 
 	Text={

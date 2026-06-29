@@ -2,12 +2,12 @@
 
 local gameParams={}
 
-local Players=game:GetService("Players")
-local ReplicatedStorage=game:GetService("ReplicatedStorage")
+local players=game:GetService("Players")
+local replicatedStorage=game:GetService("ReplicatedStorage")
 local inputService=game:GetService("UserInputService")
-local RunService=game:GetService("RunService")
+local runService=game:GetService("RunService")
 
-local me=Players.LocalPlayer
+local me=players.LocalPlayer
 local defaultGravity=196.2
 local defaultSpeed=18
 local speedForceInterval=0.05
@@ -249,7 +249,7 @@ function gameParams.new(app)
 			return
 		end
 
-		speedConn=RunService.Heartbeat:Connect(function(dt)
+		speedConn=runService.Heartbeat:Connect(function(dt)
 			if not isSpeedActive() or not isAlive() then
 				disconnect(speedConn)
 				speedConn=nil
@@ -272,7 +272,7 @@ function gameParams.new(app)
 	end
 
 	local function getCurrentModeKey()
-		local miniGames=ReplicatedStorage:FindFirstChild("MiniGames")
+		local miniGames=replicatedStorage:FindFirstChild("MiniGames")
 		local miniCount=miniGames and #miniGames:GetChildren() or 0
 
 		if miniCount>1 then
@@ -281,7 +281,7 @@ function gameParams.new(app)
 			return"mode3"
 		end
 
-		local games=ReplicatedStorage:FindFirstChild("Games")
+		local games=replicatedStorage:FindFirstChild("Games")
 		if games and #games:GetChildren()>0 then
 			return"mode1"
 		end
@@ -301,14 +301,14 @@ function gameParams.new(app)
 		local folders={}
 
 		if modeKey=="mode1" then
-			local games=ReplicatedStorage:FindFirstChild("Games")
+			local games=replicatedStorage:FindFirstChild("Games")
 			local firstGame=games and games:GetChildren()[1]
 
 			if firstGame then
 				table.insert(folders,firstGame)
 			end
 		else
-			local miniGames=ReplicatedStorage:FindFirstChild("MiniGames")
+			local miniGames=replicatedStorage:FindFirstChild("MiniGames")
 			if not miniGames then
 				return folders
 			end
@@ -457,15 +457,15 @@ function gameParams.new(app)
 			return
 		end
 
-		table.insert(rootConns,ReplicatedStorage.ChildAdded:Connect(function(child)
+		table.insert(rootConns,replicatedStorage.ChildAdded:Connect(function(child)
 			if child.Name=="Games" or child.Name=="MiniGames" then
 				watchRootFolder(child)
 				task.defer(applyGameParams)
 			end
 		end))
 
-		watchRootFolder(ReplicatedStorage:FindFirstChild("Games"))
-		watchRootFolder(ReplicatedStorage:FindFirstChild("MiniGames"))
+		watchRootFolder(replicatedStorage:FindFirstChild("Games"))
+		watchRootFolder(replicatedStorage:FindFirstChild("MiniGames"))
 	end
 
 	function api.GetState()

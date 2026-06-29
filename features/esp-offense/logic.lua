@@ -2,10 +2,10 @@
 
 local espOffense={}
 
-local Players=game:GetService("Players")
-local RunService=game:GetService("RunService")
+local players=game:GetService("Players")
+local runService=game:GetService("RunService")
 
-local me=Players.LocalPlayer
+local me=players.LocalPlayer
 
 local validTeamIds={
 	HomeTeam=true,
@@ -290,7 +290,7 @@ end
 
 local function collectDefenderRoots(players)
 	local roots={}
-	for _,player in ipairs(players or Players:GetPlayers()) do
+	for _,player in ipairs(players or players:GetPlayers()) do
 		if shouldUseAsDefender(player) then
 			local defenderRoot=getPlayerRoot(player)
 			if defenderRoot then
@@ -417,7 +417,7 @@ function espOffense.new(app)
 			return playerCache:getPlayers()
 		end
 
-		return Players:GetPlayers()
+		return players:GetPlayers()
 	end
 
 	local function cachedCharacter(player)
@@ -506,7 +506,7 @@ function espOffense.new(app)
 				end
 			end)
 		else
-			heartbeatConn=RunService.Heartbeat:Connect(function(dt)
+			heartbeatConn=runService.Heartbeat:Connect(function(dt)
 				heartbeatElapsed=heartbeatElapsed+(dt or 0)
 				if heartbeatElapsed<espRefreshInterval then return end
 				heartbeatElapsed=0

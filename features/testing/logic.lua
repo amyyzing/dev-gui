@@ -2,12 +2,12 @@
 
 local testing={}
 
-local Players=game:GetService("Players")
-local RunService=game:GetService("RunService")
-local ReplicatedStorage=game:GetService("ReplicatedStorage")
-local Workspace=game:GetService("Workspace")
+local players=game:GetService("Players")
+local runService=game:GetService("RunService")
+local replicatedStorage=game:GetService("ReplicatedStorage")
+local workspace=game:GetService("Workspace")
 
-local localPlayer=Players.LocalPlayer
+local localPlayer=players.LocalPlayer
 
 local ballGravity=28
 local testingCatchY=14.30
@@ -59,7 +59,7 @@ local function flat(v)
 end
 
 local function rootOfPlayer(player)
-	local character=player and (Workspace:FindFirstChild(player.Name) or player.Character)
+	local character=player and (workspace:FindFirstChild(player.Name) or player.Character)
 	return character and (character.PrimaryPart or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso"))
 end
 
@@ -87,7 +87,7 @@ end
 
 local function playerByName(name)
 	if not name then return nil end
-	for _,player in ipairs(Players:GetPlayers()) do
+	for _,player in ipairs(players:GetPlayers()) do
 		if player.Name==name or player.DisplayName==name then
 			return player
 		end
@@ -172,13 +172,13 @@ end
 local function collectGameReEvents()
 	local events={}
 
-	addEvent(events,ReplicatedStorage:FindFirstChild("ReEvent"))
+	addEvent(events,replicatedStorage:FindFirstChild("ReEvent"))
 
 	for _,entry in ipairs({
-		{container=ReplicatedStorage:FindFirstChild("Games"),requireLocalPlayer=false},
-		{container=ReplicatedStorage:FindFirstChild("MiniGames"),requireLocalPlayer=false},
-		{container=Workspace:FindFirstChild("Games"),requireLocalPlayer=true},
-		{container=Workspace:FindFirstChild("MiniGames"),requireLocalPlayer=false},
+		{container=replicatedStorage:FindFirstChild("Games"),requireLocalPlayer=false},
+		{container=replicatedStorage:FindFirstChild("MiniGames"),requireLocalPlayer=false},
+		{container=workspace:FindFirstChild("Games"),requireLocalPlayer=true},
+		{container=workspace:FindFirstChild("MiniGames"),requireLocalPlayer=false},
 	}) do
 		local container=entry.container
 		if container then
@@ -221,8 +221,8 @@ local function findLocalFolderIn(container,requireArc)
 end
 
 local function findLocalFolder()
-	local games=Workspace:FindFirstChild("Games")
-	local miniGames=Workspace:FindFirstChild("MiniGames")
+	local games=workspace:FindFirstChild("Games")
+	local miniGames=workspace:FindFirstChild("MiniGames")
 	return findLocalFolderIn(games,true)
 		or findLocalFolderIn(miniGames,true)
 		or findLocalFolderIn(games,false)
@@ -400,7 +400,7 @@ function testing.new(app,parent,guiBuilder)
 		end
 
 		local reach=defenderSpeed*flightTime
-		for _,player in ipairs(Players:GetPlayers()) do
+		for _,player in ipairs(players:GetPlayers()) do
 			local playerTeam=teamOf(player)
 			local isDefender=player~=thrower and player~=localPlayer and (not throwerTeam or playerTeam~=throwerTeam)
 			if isDefender then
@@ -540,7 +540,7 @@ function testing.new(app,parent,guiBuilder)
 			end
 		end
 
-		qbSafetyConn=RunService.RenderStepped:Connect(function()
+		qbSafetyConn=runService.RenderStepped:Connect(function()
 			updateQBCenterSafety()
 		end)
 	end
@@ -574,7 +574,7 @@ function testing.new(app,parent,guiBuilder)
 		params.FilterType=Enum.RaycastFilterType.Exclude
 		params.FilterDescendantsInstances={marker,groundMarker}
 
-		local result=Workspace:Raycast(position+Vector3.new(0,10,0),Vector3.new(0,-300,0),params)
+		local result=workspace:Raycast(position+Vector3.new(0,10,0),Vector3.new(0,-300,0),params)
 		if result then
 			return result.Position.Y+groundMarkerThickness*0.5+0.01
 		end
@@ -588,7 +588,7 @@ function testing.new(app,parent,guiBuilder)
 			return marker
 		end
 
-		local parent=parentFolder or Workspace
+		local parent=parentFolder or workspace
 		local existing=parent:FindFirstChild("TestingC1Marker")
 		marker=(existing and existing:IsA("BasePart")) and existing or Instance.new("Part")
 		marker.Name="TestingC1Marker"
@@ -630,7 +630,7 @@ function testing.new(app,parent,guiBuilder)
 			return groundMarker
 		end
 
-		local parent=parentFolder or Workspace
+		local parent=parentFolder or workspace
 		local existing=parent:FindFirstChild("TestingC1GroundMarker")
 		groundMarker=(existing and existing:IsA("BasePart")) and existing or Instance.new("Part")
 		groundMarker.Name="TestingC1GroundMarker"
@@ -792,12 +792,12 @@ function testing.new(app,parent,guiBuilder)
 
 	local function watchRemoteTopology()
 		disconnectTopologyConnections()
-		watchRoot(ReplicatedStorage)
-		watchRoot(Workspace)
-		watchContainer(ReplicatedStorage:FindFirstChild("Games"))
-		watchContainer(ReplicatedStorage:FindFirstChild("MiniGames"))
-		watchContainer(Workspace:FindFirstChild("Games"))
-		watchContainer(Workspace:FindFirstChild("MiniGames"))
+		watchRoot(replicatedStorage)
+		watchRoot(workspace)
+		watchContainer(replicatedStorage:FindFirstChild("Games"))
+		watchContainer(replicatedStorage:FindFirstChild("MiniGames"))
+		watchContainer(workspace:FindFirstChild("Games"))
+		watchContainer(workspace:FindFirstChild("MiniGames"))
 	end
 
 	connectIncoming=function()

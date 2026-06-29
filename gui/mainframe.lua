@@ -10,9 +10,9 @@ function mainFrame.new(app)
 	local windowState=app.windowState
 	local screenGui=app.SG
 	local inputService=app.inputService
-	local TweenService=app.TweenService
-	local RunService=app.RunService
-	local ContextActionService=game:GetService("ContextActionService")
+	local tweenService=app.TweenService
+	local runService=app.RunService
+	local contextActionService=game:GetService("ContextActionService")
 	local safeDisconnect=app.safeDisconnect
 	local wrapTextButton=app.wrapTextButton
 	local attachHover=app.attachHover
@@ -303,7 +303,7 @@ function mainFrame.new(app)
 		return mouse.X>=pos.X and mouse.X<=pos.X+size.X and mouse.Y>=pos.Y and mouse.Y<=pos.Y+size.Y
 	end
 
-	ContextActionService:BindActionAtPriority("HitboxUI_MouseInputSink",function(_,_,input)
+	contextActionService:BindActionAtPriority("HitboxUI_MouseInputSink",function(_,_,input)
 		if input and mouseInsideRoot() then
 			return Enum.ContextActionResult.Sink
 		end
@@ -311,7 +311,7 @@ function mainFrame.new(app)
 		return Enum.ContextActionResult.Pass
 	end,false,Enum.ContextActionPriority.High.Value+1000,Enum.UserInputType.MouseButton1,Enum.UserInputType.MouseButton2,Enum.UserInputType.MouseButton3)
 	trackCleanup(function()
-		ContextActionService:UnbindAction("HitboxUI_MouseInputSink")
+		contextActionService:UnbindAction("HitboxUI_MouseInputSink")
 	end)
 
 	local function tweenRootPosition(position,duration)
@@ -319,7 +319,7 @@ function mainFrame.new(app)
 			rootPositionTween:Cancel()
 		end
 
-		rootPositionTween=TweenService:Create(root,TweenInfo.new(duration or 0.08,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Position=position})
+		rootPositionTween=tweenService:Create(root,TweenInfo.new(duration or 0.08,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Position=position})
 		rootPositionTween:Play()
 	end
 
@@ -328,7 +328,7 @@ function mainFrame.new(app)
 			rootSizeTween:Cancel()
 		end
 
-		rootSizeTween=TweenService:Create(root,TweenInfo.new(duration or 0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=size})
+		rootSizeTween=tweenService:Create(root,TweenInfo.new(duration or 0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=size})
 		rootSizeTween:Play()
 		return rootSizeTween
 	end
@@ -719,7 +719,7 @@ function mainFrame.new(app)
 		local sliderPos=tabPosition(getPageIndex(activePageName))
 		local sliderSize=tabSize()
 
-		TweenService:Create(pageSlider,TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out),{Position=sliderPos,Size=sliderSize}):Play()
+		tweenService:Create(pageSlider,TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out),{Position=sliderPos,Size=sliderSize}):Play()
 		paintPageTabs()
 		refreshFooterResetButton()
 		if type(onPageActivated)=="function" then
@@ -908,22 +908,22 @@ function mainFrame.new(app)
 			end
 		end
 
-		TweenService:Create(toast,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundTransparency=0.04}):Play()
-		TweenService:Create(toastStroke,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Transparency=0.35}):Play()
+		tweenService:Create(toast,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundTransparency=0.04}):Play()
+		tweenService:Create(toastStroke,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Transparency=0.35}):Play()
 		for _,instance in ipairs(toast:GetDescendants()) do
 			if instance:IsA("TextLabel") then
-				TweenService:Create(instance,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
+				tweenService:Create(instance,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
 			end
 		end
 
 		task.delay(duration,function()
 			if not toast or not toast.Parent then return end
 			local fade=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.In)
-			TweenService:Create(toast,fade,{BackgroundTransparency=1}):Play()
-			TweenService:Create(toastStroke,fade,{Transparency=1}):Play()
+			tweenService:Create(toast,fade,{BackgroundTransparency=1}):Play()
+			tweenService:Create(toastStroke,fade,{Transparency=1}):Play()
 			for _,instance in ipairs(toast:GetDescendants()) do
 				if instance:IsA("TextLabel") then
-					TweenService:Create(instance,fade,{TextTransparency=1}):Play()
+					tweenService:Create(instance,fade,{TextTransparency=1}):Play()
 				end
 			end
 
@@ -944,13 +944,13 @@ function mainFrame.new(app)
 		local targetSize=held and 18 or (resizeHovering and 16 or 14)
 		local targetTransparency=held and 0.02 or (resizeHovering and 0.08 or 0.18)
 
-		TweenService:Create(resizeHandle,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+		tweenService:Create(resizeHandle,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
 			Size=UDim2.fromOffset(targetSize,targetSize),
 			BackgroundColor3=getUIStrokeColor(),
 			BackgroundTransparency=targetTransparency,
 		}):Play()
 
-		TweenService:Create(resizeStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+		tweenService:Create(resizeStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
 			Color=held and (colors.text or Color3.new(1,1,1)) or (colors.bg or Color3.new()),
 			Thickness=1,
 			Transparency=(held or resizeHovering) and 0.08 or 0.25,
@@ -1120,7 +1120,7 @@ function mainFrame.new(app)
 				end
 
 				safeDisconnect(dragConn)
-				dragConn=connect(RunService.RenderStepped,updateDrag)
+				dragConn=connect(runService.RenderStepped,updateDrag)
 			end
 		end)
 

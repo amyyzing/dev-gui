@@ -2,13 +2,13 @@
 
 local qbAim={}
 
-local Players=game:GetService("Players")
-local RunService=game:GetService("RunService")
+local players=game:GetService("Players")
+local runService=game:GetService("RunService")
 local inputService=game:GetService("UserInputService")
-local Workspace=game:GetService("Workspace")
-local ReplicatedStorage=game:GetService("ReplicatedStorage")
+local workspace=game:GetService("Workspace")
+local replicatedStorage=game:GetService("ReplicatedStorage")
 
-local localPlayer=Players.LocalPlayer
+local localPlayer=players.LocalPlayer
 local qbAimMath=rawget(getfenv(),"Page1QBAimMathModule")
 
 local ballGravity=28
@@ -167,7 +167,7 @@ end
 
 local function isLocalRoot(rootPart)
 	local character=rootPart and rootPart.Parent
-	return character~=nil and (character==localPlayer.Character or character==Workspace:FindFirstChild(localPlayer.Name))
+	return character~=nil and (character==localPlayer.Character or character==workspace:FindFirstChild(localPlayer.Name))
 end
 
 local function localMoveKeyDown()
@@ -225,7 +225,7 @@ local function routeSpeed(speed)
 end
 
 local function getModeKey(app)
-	local miniGames=Workspace:FindFirstChild("MiniGames")
+	local miniGames=workspace:FindFirstChild("MiniGames")
 	local miniCount=miniGames and #miniGames:GetChildren() or 0
 	if miniCount>1 then
 		return"mode2"
@@ -233,7 +233,7 @@ local function getModeKey(app)
 		return"mode3"
 	end
 
-	local games=Workspace:FindFirstChild("Games")
+	local games=workspace:FindFirstChild("Games")
 	if games and #games:GetChildren()>0 then
 		return"mode1"
 	end
@@ -245,7 +245,7 @@ local function getModeKey(app)
 		end
 	end
 
-	local replicatedMiniGames=ReplicatedStorage:FindFirstChild("MiniGames")
+	local replicatedMiniGames=replicatedStorage:FindFirstChild("MiniGames")
 	local replicatedMiniCount=replicatedMiniGames and #replicatedMiniGames:GetChildren() or 0
 	if replicatedMiniCount>1 then
 		return"mode2"
@@ -253,7 +253,7 @@ local function getModeKey(app)
 		return"mode3"
 	end
 
-	local replicatedGames=ReplicatedStorage:FindFirstChild("Games")
+	local replicatedGames=replicatedStorage:FindFirstChild("Games")
 	if replicatedGames and #replicatedGames:GetChildren()>0 then
 		return"mode1"
 	end
@@ -262,7 +262,7 @@ local function getModeKey(app)
 end
 
 local function getHeldBall()
-	local character=Workspace:FindFirstChild(localPlayer.Name) or localPlayer.Character
+	local character=workspace:FindFirstChild(localPlayer.Name) or localPlayer.Character
 	local characterRoot=root(character)
 	if not(character and characterRoot) then return nil end
 
@@ -404,8 +404,8 @@ end
 local function getGameReEvent()
 	local gameID=localGameID()
 	if gameID then
-		local workspaceGames=Workspace:FindFirstChild("Games")
-		local replicatedGames=ReplicatedStorage:FindFirstChild("Games")
+		local workspaceGames=workspace:FindFirstChild("Games")
+		local replicatedGames=replicatedStorage:FindFirstChild("Games")
 		local reEvent=folderReEvent(workspaceGames and workspaceGames:FindFirstChild(gameID))
 			or folderReEvent(replicatedGames and replicatedGames:FindFirstChild(gameID))
 
@@ -414,7 +414,7 @@ local function getGameReEvent()
 		end
 	end
 
-	local games=Workspace:FindFirstChild("Games")
+	local games=workspace:FindFirstChild("Games")
 	if games then
 		for _,gameFolder in ipairs(games:GetChildren()) do
 			local replicated=gameFolder:FindFirstChild("Replicated")
@@ -427,7 +427,7 @@ local function getGameReEvent()
 		end
 	end
 
-	local replicatedGames=ReplicatedStorage:FindFirstChild("Games")
+	local replicatedGames=replicatedStorage:FindFirstChild("Games")
 	if replicatedGames then
 		for _,gameFolder in ipairs(replicatedGames:GetChildren()) do
 			local reEvent=folderReEvent(gameFolder)
@@ -454,15 +454,15 @@ local function getFirstChildFolder(container)
 end
 
 local function getFirstGame()
-	return getFirstChildFolder(Workspace:FindFirstChild("Games"))
+	return getFirstChildFolder(workspace:FindFirstChild("Games"))
 end
 
 local function getFirstMiniGame()
-	return getFirstChildFolder(Workspace:FindFirstChild("MiniGames"))
+	return getFirstChildFolder(workspace:FindFirstChild("MiniGames"))
 end
 
 local function localFolder()
-	local miniGames=Workspace:FindFirstChild("MiniGames")
+	local miniGames=workspace:FindFirstChild("MiniGames")
 	local gameFolder=(miniGames and #miniGames:GetChildren()==1) and getFirstMiniGame() or getFirstGame()
 	return gameFolder and gameFolder:FindFirstChild("Local")
 end
@@ -549,8 +549,8 @@ end
 local function getSquadsReEvent()
 	local gameID=localGameID()
 	if gameID then
-		local replicatedMiniGames=ReplicatedStorage:FindFirstChild("MiniGames")
-		local workspaceMiniGames=Workspace:FindFirstChild("MiniGames")
+		local replicatedMiniGames=replicatedStorage:FindFirstChild("MiniGames")
+		local workspaceMiniGames=workspace:FindFirstChild("MiniGames")
 		local miniGame=(replicatedMiniGames and replicatedMiniGames:FindFirstChild(gameID))
 			or (workspaceMiniGames and workspaceMiniGames:FindFirstChild(gameID))
 		local reEvent=folderReEvent(miniGame)
@@ -560,10 +560,10 @@ local function getSquadsReEvent()
 	end
 
 	local containers={}
-	local replicatedMiniGames=ReplicatedStorage:FindFirstChild("MiniGames")
-	local workspaceMiniGames=Workspace:FindFirstChild("MiniGames")
-	local workspaceGames=Workspace:FindFirstChild("Games")
-	local replicatedGames=ReplicatedStorage:FindFirstChild("Games")
+	local replicatedMiniGames=replicatedStorage:FindFirstChild("MiniGames")
+	local workspaceMiniGames=workspace:FindFirstChild("MiniGames")
+	local workspaceGames=workspace:FindFirstChild("Games")
+	local replicatedGames=replicatedStorage:FindFirstChild("Games")
 	local function addContainer(container)
 		if container then
 			table.insert(containers,container)
@@ -630,7 +630,7 @@ end
 
 function qbAim._findThrowAnimation()
 	local containers={
-		ReplicatedStorage,
+		replicatedStorage,
 		localPlayer:FindFirstChild("PlayerScripts"),
 		localPlayer.Character,
 	}
@@ -646,7 +646,7 @@ function qbAim._findThrowAnimation()
 end
 
 function qbAim._playLocalThrowAnimation()
-	local character=localPlayer.Character or Workspace:FindFirstChild(localPlayer.Name)
+	local character=localPlayer.Character or workspace:FindFirstChild(localPlayer.Name)
 	local humanoid=character and character:FindFirstChildOfClass("Humanoid")
 	if not humanoid then return false end
 
@@ -826,7 +826,7 @@ function qbAim.new(app,parent)
 			return playerCache:getPlayers()
 		end
 
-		return Players:GetPlayers()
+		return players:GetPlayers()
 	end
 
 	local function characterOf(player)
@@ -863,7 +863,7 @@ function qbAim.new(app,parent)
 
 		params.FilterDescendantsInstances=ignore
 
-		local result=Workspace:Raycast(position+Vector3.new(0,30,0),Vector3.new(0,-220,0),params)
+		local result=workspace:Raycast(position+Vector3.new(0,30,0),Vector3.new(0,-220,0),params)
 		if result and result.Position.Y<=position.Y-1 then
 			return result.Position.Y
 		end
@@ -2023,7 +2023,7 @@ function qbAim.new(app,parent)
 				detachedSince=nil
 			end
 
-			RunService.Heartbeat:Wait()
+			runService.Heartbeat:Wait()
 		end
 
 		return false
@@ -2239,7 +2239,7 @@ function qbAim.new(app,parent)
 					end
 				end
 
-				RunService.Heartbeat:Wait()
+				runService.Heartbeat:Wait()
 			end
 		end
 
@@ -2375,7 +2375,7 @@ function qbAim.new(app,parent)
 	local function lockReceiverUnderCursor()
 		if not(enabled and isAvailable()) then return end
 
-		local camera=Workspace.CurrentCamera
+		local camera=workspace.CurrentCamera
 		local mouse=localPlayer:GetMouse()
 		local best=nil
 		local bestDistance=math.huge
@@ -2658,7 +2658,7 @@ function qbAim.new(app,parent)
 	end
 
 	if not addSchedulerJob("Heartbeat","QBAimReceiverTrack",trackSettings.ReceiverInterval,receiverTrackStep) then
-		addConnection(RunService.Heartbeat:Connect(receiverTrackStep))
+		addConnection(runService.Heartbeat:Connect(receiverTrackStep))
 	end
 
 	local function previewStep()
@@ -2717,7 +2717,7 @@ function qbAim.new(app,parent)
 	end
 
 	if not addSchedulerJob("RenderStepped","QBAimPreview",0,previewStep) then
-		addConnection(RunService.RenderStepped:Connect(previewStep))
+		addConnection(runService.RenderStepped:Connect(previewStep))
 	end
 
 	local function handleQBAimInput(input)

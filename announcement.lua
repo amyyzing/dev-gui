@@ -24,7 +24,7 @@ function announcement.new(app)
 	local colors=app.colors
 	local screenGui=app.SG
 	local botApi=app.botApi
-	local TextService=game:GetService("TextService")
+	local textService=game:GetService("TextService")
 	local playerId=tostring(app.playerId or "")
 	local getSessionId=app.getSessionId
 	local wrapTextButton=app.wrapTextButton
@@ -146,7 +146,7 @@ function announcement.new(app)
 		local bodyWidth=448
 		local measuredHeight=math.max(44,lineCount*18)
 		pcall(function()
-			measuredHeight=math.max(measuredHeight,TextService:GetTextSize(description,13,Enum.Font.Gotham,Vector2.new(bodyWidth,10000)).Y+18)
+			measuredHeight=math.max(measuredHeight,textService:GetTextSize(description,13,Enum.Font.Gotham,Vector2.new(bodyWidth,10000)).Y+18)
 		end)
 		local scrollHeight=math.clamp(math.floor(measuredHeight+18),74,330)
 		local boxHeight=math.clamp(scrollHeight+120,210,470)

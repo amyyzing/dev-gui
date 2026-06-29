@@ -2,10 +2,10 @@
 
 local hitbox={}
 
-local Players=game:GetService("Players")
+local players=game:GetService("Players")
 local inputService=game:GetService("UserInputService")
 
-local me=Players.LocalPlayer
+local me=players.LocalPlayer
 local zeroVector=Vector3.new(0,0,0)
 local defaultSizeX=2.52
 local defaultSizeY=5.4

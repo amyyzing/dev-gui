@@ -2,12 +2,12 @@
 
 local esp={}
 
-local Players=game:GetService("Players")
-local RunService=game:GetService("RunService")
+local players=game:GetService("Players")
+local runService=game:GetService("RunService")
 local inputService=game:GetService("UserInputService")
-local ReplicatedStorage=game:GetService("ReplicatedStorage")
+local replicatedStorage=game:GetService("ReplicatedStorage")
 
-local me=Players.LocalPlayer
+local me=players.LocalPlayer
 
 local validTeamIds={
 	HomeTeam=true,
@@ -121,7 +121,7 @@ local function isValidGameTeamID(teamID)
 end
 
 local function getGameplayOffenseTeam()
-	local games=ReplicatedStorage:FindFirstChild("Games")
+	local games=replicatedStorage:FindFirstChild("Games")
 	local gameFolder=firstChild(games)
 	local offense=gameFolder and gameFolder:FindFirstChild("Offense")
 	local gameStatus=offense and offense:FindFirstChild("GameStatus")
@@ -182,7 +182,7 @@ function esp.new(app,parent)
 			return playerCache:getPlayers()
 		end
 
-		return Players:GetPlayers()
+		return players:GetPlayers()
 	end
 
 	local function trackedFootball(player)
@@ -414,7 +414,7 @@ function esp.new(app,parent)
 			syncControls()
 		end)
 	else
-		heartbeatConn=RunService.Heartbeat:Connect(function(dt)
+		heartbeatConn=runService.Heartbeat:Connect(function(dt)
 			poll=poll+dt
 			if poll<0.25 then return end
 			poll=0
