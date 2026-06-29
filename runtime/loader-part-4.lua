@@ -1,11 +1,11 @@
--- HB_RUNTIME_PART_4
+-- boot part 4
 -- boot step 4: feature modules and page wiring.
 
 refreshPage2UI=function() end
 expandedOwnedPresets={}
 keybindPageApis={}
 PlayerDataAPI=nil
-ResetPositionAPI=nil
+ResetGuiAPI=nil
 DiscordAPI=nil
 settingsConnections={}
 
@@ -147,7 +147,7 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 end
 
 function refreshSettingsPage()
-	refreshRuntimeAPIs({"PlayerDataAPI","ResetPositionAPI","DiscordAPI"})
+	refreshRuntimeAPIs({"PlayerDataAPI","ResetGuiAPI","DiscordAPI"})
 end
 
 function buildUpdateSection()
@@ -269,7 +269,7 @@ function makeDiscordCtx()
 	}
 end
 
-function makeResetPositionCtx()
+function makeResetGuiCtx()
 	return{
 		make=make,
 		fusion=FusionModule,
@@ -281,7 +281,7 @@ function makeResetPositionCtx()
 		colors=colors,
 		mainFrame=mainFrame,
 		root=root,
-		ResetPositionLogicModule=ResetPositionLogicModule,
+		ResetGuiLogicModule=ResetGuiLogicModule,
 		makeSection=makeSection,
 		wrapTextButton=wrapTextButton,
 		scheduleSave=function()
@@ -296,10 +296,10 @@ function buildActualSettingsPage()
 	loadDeferredModuleNames(settingsReloadNames)
 	buildUpdateSection()
 
-	ResetPositionAPI=buildRuntimeModule({name="ResetPosition",api="ResetPositionAPI",order=2,title="GUI Position"},makeResetPositionCtx(),actualSettingsPage)
+	ResetGuiAPI=buildRuntimeModule({name="ResetGui",api="ResetGuiAPI",order=2,title="GUI Position"},makeResetGuiCtx(),actualSettingsPage)
 	PlayerDataAPI=buildRuntimeModule({name="PlayerData",api="PlayerDataAPI",order=3,title="Player Data"},makePlayerDataCtx(),actualSettingsPage,{
-		Workspace=AntiMaterialAPI,
-		antiMaterial=AntiMaterialAPI,
+		Workspace=MaterialsAPI,
+		materials=MaterialsAPI,
 		mapCleaner=MapCleanerAPI,
 	})
 	DiscordAPI=buildRuntimeModule({name="Discord",api="DiscordAPI",order=4,title="Discord"},makeDiscordCtx(),actualSettingsPage)
@@ -314,7 +314,7 @@ function clearActualSettingsPage()
 end
 
 rebuildSettingsFromModules=function()
-	destroyRuntimeAPIs({"PlayerDataAPI","ResetPositionAPI","DiscordAPI"})
+	destroyRuntimeAPIs({"PlayerDataAPI","ResetGuiAPI","DiscordAPI"})
 	clearActualSettingsPage()
 	lazyPageBuilt.settings=false
 
@@ -331,14 +331,14 @@ function addPage2Error(parent,text)
 end
 
 keybindRows={
-	{label="TOGGLE OPEN / HIDE GUI",key="TOGGLE_UI_KEY"},
-	{label="HITBOX TOGGLE",key="TOGGLE_HB_KEY"},
-	{label="JUMP BOOST TOGGLE",key="TOGGLE_JB_KEY"},
-	{label="ALWAYS BOOST TOGGLE",key="TOGGLE_AB_KEY"},
-	{label="ESP TOGGLE",key="TOGGLE_ACTION_KEY"},
-	{label="QB AIM LOCK RECEIVER",key="QB_AIM_LOCK_KEY"},
-	{label="QB AIM THROW",key="QB_AIM_THROW_KEY"},
-	{label="QB AIM TOGGLE",key="QB_AIM_TOGGLE_KEY"},
+	{label="TOGGLE OPEN / HIDE GUI",key="uiToggleKey"},
+	{label="HITBOX TOGGLE",key="hitboxToggleKey"},
+	{label="JUMP BOOST TOGGLE",key="boostToggleKey"},
+	{label="ALWAYS BOOST TOGGLE",key="alwaysBoostToggleKey"},
+	{label="ESP TOGGLE",key="espToggleKey"},
+	{label="QB AIM LOCK RECEIVER",key="qbAimLockKey"},
+	{label="QB AIM THROW",key="qbAimThrowKey"},
+	{label="QB AIM TOGGLE",key="qbAimToggleKey"},
 }
 
 keybindSections={
@@ -348,9 +348,9 @@ keybindSections={
 }
 
 keybindPageModules={
-	{api="hitboxPresets",name="HitboxPreset",section="owned",title="Hitbox Presets"},
-	{api="keybindSettings",name="KeybindSettings",section="bind",title="Keybind Settings"},
-	{api="presetEditor",name="PresetEditor",section="editor",title="Preset Editor",requires="keybindSettings",extras=function(apis) return apis.keybindSettings,apis.hitboxPresets end},
+	{api="hitboxPresets",name="HitboxPresets",section="owned",title="Hitbox Presets"},
+	{api="keybinds",name="Keybinds",section="bind",title="Keybind Settings"},
+	{api="presetEditor",name="PresetEditor",section="editor",title="Preset Editor",requires="keybinds",extras=function(apis) return apis.keybinds,apis.hitboxPresets end},
 }
 
 function makePage2Bindings()
@@ -398,8 +398,8 @@ function makePage2Ctx()
 		placeWrappedButton=placeWrappedButton,
 		setWrappedButtonBg=setWrappedButtonBg,
 		makeBox=makeBox,
-		HitboxPresetLogicModule=HitboxPresetLogicModule,
-		KeybindSettingsLogicModule=KeybindSettingsLogicModule,
+		HitboxPresetsLogicModule=HitboxPresetsLogicModule,
+		KeybindsLogicModule=KeybindsLogicModule,
 		PresetEditorLogicModule=PresetEditorLogicModule,
 		botApi=botApi,
 		playerId=tostring(me.UserId),

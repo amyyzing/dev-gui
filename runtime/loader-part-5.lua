@@ -1,4 +1,4 @@
--- HB_RUNTIME_PART_5
+-- boot part 5
 -- boot step 5: data save hooks, announcements, and final startup.
 
 function shutdownTool()
@@ -48,11 +48,11 @@ function applyHitboxPreset(index)
 			mainPageApis.hitbox.SetHitboxSize(size.X,size.Y,size.Z,true)
 		end)
 	elseif mainPageApis.hitbox and mainPageApis.hitbox.Refresh then
-		syncPage1State()
+		syncMainState()
 		pcall(mainPageApis.hitbox.Refresh)
 		requestPlayerAutosave()
 	else
-		syncPage1State()
+		syncMainState()
 		requestPlayerAutosave()
 	end
 end
@@ -94,12 +94,12 @@ function handleGlobalInput(inp,processed)
 		if not(mainPageApis.esp and mainPageApis.esp.SetESPState) then
 			if currentModeKey=="mode1" then
 				mainPageState.actionStatusOn=not mainPageState.actionStatusOn
-				syncPage1State()
+				syncMainState()
 				refreshActionStatus()
 				requestPlayerAutosave()
 			else
 				mainPageState.actionStatusOn=false
-				syncPage1State()
+				syncMainState()
 				refreshActionStatus()
 			end
 			handled=true
@@ -141,10 +141,10 @@ local persistentStringDefaults={
 	currentModeLabel="Gameplay",
 }
 local refreshApis={
-	"StrokeColourAPI",
+	"ColorsAPI",
 	"MapEditorAPI",
-	"AntiMaterialAPI",
-	"RemoveAdsAPI",
+	"MaterialsAPI",
+	"AdsAPI",
 	"MapCleanerAPI",
 	"DiscordAPI",
 }
@@ -163,7 +163,7 @@ end
 function setPersistentValue(name,value)
 	if mainPageState and mainPageState[name]~=nil then
 		mainPageState[name]=value
-		syncPage1State()
+		syncMainState()
 		return
 	end
 
@@ -184,7 +184,7 @@ function refreshAllUI()
 		for _,api in pairs(mainPageApis) do
 			if api and api.Refresh then pcall(api.Refresh) end
 		end
-		syncPage1State()
+		syncMainState()
 	end
 
 	if refreshRuntimeAPIs then
@@ -226,7 +226,7 @@ local saveStateSetters={
 	setTestingQBState={"testingQBEnabled",true,"Testing","SetTestingQBState",true},
 }
 
-local function callPage1Api(apiName,method,...)
+local function callMainApi(apiName,method,...)
 	local api=mainPageApis and mainPageApis[apiName]
 	local fn=api and api[method]
 	if type(fn)=="function" then
@@ -234,9 +234,9 @@ local function callPage1Api(apiName,method,...)
 	end
 end
 
-local function setPage1Field(key,value,coerceBool)
+local function setMainField(key,value,coerceBool)
 	mainPageState[key]=coerceBool and (value and true or false) or value
-	syncPage1State()
+	syncMainState()
 	return mainPageState[key]
 end
 
@@ -249,76 +249,76 @@ local function attachDataSaveSetters(app)
 		mainPageState.sizeX=x
 		mainPageState.sizeY=y
 		mainPageState.sizeZ=z
-		syncPage1State()
+		syncMainState()
 	end
 
 	for setterName,spec in pairs(saveStateSetters) do
 		app[setterName]=function(value)
-			local stateValue=setPage1Field(spec[1],value,spec[2])
+			local stateValue=setMainField(spec[1],value,spec[2])
 			if spec[3] then
 				if spec[5] then
-					callPage1Api(spec[3],spec[4],stateValue,false)
+					callMainApi(spec[3],spec[4],stateValue,false)
 				else
-					callPage1Api(spec[3],spec[4],stateValue)
+					callMainApi(spec[3],spec[4],stateValue)
 				end
 			end
 		end
 	end
 
 	app.setSpeedState=function(value)
-		local stateValue=setPage1Field("speedEnabled",value,true)
+		local stateValue=setMainField("speedEnabled",value,true)
 		mainPageState.speedParamsEnabled=stateValue
 		mainPageState.speedSettingEnabled=stateValue
-		syncPage1State()
-		callPage1Api("GameParams","SetSpeedState",stateValue,false)
+		syncMainState()
+		callMainApi("GameParams","SetSpeedState",stateValue,false)
 	end
 
 	app.setGravityState=function(value)
-		local stateValue=setPage1Field("gravityEnabled",value,true)
+		local stateValue=setMainField("gravityEnabled",value,true)
 		mainPageState.gravityJumpParamsEnabled=stateValue
 		mainPageState.gravitySettingEnabled=stateValue
-		syncPage1State()
-		callPage1Api("GameParams","SetGravityState",stateValue,false)
+		syncMainState()
+		callMainApi("GameParams","SetGravityState",stateValue,false)
 	end
 
 	app.setGameParamsState=function()
-		local stateValue=setPage1Field("gameParamsEnabled",true,true)
-		callPage1Api("GameParams","SetGameParamsState",stateValue,false)
+		local stateValue=setMainField("gameParamsEnabled",true,true)
+		callMainApi("GameParams","SetGameParamsState",stateValue,false)
 	end
 
 	app.setParamsSelectedPage=function(value)
-		local stateValue=setPage1Field("paramsSelectedPage",tostring(value or "speed"),false)
-		callPage1Api("GameParams","SetParamsSelectedPage",stateValue,false)
+		local stateValue=setMainField("paramsSelectedPage",tostring(value or "speed"),false)
+		callMainApi("GameParams","SetParamsSelectedPage",stateValue,false)
 	end
 
 	app.setSpeedParamsState=function(value)
-		local stateValue=setPage1Field("speedParamsEnabled",value,true)
+		local stateValue=setMainField("speedParamsEnabled",value,true)
 		mainPageState.speedEnabled=stateValue
 		mainPageState.speedSettingEnabled=stateValue
 		mainPageState.diveSettingEnabled=stateValue
-		syncPage1State()
-		callPage1Api("GameParams","SetParamsPageEnabled","speed",stateValue,false)
+		syncMainState()
+		callMainApi("GameParams","SetParamsPageEnabled","speed",stateValue,false)
 	end
 
 	app.setGravityJumpParamsState=function(value)
-		local stateValue=setPage1Field("gravityJumpParamsEnabled",value,true)
+		local stateValue=setMainField("gravityJumpParamsEnabled",value,true)
 		mainPageState.gravityEnabled=stateValue
 		mainPageState.gravitySettingEnabled=stateValue
 		mainPageState.jumpPowerSettingEnabled=stateValue
-		syncPage1State()
-		callPage1Api("GameParams","SetParamsPageEnabled","gravity",stateValue,false)
+		syncMainState()
+		callMainApi("GameParams","SetParamsPageEnabled","gravity",stateValue,false)
 	end
 
 	app.setStaminaParamsState=function(value)
-		local stateValue=setPage1Field("staminaParamsEnabled",value,true)
+		local stateValue=setMainField("staminaParamsEnabled",value,true)
 		mainPageState.staminaRegenSettingEnabled=stateValue
 		mainPageState.staminaDepleteSettingEnabled=stateValue
-		syncPage1State()
-		callPage1Api("GameParams","SetParamsPageEnabled","stamina",stateValue,false)
+		syncMainState()
+		callMainApi("GameParams","SetParamsPageEnabled","stamina",stateValue,false)
 	end
 
 	local function setParamSettingState(stateKey,value)
-		local stateValue=setPage1Field(stateKey,value,true)
+		local stateValue=setMainField(stateKey,value,true)
 		if stateKey=="speedSettingEnabled" then
 			mainPageState.speedEnabled=stateValue
 		elseif stateKey=="gravitySettingEnabled" then
@@ -327,8 +327,8 @@ local function attachDataSaveSetters(app)
 		mainPageState.speedParamsEnabled=mainPageState.speedSettingEnabled==true or mainPageState.diveSettingEnabled==true
 		mainPageState.gravityJumpParamsEnabled=mainPageState.gravitySettingEnabled==true or mainPageState.jumpPowerSettingEnabled==true
 		mainPageState.staminaParamsEnabled=mainPageState.staminaRegenSettingEnabled==true or mainPageState.staminaDepleteSettingEnabled==true
-		syncPage1State()
-		callPage1Api("GameParams","SetParamSettingEnabled",stateKey,stateValue,false)
+		syncMainState()
+		callMainApi("GameParams","SetParamSettingEnabled",stateKey,stateValue,false)
 	end
 
 	app.setSpeedSettingState=function(value)

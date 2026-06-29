@@ -1,4 +1,4 @@
--- HB_RUNTIME_PART_2
+-- boot part 2
 -- boot step 2: saved settings, page one helpers, and restore setup.
 
 guiLogic=GuiLogicModule.new({
@@ -348,7 +348,7 @@ for key,default in pairs(mainPageDefaults) do
 	mainPageState[key]=value~=nil and value or default
 end
 
-function syncPage1State()
+function syncMainState()
 	local env=getfenv()
 	for key in pairs(mainPageDefaults) do
 		env[key]=mainPageState[key]
@@ -359,13 +359,13 @@ function refreshRuntimePageControls(name,forceTheme)
 	name=tostring(name or "main")
 
 	if name=="main" then
-		syncPage1State()
+		syncMainState()
 		for _,api in pairs(mainPageApis) do
 			if api and api.Refresh then
 				pcall(api.Refresh)
 			end
 		end
-		syncPage1State()
+		syncMainState()
 		if refreshActionStatus then
 			pcall(refreshActionStatus)
 		end
@@ -374,8 +374,8 @@ function refreshRuntimePageControls(name,forceTheme)
 			pcall(refreshRuntimeAPIs,mapApiNames)
 		end
 	elseif name=="customize" then
-		if StrokeColourAPI and StrokeColourAPI.Refresh then
-			pcall(StrokeColourAPI.Refresh)
+		if ColorsAPI and ColorsAPI.Refresh then
+			pcall(ColorsAPI.Refresh)
 		end
 	elseif name=="page2" then
 		if refreshPage2UI then
@@ -401,7 +401,7 @@ end
 mainPageApis={}
 refreshActionStatus=function() end
 
-function makePage1Ctx()
+function makeMainCtx()
 	return{
 		make=make,
 		fusion=FusionModule,
@@ -422,15 +422,15 @@ function makePage1Ctx()
 		fmtNumber=fmtNumber,
 		safeDisconnect=safeDisconnect,
 		inputToBinding=inputToBinding,
-		Page1HitboxLogicModule=Page1HitboxLogicModule,
-		Page1GameParamsLogicModule=Page1GameParamsLogicModule,
-		Page1BoostLogicModule=Page1BoostLogicModule,
-		Page1ESPLogicModule=Page1ESPLogicModule,
-		Page1ESPDefenseLogicModule=Page1ESPDefenseLogicModule,
-		Page1ESPOffenseLogicModule=Page1ESPOffenseLogicModule,
-		Page1QBAimMathModule=Page1QBAimMathModule,
-		Page1QBAimLogicModule=Page1QBAimLogicModule,
-		Page1TestingLogicModule=Page1TestingLogicModule,
+		HitboxLogicModule=HitboxLogicModule,
+		ParamsLogicModule=ParamsLogicModule,
+		BoostLogicModule=BoostLogicModule,
+		ESPLogicModule=ESPLogicModule,
+		ESPDefenseLogicModule=ESPDefenseLogicModule,
+		ESPOffenseLogicModule=ESPOffenseLogicModule,
+		QBAimMathModule=QBAimMathModule,
+		QBAimLogicModule=QBAimLogicModule,
+		TestingLogicModule=TestingLogicModule,
 		getCurrentModeKey=function() return currentModeKey end,
 		getHitboxToggleKey=function() return hitboxToggleKey end,
 		getJumpBoostToggleKey=function() return boostToggleKey end,
@@ -440,8 +440,8 @@ function makePage1Ctx()
 		getQBAimThrowKey=function() return qbAimThrowKey end,
 		getQBAimToggleKey=function() return qbAimToggleKey end,
 		description=description,
-		ESPDefenseModule=Page1ESPDefenseLogicModule,
-		ESPOffenseModule=Page1ESPOffenseLogicModule,
+		ESPDefenseModule=ESPDefenseLogicModule,
+		ESPOffenseModule=ESPOffenseLogicModule,
 		refreshESPStatus=function(state,available)
 			mainPageState.actionStatusOn=state and available~=false
 			actionStatusOn=mainPageState.actionStatusOn
@@ -467,34 +467,34 @@ function makePage1Ctx()
 			refreshActionStatus()
 		end,
 		onChanged=function()
-			syncPage1State()
+			syncMainState()
 			requestPlayerAutosave()
 			refreshActionStatus()
 		end,
 	}
 end
 
-function addPage1Error(parent,order,title,path)
+function addMainError(parent,order,title,path)
 	table.insert(runtimeBuildErrors,"Main/"..tostring(title)..": "..tostring(path))
 	local section=makeSection(parent,order,title,"module did not load")
 	make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),Text=path.." did not load.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.red,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 end
 
 mainPageModules={
-	{api="Hitbox",name="Page1Hitbox",column="left",order=1,title="Hitbox"},
-	{api="GameParams",name="Page1GameParams",column="left",order=2,title="Game Params"},
-	{api="Boost",name="Page1Boost",column="right",order=2,title="Boost"},
-	{api="ESP",name="Page1ESP",column="right",order=3,title="ESP"},
-	{api="QBAim",name="Page1QBAim",column="right",order=4,title="QB Aim"},
-	{api="Testing",name="Page1Testing",column="right",order=5,title="Testing"},
+	{api="Hitbox",name="Hitbox",column="left",order=1,title="Hitbox"},
+	{api="GameParams",name="Params",column="left",order=2,title="Game Params"},
+	{api="Boost",name="Boost",column="right",order=2,title="Boost"},
+	{api="ESP",name="ESP",column="right",order=3,title="ESP"},
+	{api="QBAim",name="QBAim",column="right",order=4,title="QB Aim"},
+	{api="Testing",name="Testing",column="right",order=5,title="Testing"},
 }
 
-function getPage1Column(name)
+function getMainColumn(name)
 	return name=="left" and leftCol or rightCol
 end
 
-function buildPage1Module(spec,app)
-	local parent=getPage1Column(spec.column)
+function buildMainModule(spec,app)
+	local parent=getMainColumn(spec.column)
 	local env=getfenv()
 	local featureModule=rawget(env,moduleGlobalName(spec.name))
 	if featureModule and featureModule.new then
@@ -504,25 +504,25 @@ function buildPage1Module(spec,app)
 		if ok then
 			mainPageApis[spec.api]=result
 		else
-			addPage1Error(parent,spec.order,spec.title,tostring(result))
+			addMainError(parent,spec.order,spec.title,tostring(result))
 		end
 	else
-		addPage1Error(parent,spec.order,spec.title,modulePaths[spec.name] or tostring(spec.name))
+		addMainError(parent,spec.order,spec.title,modulePaths[spec.name] or tostring(spec.name))
 	end
 end
 
-function buildPage1()
-	local app=makePage1Ctx()
+function buildMain()
+	local app=makeMainCtx()
 
 	for _,spec in ipairs(mainPageModules) do
-		buildPage1Module(spec,app)
+		buildMainModule(spec,app)
 	end
 
-	syncPage1State()
+	syncMainState()
 	refreshActionStatus()
 end
 
-function clearPage1Column(column)
+function clearMainColumn(column)
 	if not column then return end
 
 	for _,child in ipairs(column:GetChildren()) do
@@ -532,7 +532,7 @@ function clearPage1Column(column)
 	end
 end
 
-rebuildPage1FromModules=function()
+rebuildMainFromModules=function()
 	for _,api in pairs(mainPageApis) do
 		if api and api.Destroy then
 			pcall(api.Destroy)
@@ -540,16 +540,16 @@ rebuildPage1FromModules=function()
 	end
 
 	mainPageApis={}
-	clearPage1Column(leftCol)
-	clearPage1Column(rightCol)
-	buildPage1()
+	clearMainColumn(leftCol)
+	clearMainColumn(rightCol)
+	buildMain()
 
 	if updateResponsiveLayout then
 		pcall(updateResponsiveLayout)
 	end
 end
 
-buildPage1()
+buildMain()
 
 function resetMainPageDefaults()
 	for key,value in pairs(mainPageDefaults) do
@@ -562,6 +562,6 @@ function resetMainPageDefaults()
 		end
 	end
 
-	syncPage1State()
+	syncMainState()
 	requestPlayerAutosave()
 end

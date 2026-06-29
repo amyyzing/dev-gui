@@ -1,6 +1,6 @@
 -- hides billboard ads and puts them back when disabled.
 
-local removeAds={}
+local ads={}
 
 local function firstChild(parent)
 	if not parent then return nil end
@@ -16,7 +16,7 @@ local function destroyControl(control)
 	end
 end
 
-function removeAds.new(app,page)
+function ads.new(app,page)
 	local colors=app.colors
 	local safeDisconnect=app.safeDisconnect
 	local makeSection=app.makeSection
@@ -232,4 +232,4 @@ function removeAds.new(app,page)
 	return api
 end
 
-return removeAds
+return ads

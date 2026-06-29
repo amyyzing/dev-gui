@@ -1,6 +1,6 @@
 -- keybind capture, clear, and restore actions.
 
-local keybindSettings={}
+local keybinds={}
 
 local inputService=game:GetService("UserInputService")
 local tweenService=game:GetService("TweenService")
@@ -12,17 +12,17 @@ local function defaultBindingRows(app)
 	local function ensure(name)
 		if state[name]==nil then state[name]=Enum.KeyCode.Unknown end
 	end
-	ensure("TOGGLE_UI_KEY")
-	ensure("TOGGLE_HB_KEY")
-	ensure("TOGGLE_JB_KEY")
-	ensure("TOGGLE_AB_KEY")
-	ensure("TOGGLE_ACTION_KEY")
+	ensure("uiToggleKey")
+	ensure("hitboxToggleKey")
+	ensure("boostToggleKey")
+	ensure("alwaysBoostToggleKey")
+	ensure("espToggleKey")
 	return{
-		{label="Toggle open / hide GUI",key="TOGGLE_UI_KEY"},
-		{label="Hitbox Toggle",key="TOGGLE_HB_KEY"},
-		{label="Jump Boost Toggle",key="TOGGLE_JB_KEY"},
-		{label="Always Boost Toggle",key="TOGGLE_AB_KEY"},
-		{label="ESP Toggle",key="TOGGLE_ACTION_KEY"},
+		{label="Toggle open / hide GUI",key="uiToggleKey"},
+		{label="Hitbox Toggle",key="hitboxToggleKey"},
+		{label="Jump Boost Toggle",key="boostToggleKey"},
+		{label="Always Boost Toggle",key="alwaysBoostToggleKey"},
+		{label="ESP Toggle",key="espToggleKey"},
 	}
 end
 
@@ -40,7 +40,7 @@ local function setBinding(app,item,value)
 	end
 end
 
-function keybindSettings.new(app,bindSection)
+function keybinds.new(app,bindSection)
 	local make=app.New
 	local colors=app.colors
 	local bindingToLabel=app.bindingToLabel
@@ -312,4 +312,4 @@ function keybindSettings.new(app,bindSection)
 	return api
 end
 
-return keybindSettings
+return keybinds

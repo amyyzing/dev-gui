@@ -728,15 +728,15 @@ function dataSave.new(app)
 			},
 
 			keybinds={
-				toggleUI=encodeBinding(getValue(app,"TOGGLE_UI_KEY",Enum.KeyCode.Unknown)),
-				toggleHitbox=encodeBinding(getValue(app,"TOGGLE_HB_KEY",Enum.KeyCode.Unknown)),
-				toggleJumpBoost=encodeBinding(getValue(app,"TOGGLE_JB_KEY",Enum.KeyCode.Unknown)),
-				toggleAlwaysBoost=encodeBinding(getValue(app,"TOGGLE_AB_KEY",Enum.KeyCode.Unknown)),
-				toggleESP=encodeBinding(getValue(app,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
-				toggleActionStatus=encodeBinding(getValue(app,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
-				qbAimLock=encodeBinding(getValue(app,"QB_AIM_LOCK_KEY",Enum.KeyCode.H)),
-				qbAimThrow=encodeBinding(getValue(app,"QB_AIM_THROW_KEY",Enum.KeyCode.T)),
-				qbAimToggle=encodeBinding(getValue(app,"QB_AIM_TOGGLE_KEY",Enum.KeyCode.P)),
+				toggleUI=encodeBinding(getValue(app,"uiToggleKey",Enum.KeyCode.Unknown)),
+				toggleHitbox=encodeBinding(getValue(app,"hitboxToggleKey",Enum.KeyCode.Unknown)),
+				toggleJumpBoost=encodeBinding(getValue(app,"boostToggleKey",Enum.KeyCode.Unknown)),
+				toggleAlwaysBoost=encodeBinding(getValue(app,"alwaysBoostToggleKey",Enum.KeyCode.Unknown)),
+				toggleESP=encodeBinding(getValue(app,"espToggleKey",Enum.KeyCode.Unknown)),
+				toggleActionStatus=encodeBinding(getValue(app,"espToggleKey",Enum.KeyCode.Unknown)),
+				qbAimLock=encodeBinding(getValue(app,"qbAimLockKey",Enum.KeyCode.H)),
+				qbAimThrow=encodeBinding(getValue(app,"qbAimThrowKey",Enum.KeyCode.T)),
+				qbAimToggle=encodeBinding(getValue(app,"qbAimToggleKey",Enum.KeyCode.P)),
 			},
 
 			presetEditor=collectPresetEditor(app),
@@ -864,13 +864,13 @@ function dataSave.new(app)
 
 		local keybinds=settings.keybinds or {}
 		local keyMap={
-			toggleUI="TOGGLE_UI_KEY",
-			toggleHitbox="TOGGLE_HB_KEY",
-			toggleJumpBoost="TOGGLE_JB_KEY",
-			toggleAlwaysBoost="TOGGLE_AB_KEY",
-			qbAimLock="QB_AIM_LOCK_KEY",
-			qbAimThrow="QB_AIM_THROW_KEY",
-			qbAimToggle="QB_AIM_TOGGLE_KEY",
+			toggleUI="uiToggleKey",
+			toggleHitbox="hitboxToggleKey",
+			toggleJumpBoost="boostToggleKey",
+			toggleAlwaysBoost="alwaysBoostToggleKey",
+			qbAimLock="qbAimLockKey",
+			qbAimThrow="qbAimThrowKey",
+			qbAimToggle="qbAimToggleKey",
 		}
 
 		for savedName,stateName in pairs(keyMap) do
@@ -880,9 +880,9 @@ function dataSave.new(app)
 		end
 
 		if keybinds.toggleESP~=nil then
-			setValue(app,"TOGGLE_ACTION_KEY",decodeBinding(keybinds.toggleESP))
+			setValue(app,"espToggleKey",decodeBinding(keybinds.toggleESP))
 		elseif keybinds.toggleActionStatus~=nil then
-			setValue(app,"TOGGLE_ACTION_KEY",decodeBinding(keybinds.toggleActionStatus))
+			setValue(app,"espToggleKey",decodeBinding(keybinds.toggleActionStatus))
 		end
 
 		applyPresetEditor(app,settings.presetEditor or settings.presetEditor)

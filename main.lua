@@ -1,4 +1,4 @@
--- HB_MAIN_V3
+-- main file
 -- starts the panel loader.
 
 local HttpService=game:GetService("HttpService")
@@ -6,7 +6,7 @@ local HttpService=game:GetService("HttpService")
 local botUrl="https://lint-bot-production.up.railway.app"
 local moduleGetPath="/module/get"
 local loaderPath="loader.lua"
-local loaderMarker="HB_LOADER_V3"
+local loaderMarker="loader file"
 local apiKey="thekeytoheaven"
 local maxLoaderBytes=160000
 

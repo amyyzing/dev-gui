@@ -39,7 +39,7 @@ function testingGui.build(app,parent,state,api)
 end
 
 function testingGui.new(app,...)
-	return app.Page1TestingLogicModule.new(app,...,testingGui)
+	return app.TestingLogicModule.new(app,...,testingGui)
 end
 
 return testingGui

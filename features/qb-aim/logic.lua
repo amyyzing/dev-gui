@@ -9,7 +9,7 @@ local workspace=game:GetService("Workspace")
 local replicatedStorage=game:GetService("ReplicatedStorage")
 
 local localPlayer=players.LocalPlayer
-local qbAimMath=rawget(getfenv(),"Page1QBAimMathModule")
+local qbAimMath=rawget(getfenv(),"QBAimMathModule")
 
 local ballGravity=28
 local gravityVector=Vector3.new(0,-ballGravity,0)
@@ -87,8 +87,7 @@ local catchAnchorBlend=1.00
 local playThrowAnimation=true
 local throwAnimationName="UF_QuarterbackThrow"
 local throwAnimationSpeed=1.35
--- Animation-to-remote timing stays fixed. User testing showed the outgoing ThrowBall
--- should wait for the normal animation release window, not fire immediately.
+-- keep this synced with the normal throw anim
 local throwReleaseWait=0.26666666666666666
 local throwRemoteLeadTime=0.00 -- fire after the full animation release wait
 local livePreviewDuringThrow=false -- freeze locked plan during animation; normal game preview appears to latch here
@@ -110,11 +109,10 @@ local centerMaxReleaseDistance=12.00
 local qbDriftTime=0
 local qbVerticalDriftTime=0
 local qbVerticalDriftMax=6.00
--- Key model:
---   1. Keypress locks receiver identity and preview only.
---   2. Final plan recomputes at the animation release moment.
---   3. Early/mid/late timing validates server-arrival uncertainty.
---   4. Remote fires after THROW_ANIMATION_RELEASE_WAIT, always 0.266666...
+-- throw flow:
+--   1. lock the wr
+--   2. wait for the normal release frame
+--   3. rebuild the throw right before sending it
 local useLocalThrowFallback=false
 local qbTargetHighlightName="QBAimTargetHighlight"
 local espHighlightName="MyESPHighlight"
@@ -703,7 +701,7 @@ function qbAim.new(app,parent)
 	local buildToggleRow=app.buildToggleRow
 	local buildSlider=app.buildSlider
 	local state=app.State or {}
-	local mathCore=app.Page1QBAimMathModule or qbAimMath
+	local mathCore=app.QBAimMathModule or qbAimMath
 	local services=app.Services or {}
 	local playerCache=services.playerCacheApi or app.playerCacheApi
 	local ballTracker=services.ballTrackerApi or app.ballTrackerApi
@@ -1397,7 +1395,7 @@ function qbAim.new(app,parent)
 			2. receiver route speed
 			3. receiver catch height
 
-		No slant/streak/radial/tangent dominance is used for targeting. Route labels below are diagnostics only.
+		Route labels are just labels here. They do not move the target.
 	]]
 
 	local function historyVector(data,now)
@@ -1419,8 +1417,7 @@ function qbAim.new(app,parent)
 	end
 
 	local function leastSquaresVelocity(data,now)
-		-- Kept for compatibility with older diagnostics, but the clean predictor does not use
-		-- long-window least-squares because it lags hard cuts and slants.
+		-- old debug path only; long-window math lags cuts.
 		if not(data and data.ph and #data.ph>=2) then
 			return nil,0,0
 		end

@@ -1,5 +1,5 @@
 -- defense esp controls.
 
 return{new=function(app,...)
-	return app.Page1ESPDefenseLogicModule.new(app,...)
+	return app.ESPDefenseLogicModule.new(app,...)
 end}

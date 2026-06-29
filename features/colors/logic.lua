@@ -1,6 +1,6 @@
 -- color picker, theme presets, and highlight colors.
 
-local strokeColour={}
+local colors={}
 
 local tweenService=game:GetService("TweenService")
 
@@ -182,17 +182,17 @@ for _,mode in ipairs(highlightModes) do
 		highlightStateByMode[mode.key][state.key]=state
 	end
 end
-local highlightDialWidth=96
-local highlightDialHeight=96
-local highlightDialInnerRadius=0.22
-local highlightDialOuterRadius=0.43
-local highlightDialGapDegrees=8
+local highlightWheelWidth=96
+local highlightWheelHeight=96
+local highlightWheelInnerRadius=0.22
+local highlightWheelOuterRadius=0.43
+local highlightWheelGapDegrees=8
 local highlightGlowLayers={
 	{pad=1,z=5},
 	{pad=4,z=4},
 	{pad=8,z=3},
 }
-local highlightDialSlices={
+local highlightWheelPieces={
 	{key="espDefense",assetKey="gravity",start=30,finish=150,fallbackIndex=1},
 	{key="espOffense",assetKey="speed",start=150,finish=270,fallbackIndex=2},
 	{key="qbHighlight",assetKey="stamina",start=270,finish=390,fallbackIndex=3},
@@ -220,8 +220,8 @@ local function atan2(y,x)
 end
 
 local function inAngleRange(angle,startAngle,finishAngle)
-	local start=startAngle+highlightDialGapDegrees
-	local finish=finishAngle-highlightDialGapDegrees
+	local start=startAngle+highlightWheelGapDegrees
+	local finish=finishAngle-highlightWheelGapDegrees
 
 	if finish>360 then
 		return angle>=start or angle<=(finish-360)
@@ -306,7 +306,7 @@ local function readableTextColor(color)
 	return Color3.fromRGB(18,18,18)
 end
 
-function strokeColour.new(app,page)
+function colors.new(app,page)
 	local make=app.New
 	local colors=app.colors
 	local style=app.style
@@ -708,19 +708,19 @@ function strokeColour.new(app,page)
 	local quickChoices={}
 	local rgbSliders={}
 	local hsvSliders={}
-	local highlightDialImages={}
-	local highlightDialGlowImages={}
-	local highlightDialHighlightImages={}
-	local highlightFallbackSlices={}
-	local highlightDialPaintTweens={}
-	local highlightDialCanvas=nil
-	local highlightDialCenterCap=nil
+	local highlightWheelImages={}
+	local highlightWheelGlowImages={}
+	local highlightWheelHighlightImages={}
+	local highlightFallbackPieces={}
+	local highlightWheelPaintTweens={}
+	local highlightWheelCanvas=nil
+	local highlightWheelCenterCap=nil
 	local modeBodies={}
 	local colorPreview,previewHex,hexBox
 	local svBase,svCursor,hueCursor
 	local highlightSvBase,highlightSvCursor,highlightHueCursor,highlightPreviewHex,highlightPickerPreview
 	local highlightModeLabel,highlightPreview,highlightPreviewStroke,highlightFillTransparencySlider,highlightOutlineTransparencySlider
-	local paintHighlightDial=function() end
+	local paintHighlightWheel=function() end
 
 	local function themeColor(role,fallback)
 		return colors[role] or fallback
@@ -1816,7 +1816,7 @@ function strokeColour.new(app,page)
 
 		syncHighlightPicker()
 
-		paintHighlightDial(false)
+		paintHighlightWheel(false)
 
 		local states=mode.states or {}
 		local stateCount=math.max(#states,1)
@@ -1859,33 +1859,33 @@ function strokeColour.new(app,page)
 		LayoutOrder=1,
 	},highlightPanel)
 
-	highlightDialCanvas=make("Frame",{
+	highlightWheelCanvas=make("Frame",{
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		ClipsDescendants=false,
 		Position=UDim2.fromOffset(0,1),
-		Size=UDim2.fromOffset(highlightDialWidth,highlightDialHeight),
+		Size=UDim2.fromOffset(highlightWheelWidth,highlightWheelHeight),
 		ZIndex=6,
 	},highlightModeRow)
 
-	local function tweenHighlightDialObject(object,goal)
+	local function tweenHighlightWheelObject(object,goal)
 		if not object then return end
-		local previous=highlightDialPaintTweens[object]
+		local previous=highlightWheelPaintTweens[object]
 		if previous then
 			previous:Cancel()
 		end
 
 		local tween=tweenService:Create(object,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),goal)
-		highlightDialPaintTweens[object]=tween
+		highlightWheelPaintTweens[object]=tween
 		tween.Completed:Connect(function()
-			if highlightDialPaintTweens[object]==tween then
-				highlightDialPaintTweens[object]=nil
+			if highlightWheelPaintTweens[object]==tween then
+				highlightWheelPaintTweens[object]=nil
 			end
 		end)
 		tween:Play()
 	end
 
-	paintHighlightDial=function(animate)
+	paintHighlightWheel=function(animate)
 		local selected=activeHighlightMode().key
 		local accent=getUIStrokeColor()
 		local core=brightenColor(accent,0.10)
@@ -1928,32 +1928,32 @@ function strokeColour.new(app,page)
 				transparency=0.60
 			end
 
-			local image=highlightDialImages[key]
+			local image=highlightWheelImages[key]
 			if image then
 				if animate then
-					tweenHighlightDialObject(image,{ImageColor3=color,ImageTransparency=transparency})
+					tweenHighlightWheelObject(image,{ImageColor3=color,ImageTransparency=transparency})
 				else
 					image.ImageColor3=color
 					image.ImageTransparency=transparency
 				end
 			end
 
-			local highlight=highlightDialHighlightImages[key]
+			local highlight=highlightWheelHighlightImages[key]
 			if highlight then
 				if animate then
-					tweenHighlightDialObject(highlight,{ImageColor3=Color3.new(1,1,1),ImageTransparency=highlightTransparency})
+					tweenHighlightWheelObject(highlight,{ImageColor3=Color3.new(1,1,1),ImageTransparency=highlightTransparency})
 				else
 					highlight.ImageColor3=Color3.new(1,1,1)
 					highlight.ImageTransparency=highlightTransparency
 				end
 			end
 
-			local glows=highlightDialGlowImages[key]
+			local glows=highlightWheelGlowImages[key]
 			if glows then
 				for index,glowImage in ipairs(glows) do
 					local glowTransparency=index==1 and nearGlowTransparency or (index==2 and midGlowTransparency or farGlowTransparency)
 					if animate then
-						tweenHighlightDialObject(glowImage,{ImageColor3=glow,ImageTransparency=glowTransparency})
+						tweenHighlightWheelObject(glowImage,{ImageColor3=glow,ImageTransparency=glowTransparency})
 					else
 						glowImage.ImageColor3=glow
 						glowImage.ImageTransparency=glowTransparency
@@ -1961,10 +1961,10 @@ function strokeColour.new(app,page)
 				end
 			end
 
-			local fallback=highlightFallbackSlices[key]
+			local fallback=highlightFallbackPieces[key]
 			if fallback then
 				if animate then
-					tweenHighlightDialObject(fallback,{BackgroundColor3=color,BackgroundTransparency=transparency})
+					tweenHighlightWheelObject(fallback,{BackgroundColor3=color,BackgroundTransparency=transparency})
 				else
 					fallback.BackgroundColor3=color
 					fallback.BackgroundTransparency=transparency
@@ -1972,23 +1972,23 @@ function strokeColour.new(app,page)
 			end
 		end
 
-		if highlightDialCenterCap then
+		if highlightWheelCenterCap then
 			local centerColor=themeColor("INPUT",colors.panel)
 			if animate then
-				tweenHighlightDialObject(highlightDialCenterCap,{ImageColor3=centerColor})
+				tweenHighlightWheelObject(highlightWheelCenterCap,{ImageColor3=centerColor})
 			else
-				highlightDialCenterCap.ImageColor3=centerColor
+				highlightWheelCenterCap.ImageColor3=centerColor
 			end
 		end
 	end
 
 	local function highlightModeAtPosition(position)
-		if not highlightDialCanvas then
+		if not highlightWheelCanvas then
 			return nil
 		end
 
-		local absoluteSize=highlightDialCanvas.AbsoluteSize
-		local x,y=objectLocalPointer(highlightDialCanvas,position)
+		local absoluteSize=highlightWheelCanvas.AbsoluteSize
+		local x,y=objectLocalPointer(highlightWheelCanvas,position)
 		local size=math.min(absoluteSize.X,absoluteSize.Y)
 
 		if size<=0 then
@@ -1998,8 +1998,8 @@ function strokeColour.new(app,page)
 		local dx=x-absoluteSize.X*0.5
 		local dy=y-absoluteSize.Y*0.5
 		local radius=math.sqrt(dx*dx+dy*dy)
-		local inner=size*highlightDialInnerRadius
-		local outer=size*highlightDialOuterRadius
+		local inner=size*highlightWheelInnerRadius
+		local outer=size*highlightWheelOuterRadius
 
 		if radius<inner or radius>outer then
 			return nil
@@ -2010,9 +2010,9 @@ function strokeColour.new(app,page)
 			angle=angle+360
 		end
 
-		for _,slice in ipairs(highlightDialSlices) do
-			if inAngleRange(angle,slice.start,slice.finish) then
-				return slice.key
+		for _,piece in ipairs(highlightWheelPieces) do
+			if inAngleRange(angle,piece.start,piece.finish) then
+				return piece.key
 			end
 		end
 
@@ -2030,23 +2030,21 @@ function strokeColour.new(app,page)
 		end
 
 		highlightHoverMode=modeKey
-		paintHighlightDial(true)
+		paintHighlightWheel(true)
 	end
 
-	local paramsDial=app.Page1GameParamsModule
+	local paramsWheel=app.ParamsModule
 	local assets=nil
-	if paramsDial and type(paramsDial.GetWheelImages)=="function" then
-		assets=paramsDial.GetWheelImages()
-	elseif paramsDial and type(paramsDial.GetDialSliceAssets)=="function" then
-		assets=paramsDial.GetDialSliceAssets()
+	if paramsWheel and type(paramsWheel.GetWheelImages)=="function" then
+		assets=paramsWheel.GetWheelImages()
 	end
 
-	for _,slice in ipairs(highlightDialSlices) do
-		local pageAssets=assets and assets[slice.assetKey]
-		local normalPiece=pageAssets and (pageAssets.normalPiece or pageAssets.slice)
+	for _,piece in ipairs(highlightWheelPieces) do
+		local pageAssets=assets and assets[piece.assetKey]
+		local normalPiece=pageAssets and (pageAssets.normalPiece or pageAssets.piece)
 		local glowPiece=pageAssets and (pageAssets.glowPiece or pageAssets.glow)
 		if normalPiece and glowPiece then
-			highlightDialGlowImages[slice.key]={}
+			highlightWheelGlowImages[piece.key]={}
 			for _,layer in ipairs(highlightGlowLayers) do
 				local pad=layer.pad
 				local glowImage=make("ImageLabel",{
@@ -2059,11 +2057,11 @@ function strokeColour.new(app,page)
 					ResampleMode=Enum.ResamplerMode.Default,
 					ScaleType=Enum.ScaleType.Stretch,
 					ZIndex=layer.z,
-				},highlightDialCanvas)
-				highlightDialGlowImages[slice.key][#highlightDialGlowImages[slice.key]+1]=glowImage
+				},highlightWheelCanvas)
+				highlightWheelGlowImages[piece.key][#highlightWheelGlowImages[piece.key]+1]=glowImage
 			end
 
-			highlightDialImages[slice.key]=make("ImageLabel",{
+			highlightWheelImages[piece.key]=make("ImageLabel",{
 				BackgroundTransparency=1,
 				Position=UDim2.fromScale(0,0),
 				Size=UDim2.fromScale(1,1),
@@ -2073,9 +2071,9 @@ function strokeColour.new(app,page)
 				ResampleMode=Enum.ResamplerMode.Default,
 				ScaleType=Enum.ScaleType.Stretch,
 				ZIndex=6,
-			},highlightDialCanvas)
+			},highlightWheelCanvas)
 
-			highlightDialHighlightImages[slice.key]=make("ImageLabel",{
+			highlightWheelHighlightImages[piece.key]=make("ImageLabel",{
 				BackgroundTransparency=1,
 				Position=UDim2.fromScale(0,0),
 				Size=UDim2.fromScale(1,1),
@@ -2085,9 +2083,9 @@ function strokeColour.new(app,page)
 				ResampleMode=Enum.ResamplerMode.Default,
 				ScaleType=Enum.ScaleType.Stretch,
 				ZIndex=7,
-			},highlightDialCanvas)
+			},highlightWheelCanvas)
 		else
-			local index=slice.fallbackIndex
+			local index=piece.fallbackIndex
 			local fallback=make("TextButton",{
 				Position=UDim2.new((index-1)/3,1,0,8),
 				Size=UDim2.new(1/3,-2,1,-16),
@@ -2099,15 +2097,15 @@ function strokeColour.new(app,page)
 				Selectable=false,
 				ZIndex=6,
 				ThemeRole="INPUT",
-			},highlightDialCanvas)
+			},highlightWheelCanvas)
 			addCorner(fallback,"Control")
-			highlightFallbackSlices[slice.key]=fallback
+			highlightFallbackPieces[piece.key]=fallback
 		end
 	end
 
 	if assets and assets._center then
-		local centerSize=math.floor(highlightDialWidth*highlightDialInnerRadius*2+8)
-		highlightDialCenterCap=make("ImageLabel",{
+		local centerSize=math.floor(highlightWheelWidth*highlightWheelInnerRadius*2+8)
+		highlightWheelCenterCap=make("ImageLabel",{
 			AnchorPoint=Vector2.new(0.5,0.5),
 			Position=UDim2.fromScale(0.5,0.5),
 			Size=UDim2.fromOffset(centerSize,centerSize),
@@ -2118,10 +2116,10 @@ function strokeColour.new(app,page)
 			ResampleMode=Enum.ResamplerMode.Default,
 			ScaleType=Enum.ScaleType.Stretch,
 			ZIndex=8,
-		},highlightDialCanvas)
+		},highlightWheelCanvas)
 	end
 
-	local highlightDialHit=make("TextButton",{
+	local highlightWheelHit=make("TextButton",{
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		Position=UDim2.fromScale(0,0),
@@ -2130,9 +2128,9 @@ function strokeColour.new(app,page)
 		AutoButtonColor=false,
 		Selectable=false,
 		ZIndex=10,
-	},highlightDialCanvas)
+	},highlightWheelCanvas)
 
-	trackConnection(highlightDialHit.InputBegan:Connect(function(input)
+	trackConnection(highlightWheelHit.InputBegan:Connect(function(input)
 		if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then
 			return
 		end
@@ -2143,13 +2141,13 @@ function strokeColour.new(app,page)
 		end
 	end))
 
-	trackConnection(highlightDialHit.InputChanged:Connect(function(input)
+	trackConnection(highlightWheelHit.InputChanged:Connect(function(input)
 		if input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch then
 			setHighlightHoverMode(highlightModeAtPosition(input.Position))
 		end
 	end))
 
-	trackConnection(highlightDialHit.MouseLeave:Connect(function()
+	trackConnection(highlightWheelHit.MouseLeave:Connect(function()
 		setHighlightHoverMode(nil)
 	end))
 
@@ -2486,4 +2484,4 @@ function strokeColour.new(app,page)
 	return api
 end
 
-return strokeColour
+return colors

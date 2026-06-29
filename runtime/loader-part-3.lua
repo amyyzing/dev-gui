@@ -1,4 +1,4 @@
--- HB_RUNTIME_PART_3
+-- boot part 3
 -- boot step 3: map editor page and shared runtime services.
 
 function tintSlider(slider, color)
@@ -87,7 +87,7 @@ function buildRuntimeModule(spec,app,parent,...)
 	return nil
 end
 
-StrokeColourAPI=nil
+ColorsAPI=nil
 resetCustomizePageDefaults=function() end
 
 function clearCustomizePage()
@@ -108,8 +108,8 @@ function makeCustomizeCtx()
 		inputService=inputService,
 		defaultStyle=getDefaultUIStyle and getDefaultUIStyle() or style,
 		screenGui=screenGui,
-		StrokeColourLogicModule=StrokeColourLogicModule,
-		Page1GameParamsModule=Page1GameParamsModule,
+		ColorsLogicModule=ColorsLogicModule,
+		ParamsModule=ParamsModule,
 		makeSection=makeSection,
 		buildSlider=buildSlider,
 		buildToggleRow=buildToggleRow,
@@ -134,16 +134,16 @@ function makeCustomizeCtx()
 end
 
 function buildCustomizePage()
-	destroyRuntimeAPIs({"StrokeColourAPI"})
+	destroyRuntimeAPIs({"ColorsAPI"})
 	resetCustomizePageDefaults=function() end
 	clearCustomizePage()
 	loadDeferredModuleNames(customizeReloadNames)
 
-	StrokeColourAPI=buildRuntimeModule({name="StrokeColour",api="StrokeColourAPI",order=1,title="Stroke Colour"},makeCustomizeCtx(),uiSettingsPage)
-	if StrokeColourAPI then
+	ColorsAPI=buildRuntimeModule({name="Colors",api="ColorsAPI",order=1,title="Colors"},makeCustomizeCtx(),uiSettingsPage)
+	if ColorsAPI then
 		resetCustomizePageDefaults=function()
-			if StrokeColourAPI and StrokeColourAPI.Reset then
-				StrokeColourAPI.Reset()
+			if ColorsAPI and ColorsAPI.Reset then
+				ColorsAPI.Reset()
 			end
 		end
 	end
@@ -161,7 +161,7 @@ rebuildCustomizeFromModules=function()
 		return
 	end
 
-	destroyRuntimeAPIs({"StrokeColourAPI"})
+	destroyRuntimeAPIs({"ColorsAPI"})
 	resetCustomizePageDefaults=function() end
 	clearCustomizePage()
 	lazyPageBuilt.customize=false
@@ -170,15 +170,15 @@ end
 lazyPageBuilders.customize=buildCustomizePage
 
 MapEditorAPI=nil
-AntiMaterialAPI=nil
+MaterialsAPI=nil
 MapCleanerAPI=nil
-RemoveAdsAPI=nil
-mapApiNames={"MapEditorAPI","AntiMaterialAPI","MapCleanerAPI","RemoveAdsAPI"}
+AdsAPI=nil
+mapApiNames={"MapEditorAPI","MaterialsAPI","MapCleanerAPI","AdsAPI"}
 mapPageModules={
 	{name="MapEditor",api="MapEditorAPI",order=0,title="Map Editor"},
-	{name="AntiMaterial",api="AntiMaterialAPI",order=1,title="Anti Material"},
+	{name="Materials",api="MaterialsAPI",order=1,title="Anti Material"},
 	{name="MapCleaner",api="MapCleanerAPI",order=2,title="Map Cleaner"},
-	{name="RemoveAds",api="RemoveAdsAPI",order=3,title="Remove Ads"},
+	{name="Ads",api="AdsAPI",order=3,title="Remove Ads"},
 }
 
 function clearMapPage()
@@ -245,9 +245,9 @@ function makeMapCtx(name)
 
 	if name=="MapEditor" then
 		app.MapEditorLogicModule=MapEditorLogicModule
-	elseif name=="AntiMaterial" then
+	elseif name=="Materials" then
 		app.mapSettings=mapSettings
-		app.AntiMaterialLogicModule=AntiMaterialLogicModule
+		app.MaterialsLogicModule=MaterialsLogicModule
 		app.onChanged=function(state)
 			potatoMode=state and true or false
 			if mapSettings then
@@ -257,8 +257,8 @@ function makeMapCtx(name)
 		end
 	elseif name=="MapCleaner" then
 		app.MapCleanerLogicModule=MapCleanerLogicModule
-	elseif name=="RemoveAds" then
-		app.RemoveAdsLogicModule=RemoveAdsLogicModule
+	elseif name=="Ads" then
+		app.AdsLogicModule=AdsLogicModule
 	end
 
 	return app
@@ -302,7 +302,7 @@ function buildAllRuntimePages()
 		if ensureRuntimePageBuilt then
 			loaderPhaseCurrent=(loaderPhaseCurrent or #startupModuleFiles)+1
 			if setLoaderProgress then
-				setLoaderProgress("Building interface page.",loaderPhaseCurrent,loaderStepTotal,false)
+				setLoaderProgress("building gui page",loaderPhaseCurrent,loaderStepTotal,false)
 			end
 
 			local ok,result=pcall(ensureRuntimePageBuilt,pageName)

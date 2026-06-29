@@ -1,8 +1,8 @@
 -- moves the panel back to the screen center.
 
-local resetPosition={}
+local resetGui={}
 
-function resetPosition.new(app,page)
+function resetGui.new(app,page)
 	local make=app.New
 	local colors=app.colors
 	local makeSection=app.makeSection
@@ -27,11 +27,11 @@ function resetPosition.new(app,page)
 		end
 	end
 
-	local function resetPosition()
+	local function resetGui()
 		local ok=false
 
-		if app.mainFrame and type(app.mainFrame.resetPosition)=="function" then
-			ok=pcall(app.mainFrame.resetPosition,true)
+		if app.mainFrame and type(app.mainFrame.resetGui)=="function" then
+			ok=pcall(app.mainFrame.resetGui,true)
 		elseif app.root then
 			ok=pcall(function()
 				local height=(app.root.AbsoluteSize and app.root.AbsoluteSize.Y) or 540
@@ -108,7 +108,7 @@ function resetPosition.new(app,page)
 		buttonWrap.BackgroundColor3=buttonBaseColor()
 	end)
 
-	connect(button.Activated,resetPosition)
+	connect(button.Activated,resetGui)
 
 	statusLabel=make("TextLabel",{
 		BackgroundTransparency=1,
@@ -125,4 +125,4 @@ function resetPosition.new(app,page)
 	return api
 end
 
-return resetPosition
+return resetGui

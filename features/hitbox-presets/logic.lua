@@ -1,6 +1,6 @@
 -- preset save, equip, delete, and import actions.
 
-local hitboxPreset={}
+local hitboxPresets={}
 
 local function trim(s)
 	return tostring(s or ""):gsub("^%s*(.-)%s*$","%1")
@@ -12,7 +12,7 @@ local function makeCode(name)
 	return base..tostring(math.random(100,999))
 end
 
-function hitboxPreset.new(app,ownedSection)
+function hitboxPresets.new(app,ownedSection)
 	local make=app.New
 	local colors=app.colors
 	local screenGui=app.SG
@@ -483,4 +483,4 @@ function hitboxPreset.new(app,ownedSection)
 	return api
 end
 
-return hitboxPreset
+return hitboxPresets

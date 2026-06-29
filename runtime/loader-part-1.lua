@@ -1,4 +1,4 @@
--- HB_RUNTIME_PART_1
+-- boot part 1
 -- boot step 1: services, theme defaults, loader screen, and module fetch.
 
 Players=game:GetService("Players")
@@ -575,51 +575,51 @@ modulePaths={
 	DesignThemeCrimson="design/themes/crimson.lua",
 	DesignThemeEvergreen="design/themes/evergreen.lua",
 	DesignThemeSakura="design/themes/sakura.lua",
-	announcement="announcement.lua",
+	Announcement="announcement.lua",
 	GuiFusion="gui/fusion.lua",
-	guiLogic="gui/gui-logic.lua",
-	mainFrame="gui/mainframe.lua",
-	description="gui/description.lua",
-	hitboxPreset="features/hitbox-preset/gui.lua",
-	HitboxPresetLogic="features/hitbox-preset/logic.lua",
-	keybindSettings="features/keybind-settings/gui.lua",
-	KeybindSettingsLogic="features/keybind-settings/logic.lua",
-	presetEditor="features/preset-editor/gui.lua",
+	GuiLogic="gui/gui-logic.lua",
+	MainFrame="gui/mainframe.lua",
+	Description="gui/description.lua",
+	HitboxPresets="features/hitbox-presets/gui.lua",
+	HitboxPresetsLogic="features/hitbox-presets/logic.lua",
+	Keybinds="features/keybinds/gui.lua",
+	KeybindsLogic="features/keybinds/logic.lua",
+	PresetEditor="features/preset-editor/gui.lua",
 	PresetEditorLogic="features/preset-editor/logic.lua",
-	Page1Hitbox="features/hitbox/gui.lua",
-	Page1HitboxLogic="features/hitbox/logic.lua",
-	Page1GameParams="features/game-params/gui.lua",
-	Page1GameParamsLogic="features/game-params/logic.lua",
-	Page1Boost="features/boost/gui.lua",
-	Page1BoostLogic="features/boost/logic.lua",
-	Page1ESP="features/esp/gui.lua",
-	Page1ESPLogic="features/esp/logic.lua",
-	Page1ESPDefense="features/esp-defense/gui.lua",
-	Page1ESPDefenseLogic="features/esp-defense/logic.lua",
-	Page1ESPOffense="features/esp-offense/gui.lua",
-	Page1ESPOffenseLogic="features/esp-offense/logic.lua",
-	Page1QBAim="features/qb-aim/gui.lua",
-	Page1QBAimMath="features/qb-aim/math.lua",
-	Page1QBAimLogic="features/qb-aim/logic.lua",
-	Page1Testing="features/testing/gui.lua",
-	Page1TestingLogic="features/testing/logic.lua",
-	strokeColour="features/stroke-colour/gui.lua",
-	StrokeColourLogic="features/stroke-colour/logic.lua",
-	mapEditor="features/map-editor/gui.lua",
+	Hitbox="features/hitbox/gui.lua",
+	HitboxLogic="features/hitbox/logic.lua",
+	Params="features/params/gui.lua",
+	ParamsLogic="features/params/logic.lua",
+	Boost="features/boost/gui.lua",
+	BoostLogic="features/boost/logic.lua",
+	ESP="features/esp/gui.lua",
+	ESPLogic="features/esp/logic.lua",
+	ESPDefense="features/esp-defense/gui.lua",
+	ESPDefenseLogic="features/esp-defense/logic.lua",
+	ESPOffense="features/esp-offense/gui.lua",
+	ESPOffenseLogic="features/esp-offense/logic.lua",
+	QBAim="features/qb-aim/gui.lua",
+	QBAimMath="features/qb-aim/math.lua",
+	QBAimLogic="features/qb-aim/logic.lua",
+	Testing="features/testing/gui.lua",
+	TestingLogic="features/testing/logic.lua",
+	Colors="features/colors/gui.lua",
+	ColorsLogic="features/colors/logic.lua",
+	MapEditor="features/map-editor/gui.lua",
 	MapEditorLogic="features/map-editor/logic.lua",
-	antiMaterial="features/anti-material/gui.lua",
-	AntiMaterialLogic="features/anti-material/logic.lua",
-	mapCleaner="features/map-cleaner/gui.lua",
+	Materials="features/materials/gui.lua",
+	MaterialsLogic="features/materials/logic.lua",
+	MapCleaner="features/map-cleaner/gui.lua",
 	MapCleanerLogic="features/map-cleaner/logic.lua",
-	removeAds="features/remove-ads/gui.lua",
-	RemoveAdsLogic="features/remove-ads/logic.lua",
-	playerData="features/player-data/gui.lua",
-	PlayerDataLogic="features/player-data/logic.lua",
-	resetPosition="features/reset-position/gui.lua",
-	ResetPositionLogic="features/reset-position/logic.lua",
-	discord="features/discord/gui.lua",
+	Ads="features/ads/gui.lua",
+	AdsLogic="features/ads/logic.lua",
+	PlayerData="features/data/gui.lua",
+	PlayerDataLogic="features/data/logic.lua",
+	ResetGui="features/reset-gui/gui.lua",
+	ResetGuiLogic="features/reset-gui/logic.lua",
+	Discord="features/discord/gui.lua",
 	DiscordLogic="features/discord/logic.lua",
-	dataSave="data-save/data-save.lua",
+	DataSave="data-save/data-save.lua",
 }
 moduleGlobalNames={
 	CoreScope="CoreScope",
@@ -642,20 +642,20 @@ startupModuleNames={
 	"CoreScope","CoreSignal","CoreScheduler","CorePlayerCache","CoreBallTracker",
 	"StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura",
 	"GuiFusion","GuiLogic","MainFrame","Description","Announcement",
-	"Page1HitboxLogic","Page1Hitbox","Page1GameParamsLogic","Page1GameParams","Page1BoostLogic","Page1Boost",
-	"Page1ESPDefenseLogic","Page1ESPDefense","Page1ESPOffenseLogic","Page1ESPOffense","Page1ESPLogic","Page1ESP",
-	"Page1QBAimMath","Page1QBAimLogic","Page1QBAim","Page1TestingLogic","Page1Testing",
-	"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds",
-	"StrokeColourLogic","StrokeColour",
-	"HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor",
-	"PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord",
+	"HitboxLogic","Hitbox","ParamsLogic","Params","BoostLogic","Boost",
+	"ESPDefenseLogic","ESPDefense","ESPOffenseLogic","ESPOffense","ESPLogic","ESP",
+	"QBAimMath","QBAimLogic","QBAim","TestingLogic","Testing",
+	"MapEditorLogic","MapEditor","MaterialsLogic","Materials","MapCleanerLogic","MapCleaner","AdsLogic","Ads",
+	"ColorsLogic","Colors",
+	"HitboxPresetsLogic","HitboxPresets","KeybindsLogic","Keybinds","PresetEditorLogic","PresetEditor",
+	"PlayerDataLogic","PlayerData","ResetGuiLogic","ResetGui","DiscordLogic","Discord",
 	"DataSave",
 }
 optionalModuleNames={"CorePlayerCache","CoreBallTracker"}
-mapReloadNames={"MapEditorLogic","MapEditor","AntiMaterialLogic","AntiMaterial","MapCleanerLogic","MapCleaner","RemoveAdsLogic","RemoveAds"}
-customizeReloadNames={"StrokeColourLogic","StrokeColour"}
-pageTwoReloadNames={"HitboxPresetLogic","HitboxPreset","KeybindSettingsLogic","KeybindSettings","PresetEditorLogic","PresetEditor"}
-settingsReloadNames={"PlayerDataLogic","PlayerData","ResetPositionLogic","ResetPosition","DiscordLogic","Discord"}
+mapReloadNames={"MapEditorLogic","MapEditor","MaterialsLogic","Materials","MapCleanerLogic","MapCleaner","AdsLogic","Ads"}
+customizeReloadNames={"ColorsLogic","Colors"}
+pageTwoReloadNames={"HitboxPresetsLogic","HitboxPresets","KeybindsLogic","Keybinds","PresetEditorLogic","PresetEditor"}
+settingsReloadNames={"PlayerDataLogic","PlayerData","ResetGuiLogic","ResetGui","DiscordLogic","Discord"}
 
 function moduleGlobalName(name)
 	return moduleGlobalNames[name] or (tostring(name).."Module")
@@ -719,7 +719,7 @@ for _,path in ipairs(modulePathsFromNames(optionalModuleNames)) do
 	optionalModuleFileSet[path]=true
 end
 maxModuleBytes=300000
-moduleMarkers={[manualReloadPath]="HB_LOADER_V3"}
+moduleMarkers={[manualReloadPath]="loader file"}
 
 moduleCache={}
 moduleSources={}
@@ -728,7 +728,7 @@ if type(runtimeSourcesFromLoader)=="table" then
 		moduleSources[path]=source
 	end
 end
-rebuildPage1FromModules=nil
+rebuildMainFromModules=nil
 rebuildCustomizeFromModules=nil
 rebuildMapFromModules=nil
 rebuildSettingsFromModules=nil
@@ -823,7 +823,7 @@ function loadRemoteModuleBatch(paths)
 		return false,"no module paths"
 	end
 
-	setLoaderProgress("Fetching remote module batch...",0.2,loaderStepTotal,false)
+	setLoaderProgress("loading files...",0.2,loaderStepTotal,false)
 
 	local result=botApi.Post("/module/batch",{paths=paths})
 	if not(result and result.ok and type(result.modules)=="table") then
@@ -1346,7 +1346,7 @@ function loadDeferredModule(name,path,current)
 
 	local loadedModule=loadRemoteModule(path)
 	if not loadedModule and not optionalModuleFileSet[path] then
-		warn("deferred module missing:",name,path)
+		warn("module missing:",name,path)
 	end
 	return loadedModule
 end
@@ -1940,13 +1940,13 @@ function cleanupForManualReload()
 
 	if destroyRuntimeAPIs then
 		pcall(destroyRuntimeAPIs,{
-			"StrokeColourAPI",
+			"ColorsAPI",
 			"MapEditorAPI",
-			"AntiMaterialAPI",
+			"MaterialsAPI",
 			"MapCleanerAPI",
-			"RemoveAdsAPI",
+			"AdsAPI",
 			"PlayerDataAPI",
-			"ResetPositionAPI",
+			"ResetGuiAPI",
 			"DiscordAPI",
 		})
 	end
@@ -2286,5 +2286,5 @@ function requireGuiModule(name,path,loadedModule)
 	error("loader failed: "..name.." did not load: "..path)
 end
 
-GuiLogicModule=requireGuiModule("GuiLogic",modulePaths.guiLogic,GuiLogicModule)
-MainFrameModule=requireGuiModule("MainFrame",modulePaths.mainFrame,MainFrameModule)
+GuiLogicModule=requireGuiModule("GuiLogic",modulePaths.GuiLogic,GuiLogicModule)
+MainFrameModule=requireGuiModule("MainFrame",modulePaths.MainFrame,MainFrameModule)

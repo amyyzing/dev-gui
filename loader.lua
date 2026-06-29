@@ -1,4 +1,4 @@
--- HB_LOADER_V3
+-- loader file
 -- fetches the panel code and starts the runtime.
 
 local HttpService = game:GetService( "HttpService" )
@@ -17,11 +17,11 @@ local runtimeFiles = {
 }
 
 local runtimeMarkers={
-	[runtimeFiles[1]] = "HB_RUNTIME_PART_1",
-	[runtimeFiles[2]]="HB_RUNTIME_PART_2",
-	[runtimeFiles[3]] = "HB_RUNTIME_PART_3",
-	[runtimeFiles[4]]="HB_RUNTIME_PART_4",
-	[runtimeFiles[5]] = "HB_RUNTIME_PART_5",
+	[runtimeFiles[1]] = "boot part 1",
+	[runtimeFiles[2]]="boot part 2",
+	[runtimeFiles[3]] = "boot part 3",
+	[runtimeFiles[4]]="boot part 4",
+	[runtimeFiles[5]] = "boot part 5",
 }
 
 local allowedRuntimeFiles={}
@@ -56,7 +56,7 @@ end
 
 local function fetchModule(path)
 	if not allowedRuntimeFiles[path] then
-		return nil, "Runtime path blocked: " .. tostring(path)
+		return nil, "runtime path blocked: " .. tostring(path)
 	end
 
 	local requestFn = clientRequest()

@@ -1,0 +1,5 @@
+-- reset gui button.
+
+return{new=function(app,...)
+	return app.ResetGuiLogicModule.new(app,...)
+end}

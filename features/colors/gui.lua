@@ -1,5 +1,5 @@
 -- color and highlight customization controls.
 
 return{new=function(app,...)
-	return app.StrokeColourLogicModule.new(app,...)
+	return app.ColorsLogicModule.new(app,...)
 end}

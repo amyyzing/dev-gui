@@ -1,6 +1,6 @@
 -- simplifies map materials and restores them when turned off.
 
-local antiMaterial={}
+local materials={}
 
 local function ensureWorldSettings(app)
 	local ws=app.mapSettings or app.WorldSettings or {}
@@ -35,7 +35,7 @@ local function applySmoothPlasticToPart(worldSettings,part)
 	part.Material=Enum.Material.SmoothPlastic
 end
 
-function antiMaterial.new(app,page)
+function materials.new(app,page)
 	local colors=app.colors
 	local safeDisconnect=app.safeDisconnect
 	local makeSection=app.makeSection
@@ -121,4 +121,4 @@ function antiMaterial.new(app,page)
 	return api
 end
 
-return antiMaterial
+return materials

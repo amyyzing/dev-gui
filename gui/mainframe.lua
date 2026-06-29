@@ -1147,7 +1147,7 @@ function mainFrame.new(app)
 		updateResponsiveLayout()
 	end
 
-	function api.resetPosition(animate)
+	function api.resetGui(animate)
 		local rootHeight=(root and root.AbsoluteSize and root.AbsoluteSize.Y) or windowState.H or 540
 		local defaultPosition=UDim2.new(0.5,0,0.5,-math.floor(rootHeight/2))
 		if animate==false then

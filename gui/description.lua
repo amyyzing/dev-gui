@@ -54,7 +54,7 @@ description.Categories={
 			["Secondary Colours"]={Title="SECONDARY COLOURS",description=blank},
 			["Pulse Accent"]={Title="STROKE PATTERN",description=blank},
 			["Border Shape"]={Title="BORDER",description=blank},
-			["Stroke Colour"]={Title="STROKE",description=blank},
+			["Colors"]={Title="COLORS",description=blank},
 		},
 
 		Keybinds={
