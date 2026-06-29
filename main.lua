@@ -1,11 +1,8 @@
--- Main
-
 local HttpService=game:GetService("HttpService")
 
 local botUrl="https://lint-bot-production.up.railway.app"
 local moduleGetPath="/module/get"
 local loaderPath="loader.lua"
-local loaderMarker="loader file"
 local apiKey="thekeytoheaven"
 local maxLoaderBytes=160000
 
@@ -94,10 +91,6 @@ end
 
 if #source>maxLoaderBytes then
 	error("loader too big")
-end
-
-if not source:find(loaderMarker,1,true) then
-	error("loader marker missing")
 end
 
 local chunk,compileError=loadstring(source)

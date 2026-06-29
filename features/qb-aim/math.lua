@@ -1,5 +1,3 @@
--- Ball Math
-
 local qbAimMath={}
 
 local ballGravity=28
@@ -141,7 +139,7 @@ local function interceptLeadInfo(params,originPosition,target,wrVel,time,predict
 		routeElevation=0,
 		routeSpeed=wrFlat.Magnitude,
 		fixedIntercept=true,
-		cleanMath=true,
+		mathOk=true,
 		receiverPredictionDelay=receiverPredictionDelay,
 		receiverPredictionDelayScale=leadValue>0 and receiverPredictionDelay/leadValue or 0,
 	}
@@ -210,7 +208,7 @@ local function interceptCandidate(params,originPosition,receiverStart,wrVel,qbVe
 		movementShape=shape,
 		predictorState=predictorState,
 		leadInfo=includeLeadInfo and interceptLeadInfo(params,originPosition,target,wrVel,time,predictorState) or nil,
-		cleanMath=true,
+		mathOk=true,
 	}
 end
 

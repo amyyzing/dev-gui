@@ -1,5 +1,3 @@
--- Reset Gui
-
 local resetGui={}
 
 function resetGui.new(app,page)

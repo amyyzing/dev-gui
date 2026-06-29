@@ -1,5 +1,3 @@
--- Save Data
-
 local dataSave={}
 
 local httpService=game:GetService("HttpService")

@@ -1,5 +1,3 @@
--- Boot 4
-
 refreshPage2UI=function() end
 expandedOwnedPresets={}
 keybindPageApis={}

@@ -1,5 +1,3 @@
--- Cleanup
-
 local scopeApi = {}
 scopeApi.__index = scopeApi
 

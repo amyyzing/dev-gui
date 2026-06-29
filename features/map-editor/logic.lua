@@ -1,5 +1,3 @@
--- Map Editor
-
 local mapEditor={}
 
 function mapEditor.new(app,parent)

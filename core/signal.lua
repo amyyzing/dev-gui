@@ -1,5 +1,3 @@
--- Signal
-
 local signalApi = {}
 signalApi.__index = signalApi
 

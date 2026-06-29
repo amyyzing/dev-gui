@@ -1,5 +1,3 @@
--- Gui State
-
 local fusion={}
 
 local function makeKey(kind,name)

@@ -1,5 +1,3 @@
--- Players
-
 local playerCacheApi = {}
 playerCacheApi.__index = playerCacheApi
 

@@ -1,7 +1,3 @@
--- Standalone
-
--- Practice hitbox toggle
-
 local players=game:GetService("Players")
 local inputService=game:GetService("UserInputService")
 local runService=game:GetService("RunService")

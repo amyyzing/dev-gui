@@ -1,5 +1,3 @@
--- Ads
-
 local ads={}
 
 local function firstChild(parent)

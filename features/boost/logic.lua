@@ -1,5 +1,3 @@
--- Auto Boost
-
 local boost={}
 
 local players=game:GetService("Players")

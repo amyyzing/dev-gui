@@ -1,5 +1,3 @@
--- Discord
-
 local discord={}
 
 function discord.new(app,page)

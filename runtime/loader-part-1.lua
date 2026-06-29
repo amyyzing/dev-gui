@@ -1,5 +1,3 @@
--- Boot 1
-
 Players=game:GetService("Players")
 inputService=game:GetService("UserInputService")
 TweenService=game:GetService("TweenService")
@@ -718,7 +716,6 @@ for _,path in ipairs(modulePathsFromNames(optionalModuleNames)) do
 	optionalModuleFileSet[path]=true
 end
 maxModuleBytes=300000
-moduleMarkers={[manualReloadPath]="loader file"}
 
 moduleCache={}
 moduleSources={}
@@ -749,11 +746,6 @@ function verifyRemoteModuleSource(modulePath,source)
 
 	if #source>maxModuleBytes then
 		return false,"module too big: "..tostring(modulePath)
-	end
-
-	local marker=(type(runtimeMarkersFromLoader)=="table" and runtimeMarkersFromLoader[modulePath]) or moduleMarkers[modulePath]
-	if marker and not source:find(marker,1,true) then
-		return false,"module marker failed: "..tostring(modulePath)
 	end
 
 	return true,nil

@@ -1,5 +1,3 @@
--- Gui Objects
-
 local guiLogic={}
 
 function guiLogic.new(app)

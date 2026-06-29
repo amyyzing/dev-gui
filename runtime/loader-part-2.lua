@@ -1,5 +1,3 @@
--- Boot 2
-
 guiLogic=GuiLogicModule.new({
 	make=make,
 	fusion=FusionModule,

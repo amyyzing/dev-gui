@@ -1,5 +1,3 @@
--- Color Names
-
 local designTokens = {}
 
 designTokens.Color = {

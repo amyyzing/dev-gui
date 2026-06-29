@@ -1,5 +1,3 @@
--- Player Data
-
 local playerData={}
 
 local function clearArray(t)

@@ -1,5 +1,3 @@
--- Materials
-
 local materials={}
 
 local function ensureWorldSettings(app)

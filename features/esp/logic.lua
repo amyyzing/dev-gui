@@ -1,5 +1,3 @@
--- ESP
-
 local esp={}
 
 local players=game:GetService("Players")

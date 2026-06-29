@@ -1,5 +1,3 @@
--- Map Cleaner
-
 local mapCleaner={}
 
 local function firstChild(parent)

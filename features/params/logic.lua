@@ -1,5 +1,3 @@
--- Params
-
 local gameParams={}
 
 local players=game:GetService("Players")

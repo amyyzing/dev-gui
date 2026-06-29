@@ -1,5 +1,3 @@
--- Preset Editor
-
 local presetEditor={}
 
 function presetEditor.new(app,editorSection,keybinds,hitboxPresets)

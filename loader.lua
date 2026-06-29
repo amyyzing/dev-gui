@@ -1,5 +1,3 @@
--- Loader
-
 local HttpService = game:GetService( "HttpService" )
 
 local botUrl = "https://lint-bot-production.up.railway.app"
@@ -13,14 +11,6 @@ local runtimeFiles = {
 	"runtime/loader-part-3.lua",
 	"runtime/loader-part-4.lua",
 	"runtime/loader-part-5.lua" ,
-}
-
-local runtimeMarkers={
-	[runtimeFiles[1]] = "boot part 1",
-	[runtimeFiles[2]]="boot part 2",
-	[runtimeFiles[3]] = "boot part 3",
-	[runtimeFiles[4]]="boot part 4",
-	[runtimeFiles[5]] = "boot part 5",
 }
 
 local allowedRuntimeFiles={}
@@ -112,11 +102,6 @@ local function validateSource(path, source)
 		return false,"runtime too big"
 	end
 
-	local marker = runtimeMarkers[path]
-	if marker and not source:find(marker, 1, true) then
-		return false, "runtime marker failed"
-	end
-
 	return true,nil
 end
 
@@ -134,7 +119,6 @@ end
 local runtimeEnv = setmetatable({
 	runtimeFilesFromLoader = runtimeFiles,
 	runtimeSourcesFromLoader=runtimeSources,
-	runtimeMarkersFromLoader = runtimeMarkers,
 	bootApi={
 		Url=botUrl,
 		Key = apiKey,

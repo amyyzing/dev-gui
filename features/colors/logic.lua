@@ -1,5 +1,3 @@
--- Colors
-
 local colors={}
 
 local tweenService=game:GetService("TweenService")

@@ -1,5 +1,3 @@
--- State
-
 local env = (getfenv and getfenv()) or _G
 local signalApi = rawget(env, "CoreSignal") or rawget(env, "CoreSignalModule")
 

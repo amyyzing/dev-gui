@@ -1,5 +1,3 @@
--- Dark
-
 local env = (getfenv and getfenv()) or _G
 local designTokens = rawget(env, "DesignTokens") or rawget(env, "DesignTokensModule")
 

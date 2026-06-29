@@ -1,5 +1,3 @@
--- Hitbox
-
 local hitbox={}
 
 local players=game:GetService("Players")

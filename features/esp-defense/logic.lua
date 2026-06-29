@@ -1,5 +1,3 @@
--- Defense ESP
-
 local espDefense={}
 
 local players=game:GetService("Players")

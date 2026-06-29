@@ -1,5 +1,3 @@
--- Boot 5
-
 function shutdownTool()
 	if not toolAlive then return end
 

@@ -1,5 +1,3 @@
--- Announcements
-
 local announcement={}
 
 local function safeDisconnect(connection)

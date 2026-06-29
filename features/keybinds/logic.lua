@@ -1,5 +1,3 @@
--- Keybinds
-
 local keybinds={}
 
 local inputService=game:GetService("UserInputService")

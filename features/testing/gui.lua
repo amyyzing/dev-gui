@@ -1,5 +1,3 @@
--- Testing Gui
-
 local testingGui={}
 
 function testingGui.build(app,parent,state,api)

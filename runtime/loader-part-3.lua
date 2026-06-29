@@ -1,5 +1,3 @@
--- Boot 3
-
 function tintSlider(slider, color)
 	if not slider then return end
 	if slider.fill then

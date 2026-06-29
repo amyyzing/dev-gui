@@ -1,5 +1,3 @@
--- Params Gui
-
 local paramsGui={}
 
 local tweenService=game:GetService("TweenService")

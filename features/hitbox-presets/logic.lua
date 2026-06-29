@@ -1,5 +1,3 @@
--- Hitbox Presets
-
 local hitboxPresets={}
 
 local function trim(s)

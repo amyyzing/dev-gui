@@ -1,5 +1,3 @@
--- QB Aim
-
 local qbAim={}
 
 local players=game:GetService("Players")
@@ -14,11 +12,11 @@ local qbAimMath=rawget(getfenv(),"QBAimMathModule")
 local ballGravity=28
 local gravityVector=Vector3.new(0,-ballGravity,0)
 local modelBallSpeed=95
-local remotePower=100 -- send to remote; server converts incoming UpdateFootball Power to 95
+local remotePower=100 -- remote power
 local gameplayBallPower=modelBallSpeed
 local squadsBallPower=modelBallSpeed
 local playerGravity=196.2
-local defaultCatchHeight=14.00 -- clean default catch peak; original jump formula is ~=13.85
+local defaultCatchHeight=14.00 -- jump peak
 local catchHeight=defaultCatchHeight
 local catchSolveYBias=0.00
 local maxRunSpeed=21

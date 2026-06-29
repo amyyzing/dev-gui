@@ -1,5 +1,3 @@
--- Testing
-
 local testing={}
 
 local players=game:GetService("Players")

@@ -1,5 +1,3 @@
--- Main Window
-
 local mainFrame={}
 
 function mainFrame.new(app)

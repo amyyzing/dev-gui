@@ -1,5 +1,3 @@
--- Ball
-
 local ballTrackerApi = {}
 ballTrackerApi.__index = ballTrackerApi
 
