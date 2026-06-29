@@ -2034,7 +2034,12 @@ function strokeColour.new(app,page)
 	end
 
 	local paramsDial=app.Page1GameParamsModule
-	local assets=paramsDial and type(paramsDial.GetDialSliceAssets)=="function" and paramsDial.GetDialSliceAssets() or nil
+	local assets=nil
+	if paramsDial and type(paramsDial.GetWheelImages)=="function" then
+		assets=paramsDial.GetWheelImages()
+	elseif paramsDial and type(paramsDial.GetDialSliceAssets)=="function" then
+		assets=paramsDial.GetDialSliceAssets()
+	end
 
 	for _,slice in ipairs(highlightDialSlices) do
 		local pageAssets=assets and assets[slice.assetKey]
