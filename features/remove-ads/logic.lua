@@ -89,7 +89,7 @@ function RemoveAds.new(ctx,page)
 	local function removeCurrentAds()
 		local ads=getAdsFolder(false)
 		if not ads then
-			setStatus(isGameplay() and "Ads folder not found." or "Gameplay only.",THEME.MUTED)
+			setStatus(isGameplay() and "no ads folder" or "game only",THEME.MUTED)
 			return
 		end
 
@@ -97,7 +97,7 @@ function RemoveAds.new(ctx,page)
 			removeInstance(child,ads)
 		end
 
-		setStatus("Removed "..tostring(#removed).." ad model(s).",THEME.GREEN)
+		setStatus("removed "..tostring(#removed),THEME.GREEN)
 	end
 
 	local function restoreAds()
@@ -141,7 +141,7 @@ function RemoveAds.new(ctx,page)
 					if enabled and child:IsA("Model") then
 						task.defer(function()
 							removeInstance(child,ads)
-							setStatus("Removed "..tostring(#removed).." ad model(s).",THEME.GREEN)
+							setStatus("removed "..tostring(#removed),THEME.GREEN)
 						end)
 					end
 				end)
@@ -161,7 +161,7 @@ function RemoveAds.new(ctx,page)
 					local parent=inst.Parent
 					task.defer(function()
 						removeInstance(inst,parent)
-						setStatus("Removed "..tostring(#removed).." ad model(s).",THEME.GREEN)
+						setStatus("removed "..tostring(#removed),THEME.GREEN)
 					end)
 				end
 			end)
@@ -178,7 +178,7 @@ function RemoveAds.new(ctx,page)
 		else
 			disconnectWatchers()
 			restoreAds()
-			setStatus(isGameplay() and "Ads restored." or "Gameplay only.",THEME.MUTED)
+			setStatus(isGameplay() and "ads back" or "game only",THEME.MUTED)
 		end
 
 		if fire~=false and ctx.onChanged then
@@ -198,7 +198,7 @@ function RemoveAds.new(ctx,page)
 			watchAdsFolder()
 			removeCurrentAds()
 		else
-			setStatus(isGameplay() and "" or "Gameplay only.",THEME.MUTED)
+			setStatus(isGameplay() and "" or "game only",THEME.MUTED)
 		end
 	end
 
@@ -210,7 +210,7 @@ function RemoveAds.new(ctx,page)
 		toggle=nil
 	end
 
-	local section,sectionControls=makeSection(page,3,"Remove Ads","Gameplay only",{
+	local section,sectionControls=makeSection(page,3,"Remove Ads","",{
 		compact=true,
 		headerToggle={
 			startState=enabled,

@@ -151,13 +151,13 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 	local saveRow=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},editorSection)
 	local saveBtn=keybinds.MakeBindButton(saveRow,0,0,150)
 	placeWrappedButton(saveBtn,UDim2.new(1,-150,0,0))
-	saveBtn.Text="SAVE PRESET"
+	saveBtn.Text="save"
 
 	connect(saveBtn.Activated,function()
 		if hitboxPresets and hitboxPresets.ShowSaveConfirm then
 			hitboxPresets.ShowSaveConfirm(api.Collect)
 		elseif hitboxPresets and hitboxPresets.AddPreset then
-			hitboxPresets.AddPreset("Custom Preset",api.Collect)
+			hitboxPresets.AddPreset("custom",api.Collect)
 		else
 			warn("preset editor missing save helper")
 		end
@@ -166,7 +166,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 	local function buildPresetRow(i)
 		local row=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,62),ZIndex=5},editorSection)
 
-		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text="Preset "..i.." (Hitbox)",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
+		New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text="preset "..i,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
 
 		local keyBtn=keybinds.MakeBindButton(row,0,18,78)
 
@@ -181,7 +181,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 
 		local resetBtn=keybinds.MakeBindButton(row,0,18,70)
 		placeWrappedButton(resetBtn,UDim2.new(1,-70,0,18))
-		resetBtn.Text="RESET"
+		resetBtn.Text="reset"
 
 		local function applyPresetSize()
 			local p=PRESETS[i]

@@ -152,14 +152,14 @@ function refreshSettingsPage()
 end
 
 function buildUpdateSection()
-	local section=makeSection(actualSettingsPage,1,"Update","Reload latest GUI build")
+	local section=makeSection(actualSettingsPage,1,"Update","")
 	local normalBg=settingsButtonBaseColor(false)
 	local button=New("TextButton",{
 		BackgroundColor3=normalBg,
 		BorderSizePixel=0,
 		Size=UDim2.new(1,-20,0,30),
 		Position=UDim2.fromOffset(10,0),
-		Text="UPDATE GUI",
+		Text="update gui",
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
 		TextColor3=THEME.TEXT,
@@ -188,9 +188,9 @@ function buildUpdateSection()
 	trackSettingsConnection(button.Activated:Connect(function()
 		if busy then return end
 		busy=true
-		button.Text="UPDATING..."
+		button.Text="updating"
 		if MainFrame and MainFrame.ShowToast then
-			MainFrame.ShowToast("Updating GUI...", "info", 1.2)
+			MainFrame.ShowToast("updating gui", "info", 1.2)
 		end
 
 		task.spawn(function()
@@ -204,12 +204,12 @@ function buildUpdateSection()
 				MainFrame.ShowToast("update failed. run /update then try again.", "error", 3)
 			end
 			if button and button.Parent then
-				button.Text="UPDATE FAILED"
+				button.Text="update failed"
 			end
 
 			task.wait(1.2)
 			if button and button.Parent then
-				button.Text="UPDATE GUI"
+				button.Text="update gui"
 			end
 			busy=false
 		end)
@@ -345,7 +345,7 @@ PAGE2_BINDING_SPECS={
 PAGE2_SECTION_SPECS={
 	owned={order=1,title="Hitbox Presets",subtitle="Your saved presets"},
 	editor={order=2,title="Preset Editor",subtitle="edit hotkeys and hitbox sizes and save (maybe?)"},
-	bind={order=3,title="Keybind Settings",subtitle="keyboard, controller, and mouse buttons are supported"},
+	bind={order=3,title="Keybind Settings",subtitle=""},
 }
 
 PAGE2_MODULE_SPECS={

@@ -718,8 +718,7 @@ function DataSave.new(ctx)
 				targetHighlight=getValue(ctx,"qbAimTargetHighlight",true),
 				leadDelay=getValue(ctx,"qbAimLeadDelay",0.38),
 				peakHeight=getValue(ctx,"qbAimPeakHeight",14.00),
-				serverXZLead=getValue(ctx,"qbAimQBDrift",0),
-				serverYLead=getValue(ctx,"qbAimQBYDrift",0),
+				xyzDrift=getValue(ctx,"qbAimQBDrift",0),
 			},
 
 			testing={
@@ -851,13 +850,12 @@ function DataSave.new(ctx)
 		applyBoolean(ctx,"setQBAimTargetHighlight","qbAimTargetHighlight",qbAim.targetHighlight)
 		applyClamped(ctx,"setQBAimLeadDelay","qbAimLeadDelay",qbAim.leadDelay,0,1.5,0.38)
 		applyClamped(ctx,"setQBAimPeakHeight","qbAimPeakHeight",qbAim.peakHeight,8,20,14.00)
-		local legacyDrift=qbAim.qbDrift or qbAim.xyzDrift
-		local savedXZLead=qbAim.serverXZLead
-		if savedXZLead==nil then savedXZLead=legacyDrift end
-		local savedYLead=qbAim.serverYLead
-		if savedYLead==nil then savedYLead=savedXZLead end
-		applyClamped(ctx,"setQBAimQBDrift","qbAimQBDrift",savedXZLead,-0.2,0.2,0)
-		applyClamped(ctx,"setQBAimQBYDrift","qbAimQBYDrift",savedYLead,-0.2,0.2,0)
+		local savedDrift=qbAim.xyzDrift
+		if savedDrift==nil then savedDrift=qbAim.qbDrift end
+		if savedDrift==nil then savedDrift=qbAim.serverXZLead end
+		if savedDrift==nil then savedDrift=qbAim.serverYLead end
+		applyClamped(ctx,"setQBAimXYZDrift","qbAimQBDrift",savedDrift,-0.2,0.2,0)
+		ctx.qbAimQBYDrift=ctx.qbAimQBDrift
 
 		local testing=settings.testing or {}
 		applyBoolean(ctx,"setTestingState","testingEnabled",testing.enabled)
@@ -1110,7 +1108,7 @@ function DataSave.new(ctx)
 	function api.CreateOwnedPreset(name,presetEditor)
 		local cleanName=trim(name)
 		if cleanName=="" then
-			return false,"Name cannot be empty."
+			return false,"name missing"
 		end
 
 		local editorForApi=encodePresetEditor(presetEditor or collectPresetEditor(ctx))
@@ -1141,7 +1139,7 @@ function DataSave.new(ctx)
 		end
 
 		if not preset then
-			return false,"Save returned invalid preset data."
+			return false,"preset save broke"
 		end
 
 		if ctx.OWNED_PRESETS then
@@ -1217,7 +1215,7 @@ function DataSave.new(ctx)
 	function api.EquipOwnedPreset(preset)
 		local normalized=normalizePreset(preset)
 		if not normalized then
-			return false,"Invalid preset."
+			return false,"bad preset"
 		end
 
 		api.ApplyPresetEditor(normalized.Data.PresetEditor,true)

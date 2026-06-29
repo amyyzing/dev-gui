@@ -654,7 +654,7 @@ function Testing.new(ctx,parent,guiBuilder)
 			fromPayload=pos~=nil
 		end
 		if not pos then
-			setStatus("C1 not found: "..source,THEME.RED)
+			setStatus("no c1: "..source,THEME.RED)
 			return
 		end
 
@@ -699,7 +699,7 @@ function Testing.new(ctx,parent,guiBuilder)
 			if not isLocalView(view) then
 				lastThrower=instanceName(view)
 				lastThrowAt=os.clock()
-				setStatus("Throw: "..lastThrower,THEME.MUTED)
+				setStatus("throw: "..lastThrower,THEME.MUTED)
 				captureSoon("throw")
 			end
 			return
@@ -708,7 +708,7 @@ function Testing.new(ctx,parent,guiBuilder)
 		if topic=="Mechanics" and (args[2]=="UpdateBall" or args[2]=="UpdateFootball") then
 			local payload=updateFootballPayload(args,3)
 			local powerText=payload and (" "..fmtPower(payload.Power)) or ""
-			setStatus("UpdateBall"..powerText,THEME.MUTED)
+			setStatus("ball"..powerText,THEME.MUTED)
 			captureSoon("update ball",payload)
 			return
 		end
@@ -716,7 +716,7 @@ function Testing.new(ctx,parent,guiBuilder)
 		if topic=="UpdateFootball" then
 			local payload=updateFootballPayload(args,2)
 			lastThrowAt=os.clock()
-			setStatus("UpdateFootball"..(payload and (" "..fmtPower(payload.Power)) or ""),THEME.MUTED)
+			setStatus("football"..(payload and (" "..fmtPower(payload.Power)) or ""),THEME.MUTED)
 			captureSoon("update football",payload)
 		end
 	end
@@ -814,7 +814,7 @@ function Testing.new(ctx,parent,guiBuilder)
 			end
 		end
 
-		setStatus(#remoteConnections>0 and ("Listening: "..#remoteConnections.." event(s)") or "No ReEvent found",#remoteConnections>0 and THEME.MUTED or THEME.RED)
+		setStatus(#remoteConnections>0 and (#remoteConnections.." events") or "no reevent",#remoteConnections>0 and THEME.MUTED or THEME.RED)
 	end
 
 	function api.SetTestingState(value,fire)
@@ -828,7 +828,7 @@ function Testing.new(ctx,parent,guiBuilder)
 			destroyMarker()
 			lastThrower=nil
 			lastThrowAt=0
-			setStatus("Off",THEME.MUTED)
+			setStatus("off",THEME.MUTED)
 		end
 
 		syncControls()
@@ -876,7 +876,7 @@ function Testing.new(ctx,parent,guiBuilder)
 			syncQBSafety()
 		else
 			disconnectQBSafety()
-			setStatus("Off",THEME.MUTED)
+			setStatus("off",THEME.MUTED)
 		end
 	end
 

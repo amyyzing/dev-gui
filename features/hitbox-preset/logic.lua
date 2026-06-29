@@ -58,7 +58,7 @@ function HitboxPreset.new(ctx,ownedSection)
 		BackgroundColor3=THEME.BG,
 		BorderSizePixel=0,
 		ClearTextOnFocus=false,
-		PlaceholderText="IMPORT PRESET CODE",
+		PlaceholderText="preset code",
 		Text="",
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
@@ -74,7 +74,7 @@ function HitboxPreset.new(ctx,ownedSection)
 	local importButton=New("TextButton",{
 		BackgroundColor3=THEME.BUTTON or THEME.BG,
 		BorderSizePixel=0,
-		Text="IMPORT",
+		Text="import",
 		Font=Enum.Font.GothamMedium,
 		TextSize=11,
 		TextColor3=THEME.TEXT,
@@ -286,12 +286,12 @@ function HitboxPreset.new(ctx,ownedSection)
 	function api.AddPreset(name,collectFn)
 		local cleanName=trim(name)
 		if cleanName=="" then
-			return false,"Name cannot be empty."
+			return false,"name missing"
 		end
 
 		local ok,editor=pcall(collectFn)
 		if not ok then
-			return false,"Could not collect preset: "..tostring(editor)
+			return false,"preset broke: "..tostring(editor)
 		end
 
 		if ctx.createOwnedPreset then
@@ -329,7 +329,7 @@ function HitboxPreset.new(ctx,ownedSection)
 	function api.ImportPreset(code)
 		local cleanCode=trim(code)
 		if cleanCode=="" then
-			return false,"Enter a preset code."
+			return false,"paste a code"
 		end
 
 		if ctx.importOwnedPreset then
@@ -383,8 +383,8 @@ function HitboxPreset.new(ctx,ownedSection)
 		local box=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),Size=UDim2.fromOffset(380,166),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=100},modalOverlay)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=2,Transparency=0},box)
 
-		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="Import preset?",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
-		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,44),Size=UDim2.new(1,-32,0,42),Text="Add preset "..code.." to your saved preset list?",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,ZIndex=101},box)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="import?",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,44),Size=UDim2.new(1,-32,0,42),Text="add "..code.."?",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,ZIndex=101},box)
 
 		local no=modalButton(box,"NO",166)
 		local yes=modalButton(box,"YES",268)
@@ -423,9 +423,9 @@ function HitboxPreset.new(ctx,ownedSection)
 		local box=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),Size=UDim2.fromOffset(360,188),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=100},modalOverlay)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=2,Transparency=0},box)
 
-		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="Name this preset",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="name it",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
 
-		local nameBox=New("TextBox",{Size=UDim2.fromOffset(328,30),Position=UDim2.fromOffset(16,52),BackgroundColor3=THEME.BG,BorderSizePixel=0,ClearTextOnFocus=false,Text="",PlaceholderText="Preset name",TextColor3=THEME.TEXT,PlaceholderColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,Font=Enum.Font.Gotham,TextSize=13,ZIndex=101},box)
+		local nameBox=New("TextBox",{Size=UDim2.fromOffset(328,30),Position=UDim2.fromOffset(16,52),BackgroundColor3=THEME.BG,BorderSizePixel=0,ClearTextOnFocus=false,Text="",PlaceholderText="name",TextColor3=THEME.TEXT,PlaceholderColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,Font=Enum.Font.Gotham,TextSize=13,ZIndex=101},box)
 		wrapTextBox(nameBox,THEME.BG,2)
 
 		local warning=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,88),Size=UDim2.new(1,-32,0,18),Text="",Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
@@ -459,9 +459,9 @@ function HitboxPreset.new(ctx,ownedSection)
 		local box=New("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),Size=UDim2.fromOffset(360,166),BackgroundColor3=THEME.BG,BorderSizePixel=0,ZIndex=100},modalOverlay)
 		New("UIStroke",{Color=THEME.STROKE,Thickness=2,Transparency=0},box)
 
-		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="Save current preset?",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="save?",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
 
-		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,44),Size=UDim2.new(1,-32,0,42),Text="This saves the preset to your owned preset list.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,ZIndex=101},box)
+		New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,44),Size=UDim2.new(1,-32,0,42),Text="saves this preset",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.MUTED,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,ZIndex=101},box)
 
 		local no=modalButton(box,"NO",146)
 		local yes=modalButton(box,"YES",248)

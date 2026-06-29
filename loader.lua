@@ -111,7 +111,7 @@ local function validateSource(path, source)
 	end
 
 	if #source > MAX_SOURCE_SIZE then
-		return false,"Runtime source too large."
+		return false,"runtime too big"
 	end
 
 	local marker = RUNTIME_MARKERS[path]
@@ -172,5 +172,5 @@ for _,path in ipairs(RUNTIME_PATHS) do
 end
 
 if debugEnv.HB_LOADER_DEBUG == true then
-	warn("loader done: "..tostring(#RUNTIME_PATHS).." runtime chunks loaded.")
+	warn("loader done: "..tostring(#RUNTIME_PATHS).." chunks")
 end

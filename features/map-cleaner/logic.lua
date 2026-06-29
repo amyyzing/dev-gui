@@ -89,7 +89,7 @@ function MapCleaner.new(ctx,page)
 
 	local function removeCurrent()
 		if not isGameplay() then
-			setStatus("Gameplay only.",THEME.MUTED)
+			setStatus("game only",THEME.MUTED)
 			return
 		end
 
@@ -104,7 +104,7 @@ function MapCleaner.new(ctx,page)
 			end
 		end
 
-		setStatus("Removed "..tostring(#removed).." map object(s).",changed>0 and THEME.GREEN or THEME.MUTED)
+		setStatus("removed "..tostring(#removed),changed>0 and THEME.GREEN or THEME.MUTED)
 	end
 
 	local function restoreRemoved()
@@ -167,7 +167,7 @@ function MapCleaner.new(ctx,page)
 		else
 			disconnectWatchers()
 			restoreRemoved()
-			setStatus(isGameplay() and "Map objects restored." or "Gameplay only.",THEME.MUTED)
+			setStatus(isGameplay() and "map back" or "game only",THEME.MUTED)
 		end
 
 		if fire~=false and ctx.onChanged then
@@ -189,7 +189,7 @@ function MapCleaner.new(ctx,page)
 			watchWorkspace()
 			removeCurrent()
 		else
-			setStatus(isGameplay() and "" or "Gameplay only.",THEME.MUTED)
+			setStatus(isGameplay() and "" or "game only",THEME.MUTED)
 		end
 	end
 
@@ -201,7 +201,7 @@ function MapCleaner.new(ctx,page)
 		toggle=nil
 	end
 
-	local section,sectionControls=makeSection(page,2,"Map Cleaner","Gameplay only",{
+	local section,sectionControls=makeSection(page,2,"Map Cleaner","",{
 		headerToggle={
 			startState=enabled,
 			onChange=function(state)

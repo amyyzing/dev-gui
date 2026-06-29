@@ -248,7 +248,7 @@ function createOwnedPresetFromDataSave(name,editor)
 	end
 
 	local cleanName=tostring(name or ""):gsub("^%s*(.-)%s*$","%1")
-	if cleanName=="" then return false,"Name cannot be empty." end
+	if cleanName=="" then return false,"name missing" end
 
 	local preset={Code=makeLocalPresetCode(cleanName),Name=cleanName,Data={PresetEditor=editor or {}}}
 	table.insert(OWNED_PRESETS,preset)

@@ -40,7 +40,7 @@ function ResetPosition.new(ctx,page)
 		end
 
 		if ok then
-			setStatus("GUI position reset.",THEME.GREEN)
+			setStatus("position reset",THEME.GREEN)
 			if ctx.MainFrame and type(ctx.MainFrame.ShowToast)=="function" then
 				ctx.MainFrame.ShowToast("GUI position reset.", "success", 1.6)
 			end
@@ -48,12 +48,12 @@ function ResetPosition.new(ctx,page)
 				ctx.scheduleSave()
 			end
 		else
-			setStatus("Could not reset GUI position.",THEME.RED)
+			setStatus("reset failed",THEME.RED)
 		end
 	end
 
 	function api.Refresh()
-		setStatus("Moves the panel back to its default position.",THEME.MUTED)
+		setStatus("",THEME.MUTED)
 	end
 
 	function api.Destroy()
@@ -84,7 +84,7 @@ function ResetPosition.new(ctx,page)
 		BorderSizePixel=0,
 		Size=UDim2.new(1,-20,0,30),
 		Position=UDim2.fromOffset(10,0),
-		Text="RESET GUI POSITION",
+		Text="reset position",
 		Font=Enum.Font.GothamMedium,
 		TextSize=12,
 		TextColor3=THEME.TEXT,
@@ -113,7 +113,7 @@ function ResetPosition.new(ctx,page)
 	statusLabel=New("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,18),
-		Text="Moves the panel back to its default position.",
+		Text="",
 		Font=Enum.Font.Gotham,
 		TextSize=11,
 		TextColor3=THEME.MUTED,

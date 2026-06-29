@@ -701,7 +701,7 @@ end
 
 function verifyRemoteModuleSource(modulePath,source)
 	if not isAllowedModulePath(modulePath) then
-		return false,"Module path is not allowed: "..tostring(modulePath)
+		return false,"module path blocked: "..tostring(modulePath)
 	end
 
 	if type(source)~="string" or source=="" then
@@ -709,7 +709,7 @@ function verifyRemoteModuleSource(modulePath,source)
 	end
 
 	if #source>MAX_REMOTE_MODULE_BYTES then
-		return false,"Module source too large: "..tostring(modulePath)
+		return false,"module too big: "..tostring(modulePath)
 	end
 
 	local marker=(type(APP_RUNTIME_MARKERS)=="table" and APP_RUNTIME_MARKERS[modulePath]) or REMOTE_MODULE_MARKERS[modulePath]
@@ -750,7 +750,7 @@ end
 
 function loadRemoteModule(modulePath)
 	if not isAllowedModulePath(modulePath) then
-		warn("Blocked remote module path:",modulePath)
+		warn("module path blocked:",modulePath)
 		return nil
 	end
 
@@ -780,7 +780,7 @@ end
 
 function loadRemoteModuleBatch(paths)
 	if type(paths)~="table" or #paths==0 then
-		return false,"No module paths requested."
+		return false,"no module paths"
 	end
 
 	setLoaderProgress("Fetching remote module batch...",0.2,LOADER_TOTAL,false)
@@ -1241,7 +1241,7 @@ function finishLoader()
 	if not loaderOverlay or not loaderOverlay.Parent then return end
 
 	loaderTitle.Text="ready"
-	loaderSubtitle.Text="All pages and modules are available"
+	loaderSubtitle.Text=""
 	setLoaderProgress("all loaded",LOADER_TOTAL,LOADER_TOTAL,false)
 
 	playLoaderKeyframes({
@@ -1947,7 +1947,7 @@ function refreshRemoteModulesNow()
 
 	local verified,verifyErr=verifyRemoteModuleSource(MANUAL_REFRESH_RELOAD_PATH,result.source)
 	if not verified then
-		warn("Manual update rejected:",verifyErr)
+		warn("update blocked:",verifyErr)
 		return false
 	end
 
@@ -1957,7 +1957,7 @@ function refreshRemoteModulesNow()
 		return false
 	end
 
-	warn("Reloading GUI from fresh loader source.")
+	warn("reloading gui")
 	cleanupForManualReload()
 	task.defer(function()
 		local ok,reloadErr=pcall(chunk)

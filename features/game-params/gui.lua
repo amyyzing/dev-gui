@@ -267,7 +267,7 @@ function GameParamsGui.new(ctx,parent)
 		if diveSlider then diveSlider.set(state.divePowerValue) end
 		for settingKey,toggle in pairs(settingToggles) do
 			if toggle and toggle.set then
-				toggle.set(state[settingKey]==true)
+				toggle.set(state[settingKey]==true,false)
 			end
 		end
 		if paintDial then paintDial(reason=="page" or reason=="page-toggle" or reason=="hover") end
@@ -734,6 +734,11 @@ function GameParamsGui.new(ctx,parent)
 	if runtime.SetOnStateChanged then
 		runtime.SetOnStateChanged(function(_,reason)
 			syncControls(reason)
+			task.defer(function()
+				if not destroyed then
+					syncControls(reason)
+				end
+			end)
 		end)
 	end
 

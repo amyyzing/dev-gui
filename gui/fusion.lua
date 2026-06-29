@@ -119,7 +119,7 @@ function Fusion.Value(initial)
 		for _,listener in ipairs(listeners) do
 			local ok,err=pcall(listener,nextValue,oldValue)
 			if not ok then
-				warn("Fusion listener failed:",err)
+				warn("fusion listener failed:",err)
 			end
 		end
 	end
@@ -165,7 +165,7 @@ function Fusion.Computed(fn)
 		if ok then
 			computed:set(result)
 		else
-			warn("Fusion computed failed:",result)
+			warn("fusion computed failed:",result)
 		end
 
 		for state in pairs(used) do

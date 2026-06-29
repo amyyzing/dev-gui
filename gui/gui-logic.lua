@@ -1354,6 +1354,9 @@ function GuiLogic.new(ctx)
 			local changed=nextState~=state
 
 			if not changed then
+				if animate==false then
+					applyVisuals(false)
+				end
 				return
 			end
 

@@ -43,30 +43,30 @@ function Discord.new(ctx,page)
 			linkButton.Text=inviteLink
 			linkButton.TextColor3=THEME.TEXT
 			if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
-			setStatus("Click the invite link to copy it.",THEME.MUTED)
+			setStatus("click to copy",THEME.MUTED)
 		else
 			linkButton.Text="no invite link set"
 			linkButton.TextColor3=THEME.MUTED
 			if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
-			setStatus("Use /invite-link create in Discord to set this.",THEME.MUTED)
+			setStatus("no invite yet",THEME.MUTED)
 		end
 	end
 
 	local function copyInvite()
 		if not inviteLink or inviteLink=="" then
-			setStatus("No Discord invite link has been set.",THEME.RED)
+			setStatus("no invite yet",THEME.RED)
 			return
 		end
 
 		local setter=getClipboardSetter()
 		if not setter then
-			setStatus("Clipboard is not available in this executor.",THEME.RED)
+			setStatus("clipboard not here",THEME.RED)
 			return
 		end
 
 		local ok,err=pcall(setter,inviteLink)
 		if ok then
-			setStatus("Copied Discord invite link.",THEME.GREEN)
+			setStatus("copied",THEME.GREEN)
 		else
 			setStatus("copy failed: "..tostring(err),THEME.RED)
 		end
@@ -85,7 +85,7 @@ function Discord.new(ctx,page)
 		if ok and result and result.ok then
 			inviteLink=result.inviteLink
 		else
-			setStatus("Could not fetch Discord invite link.",THEME.RED)
+			setStatus("invite failed",THEME.RED)
 		end
 
 		paint()

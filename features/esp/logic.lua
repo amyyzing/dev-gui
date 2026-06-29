@@ -295,7 +295,7 @@ function ESP.new(ctx,parent)
 		if not gameplay then
 			state.actionStatusOn=false
 			stopBoth()
-			setStatus("Gameplay only",THEME.MUTED)
+			setStatus("game only",THEME.MUTED)
 		elseif state.actionStatusOn then
 			local nextMode=mode or"defense"
 			local nextApi=nextMode=="defense" and defenseApi or offenseApi
@@ -370,7 +370,7 @@ function ESP.new(ctx,parent)
 	end
 
 	local sectionControls=nil
-	sectionBody,sectionControls=makeSection(parent,3,"ESP","Gameplay only",{
+	sectionBody,sectionControls=makeSection(parent,3,"ESP","",{
 		headerToggle={
 			startState=state.actionStatusOn,
 			onChange=function(v)

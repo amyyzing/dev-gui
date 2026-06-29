@@ -214,7 +214,7 @@ function PlayerData.new(ctx,page,deps)
 	function api.Wipe()
 		if busy then return end
 		busy=true
-		setStatus("Wiping player data...",THEME.MUTED)
+		setStatus("wiping...",THEME.MUTED)
 
 		if ctx.BOT_API and ctx.BOT_API.Post then
 			local ok,result=pcall(function()
@@ -238,7 +238,7 @@ function PlayerData.new(ctx,page,deps)
 
 		wipeLocal()
 		busy=false
-		setStatus("Player data wiped.",THEME.GREEN or THEME.TEXT)
+		setStatus("data wiped",THEME.GREEN or THEME.TEXT)
 	end
 
 	function api.ShowConfirm()
@@ -257,7 +257,7 @@ function PlayerData.new(ctx,page,deps)
 		disconnectConnections(connections)
 	end
 
-	local dataSection=makeSection(page,2,"Player Data","Saved settings",{
+	local dataSection=makeSection(page,2,"Player Data","",{
 		headerButton={
 			text="WIPE DATA",
 			width=92,

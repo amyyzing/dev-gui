@@ -745,7 +745,6 @@ function QBAim.new(ctx,parent)
 	local peakHeightSliderControl=nil
 	local peakHeightDragging=false
 	local qbDriftSliderControl=nil
-	local qbYDriftSliderControl=nil
 	local LEAD_DELAY_MIN=0.00
 	local LEAD_DELAY_MAX=1.50
 	local PEAK_HEIGHT_MIN=8.00
@@ -797,7 +796,7 @@ function QBAim.new(ctx,parent)
 	WR_MAX_Y=math.clamp(tonumber(state.qbAimPeakHeight) or WR_MAX_Y,PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX)
 	state.qbAimPeakHeight=WR_MAX_Y
 	state.qbAimQBDrift=math.clamp(tonumber(state.qbAimQBDrift) or QB_RELEASE_ORIGIN_DRIFT_TIME,QB_DRIFT_MIN,QB_DRIFT_MAX)
-	state.qbAimQBYDrift=math.clamp(tonumber(state.qbAimQBYDrift) or QB_RELEASE_VERTICAL_DRIFT_TIME,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
+	state.qbAimQBYDrift=math.clamp(state.qbAimQBDrift,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
 	local function addConnection(conn)
 		table.insert(connections,conn)
 		return conn
@@ -958,10 +957,6 @@ function QBAim.new(ctx,parent)
 		if qbDriftSliderControl then
 			qbDriftSliderControl.set(state.qbAimQBDrift)
 		end
-
-		if qbYDriftSliderControl then
-			qbYDriftSliderControl.set(state.qbAimQBYDrift)
-		end
 	end
 
 	local function setLeadDelay(value,showStatus)
@@ -975,7 +970,7 @@ function QBAim.new(ctx,parent)
 		state.qbAimLeadDelay=WR_LEAD_DELAY
 		updateLeadDelayVisuals()
 		if showStatus then
-			setStatus(string.format("LD set to %.2fs",WR_LEAD_DELAY))
+			setStatus(string.format("lead %.2fs",WR_LEAD_DELAY))
 			changed()
 		end
 		return true
@@ -987,7 +982,9 @@ function QBAim.new(ctx,parent)
 			return false
 		end
 
-		state.qbAimQBDrift=math.clamp(numberValue,QB_DRIFT_MIN,QB_DRIFT_MAX)
+		local drift=math.clamp(numberValue,QB_DRIFT_MIN,QB_DRIFT_MAX)
+		state.qbAimQBDrift=drift
+		state.qbAimQBYDrift=math.clamp(drift,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
 		updateDriftVisuals()
 		if showStatus then
 			changed()
@@ -996,17 +993,7 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function setQBYDrift(value,showStatus)
-		local numberValue=tonumber(value)
-		if not numberValue then
-			return false
-		end
-
-		state.qbAimQBYDrift=math.clamp(numberValue,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
-		updateDriftVisuals()
-		if showStatus then
-			changed()
-		end
-		return true
+		return setQBDrift(value,showStatus)
 	end
 
 	local function setPeakHeight(value,showStatus)
@@ -2300,7 +2287,7 @@ function QBAim.new(ctx,parent)
 		if not(enabled and isAvailable()) then return end
 
 		if throwBlocked() then
-			setStatus("Throw already in progress")
+			setStatus("already throwing")
 			return
 		end
 
@@ -2309,7 +2296,7 @@ function QBAim.new(ctx,parent)
 			selectedRouteLock=nil
 			clearPreviewVisuals()
 			setTargetText()
-			setStatus(state.qbAimTeamFilter~=false and "Target not teammate" or "No receiver locked")
+			setStatus(state.qbAimTeamFilter~=false and "not teammate" or "no wr")
 			return
 		end
 
@@ -2324,7 +2311,7 @@ function QBAim.new(ctx,parent)
 		local power=modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
 		local receiverRoot=rootOfPlayer(receiver)
 		if not receiverRoot then
-			setStatus("No receiver locked")
+			setStatus("no wr")
 			return
 		end
 
@@ -2347,14 +2334,14 @@ function QBAim.new(ctx,parent)
 		local plan,_,reason=buildReleasePlan(receiver,power,heldBall)
 		if not plan then
 			releaseThrowLock()
-			setStatus(reason or "No release throw solution")
+			setStatus(reason or "no throw")
 			return
 		end
 
 		if trajectoryCanBeDefended(plan,receiver) then
 			previewPlan(plan)
 			releaseThrowLock()
-			setStatus("Unsafe throw blocked")
+			setStatus("not safe")
 			return
 		end
 
@@ -2365,7 +2352,7 @@ function QBAim.new(ctx,parent)
 				return fireSquadsThrow(plan)
 			end
 
-			return false,"Park route unknown"
+			return false,"park unknown"
 		end)
 
 		if not fired then
@@ -2377,7 +2364,7 @@ function QBAim.new(ctx,parent)
 		if ok then
 			freezePreviewAtCurrentPlan(plan)
 			waitForHeldBallRelease()
-			setStatus(currentModeText().." release-time throw sent")
+			setStatus(currentModeText().." throw sent")
 		else
 			setStatus(err or "throw failed")
 		end
@@ -2415,9 +2402,9 @@ function QBAim.new(ctx,parent)
 			preview.ballMissingSince=nil
 			preview.p1,preview.p2,preview.p3=nil,nil,nil
 			setTargetText()
-			setStatus("Locked "..best.Name)
+			setStatus("locked "..best.Name)
 		else
-			setStatus(state.qbAimTeamFilter~=false and "No teammate under cursor" or "No receiver under cursor")
+			setStatus(state.qbAimTeamFilter~=false and "no teammate" or "no wr")
 		end
 	end
 
@@ -2437,7 +2424,7 @@ function QBAim.new(ctx,parent)
 		syncControls()
 
 		if enabled and not currentHeldBall() then
-			setStatus("Waiting for ball")
+			setStatus("need ball")
 		end
 	end
 
@@ -2452,7 +2439,7 @@ function QBAim.new(ctx,parent)
 			selectedRouteLock=nil
 			clearPreviewVisuals()
 			setTargetText()
-			setStatus("Target cleared")
+			setStatus("cleared")
 		end
 		syncControls()
 		if fire~=false then
@@ -2464,7 +2451,7 @@ function QBAim.new(ctx,parent)
 		state.qbAimShowArc=value and true or false
 		if not state.qbAimShowArc then
 			clearPreviewVisuals()
-			setStatus("Arc hidden")
+			setStatus("arc hidden")
 		end
 		syncControls()
 		if fire~=false then
@@ -2500,6 +2487,10 @@ function QBAim.new(ctx,parent)
 	end
 
 	function api.SetQBDrift(value,fire)
+		setQBDrift(value,fire~=false)
+	end
+
+	function api.SetQBXYZDrift(value,fire)
 		setQBDrift(value,fire~=false)
 	end
 
@@ -2580,11 +2571,8 @@ function QBAim.new(ctx,parent)
 		peakHeightSliderControl=buildSlider(sectionBody,"Peak Height",PEAK_HEIGHT_MIN,PEAK_HEIGHT_MAX,WR_MAX_Y,2,function(value)
 			api.SetPeakHeight(value,true)
 		end)
-		qbDriftSliderControl=buildSlider(sectionBody,"QB XZ Drift",QB_DRIFT_MIN,QB_DRIFT_MAX,state.qbAimQBDrift,2,function(value)
+		qbDriftSliderControl=buildSlider(sectionBody,"XYZ Drift",QB_DRIFT_MIN,QB_DRIFT_MAX,state.qbAimQBDrift,2,function(value)
 			api.SetQBDrift(value,true)
-		end)
-		qbYDriftSliderControl=buildSlider(sectionBody,"QB Y Drift",QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX,state.qbAimQBYDrift,2,function(value)
-			api.SetQBYDrift(value,true)
 		end)
 	else
 		leadDelayFrame=New("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
@@ -2752,7 +2740,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		if wantsThrow and throwBlocked() then
-			setStatus("Throw already in progress")
+			setStatus("already throwing")
 			return true
 		end
 
@@ -2765,7 +2753,7 @@ function QBAim.new(ctx,parent)
 			if trackedReceiver then
 				throwTo(trackedReceiver)
 			else
-				setStatus("No receiver locked")
+				setStatus("no wr")
 			end
 		end
 
