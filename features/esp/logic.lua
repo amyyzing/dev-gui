@@ -1,4 +1,4 @@
--- player highlights and ball-holder colors.
+-- ESP
 
 local esp={}
 

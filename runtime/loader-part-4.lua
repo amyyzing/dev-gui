@@ -1,5 +1,4 @@
--- boot part 4
--- boot step 4: feature modules and page wiring.
+-- Boot 4
 
 refreshPage2UI=function() end
 expandedOwnedPresets={}

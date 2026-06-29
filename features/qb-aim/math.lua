@@ -1,4 +1,4 @@
--- projectile math only. no gui state belongs in this file.
+-- Ball Math
 
 local qbAimMath={}
 

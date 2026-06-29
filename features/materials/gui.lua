@@ -1,4 +1,4 @@
--- anti material switch for the map editor page.
+-- Materials Gui
 
 return{new=function(app,...)
 	return app.MaterialsLogicModule.new(app,...)

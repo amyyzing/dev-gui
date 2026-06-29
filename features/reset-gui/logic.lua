@@ -1,4 +1,4 @@
--- moves the panel back to the screen center.
+-- Reset Gui
 
 local resetGui={}
 

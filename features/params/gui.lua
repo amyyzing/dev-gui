@@ -1,4 +1,4 @@
--- player param wheel and param sliders.
+-- Params Gui
 
 local paramsGui={}
 

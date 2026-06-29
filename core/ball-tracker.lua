@@ -1,4 +1,4 @@
--- tracks held balls, live balls, and current quarterback.
+-- Ball
 
 local ballTrackerApi = {}
 ballTrackerApi.__index = ballTrackerApi

@@ -1,4 +1,4 @@
--- simple event helper used by shared state.
+-- Signal
 
 local signalApi = {}
 signalApi.__index = signalApi

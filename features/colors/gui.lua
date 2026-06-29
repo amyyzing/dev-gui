@@ -1,4 +1,4 @@
--- color and highlight customization controls.
+-- Colors Gui
 
 return{new=function(app,...)
 	return app.ColorsLogicModule.new(app,...)

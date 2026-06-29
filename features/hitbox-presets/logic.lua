@@ -1,4 +1,4 @@
--- preset save, equip, delete, and import actions.
+-- Hitbox Presets
 
 local hitboxPresets={}
 

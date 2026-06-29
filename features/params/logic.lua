@@ -1,4 +1,4 @@
--- applies speed, gravity, jump, stamina, and dive values.
+-- Params
 
 local gameParams={}
 

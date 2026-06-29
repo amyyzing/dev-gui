@@ -1,4 +1,4 @@
--- esp switch and highlight settings.
+-- ESP Gui
 
 return{new=function(app,...)
 	return app.ESPLogicModule.new(app,...)

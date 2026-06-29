@@ -1,7 +1,6 @@
--- standalone scratch script. not part of the main panel loader path.
+-- Standalone
 
--- Standalone Practice / Quarterback Gauntlet hitbox toggle.
--- Toggle locally expands gauntlet TouchDetect hitboxes for easier overlap.
+-- Practice hitbox toggle
 
 local players=game:GetService("Players")
 local inputService=game:GetService("UserInputService")

@@ -1,4 +1,4 @@
--- hides billboard ads and puts them back when disabled.
+-- Ads
 
 local ads={}
 

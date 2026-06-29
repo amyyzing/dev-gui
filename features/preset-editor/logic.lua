@@ -1,4 +1,4 @@
--- edits preset sizes and preset hotkeys.
+-- Preset Editor
 
 local presetEditor={}
 

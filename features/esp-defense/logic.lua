@@ -1,4 +1,4 @@
--- marks defended receivers while the other team can throw.
+-- Defense ESP
 
 local espDefense={}
 

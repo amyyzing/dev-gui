@@ -1,4 +1,4 @@
--- map editor base section.
+-- Map Editor Gui
 
 return{new=function(app,...)
 	return app.MapEditorLogicModule.new(app,...)

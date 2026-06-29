@@ -1,4 +1,4 @@
--- loads, copies, and opens the community invite.
+-- Discord
 
 local discord={}
 

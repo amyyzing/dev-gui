@@ -1,5 +1,4 @@
--- boot part 1
--- boot step 1: services, theme defaults, loader screen, and module fetch.
+-- Boot 1
 
 Players=game:GetService("Players")
 inputService=game:GetService("UserInputService")

@@ -1,4 +1,4 @@
--- small reactive gui layer used by the panel.
+-- Gui State
 
 local fusion={}
 

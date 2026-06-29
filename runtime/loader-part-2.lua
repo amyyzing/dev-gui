@@ -1,5 +1,4 @@
--- boot part 2
--- boot step 2: saved settings, page one helpers, and restore setup.
+-- Boot 2
 
 guiLogic=GuiLogicModule.new({
 	make=make,

@@ -1,4 +1,4 @@
--- testing switches for wr and qb checks.
+-- Testing Gui
 
 local testingGui={}
 

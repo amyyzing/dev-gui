@@ -1,4 +1,4 @@
--- qb aim switches and tuning sliders.
+-- QB Aim Gui
 
 return{new=function(app,...)
 	return app.QBAimLogicModule.new(app,...)

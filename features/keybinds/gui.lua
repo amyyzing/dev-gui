@@ -1,4 +1,4 @@
--- keybind list controls.
+-- Keybinds Gui
 
 return{new=function(app,...)
 	return app.KeybindsLogicModule.new(app,...)

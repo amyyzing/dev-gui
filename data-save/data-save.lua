@@ -1,4 +1,4 @@
--- saves and restores player settings without dropping old fields.
+-- Save Data
 
 local dataSave={}
 

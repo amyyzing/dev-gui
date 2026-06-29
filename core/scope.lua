@@ -1,4 +1,4 @@
--- cleanup bag for connections, tweens, and instances.
+-- Cleanup
 
 local scopeApi = {}
 scopeApi.__index = scopeApi

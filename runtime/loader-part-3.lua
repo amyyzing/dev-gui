@@ -1,5 +1,4 @@
--- boot part 3
--- boot step 3: map editor page and shared runtime services.
+-- Boot 3
 
 function tintSlider(slider, color)
 	if not slider then return end

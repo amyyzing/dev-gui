@@ -1,4 +1,4 @@
--- shared names for gui colors and text roles.
+-- Color Names
 
 local designTokens = {}
 

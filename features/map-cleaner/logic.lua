@@ -1,4 +1,4 @@
--- hides unused map parts and restores them later.
+-- Map Cleaner
 
 local mapCleaner={}
 

@@ -1,4 +1,4 @@
--- cached player, character, root, and team lookup.
+-- Players
 
 local playerCacheApi = {}
 playerCacheApi.__index = playerCacheApi

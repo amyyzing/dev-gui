@@ -1,4 +1,4 @@
--- save/load/wipe controls for player settings.
+-- Player Data
 
 local playerData={}
 

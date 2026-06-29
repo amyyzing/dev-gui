@@ -1,5 +1,4 @@
--- loader file
--- fetches the panel code and starts the runtime.
+-- Loader
 
 local HttpService = game:GetService( "HttpService" )
 
@@ -35,7 +34,7 @@ local function typeOf(value)
 end
 
 local function clientRequest()
-	-- different executors expose different request functions.
+	-- Request funcs
 	if typeOf(syn)=="table" and type(syn.request) == "function" then
 		return syn.request
 	end

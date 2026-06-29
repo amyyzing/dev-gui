@@ -1,5 +1,4 @@
--- main file
--- starts the panel loader.
+-- Main
 
 local HttpService=game:GetService("HttpService")
 

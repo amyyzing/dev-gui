@@ -1,4 +1,4 @@
--- keybind capture, clear, and restore actions.
+-- Keybinds
 
 local keybinds={}
 

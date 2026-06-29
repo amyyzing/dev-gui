@@ -1,4 +1,4 @@
--- shared heartbeat and render-step scheduler.
+-- Loops
 
 local env = (getfenv and getfenv()) or _G
 local scopeApi = rawget(env, "CoreScope") or rawget(env, "CoreScopeModule")

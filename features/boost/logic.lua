@@ -1,4 +1,4 @@
--- applies auto boost when the ball is close enough.
+-- Auto Boost
 
 local boost={}
 

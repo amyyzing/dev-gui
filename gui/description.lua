@@ -1,4 +1,4 @@
--- central page/category labels so the loader and panel say the same thing.
+-- Text
 
 local blank=""
 

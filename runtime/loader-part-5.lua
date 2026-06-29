@@ -1,5 +1,4 @@
--- boot part 5
--- boot step 5: data save hooks, announcements, and final startup.
+-- Boot 5
 
 function shutdownTool()
 	if not toolAlive then return end

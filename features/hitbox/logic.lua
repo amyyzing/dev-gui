@@ -1,4 +1,4 @@
--- tackle hitbox sizing, alpha, presets, and keybind toggle.
+-- Hitbox
 
 local hitbox={}
 

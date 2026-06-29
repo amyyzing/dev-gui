@@ -1,4 +1,4 @@
--- marks open receivers while you are the quarterback.
+-- Offense ESP
 
 local espOffense={}
 

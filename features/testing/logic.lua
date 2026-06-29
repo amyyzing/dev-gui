@@ -1,4 +1,4 @@
--- testing poles, C1 marker, and normal-arc safety colors.
+-- Testing
 
 local testing={}
 

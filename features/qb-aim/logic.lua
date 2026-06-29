@@ -1,4 +1,4 @@
--- qb aim runtime: pick a wr, draw the arc, then send the throw.
+-- QB Aim
 
 local qbAim={}
 
@@ -27,7 +27,7 @@ local catchYTolerance=0.35
 local targetMissTolerance=0.35
 local nearTargetMissTolerance=0.05
 local leadDelay=0.38
-local leadDelayBaseline=0.38 -- clean math: Lead Adjust is direct intentional ahead-time
+local leadDelayBaseline=0.38 -- lead time
 local receiverHistoryMaxAge=0.30
 local receiverAccelMax=48
 local receiverConfidenceMin=0.30
@@ -87,10 +87,10 @@ local catchAnchorBlend=1.00
 local playThrowAnimation=true
 local throwAnimationName="UF_QuarterbackThrow"
 local throwAnimationSpeed=1.35
--- keep this synced with the normal throw anim
+-- Anim Time
 local throwReleaseWait=0.26666666666666666
-local throwRemoteLeadTime=0.00 -- fire after the full animation release wait
-local livePreviewDuringThrow=false -- freeze locked plan during animation; normal game preview appears to latch here
+local throwRemoteLeadTime=0.00 -- fire wait
+local livePreviewDuringThrow=false -- freeze arc
 local fireThrowImmediately=false
 local throwInputCooldown=0.85
 local releaseConfirmTimeout=1.75
@@ -105,14 +105,14 @@ local releaseAngleSpreadMax=2.0
 local safeArcSampleStep=0.04
 local safeArcCatchYMargin=0.25
 local centerMaxReleaseDistance=12.00
--- Manual server-origin drift. C2 is still the base; this nudges the sampled release point.
+-- QB Drift
 local qbDriftTime=0
 local qbVerticalDriftTime=0
 local qbVerticalDriftMax=6.00
--- throw flow:
+-- Throw Steps
 --   1. lock the wr
---   2. wait for the normal release frame
---   3. rebuild the throw right before sending it
+--   2. wait
+--   3. send
 local useLocalThrowFallback=false
 local qbTargetHighlightName="QBAimTargetHighlight"
 local espHighlightName="MyESPHighlight"
@@ -212,8 +212,7 @@ local function movementAwareRootVelocity(rootPart)
 end
 
 local function routeSpeed(speed)
-	-- Clean math rebuild: receivers are modeled as either stopped or moving at route speed.
-	-- This removes partial-speed formula drift and keeps the prediction equation simple.
+	-- Route Speed
 	local clamped=math.clamp(speed or 0,0,maxRunSpeed)
 	if clamped<movingSpeedMin then
 		return 0
@@ -1286,8 +1285,7 @@ function qbAim.new(app,parent)
 	end
 
 	local function c2Position()
-		-- Use the game's original Center.C2 as the release-position reference.
-		-- Do not read from the cloned preview C2 here, because that creates stale/self-referential C2 values.
+		-- Real C2
 		local center=originalCenter()
 		local c2=center and center:FindFirstChild("C2",true)
 		local cframeValue=c2 and attachmentCFrame(c2)
@@ -1384,18 +1382,12 @@ function qbAim.new(app,parent)
 	end
 
 	--[[
-		Clean math rebuild
+		Throw Math
 
-		Core equation:
-			ball(t) = origin + throwVelocity*t + 0.5*gravityVector*t^2
-			target(t) = receiverPeakAtRelease + wrVelocity*(t + leadDelay)
+		ball(t)=origin+velocity*t+0.5*g*t^2
+		wr(t)=wrStart+wrVel*(t+lead)
 
-		Only three football constants matter in the math core:
-			1. ball speed
-			2. receiver route speed
-			3. receiver catch height
-
-		Route labels are just labels here. They do not move the target.
+		route label = text only
 	]]
 
 	local function historyVector(data,now)
@@ -1417,7 +1409,7 @@ function qbAim.new(app,parent)
 	end
 
 	local function leastSquaresVelocity(data,now)
-		-- old debug path only; long-window math lags cuts.
+		-- Old Check
 		if not(data and data.ph and #data.ph>=2) then
 			return nil,0,0
 		end
@@ -1449,8 +1441,7 @@ function qbAim.new(app,parent)
 		local storedXZ=flat((data and data.vel) or Vector3.zero)
 		local canTrustAssembly=receiverRoot and rootHasMoveInput(receiverRoot) and now>=possessionSettleUntil
 
-		-- AssemblyLinearVelocity is preferred when it is clearly moving; otherwise use the
-		-- immediate position-delta velocity from the heartbeat tracker. No route-shape basis.
+		-- Velocity Source
 		local velocity=Vector3.zero
 		local source="none"
 		if canTrustAssembly and assemblyXZ.Magnitude>=movingSpeedMin then
@@ -1498,7 +1489,7 @@ function qbAim.new(app,parent)
 	end
 
 	local function updateStable(data)
-		-- Compatibility shim. Clean math does not hold old route direction.
+		-- Old Route Vars
 		local velocity,source,rawSpeed=currentReceiverRawVelocity(data,nil,data and data.rawVel or Vector3.zero)
 		if velocity.Magnitude<movingSpeedMin then
 			if data then
@@ -1520,7 +1511,7 @@ function qbAim.new(app,parent)
 	end
 
 	local function movementShape(origin,position,velocity)
-		-- Diagnostic only. The clean solver does not change the target formula based on this label.
+		-- Route Label
 		local velocityXZ=flat(velocity or Vector3.zero)
 		local speed=velocityXZ.Magnitude
 		if speed<0.1 then
@@ -1578,7 +1569,7 @@ function qbAim.new(app,parent)
 			return Vector3.zero,"standing",state
 		end
 
-		-- H locks receiver identity only. Direction always uses the current raw vector.
+		-- H keeps the wr
 		velocity=velocity.Unit*maxRunSpeed
 		state.routeVelocity=velocity
 		return velocity,movementShape(originPosition,receiverRoot.Position,velocity),state
@@ -2260,8 +2251,7 @@ function qbAim.new(app,parent)
 			Power=remotePower,
 		})
 
-		-- Do not call local UnequipFootball here. Normal flow lets the server send the
-		-- incoming Mechanics/UnequipFootball and UpdateFootball events after ThrowBall.
+		-- Server handles unequip
 		return true,nil
 	end
 

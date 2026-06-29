@@ -1,4 +1,4 @@
--- announcement popup used for bot messages.
+-- Announcements
 
 local announcement={}
 

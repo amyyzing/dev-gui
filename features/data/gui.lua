@@ -1,4 +1,4 @@
--- player data buttons.
+-- Player Data Gui
 
 return{new=function(app,...)
 	return app.PlayerDataLogicModule.new(app,...)

@@ -1,4 +1,4 @@
--- color picker, theme presets, and highlight colors.
+-- Colors
 
 local colors={}
 

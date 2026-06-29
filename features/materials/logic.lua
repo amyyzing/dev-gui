@@ -1,4 +1,4 @@
--- simplifies map materials and restores them when turned off.
+-- Materials
 
 local materials={}
 

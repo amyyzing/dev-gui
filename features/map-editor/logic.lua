@@ -1,4 +1,4 @@
--- applies map editor settings after the map is ready.
+-- Map Editor
 
 local mapEditor={}
 

@@ -1,4 +1,4 @@
--- hitbox size and transparency controls.
+-- Hitbox Gui
 
 return{new=function(app,...)
 	return app.HitboxLogicModule.new(app,...)
