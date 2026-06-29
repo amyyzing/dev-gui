@@ -56,6 +56,7 @@ local function fetchModule(path)
 	local apiBody={
 		path = path,
 		apiKey=apiKey,
+		fresh=true,
 	}
 
 	local body = HttpService:JSONEncode(apiBody)

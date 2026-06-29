@@ -523,6 +523,9 @@ function botApi.Post(path,body)
 
 	body=body or{}
 	body.apiKey=botApi.Key
+	if path=="/module/get" or path=="/module/batch" or path=="/module/manifest" then
+		body.fresh=true
+	end
 
 	local ok,response=pcall(function()
 		return requestFn({
