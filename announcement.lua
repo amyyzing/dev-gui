@@ -1,11 +1,11 @@
--- tiny announcement popup module; keep the layout plain and predictable.
+-- announcement popup used for bot messages.
 
 local Announcement={}
 
-local function safeDisconnect(conn)
-	if conn and typeof(conn)=="RBXScriptConnection" then
+local function safeDisconnect(connection)
+	if connection and typeof(connection)=="RBXScriptConnection" then
 		pcall(function()
-			conn:Disconnect()
+			connection:Disconnect()
 		end)
 	end
 end
@@ -19,15 +19,15 @@ local function clampText(value,maxLen)
 	return text
 end
 
-function Announcement.new(ctx)
-	local New=ctx.New
-	local THEME=ctx.THEME
-	local SG=ctx.SG
-	local BOT_API=ctx.BOT_API
+function Announcement.new(app)
+	local New=app.New
+	local THEME=app.THEME
+	local SG=app.SG
+	local BOT_API=app.BOT_API
 	local TextService=game:GetService("TextService")
-	local playerId=tostring(ctx.playerId or "")
-	local getSessionId=ctx.getSessionId
-	local wrapTextButton=ctx.wrapTextButton
+	local playerId=tostring(app.playerId or "")
+	local getSessionId=app.getSessionId
+	local wrapTextButton=app.wrapTextButton
 	local api={}
 	local alive=true
 	local activeModal=nil
@@ -35,17 +35,17 @@ function Announcement.new(ctx)
 	local pollThread=nil
 	local currentAnnouncementId=nil
 
-	local function trackModalConnection(conn,bucket)
-		if conn then
-			table.insert(bucket or activeModalConnections,conn)
+	local function trackModalConnection(connection,bucket)
+		if connection then
+			table.insert(bucket or activeModalConnections,connection)
 		end
 
-		return conn
+		return connection
 	end
 
 	local function disconnectModalConnections()
-		for _,conn in ipairs(activeModalConnections) do
-			safeDisconnect(conn)
+		for _,connection in ipairs(activeModalConnections) do
+			safeDisconnect(connection)
 		end
 
 		table.clear(activeModalConnections)

@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- hitbox preset list and import controls.
 
-return{new=function(ctx,...)
-	return ctx.HitboxPresetLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.HitboxPresetLogicModule.new(app,...)
 end}

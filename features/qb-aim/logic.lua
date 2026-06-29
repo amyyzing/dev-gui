@@ -1,4 +1,4 @@
--- qb aim runtime. keep preview, throw timing, and cleanup paths separate.
+-- qb aim runtime: pick a wr, draw the arc, then send the throw.
 
 local QBAim={}
 
@@ -224,7 +224,7 @@ local function routeSpeed(speed)
 	return MAX_RUN_SPEED
 end
 
-local function getModeKey(ctx)
+local function getModeKey(app)
 	local miniGames=Workspace:FindFirstChild("MiniGames")
 	local miniCount=miniGames and #miniGames:GetChildren() or 0
 	if miniCount>1 then
@@ -238,8 +238,8 @@ local function getModeKey(ctx)
 		return"mode1"
 	end
 
-	if ctx.getCurrentModeKey then
-		local ok,modeKey=pcall(ctx.getCurrentModeKey)
+	if app.getCurrentModeKey then
+		local ok,modeKey=pcall(app.getCurrentModeKey)
 		if ok and modeKey then
 			return tostring(modeKey)
 		end
@@ -693,28 +693,28 @@ function QBAim._playThrowAnimation()
 	return false,"none"
 end
 
-function QBAim.new(ctx,parent)
-	local New=ctx.New
-	local THEME=ctx.THEME
-	local UI_STYLE=ctx.UI_STYLE
-	local safeDisconnect=ctx.safeDisconnect
-	local inputToBinding=ctx.inputToBinding
-	local makeSection=ctx.makeSection
-	local buildToggleRow=ctx.buildToggleRow
-	local buildSlider=ctx.buildSlider
-	local state=ctx.State or {}
-	local mathCore=ctx.Page1QBAimMathModule or QBAimMathModule
-	local services=ctx.Services or {}
-	local playerCache=services.PlayerCache or ctx.PlayerCache
-	local ballTracker=services.BallTracker or ctx.BallTracker
-	local scheduler=ctx.Scheduler or services.Scheduler
+function QBAim.new(app,parent)
+	local New=app.New
+	local THEME=app.THEME
+	local UI_STYLE=app.UI_STYLE
+	local safeDisconnect=app.safeDisconnect
+	local inputToBinding=app.inputToBinding
+	local makeSection=app.makeSection
+	local buildToggleRow=app.buildToggleRow
+	local buildSlider=app.buildSlider
+	local state=app.State or {}
+	local mathCore=app.Page1QBAimMathModule or QBAimMathModule
+	local services=app.Services or {}
+	local playerCache=services.PlayerCache or app.PlayerCache
+	local ballTracker=services.BallTracker or app.BallTracker
+	local scheduler=app.Scheduler or services.Scheduler
 	local api={}
 	local enabled=false
 	local trackedReceiver=nil
 	local selectedRouteLock=nil
 	local receiverData={}
 	local receiverTrackElapsed=0
-	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,beamDefaultColor=nil,orig=nil,p1=nil,p2=nil,p3=nil,ballMissingSince=nil}
+	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,beamDefaultColor=nil,orig=nil,lastCatchPoint=nil,lastStartPoint=nil,lastLandingPoint=nil,ballMissingSince=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
 	local lastHeldBall=nil
@@ -797,9 +797,9 @@ function QBAim.new(ctx,parent)
 	state.qbAimPeakHeight=WR_MAX_Y
 	state.qbAimQBDrift=math.clamp(tonumber(state.qbAimQBDrift) or QB_RELEASE_ORIGIN_DRIFT_TIME,QB_DRIFT_MIN,QB_DRIFT_MAX)
 	state.qbAimQBYDrift=math.clamp(state.qbAimQBDrift,QB_Y_DRIFT_MIN,QB_Y_DRIFT_MAX)
-	local function addConnection(conn)
-		table.insert(connections,conn)
-		return conn
+	local function addConnection(connection)
+		table.insert(connections,connection)
+		return connection
 	end
 
 	local function addSchedulerJob(kind,id,interval,fn)
@@ -812,8 +812,8 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function changed()
-		if ctx.onChanged then
-			pcall(ctx.onChanged,state)
+		if app.onChanged then
+			pcall(app.onChanged,state)
 		end
 	end
 
@@ -894,12 +894,12 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function isAvailable()
-		local modeKey=getModeKey(ctx)
+		local modeKey=getModeKey(app)
 		return modeKey=="mode1" or modeKey=="mode3"
 	end
 
 	local function currentModeText()
-		local modeKey=getModeKey(ctx)
+		local modeKey=getModeKey(app)
 		if modeKey=="mode1" then
 			return"Gameplay"
 		elseif modeKey=="mode2" then
@@ -1216,7 +1216,7 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function configuredBinding(getterName,fallback)
-		local getter=ctx[getterName]
+		local getter=app[getterName]
 		if type(getter)=="function" then
 			local ok,binding=pcall(getter)
 			if ok and binding~=nil then
@@ -1250,7 +1250,7 @@ function QBAim.new(ctx,parent)
 			selectedRouteLock=nil
 			previewFrozen=false
 			preview.ballMissingSince=nil
-			preview.p1,preview.p2,preview.p3=nil,nil,nil
+			preview.lastCatchPoint,preview.lastStartPoint,preview.lastLandingPoint=nil,nil,nil
 		end
 
 		if enabledToggle then
@@ -1292,8 +1292,8 @@ function QBAim.new(ctx,parent)
 		-- Do not read from the cloned preview C2 here, because that creates stale/self-referential C2 values.
 		local center=originalCenter()
 		local c2=center and center:FindFirstChild("C2",true)
-		local cf=c2 and attachmentCFrame(c2)
-		return cf and cf.Position
+		local cframeValue=c2 and attachmentCFrame(c2)
+		return cframeValue and cframeValue.Position
 	end
 
 	local function setPreviewCenterVisible(visible)
@@ -1942,7 +1942,7 @@ function QBAim.new(ctx,parent)
 	local function clearPreviewVisuals(destroyCenter)
 		previewFrozen=false
 		preview.ballMissingSince=nil
-		preview.p1,preview.p2,preview.p3=nil,nil,nil
+		preview.lastCatchPoint,preview.lastStartPoint,preview.lastLandingPoint=nil,nil,nil
 		hideQBTrailPreview()
 
 		if destroyCenter then
@@ -1971,27 +1971,27 @@ function QBAim.new(ctx,parent)
 		if not(startPoint and catchPoint and endPoint and previewTime and catchTime) then return end
 
 		local endVelocity=plan.velocity+G*previewTime
-		local p2=startPoint
-		local p1=catchPoint
-		local p3=endPoint
+		local smoothedStartPoint=startPoint
+		local smoothedCatchPoint=catchPoint
+		local smoothedLandingPoint=endPoint
 
-		if preview.p2 then
-			p2=preview.p2:Lerp(p2,PREVIEW_SMOOTH)
+		if preview.lastStartPoint then
+			smoothedStartPoint=preview.lastStartPoint:Lerp(smoothedStartPoint,PREVIEW_SMOOTH)
 		end
 
-		if preview.p1 and (p1-preview.p1).Magnitude<=28 then
-			p1=preview.p1:Lerp(p1,PREVIEW_SMOOTH)
+		if preview.lastCatchPoint and (smoothedCatchPoint-preview.lastCatchPoint).Magnitude<=28 then
+			smoothedCatchPoint=preview.lastCatchPoint:Lerp(smoothedCatchPoint,PREVIEW_SMOOTH)
 		end
 
-		if preview.p3 and (p3-preview.p3).Magnitude<=85 then
-			p3=preview.p3:Lerp(p3,PREVIEW_SMOOTH)
+		if preview.lastLandingPoint and (smoothedLandingPoint-preview.lastLandingPoint).Magnitude<=85 then
+			smoothedLandingPoint=preview.lastLandingPoint:Lerp(smoothedLandingPoint,PREVIEW_SMOOTH)
 		end
 
-		preview.p1,preview.p2,preview.p3=p1,p2,p3
-		setAttachmentCFrame(c2,xAxisCFrame(p2,plan.velocity)*CFrame.Angles(ARC_SETTINGS.AttachmentRoll,0,0))
-		setAttachmentCFrame(c1,xAxisCFrame(p1,plan.velocity+G*catchTime)*CFrame.Angles(ARC_SETTINGS.AttachmentRoll,0,0))
-		setAttachmentCFrame(c3,xAxisCFrame(p3,endVelocity)*CFrame.Angles(ARC_SETTINGS.AttachmentRoll,0,0))
-		updateC1AndC3Info(plan,p1,p3)
+		preview.lastCatchPoint,preview.lastStartPoint,preview.lastLandingPoint=smoothedCatchPoint,smoothedStartPoint,smoothedLandingPoint
+		setAttachmentCFrame(c2,xAxisCFrame(smoothedStartPoint,plan.velocity)*CFrame.Angles(ARC_SETTINGS.AttachmentRoll,0,0))
+		setAttachmentCFrame(c1,xAxisCFrame(smoothedCatchPoint,plan.velocity+G*catchTime)*CFrame.Angles(ARC_SETTINGS.AttachmentRoll,0,0))
+		setAttachmentCFrame(c3,xAxisCFrame(smoothedLandingPoint,endVelocity)*CFrame.Angles(ARC_SETTINGS.AttachmentRoll,0,0))
+		updateC1AndC3Info(plan,smoothedCatchPoint,smoothedLandingPoint)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
 		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-ARC_MAX_CURVE,ARC_MAX_CURVE)
@@ -2002,7 +2002,7 @@ function QBAim.new(ctx,parent)
 	end
 
 	local function currentBallPower()
-		return getModeKey(ctx)=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
+		return getModeKey(app)=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
 	end
 
 	local function throwBlocked()
@@ -2307,7 +2307,7 @@ function QBAim.new(ctx,parent)
 		end
 		noteHeldBallState(heldBall,os.clock())
 
-		local modeKey=getModeKey(ctx)
+		local modeKey=getModeKey(app)
 		local power=modeKey=="mode3" and SQUADS_BALL_POWER or GAMEPLAY_BALL_POWER
 		local receiverRoot=rootOfPlayer(receiver)
 		if not receiverRoot then
@@ -2400,7 +2400,7 @@ function QBAim.new(ctx,parent)
 			selectedRouteLock=lockRoute(best)
 			previewFrozen=false
 			preview.ballMissingSince=nil
-			preview.p1,preview.p2,preview.p3=nil,nil,nil
+			preview.lastCatchPoint,preview.lastStartPoint,preview.lastLandingPoint=nil,nil,nil
 			setTargetText()
 			setStatus("locked "..best.Name)
 		else
@@ -2416,7 +2416,7 @@ function QBAim.new(ctx,parent)
 			selectedRouteLock=nil
 			previewFrozen=false
 			preview.ballMissingSince=nil
-			preview.p1,preview.p2,preview.p3=nil,nil,nil
+			preview.lastCatchPoint,preview.lastStartPoint,preview.lastLandingPoint=nil,nil,nil
 			hideQBTrailPreview()
 			clearTargetHighlights()
 		end
@@ -2514,8 +2514,8 @@ function QBAim.new(ctx,parent)
 		end
 		table.clear(schedulerJobs)
 
-		for _,conn in ipairs(connections) do
-			safeDisconnect(conn)
+		for _,connection in ipairs(connections) do
+			safeDisconnect(connection)
 		end
 
 		table.clear(connections)

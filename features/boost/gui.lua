@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- auto boost switch, always mode, and boost sliders.
 
-return{new=function(ctx,...)
-	return ctx.Page1BoostLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.Page1BoostLogicModule.new(app,...)
 end}

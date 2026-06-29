@@ -1,4 +1,4 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- hides unused map parts and restores them later.
 
 local MapCleaner={}
 
@@ -47,13 +47,13 @@ local function isTarget(inst)
 	return false
 end
 
-function MapCleaner.new(ctx,page)
-	local New=ctx.New
-	local THEME=ctx.THEME
-	local safeDisconnect=ctx.safeDisconnect
-	local makeSection=ctx.makeSection
-	local buildToggleRow=ctx.buildToggleRow
-	local getCurrentModeKey=ctx.getCurrentModeKey or function() return "mode1" end
+function MapCleaner.new(app,page)
+	local New=app.New
+	local THEME=app.THEME
+	local safeDisconnect=app.safeDisconnect
+	local makeSection=app.makeSection
+	local buildToggleRow=app.buildToggleRow
+	local getCurrentModeKey=app.getCurrentModeKey or function() return "mode1" end
 
 	local api={}
 	local enabled=false
@@ -170,8 +170,8 @@ function MapCleaner.new(ctx,page)
 			setStatus(isGameplay() and "map back" or "game only",THEME.MUTED)
 		end
 
-		if fire~=false and ctx.onChanged then
-			pcall(ctx.onChanged,enabled)
+		if fire~=false and app.onChanged then
+			pcall(app.onChanged,enabled)
 		end
 	end
 

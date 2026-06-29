@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- map cleaner switch.
 
-return{new=function(ctx,...)
-	return ctx.MapCleanerLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.MapCleanerLogicModule.new(app,...)
 end}

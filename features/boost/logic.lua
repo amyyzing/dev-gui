@@ -1,4 +1,4 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- applies auto boost when the ball is close enough.
 
 local Boost={}
 
@@ -98,14 +98,14 @@ local function getFootball()
 	return nil
 end
 
-function Boost.new(ctx,parent)
-	local safeDisconnect=ctx.safeDisconnect
-	local inputToBinding=ctx.inputToBinding
-	local makeSection=ctx.makeSection
-	local buildSlider=ctx.buildSlider
-	local buildToggleRow=ctx.buildToggleRow
-	local state=ctx.State
-	local scheduler=ctx.Scheduler
+function Boost.new(app,parent)
+	local safeDisconnect=app.safeDisconnect
+	local inputToBinding=app.inputToBinding
+	local makeSection=app.makeSection
+	local buildSlider=app.buildSlider
+	local buildToggleRow=app.buildToggleRow
+	local state=app.State
+	local scheduler=app.Scheduler
 	local api={}
 	local jumpBoostToggle=nil
 	local jumpBoostModeToggle=nil
@@ -124,7 +124,7 @@ function Boost.new(ctx,parent)
 	local footballCacheExpires=0
 
 	local function changed()
-		if ctx.onChanged then pcall(ctx.onChanged,state) end
+		if app.onChanged then pcall(app.onChanged,state) end
 	end
 
 	local function normalizeState()
@@ -474,12 +474,12 @@ function Boost.new(ctx,parent)
 		local jumpBoostKey=TOGGLE_JB_KEY
 		local alwaysBoostKey=TOGGLE_AB_KEY
 
-		if ctx.getJumpBoostToggleKey then
-			jumpBoostKey=ctx.getJumpBoostToggleKey() or Enum.KeyCode.Unknown
+		if app.getJumpBoostToggleKey then
+			jumpBoostKey=app.getJumpBoostToggleKey() or Enum.KeyCode.Unknown
 		end
 
-		if ctx.getAlwaysBoostToggleKey then
-			alwaysBoostKey=ctx.getAlwaysBoostToggleKey() or Enum.KeyCode.Unknown
+		if app.getAlwaysBoostToggleKey then
+			alwaysBoostKey=app.getAlwaysBoostToggleKey() or Enum.KeyCode.Unknown
 		end
 
 		local binding=inputToBinding(input)

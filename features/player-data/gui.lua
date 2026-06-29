@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- player data buttons.
 
-return{new=function(ctx,...)
-	return ctx.PlayerDataLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.PlayerDataLogicModule.new(app,...)
 end}

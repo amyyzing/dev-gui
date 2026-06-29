@@ -1,12 +1,12 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- moves the panel back to the screen center.
 
 local ResetPosition={}
 
-function ResetPosition.new(ctx,page)
-	local New=ctx.New
-	local THEME=ctx.THEME
-	local makeSection=ctx.makeSection
-	local wrapTextButton=ctx.wrapTextButton
+function ResetPosition.new(app,page)
+	local New=app.New
+	local THEME=app.THEME
+	local makeSection=app.makeSection
+	local wrapTextButton=app.wrapTextButton
 
 	local api={}
 	local connections={}
@@ -15,9 +15,9 @@ function ResetPosition.new(ctx,page)
 	local buttonWrap=nil
 
 	local function connect(signal,fn)
-		local conn=signal:Connect(fn)
-		table.insert(connections,conn)
-		return conn
+		local connection=signal:Connect(fn)
+		table.insert(connections,connection)
+		return connection
 	end
 
 	local function setStatus(text,color)
@@ -30,22 +30,22 @@ function ResetPosition.new(ctx,page)
 	local function resetPosition()
 		local ok=false
 
-		if ctx.MainFrame and type(ctx.MainFrame.ResetPosition)=="function" then
-			ok=pcall(ctx.MainFrame.ResetPosition,true)
-		elseif ctx.root then
+		if app.MainFrame and type(app.MainFrame.ResetPosition)=="function" then
+			ok=pcall(app.MainFrame.ResetPosition,true)
+		elseif app.root then
 			ok=pcall(function()
-				local height=(ctx.root.AbsoluteSize and ctx.root.AbsoluteSize.Y) or 540
-				ctx.root.Position=UDim2.new(0.5,0,0.5,-math.floor(height/2))
+				local height=(app.root.AbsoluteSize and app.root.AbsoluteSize.Y) or 540
+				app.root.Position=UDim2.new(0.5,0,0.5,-math.floor(height/2))
 			end)
 		end
 
 		if ok then
 			setStatus("position reset",THEME.GREEN)
-			if ctx.MainFrame and type(ctx.MainFrame.ShowToast)=="function" then
-				ctx.MainFrame.ShowToast("GUI position reset.", "success", 1.6)
+			if app.MainFrame and type(app.MainFrame.ShowToast)=="function" then
+				app.MainFrame.ShowToast("GUI position reset.", "success", 1.6)
 			end
-			if type(ctx.scheduleSave)=="function" then
-				ctx.scheduleSave()
+			if type(app.scheduleSave)=="function" then
+				app.scheduleSave()
 			end
 		else
 			setStatus("reset failed",THEME.RED)
@@ -57,9 +57,9 @@ function ResetPosition.new(ctx,page)
 	end
 
 	function api.Destroy()
-		for _,conn in ipairs(connections) do
+		for _,connection in ipairs(connections) do
 			pcall(function()
-				conn:Disconnect()
+				connection:Disconnect()
 			end)
 		end
 		table.clear(connections)

@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- map editor base section.
 
-return{new=function(ctx,...)
-	return ctx.MapEditorLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.MapEditorLogicModule.new(app,...)
 end}

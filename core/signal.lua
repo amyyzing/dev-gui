@@ -1,4 +1,4 @@
--- small core helper. these modules are deliberately plain so features can share them.
+-- simple event helper used by shared state.
 
 local Signal = {}
 Signal.__index = Signal

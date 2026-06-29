@@ -1,4 +1,4 @@
--- small core helper. these modules are deliberately plain so features can share them.
+-- cleanup bag for connections, tweens, and instances.
 
 local Scope = {}
 Scope.__index = Scope

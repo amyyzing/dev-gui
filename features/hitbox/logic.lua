@@ -1,4 +1,4 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- tackle hitbox sizing, alpha, presets, and keybind toggle.
 
 local Hitbox={}
 
@@ -37,15 +37,15 @@ local function folderHasAnyDescendants(folder)
 	return #folder:GetDescendants()>0
 end
 
-function Hitbox.new(ctx,parent)
-	local safeDisconnect=ctx.safeDisconnect
-	local inputToBinding=ctx.inputToBinding
-	local New=ctx.New
-	local THEME=ctx.THEME
-	local makeSection=ctx.makeSection
-	local buildSlider=ctx.buildSlider
-	local fmtNumber=ctx.fmtNumber
-	local state=ctx.State
+function Hitbox.new(app,parent)
+	local safeDisconnect=app.safeDisconnect
+	local inputToBinding=app.inputToBinding
+	local New=app.New
+	local THEME=app.THEME
+	local makeSection=app.makeSection
+	local buildSlider=app.buildSlider
+	local fmtNumber=app.fmtNumber
+	local state=app.State
 	local api={}
 	local toggle=nil
 	local boxX=nil
@@ -61,7 +61,7 @@ function Hitbox.new(ctx,parent)
 	local currentModeKey="mode1"
 	local currentModeLabel="Gameplay"
 	local watchers=setmetatable({}, {__mode="k"})
-	local originalParts=ctx.HITBOX_ORIGINALS or {
+	local originalParts=app.HITBOX_ORIGINALS or {
 		Transparency=setmetatable({}, {__mode="k"}),
 		Size=setmetatable({}, {__mode="k"}),
 	}
@@ -69,15 +69,15 @@ function Hitbox.new(ctx,parent)
 	local function safeDisconnectAll(t)
 		if not t then return end
 
-		for _,conn in ipairs(t) do
-			safeDisconnect(conn)
+		for _,connection in ipairs(t) do
+			safeDisconnect(connection)
 		end
 
 		table.clear(t)
 	end
 
 	local function changed()
-		if ctx.onChanged then pcall(ctx.onChanged,state) end
+		if app.onChanged then pcall(app.onChanged,state) end
 	end
 
 	local function isAlive()
@@ -97,8 +97,8 @@ function Hitbox.new(ctx,parent)
 	end
 
 	local function syncModeToCtx()
-		if ctx.setCurrentMode then
-			pcall(ctx.setCurrentMode,currentModeKey,currentModeLabel)
+		if app.setCurrentMode then
+			pcall(app.setCurrentMode,currentModeKey,currentModeLabel)
 		end
 	end
 
@@ -609,8 +609,8 @@ function Hitbox.new(ctx,parent)
 
 	local function handleToggleInput(input)
 		local hitboxKey=TOGGLE_HB_KEY
-		if ctx.getHitboxToggleKey then
-			hitboxKey=ctx.getHitboxToggleKey() or Enum.KeyCode.Unknown
+		if app.getHitboxToggleKey then
+			hitboxKey=app.getHitboxToggleKey() or Enum.KeyCode.Unknown
 		end
 
 		if hitboxKey==nil or hitboxKey==Enum.KeyCode.Unknown then return false end

@@ -1,4 +1,4 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- save/load/wipe controls for player settings.
 
 local PlayerData={}
 
@@ -8,14 +8,14 @@ local function clearArray(t)
 	end
 end
 
-function PlayerData.new(ctx,page,deps)
+function PlayerData.new(app,page,deps)
 	deps=deps or {}
 
-	local New=ctx.New
-	local THEME=ctx.THEME
-	local SG=ctx.SG
-	local makeSection=ctx.makeSection
-	local wrapTextButton=ctx.wrapTextButton
+	local New=app.New
+	local THEME=app.THEME
+	local SG=app.SG
+	local makeSection=app.makeSection
+	local wrapTextButton=app.wrapTextButton
 
 	local api={}
 	local statusLabel=nil
@@ -24,18 +24,18 @@ function PlayerData.new(ctx,page,deps)
 	local busy=false
 	local connections={}
 
-	local function trackConnection(conn,bucket)
-		if conn then
-			table.insert(bucket or connections,conn)
+	local function trackConnection(connection,bucket)
+		if connection then
+			table.insert(bucket or connections,connection)
 		end
 
-		return conn
+		return connection
 	end
 
 	local function disconnectConnections(bucket)
-		for _,conn in ipairs(bucket) do
+		for _,connection in ipairs(bucket) do
 			pcall(function()
-				conn:Disconnect()
+				connection:Disconnect()
 			end)
 		end
 
@@ -72,7 +72,7 @@ function PlayerData.new(ctx,page,deps)
 
 		local normalBg=baseColor()
 		local textColor=danger and Color3.fromRGB(0,0,0) or THEME.TEXT
-		local btn=New("TextButton",{
+		local button=New("TextButton",{
 			Position=UDim2.fromOffset(x,120),
 			Size=UDim2.fromOffset(104,30),
 			BackgroundColor3=normalBg,
@@ -87,26 +87,26 @@ function PlayerData.new(ctx,page,deps)
 			ZIndex=102,
 		},parent)
 
-		local wrap=wrapTextButton(btn,normalBg,2)
+		local wrap=wrapTextButton(button,normalBg,2)
 		wrap.BackgroundColor3=normalBg
 		if danger then
 			wrap:SetAttribute("ThemeRole","RED")
 		end
 
-		trackConnection(btn.MouseEnter:Connect(function()
+		trackConnection(button.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=hoverColor()
 		end),bucket)
 
-		trackConnection(btn.MouseLeave:Connect(function()
+		trackConnection(button.MouseLeave:Connect(function()
 			wrap.BackgroundColor3=baseColor()
 		end),bucket)
 
-		return btn
+		return button
 	end
 
 	local function showConfirmModal(titleText,bodyText,yesText,onYes,options)
-		if ctx.showConfirmModal then
-			ctx.showConfirmModal(titleText,bodyText,yesText,onYes,options)
+		if app.showConfirmModal then
+			app.showConfirmModal(titleText,bodyText,yesText,onYes,options)
 			return
 		end
 
@@ -175,40 +175,40 @@ function PlayerData.new(ctx,page,deps)
 	end
 
 	local function getPlayerId()
-		if ctx.playerId then return tostring(ctx.playerId) end
-		if ctx.me and ctx.me.UserId then return tostring(ctx.me.UserId) end
+		if app.playerId then return tostring(app.playerId) end
+		if app.me and app.me.UserId then return tostring(app.me.UserId) end
 
 		local lp=game:GetService("Players").LocalPlayer
 		return lp and tostring(lp.UserId) or ""
 	end
 
 	local function wipeLocal()
-		if ctx.OWNED_PRESETS then
-			clearArray(ctx.OWNED_PRESETS)
+		if app.OWNED_PRESETS then
+			clearArray(app.OWNED_PRESETS)
 		end
 
-		if ctx.expandedOwned then
-			for k in pairs(ctx.expandedOwned) do
-				ctx.expandedOwned[k]=nil
+		if app.expandedOwned then
+			for k in pairs(app.expandedOwned) do
+				app.expandedOwned[k]=nil
 			end
 		end
 
 		if deps.Workspace and deps.Workspace.SetEnabled then
 			deps.Workspace.SetEnabled(false)
-		elseif ctx.WorkspaceAPI and ctx.WorkspaceAPI.SetEnabled then
-			ctx.WorkspaceAPI.SetEnabled(false)
+		elseif app.WorkspaceAPI and app.WorkspaceAPI.SetEnabled then
+			app.WorkspaceAPI.SetEnabled(false)
 		end
 
 		if deps.MapCleaner and deps.MapCleaner.SetEnabled then
 			deps.MapCleaner.SetEnabled(false)
 		end
 
-		if ctx.resetMainPageDefaults then pcall(ctx.resetMainPageDefaults) end
-		if ctx.resetCustomizePageDefaults then pcall(ctx.resetCustomizePageDefaults) end
-		if ctx.resetKeybindPresetPageDefaults then pcall(ctx.resetKeybindPresetPageDefaults) end
-		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
-		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
-		if ctx.refreshSettingsPage then pcall(ctx.refreshSettingsPage) end
+		if app.resetMainPageDefaults then pcall(app.resetMainPageDefaults) end
+		if app.resetCustomizePageDefaults then pcall(app.resetCustomizePageDefaults) end
+		if app.resetKeybindPresetPageDefaults then pcall(app.resetKeybindPresetPageDefaults) end
+		if app.rebuildOwnedList then pcall(app.rebuildOwnedList) end
+		if app.refreshPage2UI then pcall(app.refreshPage2UI) end
+		if app.refreshSettingsPage then pcall(app.refreshSettingsPage) end
 	end
 
 	function api.Wipe()
@@ -216,9 +216,9 @@ function PlayerData.new(ctx,page,deps)
 		busy=true
 		setStatus("wiping...",THEME.MUTED)
 
-		if ctx.BOT_API and ctx.BOT_API.Post then
+		if app.BOT_API and app.BOT_API.Post then
 			local ok,result=pcall(function()
-				return ctx.BOT_API.Post("/player/wipe",{
+				return app.BOT_API.Post("/player/wipe",{
 					playerId=getPlayerId(),
 				})
 			end)

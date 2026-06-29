@@ -2,19 +2,19 @@
 
 local GuiLogic={}
 
-function GuiLogic.new(ctx)
-	local New=ctx.New
-	local Fusion=ctx.Fusion
-	local THEME=ctx.THEME
-	local UI_STYLE=ctx.UI_STYLE or {}
-	local UIS=ctx.UIS
-	local GuiService=ctx.GuiService or game:GetService("GuiService")
-	local TweenService=ctx.TweenService
-	local fmtNumber=ctx.fmtNumber
-	local BOX_WRAPPERS=ctx.BOX_WRAPPERS or setmetatable({}, {__mode="k"})
-	local BUTTON_WRAPPERS=ctx.BUTTON_WRAPPERS or setmetatable({}, {__mode="k"})
-	local markThemeRole=ctx.markThemeRole or function() end
-	local getUILibRuntimeStyle=ctx.getUILibRuntimeStyle
+function GuiLogic.new(app)
+	local New=app.New
+	local Fusion=app.Fusion
+	local THEME=app.THEME
+	local UI_STYLE=app.UI_STYLE or {}
+	local UIS=app.UIS
+	local GuiService=app.GuiService or game:GetService("GuiService")
+	local TweenService=app.TweenService
+	local fmtNumber=app.fmtNumber
+	local BOX_WRAPPERS=app.BOX_WRAPPERS or setmetatable({}, {__mode="k"})
+	local BUTTON_WRAPPERS=app.BUTTON_WRAPPERS or setmetatable({}, {__mode="k"})
+	local markThemeRole=app.markThemeRole or function() end
+	local getUILibRuntimeStyle=app.getUILibRuntimeStyle
 
 	local api={}
 	local WRAP_INSET=0
@@ -100,11 +100,11 @@ function GuiLogic.new(ctx)
 		return componentValue(key,fallback)
 	end
 
-	local function addCorner(obj,role)
-		if not obj then return nil end
+	local function addCorner(instance,role)
+		if not instance then return nil end
 
-		obj:SetAttribute("CornerRole",role or "Control")
-		return New("UICorner",{CornerRadius=UDim.new(0,0)},obj)
+		instance:SetAttribute("CornerRole",role or "Control")
+		return New("UICorner",{CornerRadius=UDim.new(0,0)},instance)
 	end
 
 	local function themeColor(role,fallback)
@@ -235,9 +235,9 @@ function GuiLogic.new(ctx)
 		local connections={}
 
 		local function connect(signal,fn)
-			local conn=signal:Connect(fn)
-			table.insert(connections,conn)
-			return conn
+			local connection=signal:Connect(fn)
+			table.insert(connections,connection)
+			return connection
 		end
 
 		local wrap=New("Frame",{
@@ -379,9 +379,9 @@ function GuiLogic.new(ctx)
 		local function destroySwitch()
 			cancelTweens()
 			destroyFusionValue(stateValue)
-			for _,conn in ipairs(connections) do
+			for _,connection in ipairs(connections) do
 				pcall(function()
-					conn:Disconnect()
+					connection:Disconnect()
 				end)
 			end
 			table.clear(connections)
@@ -635,14 +635,14 @@ function GuiLogic.new(ctx)
 		local sectionConnections={}
 		local sectionDestroyed=false
 		local function connectSection(signal,fn)
-			local conn=signal:Connect(fn)
-			table.insert(sectionConnections,conn)
-			return conn
+			local connection=signal:Connect(fn)
+			table.insert(sectionConnections,connection)
+			return connection
 		end
 		local function disconnectSectionConnections()
-			for _,conn in ipairs(sectionConnections) do
+			for _,connection in ipairs(sectionConnections) do
 				pcall(function()
-					conn:Disconnect()
+					connection:Disconnect()
 				end)
 			end
 			table.clear(sectionConnections)
@@ -911,20 +911,20 @@ function GuiLogic.new(ctx)
 		return body or sec,controls
 	end
 
-	function api.makeBox(parent,w,txt,placeholder)
-		local b=New("TextBox",{Size=UDim2.fromOffset(w,componentNumber("TextBoxHeight",28)),BackgroundColor3=themeColor("INPUT",THEME.PANEL),BorderSizePixel=0,ClearTextOnFocus=false,Text=txt,PlaceholderText=placeholder or "",Font=componentFont("TextFont",Enum.Font.Gotham),TextSize=componentNumber("InputTextSize",13),TextColor3=THEME.TEXT,PlaceholderColor3=THEME.MUTED,ZIndex=6,ThemeRole="INPUT"},parent)
+	function api.makeBox(parent,w,textValue,placeholder)
+		local b=New("TextBox",{Size=UDim2.fromOffset(w,componentNumber("TextBoxHeight",28)),BackgroundColor3=themeColor("INPUT",THEME.PANEL),BorderSizePixel=0,ClearTextOnFocus=false,Text=textValue,PlaceholderText=placeholder or "",Font=componentFont("TextFont",Enum.Font.Gotham),TextSize=componentNumber("InputTextSize",13),TextColor3=THEME.TEXT,PlaceholderColor3=THEME.MUTED,ZIndex=6,ThemeRole="INPUT"},parent)
 		local wrap,stroke=api.wrapTextBox(b,themeColor("INPUT",THEME.PANEL),2)
 		wrap:SetAttribute("ThemeRole","INPUT")
 		local boxConnections={}
 		local function connectBox(signal,fn)
-			local conn=signal:Connect(fn)
-			table.insert(boxConnections,conn)
-			return conn
+			local connection=signal:Connect(fn)
+			table.insert(boxConnections,connection)
+			return connection
 		end
 		local function cleanupBox()
-			for _,conn in ipairs(boxConnections) do
+			for _,connection in ipairs(boxConnections) do
 				pcall(function()
-					conn:Disconnect()
+					connection:Disconnect()
 				end)
 			end
 			table.clear(boxConnections)
@@ -1050,9 +1050,9 @@ function GuiLogic.new(ctx)
 		local connections={}
 
 		local function connect(signal,fn)
-			local conn=signal:Connect(fn)
-			table.insert(connections,conn)
-			return conn
+			local connection=signal:Connect(fn)
+			table.insert(connections,connection)
+			return connection
 		end
 
 		local function roundTo(v,d)
@@ -1225,9 +1225,9 @@ function GuiLogic.new(ctx)
 			dragInputType=nil
 			cancelSliderTweens()
 			destroyFusionValue(valueState)
-			for _,conn in ipairs(connections) do
+			for _,connection in ipairs(connections) do
 				pcall(function()
-					conn:Disconnect()
+					connection:Disconnect()
 				end)
 			end
 			table.clear(connections)
@@ -1284,9 +1284,9 @@ function GuiLogic.new(ctx)
 		},row)
 
 		local function connect(signal,fn)
-			local conn=signal:Connect(fn)
-			table.insert(connections,conn)
-			return conn
+			local connection=signal:Connect(fn)
+			table.insert(connections,connection)
+			return connection
 		end
 
 		local function offColor()
@@ -1324,23 +1324,23 @@ function GuiLogic.new(ctx)
 
 		local function applyVisuals(animate)
 			cancelTween()
-			local props=targetProps()
+			local properties=targetProps()
 
 			if not animate then
-				for key,value in pairs(props) do
+				for key,value in pairs(properties) do
 					label[key]=value
 				end
 				return
 			end
 
-			textTween=TweenService:Create(label,tweenInfo,props)
+			textTween=TweenService:Create(label,tweenInfo,properties)
 
 			local thisTween=textTween
 
 			textTween.Completed:Connect(function()
 				if textTween==thisTween then
 					textTween=nil
-					for key,value in pairs(props) do
+					for key,value in pairs(properties) do
 						label[key]=value
 					end
 				end
@@ -1388,9 +1388,9 @@ function GuiLogic.new(ctx)
 			cancelTween()
 			destroyFusionValue(stateValue)
 
-			for _,conn in ipairs(connections) do
+			for _,connection in ipairs(connections) do
 				pcall(function()
-					conn:Disconnect()
+					connection:Disconnect()
 				end)
 			end
 

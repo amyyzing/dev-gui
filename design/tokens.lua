@@ -1,4 +1,4 @@
--- design glue. resolves theme tokens into concrete gui colours.
+-- shared names for gui colors and text roles.
 
 local Tokens = {}
 

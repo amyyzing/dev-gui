@@ -1,18 +1,18 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- edits preset sizes and preset hotkeys.
 
 local PresetEditor={}
 
-function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
-	local New=ctx.New
-	local THEME=ctx.THEME
-	local PRESETS=ctx.PRESETS
-	local DEFAULT_PRESETS=ctx.DEFAULT_PRESETS
-	local fmtNumber=ctx.fmtNumber
-	local bindingToLabel=ctx.bindingToLabel
-	local wrapTextBox=ctx.wrapTextBox
-	local placeWrappedBox=ctx.placeWrappedBox
-	local placeWrappedButton=ctx.placeWrappedButton
-	local setWrappedButtonBg=ctx.setWrappedButtonBg
+function PresetEditor.new(app,editorSection,keybinds,hitboxPresets)
+	local New=app.New
+	local THEME=app.THEME
+	local PRESETS=app.PRESETS
+	local DEFAULT_PRESETS=app.DEFAULT_PRESETS
+	local fmtNumber=app.fmtNumber
+	local bindingToLabel=app.bindingToLabel
+	local wrapTextBox=app.wrapTextBox
+	local placeWrappedBox=app.placeWrappedBox
+	local placeWrappedButton=app.placeWrappedButton
+	local setWrappedButtonBg=app.setWrappedButtonBg
 
 	local api={}
 	local presetRows={}
@@ -20,9 +20,9 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 	local suppressKeyButtonClickUntil=0
 	local connections={}
 	local function connect(signal,fn)
-		local conn=signal:Connect(fn)
-		table.insert(connections,conn)
-		return conn
+		local connection=signal:Connect(fn)
+		table.insert(connections,connection)
+		return connection
 	end
 
 	function api.SetRefreshAll(fn)
@@ -35,8 +35,8 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 	end
 
 	local function setPresetSize(index,x,y,z)
-		if ctx.setPresetSize then
-			local ok,success,err=pcall(ctx.setPresetSize,index,x,y,z)
+		if app.setPresetSize then
+			local ok,success,err=pcall(app.setPresetSize,index,x,y,z)
 			if ok and success~=false then
 				return
 			end
@@ -57,14 +57,14 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			math.clamp(tonumber(z) or p.size.Z,0.1,50)
 		)
 
-		if ctx.requestPlayerAutosave then
-			ctx.requestPlayerAutosave()
+		if app.requestPlayerAutosave then
+			app.requestPlayerAutosave()
 		end
 	end
 
 	local function setPresetKey(index,binding)
-		if ctx.setPresetKey then
-			local ok,success,err=pcall(ctx.setPresetKey,index,binding)
+		if app.setPresetKey then
+			local ok,success,err=pcall(app.setPresetKey,index,binding)
 			if ok and success~=false then
 				return
 			end
@@ -80,14 +80,14 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			PRESETS[index].key=binding or Enum.KeyCode.Unknown
 		end
 
-		if ctx.requestPlayerAutosave then
-			ctx.requestPlayerAutosave()
+		if app.requestPlayerAutosave then
+			app.requestPlayerAutosave()
 		end
 	end
 
 	local function resetPreset(index)
-		if ctx.resetPreset then
-			local ok,success,err=pcall(ctx.resetPreset,index)
+		if app.resetPreset then
+			local ok,success,err=pcall(app.resetPreset,index)
 			if ok and success~=false then
 				return
 			end
@@ -104,18 +104,18 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			PRESETS[index].size=DEFAULT_PRESETS[index].size
 		end
 
-		if ctx.requestPlayerAutosave then
-			ctx.requestPlayerAutosave()
+		if app.requestPlayerAutosave then
+			app.requestPlayerAutosave()
 		end
 	end
 
-	local function makeBox(parent,w,txt,placeholder)
-		if ctx.makeBox then
-			return ctx.makeBox(parent,w,txt,placeholder)
+	local function makeBox(parent,w,textValue,placeholder)
+		if app.makeBox then
+			return app.makeBox(parent,w,textValue,placeholder)
 		end
 
 		local normalBg=THEME.INPUT or THEME.PANEL
-		local b=New("TextBox",{Size=UDim2.fromOffset(w,28),BackgroundColor3=normalBg,BorderSizePixel=0,ClearTextOnFocus=false,Text=txt or"",PlaceholderText=placeholder or"",Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,PlaceholderColor3=THEME.MUTED,ZIndex=6,ThemeRole="INPUT"},parent)
+		local b=New("TextBox",{Size=UDim2.fromOffset(w,28),BackgroundColor3=normalBg,BorderSizePixel=0,ClearTextOnFocus=false,Text=textValue or"",PlaceholderText=placeholder or"",Font=Enum.Font.Gotham,TextSize=13,TextColor3=THEME.TEXT,PlaceholderColor3=THEME.MUTED,ZIndex=6,ThemeRole="INPUT"},parent)
 		local wrap,stroke=wrapTextBox(b,normalBg,2)
 		wrap:SetAttribute("ThemeRole","INPUT")
 
@@ -265,9 +265,9 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 	end
 
 	function api.Destroy()
-		for _,conn in ipairs(connections) do
+		for _,connection in ipairs(connections) do
 			pcall(function()
-				conn:Disconnect()
+				connection:Disconnect()
 			end)
 		end
 		table.clear(connections)

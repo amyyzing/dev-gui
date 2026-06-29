@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- defense esp controls.
 
-return{new=function(ctx,...)
-	return ctx.Page1ESPDefenseLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.Page1ESPDefenseLogicModule.new(app,...)
 end}

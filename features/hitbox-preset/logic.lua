@@ -1,4 +1,4 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- preset save, equip, delete, and import actions.
 
 local HitboxPreset={}
 
@@ -12,22 +12,22 @@ local function makeCode(name)
 	return base..tostring(math.random(100,999))
 end
 
-function HitboxPreset.new(ctx,ownedSection)
-	local New=ctx.New
-	local THEME=ctx.THEME
-	local SG=ctx.SG
-	local PRESETS=ctx.PRESETS
-	local OWNED_PRESETS=ctx.OWNED_PRESETS or {}
-	ctx.OWNED_PRESETS=OWNED_PRESETS
+function HitboxPreset.new(app,ownedSection)
+	local New=app.New
+	local THEME=app.THEME
+	local SG=app.SG
+	local PRESETS=app.PRESETS
+	local OWNED_PRESETS=app.OWNED_PRESETS or {}
+	app.OWNED_PRESETS=OWNED_PRESETS
 
-	local fmtNumber=ctx.fmtNumber
-	local bindingToLabel=ctx.bindingToLabel
-	local wrapTextButton=ctx.wrapTextButton
-	local wrapTextBox=ctx.wrapTextBox
+	local fmtNumber=app.fmtNumber
+	local bindingToLabel=app.bindingToLabel
+	local wrapTextButton=app.wrapTextButton
+	local wrapTextBox=app.wrapTextBox
 
 	local api={}
-	local expandedOwned=ctx.expandedOwned or {}
-	ctx.expandedOwned=expandedOwned
+	local expandedOwned=app.expandedOwned or {}
+	app.expandedOwned=expandedOwned
 
 	local modalOverlay=nil
 	local refreshAll=nil
@@ -38,16 +38,16 @@ function HitboxPreset.new(ctx,ownedSection)
 	local importWarning=nil
 	local requestImport=nil
 
-	local function trackConnection(conn,bucket)
+	local function trackConnection(connection,bucket)
 		bucket=bucket or connections
-		table.insert(bucket,conn)
-		return conn
+		table.insert(bucket,connection)
+		return connection
 	end
 
 	local function disconnectAll(bucket)
-		for _,conn in ipairs(bucket) do
+		for _,connection in ipairs(bucket) do
 			pcall(function()
-				conn:Disconnect()
+				connection:Disconnect()
 			end)
 		end
 		table.clear(bucket)
@@ -127,8 +127,8 @@ function HitboxPreset.new(ctx,ownedSection)
 	local function requestRefresh()
 		api.Refresh()
 		if refreshAll then refreshAll() end
-		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
-		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
+		if app.refreshPage2UI then pcall(app.refreshPage2UI) end
+		if app.rebuildOwnedList then pcall(app.rebuildOwnedList) end
 	end
 
 	local function applyEditorLocally(editor)
@@ -142,14 +142,14 @@ function HitboxPreset.new(ctx,ownedSection)
 			end
 		end
 
-		if ctx.requestPlayerAutosave then
-			ctx.requestPlayerAutosave()
+		if app.requestPlayerAutosave then
+			app.requestPlayerAutosave()
 		end
 	end
 
 	local function applyOwnedPreset(preset,editor)
-		if ctx.equipOwnedPreset then
-			local ok,success,err=pcall(ctx.equipOwnedPreset,preset)
+		if app.equipOwnedPreset then
+			local ok,success,err=pcall(app.equipOwnedPreset,preset)
 			if ok and success~=false then
 				return true
 			end
@@ -159,8 +159,8 @@ function HitboxPreset.new(ctx,ownedSection)
 			elseif err then
 				warn("preset equip failed:",err)
 			end
-		elseif ctx.applyPresetEditor then
-			local ok,success,err=pcall(ctx.applyPresetEditor,editor)
+		elseif app.applyPresetEditor then
+			local ok,success,err=pcall(app.applyPresetEditor,editor)
 			if ok and success~=false then
 				return true
 			end
@@ -177,8 +177,8 @@ function HitboxPreset.new(ctx,ownedSection)
 	end
 
 	local function deleteOwnedPreset(code,index)
-		if ctx.deleteOwnedPreset then
-			local ok,success,err=pcall(ctx.deleteOwnedPreset,code,index)
+		if app.deleteOwnedPreset then
+			local ok,success,err=pcall(app.deleteOwnedPreset,code,index)
 			if ok and success~=false then
 				return true
 			end
@@ -212,19 +212,19 @@ function HitboxPreset.new(ctx,ownedSection)
 
 	local function makePresetActionButton(parent,label,bucket)
 		local normalBg=THEME.BUTTON or THEME.BG
-		local btn=New("TextButton",{Size=UDim2.fromOffset(92,26),BackgroundColor3=normalBg,BorderSizePixel=0,Text=label,Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=9,ThemeRole="BUTTON"},parent)
-		local wrap=wrapTextButton(btn,normalBg,2)
+		local button=New("TextButton",{Size=UDim2.fromOffset(92,26),BackgroundColor3=normalBg,BorderSizePixel=0,Text=label,Font=Enum.Font.Gotham,TextSize=11,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=9,ThemeRole="BUTTON"},parent)
+		local wrap=wrapTextButton(button,normalBg,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 
-		trackConnection(btn.MouseEnter:Connect(function()
+		trackConnection(button.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=THEME.CARD
 		end),bucket)
 
-		trackConnection(btn.MouseLeave:Connect(function()
+		trackConnection(button.MouseLeave:Connect(function()
 			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
 		end),bucket)
 
-		return btn
+		return button
 	end
 
 	function api.Refresh()
@@ -294,8 +294,8 @@ function HitboxPreset.new(ctx,ownedSection)
 			return false,"preset broke: "..tostring(editor)
 		end
 
-		if ctx.createOwnedPreset then
-			local callOk,success,result=pcall(ctx.createOwnedPreset,cleanName,editor)
+		if app.createOwnedPreset then
+			local callOk,success,result=pcall(app.createOwnedPreset,cleanName,editor)
 			if not callOk then
 				return false,tostring(success)
 			end
@@ -318,8 +318,8 @@ function HitboxPreset.new(ctx,ownedSection)
 
 		table.insert(OWNED_PRESETS,preset)
 		expandedOwned[code]=true
-		if ctx.requestPlayerAutosave then
-			ctx.requestPlayerAutosave()
+		if app.requestPlayerAutosave then
+			app.requestPlayerAutosave()
 		end
 		requestRefresh()
 
@@ -332,8 +332,8 @@ function HitboxPreset.new(ctx,ownedSection)
 			return false,"paste a code"
 		end
 
-		if ctx.importOwnedPreset then
-			local ok,success,result=pcall(ctx.importOwnedPreset,cleanCode)
+		if app.importOwnedPreset then
+			local ok,success,result=pcall(app.importOwnedPreset,cleanCode)
 			if not ok then
 				return false,tostring(success)
 			end
@@ -359,19 +359,19 @@ function HitboxPreset.new(ctx,ownedSection)
 
 	local function modalButton(parent,text,x)
 		local normalBg=THEME.BUTTON or THEME.BG
-		local btn=New("TextButton",{Size=UDim2.fromOffset(96,30),Position=UDim2.fromOffset(x,118),BackgroundColor3=normalBg,BorderSizePixel=0,Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=101,ThemeRole="BUTTON"},parent)
-		local wrap=wrapTextButton(btn,normalBg,2)
+		local button=New("TextButton",{Size=UDim2.fromOffset(96,30),Position=UDim2.fromOffset(x,118),BackgroundColor3=normalBg,BorderSizePixel=0,Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=101,ThemeRole="BUTTON"},parent)
+		local wrap=wrapTextButton(button,normalBg,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 
-		trackConnection(btn.MouseEnter:Connect(function()
+		trackConnection(button.MouseEnter:Connect(function()
 			wrap.BackgroundColor3=THEME.CARD
 		end),modalConnections)
 
-		trackConnection(btn.MouseLeave:Connect(function()
+		trackConnection(button.MouseLeave:Connect(function()
 			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
 		end),modalConnections)
 
-		return btn
+		return button
 	end
 
 	local function showImportConfirm(code)

@@ -2,26 +2,26 @@
 
 local MainFrame={}
 
-function MainFrame.new(ctx)
-	local New=ctx.New
-	local Fusion=ctx.Fusion
-	local THEME=ctx.THEME
-	local Description=ctx.Description or {}
-	local UI_WINDOW=ctx.UI_WINDOW
-	local SG=ctx.SG
-	local UIS=ctx.UIS
-	local TweenService=ctx.TweenService
-	local RunService=ctx.RunService
+function MainFrame.new(app)
+	local New=app.New
+	local Fusion=app.Fusion
+	local THEME=app.THEME
+	local Description=app.Description or {}
+	local UI_WINDOW=app.UI_WINDOW
+	local SG=app.SG
+	local UIS=app.UIS
+	local TweenService=app.TweenService
+	local RunService=app.RunService
 	local ContextActionService=game:GetService("ContextActionService")
-	local safeDisconnect=ctx.safeDisconnect
-	local wrapTextButton=ctx.wrapTextButton
-	local attachHover=ctx.attachHover
-	local isAlive=ctx.isAlive or function() return true end
-	local getModeLabel=ctx.getModeLabel or function() return "Gameplay" end
-	local getUIStrokeColor=ctx.getUIStrokeColor or function() return THEME.STROKE end
-	local getCurrentUILibProfile=ctx.getCurrentUILibProfile
-	local onPageActivated=ctx.onPageActivated
-	local uiProfile=type(ctx.UI_PROFILE)=="table" and ctx.UI_PROFILE or {}
+	local safeDisconnect=app.safeDisconnect
+	local wrapTextButton=app.wrapTextButton
+	local attachHover=app.attachHover
+	local isAlive=app.isAlive or function() return true end
+	local getModeLabel=app.getModeLabel or function() return "Gameplay" end
+	local getUIStrokeColor=app.getUIStrokeColor or function() return THEME.STROKE end
+	local getCurrentUILibProfile=app.getCurrentUILibProfile
+	local onPageActivated=app.onPageActivated
+	local uiProfile=type(app.UI_PROFILE)=="table" and app.UI_PROFILE or {}
 	local mainFrameProfile={}
 	local windowProfile={}
 	local layoutProfile={}
@@ -268,9 +268,9 @@ function MainFrame.new(ctx)
 		return nil
 	end
 
-	local function hydrateFusion(obj,props)
-		if obj and fusionScope and type(fusionScope.Hydrate)=="function" then
-			fusionScope:Hydrate(obj)(props)
+	local function hydrateFusion(instance,properties)
+		if instance and fusionScope and type(fusionScope.Hydrate)=="function" then
+			fusionScope:Hydrate(instance)(properties)
 		end
 	end
 
@@ -902,17 +902,17 @@ function MainFrame.new(ctx)
 
 		toast.BackgroundTransparency=1
 		toastStroke.Transparency=1
-		for _,obj in ipairs(toast:GetDescendants()) do
-			if obj:IsA("TextLabel") then
-				obj.TextTransparency=1
+		for _,instance in ipairs(toast:GetDescendants()) do
+			if instance:IsA("TextLabel") then
+				instance.TextTransparency=1
 			end
 		end
 
 		TweenService:Create(toast,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundTransparency=0.04}):Play()
 		TweenService:Create(toastStroke,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Transparency=0.35}):Play()
-		for _,obj in ipairs(toast:GetDescendants()) do
-			if obj:IsA("TextLabel") then
-				TweenService:Create(obj,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
+		for _,instance in ipairs(toast:GetDescendants()) do
+			if instance:IsA("TextLabel") then
+				TweenService:Create(instance,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
 			end
 		end
 
@@ -921,9 +921,9 @@ function MainFrame.new(ctx)
 			local fade=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.In)
 			TweenService:Create(toast,fade,{BackgroundTransparency=1}):Play()
 			TweenService:Create(toastStroke,fade,{Transparency=1}):Play()
-			for _,obj in ipairs(toast:GetDescendants()) do
-				if obj:IsA("TextLabel") then
-					TweenService:Create(obj,fade,{TextTransparency=1}):Play()
+			for _,instance in ipairs(toast:GetDescendants()) do
+				if instance:IsA("TextLabel") then
+					TweenService:Create(instance,fade,{TextTransparency=1}):Play()
 				end
 			end
 

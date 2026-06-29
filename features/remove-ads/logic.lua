@@ -1,4 +1,4 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- hides billboard ads and puts them back when disabled.
 
 local RemoveAds={}
 
@@ -16,12 +16,12 @@ local function destroyControl(control)
 	end
 end
 
-function RemoveAds.new(ctx,page)
-	local THEME=ctx.THEME
-	local safeDisconnect=ctx.safeDisconnect
-	local makeSection=ctx.makeSection
-	local buildToggleRow=ctx.buildToggleRow
-	local getCurrentModeKey=ctx.getCurrentModeKey or function() return "mode1" end
+function RemoveAds.new(app,page)
+	local THEME=app.THEME
+	local safeDisconnect=app.safeDisconnect
+	local makeSection=app.makeSection
+	local buildToggleRow=app.buildToggleRow
+	local getCurrentModeKey=app.getCurrentModeKey or function() return "mode1" end
 
 	local api={}
 	local enabled=false
@@ -181,8 +181,8 @@ function RemoveAds.new(ctx,page)
 			setStatus(isGameplay() and "ads back" or "game only",THEME.MUTED)
 		end
 
-		if fire~=false and ctx.onChanged then
-			pcall(ctx.onChanged,enabled)
+		if fire~=false and app.onChanged then
+			pcall(app.onChanged,enabled)
 		end
 	end
 

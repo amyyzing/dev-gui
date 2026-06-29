@@ -1,4 +1,4 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- marks defended receivers while the other team can throw.
 
 local ESPDefense={}
 
@@ -59,8 +59,8 @@ local function styleColor(style,prefix,legacyPrefix,channel,fallback)
 	)
 end
 
-local function highlightStyle(ctx,stateKey,fallbackColor)
-	local style=ctx and ctx.UI_STYLE
+local function highlightStyle(app,stateKey,fallbackColor)
+	local style=app and app.UI_STYLE
 	local prefix=stateKey=="holder" and "ESPDefenseHolder" or (stateKey=="closed" and "ESPDefenseClosed" or "ESPDefenseOpen")
 	return{
 		fill=styleColor(style,prefix,"ESPDefense","Fill",fallbackColor),
@@ -224,8 +224,8 @@ local function findBallCarrierData(players)
 	return nil
 end
 
-local function getConfiguredThrowY(ctx)
-	local state=ctx and ctx.State
+local function getConfiguredThrowY(app)
+	local state=app and app.State
 	local value=state and tonumber(state.qbAimPeakHeight)
 	if value then
 		return math.clamp(value,8,24)
@@ -354,7 +354,7 @@ local function passCanBeIntercepted(plan,defenderRoots,catchY)
 	return false
 end
 
-local function isReceiverClosed(receiverPlayer,carrierData,defenderRoots,ctx)
+local function isReceiverClosed(receiverPlayer,carrierData,defenderRoots,app)
 	if not receiverPlayer or not carrierData then
 		return true
 	end
@@ -379,7 +379,7 @@ local function isReceiverClosed(receiverPlayer,carrierData,defenderRoots,ctx)
 		return true
 	end
 
-	local catchY=getConfiguredThrowY(ctx)
+	local catchY=getConfiguredThrowY(app)
 	local origin=getThrowOrigin(carrierRoot,footballPart,catchY)
 	local target=getReceiverTarget(receiverRoot,catchY)
 	local plan=origin and target and solveStationaryThrow(origin,target) or nil
@@ -406,10 +406,10 @@ local function ensureOwnedHighlight(character)
 	return highlight
 end
 
-local function forceHighlight(ctx,character,stateKey,color)
+local function forceHighlight(app,character,stateKey,color)
 	if not character then return end
 
-	local style=highlightStyle(ctx,stateKey,color)
+	local style=highlightStyle(app,stateKey,color)
 	local owned=ensureOwnedHighlight(character)
 	owned.Adornee=character
 	owned.Enabled=true
@@ -427,13 +427,13 @@ local function destroyOwnedHighlight(character)
 	end
 end
 
-function ESPDefense.new(ctx)
-	local THEME=ctx.THEME
-	local safeDisconnect=ctx.safeDisconnect
-	local scheduler=ctx.Scheduler
-	local services=ctx.Services or {}
-	local playerCache=services.PlayerCache or ctx.PlayerCache
-	local ballTracker=services.BallTracker or ctx.BallTracker
+function ESPDefense.new(app)
+	local THEME=app.THEME
+	local safeDisconnect=app.safeDisconnect
+	local scheduler=app.Scheduler
+	local services=app.Services or {}
+	local playerCache=services.PlayerCache or app.PlayerCache
+	local ballTracker=services.BallTracker or app.BallTracker
 	local api={}
 	local heartbeatConn=nil
 	local heartbeatElapsed=0
@@ -494,12 +494,12 @@ function ESPDefense.new(ctx)
 				if character then
 					if shouldHighlightPlayer(player) then
 						if carrierData and player==carrierData.player then
-							forceHighlight(ctx,character,"holder",blue)
+							forceHighlight(app,character,"holder",blue)
 						elseif carrierData and isSameTeam(player,carrierData.player) then
-							if isReceiverClosed(player,carrierData,defenderRoots,ctx) then
-								forceHighlight(ctx,character,"closed",red)
+							if isReceiverClosed(player,carrierData,defenderRoots,app) then
+								forceHighlight(app,character,"closed",red)
 							else
-								forceHighlight(ctx,character,"open",green)
+								forceHighlight(app,character,"open",green)
 							end
 						else
 							destroyOwnedHighlight(character)

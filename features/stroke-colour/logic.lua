@@ -1,4 +1,4 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- color picker, theme presets, and highlight colors.
 
 local StrokeColour={}
 
@@ -306,18 +306,18 @@ local function readableTextColor(color)
 	return Color3.fromRGB(18,18,18)
 end
 
-function StrokeColour.new(ctx,page)
-	local New=ctx.New
-	local THEME=ctx.THEME
-	local UI_STYLE=ctx.UI_STYLE
-	local UIS=ctx.UIS or game:GetService("UserInputService")
+function StrokeColour.new(app,page)
+	local New=app.New
+	local THEME=app.THEME
+	local UI_STYLE=app.UI_STYLE
+	local UIS=app.UIS or game:GetService("UserInputService")
 	local GuiService=game:GetService("GuiService")
-	local buildSlider=ctx.buildSlider
+	local buildSlider=app.buildSlider
 
-	applyDefaultOverrides(ctx.DEFAULT_UI_STYLE)
+	applyDefaultOverrides(app.DEFAULT_UI_STYLE)
 	ensureStyleDefaults(UI_STYLE)
 
-	local defaultStyle=copyDefaultStyle(ctx.DEFAULT_UI_STYLE or UI_STYLE)
+	local defaultStyle=copyDefaultStyle(app.DEFAULT_UI_STYLE or UI_STYLE)
 
 	local api={}
 	local prSlider,pgSlider,pbSlider
@@ -408,30 +408,30 @@ function StrokeColour.new(ctx,page)
 		return best.X-pos.X,best.Y-pos.Y,math.max(size.X,1),math.max(size.Y,1)
 	end
 
-	local function trackConnection(conn)
-		connections[#connections+1]=conn
-		return conn
+	local function trackConnection(connection)
+		connections[#connections+1]=connection
+		return connection
 	end
 
 	local function getUIStrokeColor()
-		if ctx.getUIStrokeColor then
-			return ctx.getUIStrokeColor()
+		if app.getUIStrokeColor then
+			return app.getUIStrokeColor()
 		end
 
 		return colorFromStyle(UI_STYLE,"Stroke")
 	end
 
 	local function getUIStrokeGradientColor()
-		if ctx.getUIStrokeGradientColor then
-			return ctx.getUIStrokeGradientColor()
+		if app.getUIStrokeGradientColor then
+			return app.getUIStrokeGradientColor()
 		end
 
 		return colorFromStyle(UI_STYLE,"Gradient")
 	end
 
 	local function getUIPrimaryColor()
-		if ctx.getUIPrimaryColor then
-			return ctx.getUIPrimaryColor()
+		if app.getUIPrimaryColor then
+			return app.getUIPrimaryColor()
 		end
 
 		return colorFromStyle(UI_STYLE,"Primary")
@@ -439,8 +439,8 @@ function StrokeColour.new(ctx,page)
 
 	local function tintSlider(slider,color)
 		local sliderColor=color or getUIStrokeColor()
-		if ctx.tintSlider then
-			ctx.tintSlider(slider,sliderColor)
+		if app.tintSlider then
+			app.tintSlider(slider,sliderColor)
 			return
 		end
 
@@ -455,8 +455,8 @@ function StrokeColour.new(ctx,page)
 	end
 
 	local function applyUIStrokeTheme()
-		if ctx.applyUIStrokeTheme then
-			ctx.applyUIStrokeTheme()
+		if app.applyUIStrokeTheme then
+			app.applyUIStrokeTheme()
 		end
 	end
 
@@ -472,8 +472,8 @@ function StrokeColour.new(ctx,page)
 		applyUIStrokeTheme()
 		updatePreview()
 
-		if ctx.onChanged then
-			pcall(ctx.onChanged,UI_STYLE)
+		if app.onChanged then
+			pcall(app.onChanged,UI_STYLE)
 		end
 	end
 
@@ -552,14 +552,14 @@ function StrokeColour.new(ctx,page)
 		end
 
 		local valueConnections={}
-		local function trackValueConnection(conn)
-			valueConnections[#valueConnections+1]=conn
-			return conn
+		local function trackValueConnection(connection)
+			valueConnections[#valueConnections+1]=connection
+			return connection
 		end
 		local function cleanupValueConnections()
-			for _,conn in ipairs(valueConnections) do
+			for _,connection in ipairs(valueConnections) do
 				pcall(function()
-					conn:Disconnect()
+					connection:Disconnect()
 				end)
 			end
 			table.clear(valueConnections)
@@ -569,10 +569,10 @@ function StrokeColour.new(ctx,page)
 		trackValueConnection(gradientValue.Changed:Connect(applyStep))
 
 		local info=TweenInfo.new(0.24,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
-		local t1=TweenService:Create(mainValue,info,{Value=c1})
-		local t2=TweenService:Create(gradientValue,info,{Value=c1})
+		local mainColourTween=TweenService:Create(mainValue,info,{Value=c1})
+		local gradientColourTween=TweenService:Create(gradientValue,info,{Value=c1})
 
-		trackValueConnection(t2.Completed:Connect(function()
+		trackValueConnection(gradientColourTween.Completed:Connect(function()
 			if token==colourTweenToken then
 				setMainColour(c1)
 				setGradientColour(c1)
@@ -587,8 +587,8 @@ function StrokeColour.new(ctx,page)
 			gradientValue:Destroy()
 		end))
 
-		t1:Play()
-		t2:Play()
+		mainColourTween:Play()
+		gradientColourTween:Play()
 	end
 
 	function api.Refresh()
@@ -616,9 +616,9 @@ function StrokeColour.new(ctx,page)
 		end
 		table.clear(sharedSliderControls)
 
-		for _,conn in ipairs(connections) do
+		for _,connection in ipairs(connections) do
 			pcall(function()
-				conn:Disconnect()
+				connection:Disconnect()
 			end)
 		end
 
@@ -726,13 +726,13 @@ function StrokeColour.new(ctx,page)
 		return THEME[role] or fallback
 	end
 
-	local function addCorner(obj,role)
-		if not obj then
+	local function addCorner(instance,role)
+		if not instance then
 			return nil
 		end
 
-		obj:SetAttribute("CornerRole",role or "Control")
-		return New("UICorner",{CornerRadius=UDim.new(0,0)},obj)
+		instance:SetAttribute("CornerRole",role or "Control")
+		return New("UICorner",{CornerRadius=UDim.new(0,0)},instance)
 	end
 
 	local function toHSV(color)
@@ -904,8 +904,8 @@ function StrokeColour.new(ctx,page)
 				end
 			end
 
-			if fire and ctx.onChanged then
-				pcall(ctx.onChanged,UI_STYLE)
+			if fire and app.onChanged then
+				pcall(app.onChanged,UI_STYLE)
 			end
 		end
 
@@ -2033,7 +2033,7 @@ function StrokeColour.new(ctx,page)
 		paintHighlightDial(true)
 	end
 
-	local paramsDial=ctx.Page1GameParamsModule
+	local paramsDial=app.Page1GameParamsModule
 	local assets=paramsDial and type(paramsDial.GetDialSliceAssets)=="function" and paramsDial.GetDialSliceAssets() or nil
 
 	for _,slice in ipairs(HIGHLIGHT_DIAL_SLICES) do

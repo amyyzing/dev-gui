@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- reset-position button.
 
-return{new=function(ctx,...)
-	return ctx.ResetPositionLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.ResetPositionLogicModule.new(app,...)
 end}

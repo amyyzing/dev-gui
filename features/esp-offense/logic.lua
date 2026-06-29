@@ -1,4 +1,4 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- marks open receivers while you are the quarterback.
 
 local ESPOffense={}
 
@@ -60,8 +60,8 @@ local function styleColor(style,prefix,legacyPrefix,channel,fallback)
 	)
 end
 
-local function highlightStyle(ctx,stateKey,fallbackColor)
-	local style=ctx and ctx.UI_STYLE
+local function highlightStyle(app,stateKey,fallbackColor)
+	local style=app and app.UI_STYLE
 	local prefix=stateKey=="closed" and "ESPOffenseClosed" or "ESPOffenseOpen"
 	return{
 		fill=styleColor(style,prefix,"ESPOffense","Fill",fallbackColor),
@@ -213,8 +213,8 @@ local function shouldUseAsDefender(player)
 	return myTeam~=theirTeam
 end
 
-local function getConfiguredThrowY(ctx)
-	local state=ctx and ctx.State
+local function getConfiguredThrowY(app)
+	local state=app and app.State
 	local value=state and tonumber(state.qbAimPeakHeight)
 	if value then
 		return math.clamp(value,8,24)
@@ -379,10 +379,10 @@ local function ensureOwnedHighlight(character)
 	return highlight
 end
 
-local function forceHighlight(ctx,character,stateKey,color)
+local function forceHighlight(app,character,stateKey,color)
 	if not character then return end
 
-	local style=highlightStyle(ctx,stateKey,color)
+	local style=highlightStyle(app,stateKey,color)
 	local owned=ensureOwnedHighlight(character)
 	owned.Adornee=character
 	owned.Enabled=true
@@ -400,13 +400,13 @@ local function destroyOwnedHighlight(character)
 	end
 end
 
-function ESPOffense.new(ctx)
-	local THEME=ctx.THEME
-	local safeDisconnect=ctx.safeDisconnect
-	local scheduler=ctx.Scheduler
-	local services=ctx.Services or {}
-	local playerCache=services.PlayerCache or ctx.PlayerCache
-	local ballTracker=services.BallTracker or ctx.BallTracker
+function ESPOffense.new(app)
+	local THEME=app.THEME
+	local safeDisconnect=app.safeDisconnect
+	local scheduler=app.Scheduler
+	local services=app.Services or {}
+	local playerCache=services.PlayerCache or app.PlayerCache
+	local ballTracker=services.BallTracker or app.BallTracker
 	local api={}
 	local heartbeatConn=nil
 	local heartbeatElapsed=0
@@ -467,7 +467,7 @@ function ESPOffense.new(ctx)
 		end
 
 		local players=currentPlayers()
-		local catchY=getConfiguredThrowY(ctx)
+		local catchY=getConfiguredThrowY(app)
 		local origin=getThrowOrigin(qbRoot,nil,catchY)
 		local defenderRoots=collectDefenderRoots(players)
 		local red=THEME.RED or Color3.fromRGB(210,70,70)
@@ -481,9 +481,9 @@ function ESPOffense.new(ctx)
 						if hasActiveQBAimHighlight(character) then
 							destroyOwnedHighlight(character)
 						elseif isReceiverClosed(player,origin,defenderRoots,catchY) then
-							forceHighlight(ctx,character,"closed",red)
+							forceHighlight(app,character,"closed",red)
 						else
-							forceHighlight(ctx,character,"open",green)
+							forceHighlight(app,character,"open",green)
 						end
 					else
 						destroyOwnedHighlight(character)

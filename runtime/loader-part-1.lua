@@ -1,7 +1,6 @@
 -- HB_RUNTIME_PART_1
--- old globals live here because the runtime chunks share one env.
+-- boot step 1: services, theme defaults, loader screen, and module fetch.
 
--- Runtime chunk 1. Loaded by loader.lua with a shared environment.
 Players=game:GetService("Players")
 UIS=game:GetService("UserInputService")
 TweenService=game:GetService("TweenService")
@@ -98,20 +97,20 @@ RUNTIME_JOB_CONNECTIONS={}
 RUNTIME_BUILD_ERRORS={}
 RUNTIME_ROOT_SCOPE=nil
 
-function trackRuntimeConnection(conn)
-	if conn then
+function trackRuntimeConnection(connection)
+	if connection then
 		if RUNTIME_ROOT_SCOPE and RUNTIME_ROOT_SCOPE.add then
-			RUNTIME_ROOT_SCOPE:add(conn)
+			RUNTIME_ROOT_SCOPE:add(connection)
 		end
-		table.insert(RUNTIME_CONNECTIONS,conn)
+		table.insert(RUNTIME_CONNECTIONS,connection)
 	end
 
-	return conn
+	return connection
 end
 
-function untrackRuntimeConnection(conn)
+function untrackRuntimeConnection(connection)
 	for index=#RUNTIME_CONNECTIONS,1,-1 do
-		if RUNTIME_CONNECTIONS[index]==conn then
+		if RUNTIME_CONNECTIONS[index]==connection then
 			table.remove(RUNTIME_CONNECTIONS,index)
 			return
 		end
@@ -125,13 +124,13 @@ function disconnectRuntimeConnections()
 		end)
 	end
 
-	for _,conn in ipairs(RUNTIME_CONNECTIONS) do
-		if typeof(conn)=="RBXScriptConnection" then
+	for _,connection in ipairs(RUNTIME_CONNECTIONS) do
+		if typeof(connection)=="RBXScriptConnection" then
 			pcall(function()
-				conn:Disconnect()
+				connection:Disconnect()
 			end)
-		elseif type(conn)=="function" then
-			pcall(conn)
+		elseif type(connection)=="function" then
+			pcall(connection)
 		end
 	end
 
@@ -147,19 +146,19 @@ function disconnectRuntimeConnections()
 	end
 end
 
-function registerThemeObject(obj)
-	if not obj then return end
+function registerThemeObject(instance)
+	if not instance then return end
 
-	if obj:IsA("GuiObject") then
-		THEMED_GUI_OBJECTS[obj]=true
+	if instance:IsA("GuiObject") then
+		THEMED_GUI_OBJECTS[instance]=true
 	end
 
-	if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
-		THEMED_TEXT_OBJECTS[obj]=true
-	elseif obj:IsA("UIStroke") then
-		THEMED_STROKES[obj]=true
-	elseif obj:IsA("UICorner") then
-		THEMED_CORNERS[obj]=true
+	if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
+		THEMED_TEXT_OBJECTS[instance]=true
+	elseif instance:IsA("UIStroke") then
+		THEMED_STROKES[instance]=true
+	elseif instance:IsA("UICorner") then
+		THEMED_CORNERS[instance]=true
 	end
 end
 
@@ -179,24 +178,24 @@ local function findThemeRole(color,roles)
 	end
 end
 
-function markThemeRole(obj,color)
-	if not(obj and color) then return end
-	registerThemeObject(obj)
-	if obj:IsA("TextButton") and obj.Text=="" then return end
+function markThemeRole(instance,color)
+	if not(instance and color) then return end
+	registerThemeObject(instance)
+	if instance:IsA("TextButton") and instance.Text=="" then return end
 
 	local role=findThemeRole(color,THEME_ROLE_NAMES)
 	if role then
-		obj:SetAttribute("ThemeRole",role)
+		instance:SetAttribute("ThemeRole",role)
 	end
 end
 
-function markThemeTextRole(obj,color,defaultRole)
-	if not(obj and color) then return end
-	registerThemeObject(obj)
+function markThemeTextRole(instance,color,defaultRole)
+	if not(instance and color) then return end
+	registerThemeObject(instance)
 
 	local role=findThemeRole(color,THEME_TEXT_ROLE_NAMES)
 	if role or defaultRole then
-		obj:SetAttribute("ThemeTextRole",role or defaultRole)
+		instance:SetAttribute("ThemeTextRole",role or defaultRole)
 	end
 end
 
@@ -216,114 +215,114 @@ function translateUIText(value)
 	return value
 end
 
-function New(class, props, parent)
-	props=props or {}
-	local skipThemeRole=props.SkipThemeRole
-	local skipTextRole=props.SkipTextRole
-	local forcedThemeRole=props.ThemeRole
-	local forcedTextRole=props.TextRole
-	local forcedStrokeRole=props.StrokeRole
-	local forcedCornerRole=props.CornerRole
+function New(class, properties, parent)
+	properties=properties or {}
+	local skipThemeRole=properties.SkipThemeRole
+	local skipTextRole=properties.SkipTextRole
+	local forcedThemeRole=properties.ThemeRole
+	local forcedTextRole=properties.TextRole
+	local forcedStrokeRole=properties.StrokeRole
+	local forcedCornerRole=properties.CornerRole
 	local isTextClass=class=="TextLabel" or class=="TextButton" or class=="TextBox"
 
-	props.SkipThemeRole=nil
-	props.SkipTextRole=nil
-	props.ThemeRole=nil
-	props.TextRole=nil
-	props.StrokeRole=nil
-	props.CornerRole=nil
+	properties.SkipThemeRole=nil
+	properties.SkipTextRole=nil
+	properties.ThemeRole=nil
+	properties.TextRole=nil
+	properties.StrokeRole=nil
+	properties.CornerRole=nil
 
-	if props.Active==nil and (class=="Frame" or class=="ScrollingFrame" or class=="TextButton" or class=="TextBox") then
-		props.Active=true
+	if properties.Active==nil and (class=="Frame" or class=="ScrollingFrame" or class=="TextButton" or class=="TextBox") then
+		properties.Active=true
 	end
 
 	if isTextClass then
-		if props.TextColor3==nil then props.TextColor3=THEME.TEXT end
-		if props.Font==nil then props.Font=Enum.Font.Gotham end
-		props.TextStrokeTransparency=1
-		props.TextStrokeColor3=Color3.fromRGB(0, 0, 0)
-		if props.TextYAlignment==nil then props.TextYAlignment=Enum.TextYAlignment.Center end
-		if props.Text~=nil then props.Text=translateUIText(props.Text) end
-		if props.PlaceholderText~=nil then props.PlaceholderText=translateUIText(props.PlaceholderText) end
+		if properties.TextColor3==nil then properties.TextColor3=THEME.TEXT end
+		if properties.Font==nil then properties.Font=Enum.Font.Gotham end
+		properties.TextStrokeTransparency=1
+		properties.TextStrokeColor3=Color3.fromRGB(0, 0, 0)
+		if properties.TextYAlignment==nil then properties.TextYAlignment=Enum.TextYAlignment.Center end
+		if properties.Text~=nil then properties.Text=translateUIText(properties.Text) end
+		if properties.PlaceholderText~=nil then properties.PlaceholderText=translateUIText(properties.PlaceholderText) end
 
 		if class=="TextBox" then
-			props.TextSize=props.TextSize or 13
-			props.TextScaled=false
-			props.TextWrapped=false
-			props.TextYAlignment=Enum.TextYAlignment.Center
+			properties.TextSize=properties.TextSize or 13
+			properties.TextScaled=false
+			properties.TextWrapped=false
+			properties.TextYAlignment=Enum.TextYAlignment.Center
 		end
 	end
 
-	local obj=nil
+	local instance=nil
 	if FusionModule and type(FusionModule.New)=="function" then
 		local ok,result=pcall(function()
-			return FusionModule.New(class)(props)
+			return FusionModule.New(class)(properties)
 		end)
 		if ok and typeof(result)=="Instance" then
-			obj=result
+			instance=result
 		else
 			warn("ui create failed, using backup:",class,result)
 		end
 	end
 
-	if not obj then
-		obj=Instance.new(class)
-		for k, v in pairs(props) do
-			obj[k]=v
+	if not instance then
+		instance=Instance.new(class)
+		for k, v in pairs(properties) do
+			instance[k]=v
 		end
 	end
 	if parent~=nil then
-		obj.Parent=parent
+		instance.Parent=parent
 	end
-	registerThemeObject(obj)
+	registerThemeObject(instance)
 
 	if forcedThemeRole then
-		obj:SetAttribute("ThemeRole",forcedThemeRole)
-	elseif not skipThemeRole and props.BackgroundColor3 then
-		markThemeRole(obj,props.BackgroundColor3)
+		instance:SetAttribute("ThemeRole",forcedThemeRole)
+	elseif not skipThemeRole and properties.BackgroundColor3 then
+		markThemeRole(instance,properties.BackgroundColor3)
 	end
 
 	if skipTextRole and isTextClass then
-		obj:SetAttribute("SkipTextRole",true)
+		instance:SetAttribute("SkipTextRole",true)
 	end
 
 	if forcedTextRole and isTextClass then
-		obj:SetAttribute("ThemeTextRole",forcedTextRole)
+		instance:SetAttribute("ThemeTextRole",forcedTextRole)
 	elseif isTextClass and not skipTextRole then
-		markThemeTextRole(obj,props.TextColor3,"TEXT")
+		markThemeTextRole(instance,properties.TextColor3,"TEXT")
 	end
 
 	if forcedCornerRole then
-		obj:SetAttribute("CornerRole",forcedCornerRole)
+		instance:SetAttribute("CornerRole",forcedCornerRole)
 	end
 
 	if forcedStrokeRole then
-		obj:SetAttribute("StrokeRole",forcedStrokeRole)
+		instance:SetAttribute("StrokeRole",forcedStrokeRole)
 	end
 
 	if class=="TextBox" then
-		trackRuntimeConnection(obj.Focused:Connect(function()
-			obj.TextSize=13
-			obj.TextScaled=false
-			obj.TextWrapped=false
-			obj.TextYAlignment=Enum.TextYAlignment.Center
+		trackRuntimeConnection(instance.Focused:Connect(function()
+			instance.TextSize=13
+			instance.TextScaled=false
+			instance.TextWrapped=false
+			instance.TextYAlignment=Enum.TextYAlignment.Center
 		end))
 
-		trackRuntimeConnection(obj.FocusLost:Connect(function()
-			obj.TextSize=13
-			obj.TextScaled=false
-			obj.TextWrapped=false
-			obj.TextYAlignment=Enum.TextYAlignment.Center
+		trackRuntimeConnection(instance.FocusLost:Connect(function()
+			instance.TextSize=13
+			instance.TextScaled=false
+			instance.TextWrapped=false
+			instance.TextYAlignment=Enum.TextYAlignment.Center
 		end))
 	end
 
-	return obj
+	return instance
 end
 
-function safeDisconnect(conn)
-	if conn and typeof(conn)=="RBXScriptConnection" then
+function safeDisconnect(connection)
+	if connection and typeof(connection)=="RBXScriptConnection" then
 		pcall(function()
-			conn:Disconnect()
+			connection:Disconnect()
 		end)
 	end
 end
@@ -621,19 +620,19 @@ function moduleGlobalName(name)
 	return MODULE_GLOBAL_NAMES[name] or (tostring(name).."Module")
 end
 
-function setLoadedModule(name,module)
-	getfenv()[moduleGlobalName(name)]=module
-	return module
+function setLoadedModule(name,loadedModule)
+	getfenv()[moduleGlobalName(name)]=loadedModule
+	return loadedModule
 end
 
-function setLoadedModuleByPath(path,module)
+function setLoadedModuleByPath(path,loadedModule)
 	for name,modulePath in pairs(MODULE_PATHS) do
 		if modulePath==path then
-			return setLoadedModule(name,module)
+			return setLoadedModule(name,loadedModule)
 		end
 	end
 
-	return module
+	return loadedModule
 end
 
 function modulePathsFromNames(names)
@@ -737,15 +736,15 @@ function loadModuleFromSource(modulePath,source)
 		setfenv(chunk,getfenv())
 	end
 
-	local ok,module=pcall(chunk)
-	if not ok then
+	local loadedOk,loadedModule=pcall(chunk)
+	if not loadedOk then
 		REMOTE_MODULE_SOURCES[modulePath]=source
-		return nil,module
+		return nil,loadedModule
 	end
 
 	REMOTE_MODULE_SOURCES[modulePath]=source
-	REMOTE_MODULE_CACHE[modulePath]=module
-	return module,nil
+	REMOTE_MODULE_CACHE[modulePath]=loadedModule
+	return loadedModule,nil
 end
 
 function loadRemoteModule(modulePath)
@@ -769,13 +768,13 @@ function loadRemoteModule(modulePath)
 		return nil
 	end
 
-	local module,err=loadModuleFromSource(modulePath,result.source)
-	if not module then
+	local loadedModule,err=loadModuleFromSource(modulePath,result.source)
+	if not loadedModule then
 		warn("module broke while loading:",modulePath,err)
 		return nil
 	end
 
-	return module
+	return loadedModule
 end
 
 function loadRemoteModuleBatch(paths)
@@ -795,17 +794,17 @@ function loadRemoteModuleBatch(paths)
 
 	for index,modulePath in ipairs(paths) do
 		local item=result.modules[modulePath]
-		local module=nil
+		local loadedModule=nil
 		local err=nil
 
 		if item and type(item.source)=="string" then
-			module,err=loadModuleFromSource(modulePath,item.source)
+			loadedModule,err=loadModuleFromSource(modulePath,item.source)
 		else
 			err=result.errors and result.errors[modulePath] or "batch module missing"
 		end
 
-		if module then
-			setLoadedModuleByPath(modulePath,module)
+		if loadedModule then
+			setLoadedModuleByPath(modulePath,loadedModule)
 			loaded=loaded+1
 		else
 			REMOTE_MODULE_SOURCES[modulePath]=false
@@ -1103,9 +1102,9 @@ for index,name in ipairs(loaderPhaseNames) do
 	loaderPhaseItems[index]={Frame=item,Dot=dot,Label=label}
 end
 
-local function tweenLoader(obj,props,duration,style,direction)
-	if not obj or not obj.Parent then return end
-	local tween=TweenService:Create(obj,TweenInfo.new(duration or 0.16,style or Enum.EasingStyle.Quad,direction or Enum.EasingDirection.Out),props)
+local function tweenLoader(instance,properties,duration,style,direction)
+	if not instance or not instance.Parent then return end
+	local tween=TweenService:Create(instance,TweenInfo.new(duration or 0.16,style or Enum.EasingStyle.Quad,direction or Enum.EasingDirection.Out),properties)
 	tween:Play()
 	return tween
 end
@@ -1168,18 +1167,18 @@ function showLoader()
 		{loaderBoxScale,Enum.EasingDirection.Out,Enum.EasingStyle.Back,0.22,{Scale=1}},
 	},true)
 
-	local ti=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
-	TweenService:Create(loaderBoxStroke,ti,{Transparency=0.08}):Play()
-	TweenService:Create(titleText,ti,{TextTransparency=0}):Play()
-	TweenService:Create(subtitleText,ti,{TextTransparency=0}):Play()
-	TweenService:Create(loaderStatus,ti,{TextTransparency=0}):Play()
-	TweenService:Create(loaderPercent,ti,{TextTransparency=0}):Play()
-	TweenService:Create(loaderPercentPill,ti,{BackgroundTransparency=0.18}):Play()
-	TweenService:Create(loaderPercentPillStroke,ti,{Transparency=0.35}):Play()
-	TweenService:Create(loaderTrack,ti,{BackgroundTransparency=0.12}):Play()
-	TweenService:Create(loaderTrackStroke,ti,{Transparency=0.35}):Play()
-	TweenService:Create(loaderFill,ti,{BackgroundTransparency=0}):Play()
-	TweenService:Create(loaderFillGlow,ti,{BackgroundTransparency=0.78}):Play()
+	local tweenInfo=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+	TweenService:Create(loaderBoxStroke,tweenInfo,{Transparency=0.08}):Play()
+	TweenService:Create(titleText,tweenInfo,{TextTransparency=0}):Play()
+	TweenService:Create(subtitleText,tweenInfo,{TextTransparency=0}):Play()
+	TweenService:Create(loaderStatus,tweenInfo,{TextTransparency=0}):Play()
+	TweenService:Create(loaderPercent,tweenInfo,{TextTransparency=0}):Play()
+	TweenService:Create(loaderPercentPill,tweenInfo,{BackgroundTransparency=0.18}):Play()
+	TweenService:Create(loaderPercentPillStroke,tweenInfo,{Transparency=0.35}):Play()
+	TweenService:Create(loaderTrack,tweenInfo,{BackgroundTransparency=0.12}):Play()
+	TweenService:Create(loaderTrackStroke,tweenInfo,{Transparency=0.35}):Play()
+	TweenService:Create(loaderFill,tweenInfo,{BackgroundTransparency=0}):Play()
+	TweenService:Create(loaderFillGlow,tweenInfo,{BackgroundTransparency=0.78}):Play()
 	TweenService:Create(loaderAccent,TweenInfo.new(0.34,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundTransparency=0,Size=UDim2.new(1,0,0,2)}):Play()
 	setLoaderPhase(1,false)
 
@@ -1253,16 +1252,16 @@ function finishLoader()
 		if not loaderOverlay or not loaderOverlay.Parent then return end
 		loaderAlive=false
 
-		local ti=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
-		TweenService:Create(loaderOverlay,ti,{BackgroundTransparency=1}):Play()
+		local tweenInfo=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		TweenService:Create(loaderOverlay,tweenInfo,{BackgroundTransparency=1}):Play()
 
-		for _,obj in ipairs(loaderOverlay:GetDescendants()) do
-			if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-				TweenService:Create(obj,ti,{TextTransparency=1}):Play()
-			elseif obj:IsA("Frame") then
-				TweenService:Create(obj,ti,{BackgroundTransparency=1}):Play()
-			elseif obj:IsA("UIStroke") then
-				TweenService:Create(obj,ti,{Transparency=1}):Play()
+		for _,instance in ipairs(loaderOverlay:GetDescendants()) do
+			if instance:IsA("TextLabel") or instance:IsA("TextButton") then
+				TweenService:Create(instance,tweenInfo,{TextTransparency=1}):Play()
+			elseif instance:IsA("Frame") then
+				TweenService:Create(instance,tweenInfo,{BackgroundTransparency=1}):Play()
+			elseif instance:IsA("UIStroke") then
+				TweenService:Create(instance,tweenInfo,{Transparency=1}):Play()
 			end
 		end
 
@@ -1284,9 +1283,9 @@ function loadRemoteModuleStep(name,path)
 	end
 
 	setLoaderProgress("Fetching required module.",loaderCurrent-0.35,LOADER_TOTAL,false)
-	local module=loadRemoteModule(path)
-	setLoaderProgress(module and "module loaded" or "module missing",loaderCurrent,LOADER_TOTAL,not module)
-	return module
+	local loadedModule=loadRemoteModule(path)
+	setLoaderProgress(loadedModule and "module loaded" or "module missing",loaderCurrent,LOADER_TOTAL,not loadedModule)
+	return loadedModule
 end
 
 function loadRemoteModuleStepByName(name)
@@ -1304,11 +1303,11 @@ function loadDeferredModule(name,path,current)
 		return current
 	end
 
-	local module=loadRemoteModule(path)
-	if not module and not OPTIONAL_MODULE_PATH_SET[path] then
+	local loadedModule=loadRemoteModule(path)
+	if not loadedModule and not OPTIONAL_MODULE_PATH_SET[path] then
 		warn("deferred module missing:",name,path)
 	end
-	return module
+	return loadedModule
 end
 
 local batchLoaded,batchErr=loadRemoteModuleBatch(STARTUP_MODULE_PATHS)
@@ -1521,9 +1520,9 @@ function installRuntimeArchitecture()
 		end
 	end
 
-	function RuntimeThemeStore.RefreshObject(obj)
-		if obj and registerThemeObject then
-			registerThemeObject(obj)
+	function RuntimeThemeStore.RefreshObject(instance)
+		if instance and registerThemeObject then
+			registerThemeObject(instance)
 		end
 	end
 
@@ -1805,28 +1804,28 @@ function applyUIPrimaryTheme()
 
 	if not SG then return end
 
-	for obj in pairs(THEMED_GUI_OBJECTS) do
-		if not obj.Parent then
-			THEMED_GUI_OBJECTS[obj]=nil
-		elseif obj:IsDescendantOf(SG) then
-			local role=obj:GetAttribute("ThemeRole")
+	for instance in pairs(THEMED_GUI_OBJECTS) do
+		if not instance.Parent then
+			THEMED_GUI_OBJECTS[instance]=nil
+		elseif instance:IsDescendantOf(SG) then
+			local role=instance:GetAttribute("ThemeRole")
 			if role and THEME[role] then
-				obj.BackgroundColor3=THEME[role]
+				instance.BackgroundColor3=THEME[role]
 			end
 		end
 	end
 
-	for obj in pairs(THEMED_TEXT_OBJECTS) do
-		if not obj.Parent then
-			THEMED_TEXT_OBJECTS[obj]=nil
-		elseif obj:IsDescendantOf(SG) then
-			local textRole=obj:GetAttribute("ThemeTextRole")
-			if not textRole and not obj:GetAttribute("SkipTextRole") then
+	for instance in pairs(THEMED_TEXT_OBJECTS) do
+		if not instance.Parent then
+			THEMED_TEXT_OBJECTS[instance]=nil
+		elseif instance:IsDescendantOf(SG) then
+			local textRole=instance:GetAttribute("ThemeTextRole")
+			if not textRole and not instance:GetAttribute("SkipTextRole") then
 				textRole="TEXT"
-				obj:SetAttribute("ThemeTextRole",textRole)
+				instance:SetAttribute("ThemeTextRole",textRole)
 			end
-			if textRole and THEME[textRole] and not obj:GetAttribute("SkipTextRole") then
-				obj.TextColor3=THEME[textRole]
+			if textRole and THEME[textRole] and not instance:GetAttribute("SkipTextRole") then
+				instance.TextColor3=THEME[textRole]
 			end
 		end
 	end
@@ -2038,37 +2037,37 @@ function updateLiquidStrokeAnimation()
 		local direction=tostring(UI_STYLE.LiquidStrokeDirection or "Right")
 		local wave=math.sin(math.rad(t*2))*0.25
 
-		for obj in pairs(LIQUID_STROKE_GRADIENTS) do
-			if not obj.Parent then
-				LIQUID_STROKE_GRADIENTS[obj]=nil
-			elseif obj:IsDescendantOf(SG) and obj:IsA("UIGradient") and obj.Name=="StrokeGradient" then
+		for instance in pairs(LIQUID_STROKE_GRADIENTS) do
+			if not instance.Parent then
+				LIQUID_STROKE_GRADIENTS[instance]=nil
+			elseif instance:IsDescendantOf(SG) and instance:IsA("UIGradient") and instance.Name=="StrokeGradient" then
 				if direction=="Right" then
-					obj.Rotation=0
-					obj.Offset=Vector2.new(wave,0)
+					instance.Rotation=0
+					instance.Offset=Vector2.new(wave,0)
 
 				elseif direction=="Left" then
-					obj.Rotation=0
-					obj.Offset=Vector2.new(-wave,0)
+					instance.Rotation=0
+					instance.Offset=Vector2.new(-wave,0)
 
 				elseif direction=="Down" then
-					obj.Rotation=90
-					obj.Offset=Vector2.new(0,wave)
+					instance.Rotation=90
+					instance.Offset=Vector2.new(0,wave)
 
 				elseif direction=="Up" then
-					obj.Rotation=90
-					obj.Offset=Vector2.new(0,-wave)
+					instance.Rotation=90
+					instance.Offset=Vector2.new(0,-wave)
 
 				elseif direction=="SpinCW" then
-					obj.Offset=Vector2.new(0,0)
-					obj.Rotation=t
+					instance.Offset=Vector2.new(0,0)
+					instance.Rotation=t
 
 				elseif direction=="SpinCCW" then
-					obj.Offset=Vector2.new(0,0)
-					obj.Rotation=-t
+					instance.Offset=Vector2.new(0,0)
+					instance.Rotation=-t
 
 				else
-					obj.Rotation=t
-					obj.Offset=Vector2.new(wave,0)
+					instance.Rotation=t
+					instance.Offset=Vector2.new(wave,0)
 				end
 			end
 		end
@@ -2152,39 +2151,39 @@ applyUIStrokeTheme=function()
 
 	local libShape=(getUILibRuntimeStyle(UI_STYLE.UILib) or {}).Shape or {}
 
-	for obj in pairs(THEMED_STROKES) do
-		if not obj.Parent then
-			THEMED_STROKES[obj]=nil
-		elseif obj:IsDescendantOf(SG) then
-			local role=resolveStrokeRole(obj)
+	for instance in pairs(THEMED_STROKES) do
+		if not instance.Parent then
+			THEMED_STROKES[instance]=nil
+		elseif instance:IsDescendantOf(SG) then
+			local role=resolveStrokeRole(instance)
 			if role~="Fixed" then
 				local accentRole=role=="Window" or role=="Accent"
 				local softColor=THEME.STROKE_SOFT or (THEME.CARD and THEME.CARD:Lerp(THEME.TEXT or color,0.12)) or color
 
-				obj.Color=accentRole and color or softColor
-				obj.Thickness=math.clamp(tonumber(UI_STYLE.StrokeThickness) or obj.Thickness,0,8)
-				if obj:GetAttribute("BaseStrokeTransparency")==nil then
-					obj:SetAttribute("BaseStrokeTransparency",obj.Transparency)
+				instance.Color=accentRole and color or softColor
+				instance.Thickness=math.clamp(tonumber(UI_STYLE.StrokeThickness) or instance.Thickness,0,8)
+				if instance:GetAttribute("BaseStrokeTransparency")==nil then
+					instance:SetAttribute("BaseStrokeTransparency",instance.Transparency)
 				end
 
-				local baseTransparency=tonumber(obj:GetAttribute("BaseStrokeTransparency")) or obj.Transparency
+				local baseTransparency=tonumber(instance:GetAttribute("BaseStrokeTransparency")) or instance.Transparency
 				local styleTransparency=tonumber(UI_STYLE.StrokeTransparency) or 0.84
-				obj.Transparency=strokeTransparencyForRole(role,libShape,baseTransparency,styleTransparency)
+				instance.Transparency=strokeTransparencyForRole(role,libShape,baseTransparency,styleTransparency)
 				pcall(function()
-					obj.Enabled=obj.Transparency<strokeHideTransparency and obj.Thickness>0
+					instance.Enabled=instance.Transparency<strokeHideTransparency and instance.Thickness>0
 				end)
 
 				pcall(function()
-					obj.LineJoinMode=strokeRoleRadius(role,libShape)>0 and Enum.LineJoinMode.Round or Enum.LineJoinMode.Miter
+					instance.LineJoinMode=strokeRoleRadius(role,libShape)>0 and Enum.LineJoinMode.Round or Enum.LineJoinMode.Miter
 				end)
 
-				local gradient=obj:FindFirstChild("StrokeGradient")
+				local gradient=instance:FindFirstChild("StrokeGradient")
 
 				if UI_STYLE.LiquidStroke and accentRole then
 					if not gradient then
 						gradient=Instance.new("UIGradient")
 						gradient.Name="StrokeGradient"
-						gradient.Parent=obj
+						gradient.Parent=instance
 					end
 					LIQUID_STROKE_GRADIENTS[gradient]=true
 
@@ -2213,12 +2212,12 @@ applyUIStrokeTheme=function()
 		end
 	end
 
-	for obj in pairs(THEMED_CORNERS) do
-		if not obj.Parent then
-			THEMED_CORNERS[obj]=nil
-		elseif obj:IsDescendantOf(SG) then
-			local role=obj.Parent and obj.Parent:GetAttribute("CornerRole") or "Control"
-			obj.CornerRadius=UDim.new(0,strokeRoleRadius(role,libShape))
+	for instance in pairs(THEMED_CORNERS) do
+		if not instance.Parent then
+			THEMED_CORNERS[instance]=nil
+		elseif instance:IsDescendantOf(SG) then
+			local role=instance.Parent and instance.Parent:GetAttribute("CornerRole") or "Control"
+			instance.CornerRadius=UDim.new(0,strokeRoleRadius(role,libShape))
 		end
 	end
 
@@ -2238,9 +2237,9 @@ function setUIVisible(state)
 	end
 end
 
-function requireGuiModule(name,path,module)
-	if module and type(module.new)=="function" then
-		return module
+function requireGuiModule(name,path,loadedModule)
+	if loadedModule and type(loadedModule.new)=="function" then
+		return loadedModule
 	end
 
 	error("loader failed: "..name.." did not load: "..path)

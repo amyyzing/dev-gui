@@ -1,4 +1,4 @@
--- testing helpers. these draw diagnostics and should clean up after refresh.
+-- testing poles, C1 marker, and normal-arc safety colors.
 
 local Testing={}
 
@@ -99,9 +99,9 @@ local function projectileAt(origin,velocity,time)
 	return origin+velocity*time+Vector3.new(0,-0.5*BALL_G*time*time,0)
 end
 
-local function cubicBezier(p0,p1,p2,p3,t)
-	local u=1-t
-	return p0*(u*u*u)+p1*(3*u*u*t)+p2*(3*u*t*t)+p3*(t*t*t)
+local function cubicBezier(startPoint,firstHandle,secondHandle,endPoint,progress)
+	local remaining=1-progress
+	return startPoint*(remaining*remaining*remaining)+firstHandle*(3*remaining*remaining*progress)+secondHandle*(3*remaining*progress*progress)+endPoint*(progress*progress*progress)
 end
 
 local function c1FromPayload(payload)
@@ -124,11 +124,11 @@ local function c1FromPayload(payload)
 	end
 
 	local root=math.sqrt(disc)
-	local t1=(-b-root)/(2*a)
-	local t2=(-b+root)/(2*a)
-	local time=math.max(t1,t2)
+	local earlyPeakTime=(-b-root)/(2*a)
+	local latePeakTime=(-b+root)/(2*a)
+	local time=math.max(earlyPeakTime,latePeakTime)
 	if time<=0 then
-		time=math.min(t1,t2)
+		time=math.min(earlyPeakTime,latePeakTime)
 	end
 	if time<=0 then return nil,nil end
 
@@ -234,14 +234,14 @@ local function findCenter()
 	return localFolder and localFolder:FindFirstChild("Center"),localFolder
 end
 
-function Testing.new(ctx,parent,guiBuilder)
-	local New=ctx.New
-	local THEME=ctx.THEME
-	local safeDisconnect=ctx.safeDisconnect
-	local makeSection=ctx.makeSection
-	local buildToggleRow=ctx.buildToggleRow
-	local scheduler=ctx.Scheduler
-	local state=ctx.State
+function Testing.new(app,parent,guiBuilder)
+	local New=app.New
+	local THEME=app.THEME
+	local safeDisconnect=app.safeDisconnect
+	local makeSection=app.makeSection
+	local buildToggleRow=app.buildToggleRow
+	local scheduler=app.Scheduler
+	local state=app.State
 	local api={}
 	local section=nil
 	local toggle=nil
@@ -266,8 +266,8 @@ function Testing.new(ctx,parent,guiBuilder)
 	if state.testingQBEnabled==nil then state.testingQBEnabled=true end
 
 	local function changed()
-		if ctx.onChanged then
-			pcall(ctx.onChanged,state)
+		if app.onChanged then
+			pcall(app.onChanged,state)
 		end
 	end
 
@@ -291,8 +291,8 @@ function Testing.new(ctx,parent,guiBuilder)
 	end
 
 	local function disconnectRemoteConnections()
-		for _,conn in ipairs(remoteConnections) do
-			safeDisconnect(conn)
+		for _,connection in ipairs(remoteConnections) do
+			safeDisconnect(connection)
 		end
 
 		table.clear(remoteConnections)
@@ -300,8 +300,8 @@ function Testing.new(ctx,parent,guiBuilder)
 	end
 
 	local function disconnectTopologyConnections()
-		for _,conn in ipairs(topologyConnections) do
-			safeDisconnect(conn)
+		for _,connection in ipairs(topologyConnections) do
+			safeDisconnect(connection)
 		end
 
 		table.clear(topologyConnections)
@@ -425,54 +425,54 @@ function Testing.new(ctx,parent,guiBuilder)
 			return nil,nil
 		end
 
-		local p0=c2Frame.Position
-		local p3=c3Frame.Position
-		local p1=p0+c2Frame.RightVector*beam.CurveSize0
-		local p2=p3-c3Frame.RightVector*beam.CurveSize1
+		local arcStart=c2Frame.Position
+		local arcEnd=c3Frame.Position
+		local firstHandle=arcStart+c2Frame.RightVector*beam.CurveSize0
+		local secondHandle=arcEnd-c3Frame.RightVector*beam.CurveSize1
 		local bestPoint=nil
-		local bestT=0
+		local bestProgress=0
 		local bestDiff=math.huge
 		local crossingPoint=nil
-		local crossingT=nil
-		local previousPoint=p0
-		local previousT=0
+		local crossingProgress=nil
+		local previousPoint=arcStart
+		local previousProgress=0
 		local previousY=previousPoint.Y-TESTING_C1_Y
 
 		for i=1,96 do
-			local t=i/96
-			local point=cubicBezier(p0,p1,p2,p3,t)
+			local progress=i/96
+			local point=cubicBezier(arcStart,firstHandle,secondHandle,arcEnd,progress)
 			local y=point.Y-TESTING_C1_Y
 			local diff=math.abs(y)
 			if diff<bestDiff then
 				bestDiff=diff
 				bestPoint=point
-				bestT=t
+				bestProgress=progress
 			end
 
 			if previousY==0 or y==0 or (previousY<0 and y>0) or (previousY>0 and y<0) then
 				local denom=math.abs(previousY)+math.abs(y)
 				local alpha=denom>1e-6 and math.abs(previousY)/denom or 0
-				crossingT=previousT+(t-previousT)*alpha
+				crossingProgress=previousProgress+(progress-previousProgress)*alpha
 				crossingPoint=previousPoint:Lerp(point,alpha)
 			end
 
 			previousPoint=point
-			previousT=t
+			previousProgress=progress
 			previousY=y
 		end
 
 		local c1Point=crossingPoint or bestPoint
-		local c1T=crossingT or bestT
+		local c1Progress=crossingProgress or bestProgress
 		if not c1Point then
 			return nil,nil
 		end
 
 		c1Point=Vector3.new(c1Point.X,TESTING_C1_Y,c1Point.Z)
-		local flatDistance=(flat(c1Point)-flat(p0)).Magnitude
+		local flatDistance=(flat(c1Point)-flat(arcStart)).Magnitude
 		local distanceTime=flatDistance/TESTING_BALL_SPEED
-		local heightDelta=math.max(c1Point.Y-p0.Y,0)
+		local heightDelta=math.max(c1Point.Y-arcStart.Y,0)
 		local verticalTime=heightDelta>0 and math.sqrt((2*heightDelta)/BALL_G) or 0
-		local estimatedTime=math.max(distanceTime,verticalTime,c1T*distanceTime)
+		local estimatedTime=math.max(distanceTime,verticalTime,c1Progress*distanceTime)
 		return c1Point,estimatedTime
 	end
 
@@ -735,8 +735,8 @@ function Testing.new(ctx,parent,guiBuilder)
 		end)
 	end
 
-	local function watchConnection(conn)
-		table.insert(topologyConnections,conn)
+	local function watchConnection(connection)
+		table.insert(topologyConnections,connection)
 	end
 
 	local function shouldReconnectForInstance(instance)
@@ -887,8 +887,8 @@ function Testing.new(ctx,parent,guiBuilder)
 	function api.Destroy()
 		disconnectAll()
 		disconnectQBSafety()
-		for _,conn in ipairs(lifetimeConnections) do
-			safeDisconnect(conn)
+		for _,connection in ipairs(lifetimeConnections) do
+			safeDisconnect(connection)
 		end
 		table.clear(lifetimeConnections)
 		destroyControl(toggle)
@@ -899,7 +899,7 @@ function Testing.new(ctx,parent,guiBuilder)
 
 	local builtGui=nil
 	if guiBuilder and type(guiBuilder.build)=="function" then
-		local ok,result=pcall(guiBuilder.build,ctx,parent,state,api)
+		local ok,result=pcall(guiBuilder.build,app,parent,state,api)
 		if ok and type(result)=="table" then
 			builtGui=result
 		else

@@ -1,6 +1,5 @@
 -- HB_LOADER_V3
--- loader.lua
--- kinda ugly on purpose. dont "clean" this too hard unless the loader breaks.
+-- fetches the panel code and starts the runtime.
 
 local HttpService = game:GetService( "HttpService" )
 
@@ -36,7 +35,7 @@ local function typeOf(value)
 end
 
 local function clientRequest()
-	-- executor roulette. annoying, but it is what it is.
+	-- different executors expose different request functions.
 	if typeOf(syn)=="table" and type(syn.request) == "function" then
 		return syn.request
 	end

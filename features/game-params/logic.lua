@@ -1,4 +1,4 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- applies speed, gravity, jump, stamina, and dive values.
 
 local GameParams={}
 
@@ -86,11 +86,11 @@ local function normalizePageKey(value)
 	return DEFAULT_SELECTED_PAGE
 end
 
-function GameParams.new(ctx)
-	ctx=ctx or {}
-	local safeDisconnect=ctx.safeDisconnect
-	local inputToBinding=ctx.inputToBinding
-	local state=ctx.State or {}
+function GameParams.new(app)
+	app=app or {}
+	local safeDisconnect=app.safeDisconnect
+	local inputToBinding=app.inputToBinding
+	local state=app.State or {}
 	local api={}
 	local speedConn=nil
 	local speedElapsed=0
@@ -102,12 +102,12 @@ function GameParams.new(ctx)
 	local destroyed=false
 	local stateListener=nil
 
-	local function disconnect(conn)
+	local function disconnect(connection)
 		if safeDisconnect then
-			safeDisconnect(conn)
-		elseif conn then
+			safeDisconnect(connection)
+		elseif connection then
 			pcall(function()
-				conn:Disconnect()
+				connection:Disconnect()
 			end)
 		end
 	end
@@ -115,15 +115,15 @@ function GameParams.new(ctx)
 	local function safeDisconnectAll(t)
 		if not t then return end
 
-		for _,conn in ipairs(t) do
-			disconnect(conn)
+		for _,connection in ipairs(t) do
+			disconnect(connection)
 		end
 
 		table.clear(t)
 	end
 
 	local function changed()
-		if ctx.onChanged then pcall(ctx.onChanged,state) end
+		if app.onChanged then pcall(app.onChanged,state) end
 	end
 
 	local function notify(reason)
@@ -286,8 +286,8 @@ function GameParams.new(ctx)
 			return"mode1"
 		end
 
-		if ctx.getCurrentModeKey then
-			local ok,modeKey=pcall(ctx.getCurrentModeKey)
+		if app.getCurrentModeKey then
+			local ok,modeKey=pcall(app.getCurrentModeKey)
 			if ok and modeKey then
 				return tostring(modeKey)
 			end

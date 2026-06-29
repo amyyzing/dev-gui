@@ -1,4 +1,4 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- player highlights and ball-holder colors.
 
 local ESP={}
 
@@ -151,18 +151,18 @@ local function makeNoop()
 	}
 end
 
-function ESP.new(ctx,parent)
-	local safeDisconnect=ctx.safeDisconnect
-	local makeSection=ctx.makeSection
-	local buildToggleRow=ctx.buildToggleRow
-	local inputToBinding=ctx.inputToBinding
-	local state=ctx.State
-	local THEME=ctx.THEME
-	local UI_STYLE=ctx.UI_STYLE
-	local scheduler=ctx.Scheduler
-	local services=ctx.Services or {}
-	local playerCache=services.PlayerCache or ctx.PlayerCache
-	local ballTracker=services.BallTracker or ctx.BallTracker
+function ESP.new(app,parent)
+	local safeDisconnect=app.safeDisconnect
+	local makeSection=app.makeSection
+	local buildToggleRow=app.buildToggleRow
+	local inputToBinding=app.inputToBinding
+	local state=app.State
+	local THEME=app.THEME
+	local UI_STYLE=app.UI_STYLE
+	local scheduler=app.Scheduler
+	local services=app.Services or {}
+	local playerCache=services.PlayerCache or app.PlayerCache
+	local ballTracker=services.BallTracker or app.BallTracker
 	local api={}
 	local sectionBody=nil
 	local sectionFrame=nil
@@ -175,8 +175,8 @@ function ESP.new(ctx,parent)
 	local activeMode=nil
 	local poll=0
 
-	local DefenseModule=ctx.ESPDefenseModule
-	local OffenseModule=ctx.ESPOffenseModule
+	local DefenseModule=app.ESPDefenseModule
+	local OffenseModule=app.ESPOffenseModule
 	local function currentPlayers()
 		if playerCache and type(playerCache.getPlayers)=="function" then
 			return playerCache:getPlayers()
@@ -222,8 +222,8 @@ function ESP.new(ctx,parent)
 	end
 
 	local function isGameplay()
-		if ctx.getCurrentModeKey then
-			return ctx.getCurrentModeKey()=="mode1"
+		if app.getCurrentModeKey then
+			return app.getCurrentModeKey()=="mode1"
 		end
 
 		return true
@@ -274,14 +274,14 @@ function ESP.new(ctx,parent)
 	end
 
 	local function refreshFooter(available)
-		if ctx.refreshESPStatus then
-			pcall(ctx.refreshESPStatus,state.actionStatusOn,available)
+		if app.refreshESPStatus then
+			pcall(app.refreshESPStatus,state.actionStatusOn,available)
 		end
 	end
 
 	local function changed()
-		if ctx.onChanged then
-			pcall(ctx.onChanged,state)
+		if app.onChanged then
+			pcall(app.onChanged,state)
 		end
 
 		refreshFooter(isGameplay())
@@ -364,8 +364,8 @@ function ESP.new(ctx,parent)
 			sectionBody:Destroy()
 		end
 
-		if ctx.refreshESPStatus then
-			pcall(ctx.refreshESPStatus,false,false)
+		if app.refreshESPStatus then
+			pcall(app.refreshESPStatus,false,false)
 		end
 	end
 
@@ -391,7 +391,7 @@ function ESP.new(ctx,parent)
 	local function handleESPInput(input)
 		if not isGameplay() then return false end
 
-		local getKey=ctx.getESPToggleKey or ctx.getActionToggleKey
+		local getKey=app.getESPToggleKey or app.getActionToggleKey
 		local key=getKey and getKey() or Enum.KeyCode.Unknown
 		if not key or key==Enum.KeyCode.Unknown then return false end
 

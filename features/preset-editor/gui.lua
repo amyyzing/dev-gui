@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- preset editor controls.
 
-return{new=function(ctx,...)
-	return ctx.PresetEditorLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.PresetEditorLogicModule.new(app,...)
 end}

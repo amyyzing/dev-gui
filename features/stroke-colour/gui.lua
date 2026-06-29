@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- color and highlight customization controls.
 
-return{new=function(ctx,...)
-	return ctx.StrokeColourLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.StrokeColourLogicModule.new(app,...)
 end}

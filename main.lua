@@ -1,5 +1,5 @@
 -- HB_MAIN_V3
--- entrypoint glue. it mostly just gets the remote loader and stays out of the way.
+-- starts the panel loader.
 
 local HttpService=game:GetService("HttpService")
 

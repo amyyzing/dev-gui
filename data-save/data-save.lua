@@ -1,4 +1,4 @@
--- save/restore glue. old field names are kept so updates do not wipe user settings.
+-- saves and restores player settings without dropping old fields.
 
 local DataSave={}
 
@@ -221,9 +221,9 @@ local function clampNumber(value,min,max,fallback)
 	return math.clamp(n,min,max)
 end
 
-local function getDefaultUIStyle(ctx)
-	if ctx and type(ctx.getDefaultUIStyle)=="function" then
-		local ok,result=pcall(ctx.getDefaultUIStyle)
+local function getDefaultUIStyle(app)
+	if app and type(app.getDefaultUIStyle)=="function" then
+		local ok,result=pcall(app.getDefaultUIStyle)
 		if ok and type(result)=="table" then
 			local copy={}
 			for key,value in pairs(result) do
@@ -384,19 +384,19 @@ local function normalizeRoot(raw)
 	}
 end
 
-local function getValue(ctx,name,default)
-	local state=ctx.State or ctx.state
+local function getValue(app,name,default)
+	local state=app.State or app.state
 
 	if state and state[name]~=nil then
 		return state[name]
 	end
 
-	if ctx[name]~=nil then
-		return ctx[name]
+	if app[name]~=nil then
+		return app[name]
 	end
 
-	if ctx.Get then
-		local ok,value=pcall(ctx.Get,name,default)
+	if app.Get then
+		local ok,value=pcall(app.Get,name,default)
 		if ok and value~=nil then
 			return value
 		end
@@ -413,16 +413,16 @@ local function hasAnyKey(t)
 	return false
 end
 
-local function setValue(ctx,name,value)
-	local state=ctx.State or ctx.state
+local function setValue(app,name,value)
+	local state=app.State or app.state
 
-	if ctx.Set then
-		local ok=pcall(ctx.Set,name,value)
+	if app.Set then
+		local ok=pcall(app.Set,name,value)
 		if ok then return end
 	end
 
-	if ctx.Setters and ctx.Setters[name] then
-		local ok=pcall(ctx.Setters[name],value)
+	if app.Setters and app.Setters[name] then
+		local ok=pcall(app.Setters[name],value)
 		if ok then return end
 	end
 
@@ -430,58 +430,58 @@ local function setValue(ctx,name,value)
 		state[name]=value
 	end
 
-	ctx[name]=value
+	app[name]=value
 end
 
-local function applyValue(ctx,setterName,stateName,value)
-	local setter=ctx[setterName]
+local function applyValue(app,setterName,stateName,value)
+	local setter=app[setterName]
 	if setter then
 		local ok=pcall(setter,value)
 		if ok then return end
 	end
 
-	setValue(ctx,stateName,value)
+	setValue(app,stateName,value)
 end
 
-local function applyBoolean(ctx,setterName,stateName,value)
+local function applyBoolean(app,setterName,stateName,value)
 	if value~=nil then
-		applyValue(ctx,setterName,stateName,value and true or false)
+		applyValue(app,setterName,stateName,value and true or false)
 	end
 end
 
-local function applyClamped(ctx,setterName,stateName,value,min,max,fallback,clampFn)
+local function applyClamped(app,setterName,stateName,value,min,max,fallback,clampFn)
 	if value~=nil then
-		applyValue(ctx,setterName,stateName,(clampFn or clampNumber)(value,min,max,fallback))
+		applyValue(app,setterName,stateName,(clampFn or clampNumber)(value,min,max,fallback))
 	end
 end
 
-local function setBoolean(ctx,stateName,value)
+local function setBoolean(app,stateName,value)
 	if value~=nil then
-		setValue(ctx,stateName,value and true or false)
+		setValue(app,stateName,value and true or false)
 	end
 end
 
-local function setClamped(ctx,stateName,value,min,max,fallback)
+local function setClamped(app,stateName,value,min,max,fallback)
 	if value~=nil then
-		setValue(ctx,stateName,clampNumber(value,min,max,fallback))
+		setValue(app,stateName,clampNumber(value,min,max,fallback))
 	end
 end
 
-local function getModeKey(ctx)
-	return tostring(getValue(ctx,"CURRENT_MODE_KEY",ctx.CURRENT_MODE_KEY or "mode1"))
+local function getModeKey(app)
+	return tostring(getValue(app,"CURRENT_MODE_KEY",app.CURRENT_MODE_KEY or "mode1"))
 end
 
-local function getPlayerId(ctx)
-	if ctx.playerId then return tostring(ctx.playerId) end
-	if ctx.me and ctx.me.UserId then return tostring(ctx.me.UserId) end
+local function getPlayerId(app)
+	if app.playerId then return tostring(app.playerId) end
+	if app.me and app.me.UserId then return tostring(app.me.UserId) end
 
 	local lp=game:GetService("Players").LocalPlayer
 	return lp and tostring(lp.UserId) or ""
 end
 
-local function collectPresetEditor(ctx)
+local function collectPresetEditor(app)
 	local output={}
-	local presets=ctx.PRESETS or {}
+	local presets=app.PRESETS or {}
 
 	for i=1,4 do
 		local p=presets[i] or {}
@@ -521,10 +521,10 @@ local function collectUIStylePayload(uiStyle,defaultUIStyle)
 	return payload
 end
 
-local function applyPresetEditor(ctx,presetEditor)
+local function applyPresetEditor(app,presetEditor)
 	if type(presetEditor)~="table" then return end
 
-	local presets=ctx.PRESETS or {}
+	local presets=app.PRESETS or {}
 
 	for i=1,4 do
 		local item=presetEditor[i] or {}
@@ -594,14 +594,14 @@ local function makeLocalCode(name)
 	return base..tostring(math.random(100,999))
 end
 
-function DataSave.new(ctx)
-	ctx=ctx or {}
+function DataSave.new(app)
+	app=app or {}
 
 	local api={}
-	local root=normalizeRoot(ctx.PLAYER_SETTINGS_ROOT)
+	local root=normalizeRoot(app.PLAYER_SETTINGS_ROOT)
 	local loading=false
 	local autosaveQueued=false
-	local autosaveDelay=ctx.autosaveDelay or 0.8
+	local autosaveDelay=app.autosaveDelay or 0.8
 	local autosaveLastPayload=nil
 
 	function api.IsLoading()
@@ -610,140 +610,140 @@ function DataSave.new(ctx)
 
 	function api.SetLoading(value)
 		loading=value and true or false
-		ctx.PLAYER_SETTINGS_LOADING=loading
+		app.PLAYER_SETTINGS_LOADING=loading
 	end
 
 	function api.GetRoot()
 		root=normalizeRoot(root)
-		ctx.PLAYER_SETTINGS_ROOT=root
+		app.PLAYER_SETTINGS_ROOT=root
 		return root
 	end
 
 	function api.SetRoot(nextRoot)
 		root=normalizeRoot(nextRoot)
-		ctx.PLAYER_SETTINGS_ROOT=root
+		app.PLAYER_SETTINGS_ROOT=root
 		return root
 	end
 
 	function api.GetSavedSettingsForCurrentMode()
 		local r=api.GetRoot()
-		return r.modes[getModeKey(ctx)] or {}
+		return r.modes[getModeKey(app)] or {}
 	end
 
 	function api.BuildRootForSave(currentSettings)
 		local r=api.GetRoot()
-		local modeKey=getModeKey(ctx)
+		local modeKey=getModeKey(app)
 
 		r.version=2
 		r.lastMode=modeKey
 		r.updatedAt=os.time()
 		r.modes[modeKey]=currentSettings
 
-		ctx.PLAYER_SETTINGS_ROOT=r
+		app.PLAYER_SETTINGS_ROOT=r
 		return r
 	end
 
 	function api.Collect()
-		if ctx.collectPlayerSettingsForApi then
-			local ok,result=pcall(ctx.collectPlayerSettingsForApi)
+		if app.collectPlayerSettingsForApi then
+			local ok,result=pcall(app.collectPlayerSettingsForApi)
 			if ok and type(result)=="table" then
 				return result
 			end
 		end
 
-		local rootFrame=ctx.root
+		local rootFrame=app.root
 		local pos=rootFrame and rootFrame.Position or UDim2.new(0.5,0,0,80)
 
-		local uiStyle=ctx.UI_STYLE or {}
-		local defaultUIStyle=getDefaultUIStyle(ctx)
-		local uiWindow=ctx.UI_WINDOW or {}
-		local worldSettings=ctx.WORLD_SETTINGS or {}
+		local uiStyle=app.UI_STYLE or {}
+		local defaultUIStyle=getDefaultUIStyle(app)
+		local uiWindow=app.UI_WINDOW or {}
+		local worldSettings=app.WORLD_SETTINGS or {}
 
 		return{
 			version=1,
-			mode=getModeKey(ctx),
+			mode=getModeKey(app),
 
 			hitbox={
-				x=getValue(ctx,"sizeX",2.52),
-				y=getValue(ctx,"sizeY",5.4),
-				z=getValue(ctx,"sizeZ",1.41),
-				transparency=getValue(ctx,"targetTransparency",0.7),
-				enabled=getValue(ctx,"hitboxOn",false),
+				x=getValue(app,"sizeX",2.52),
+				y=getValue(app,"sizeY",5.4),
+				z=getValue(app,"sizeZ",1.41),
+				transparency=getValue(app,"targetTransparency",0.7),
+				enabled=getValue(app,"hitboxOn",false),
 			},
 
-			gravity=getValue(ctx,"gravityValue",196.2),
-			gravityEnabled=getValue(ctx,"gravityEnabled",false),
+			gravity=getValue(app,"gravityValue",196.2),
+			gravityEnabled=getValue(app,"gravityEnabled",false),
 
 			speed={
-				enabled=getValue(ctx,"speedEnabled",false),
-				value=getValue(ctx,"speedValue",18),
+				enabled=getValue(app,"speedEnabled",false),
+				value=getValue(app,"speedValue",18),
 			},
 
 			gameParams={
-				enabled=getValue(ctx,"gameParamsEnabled",true),
-				selectedPage=getValue(ctx,"paramsSelectedPage","speed"),
-				speedEnabled=getValue(ctx,"speedParamsEnabled",false),
-				gravityJumpEnabled=getValue(ctx,"gravityJumpParamsEnabled",false),
-				staminaEnabled=getValue(ctx,"staminaParamsEnabled",false),
-				speedSettingEnabled=getValue(ctx,"speedSettingEnabled",false),
-				diveSettingEnabled=getValue(ctx,"diveSettingEnabled",false),
-				gravitySettingEnabled=getValue(ctx,"gravitySettingEnabled",false),
-				jumpPowerSettingEnabled=getValue(ctx,"jumpPowerSettingEnabled",false),
-				staminaRegenSettingEnabled=getValue(ctx,"staminaRegenSettingEnabled",false),
-				staminaDepleteSettingEnabled=getValue(ctx,"staminaDepleteSettingEnabled",false),
-				staminaRegen=getValue(ctx,"staminaRegenValue",10),
-				staminaDeplete=getValue(ctx,"staminaDepleteValue",10),
-				jumpPower=getValue(ctx,"jumpPowerValue",53.5),
-				divePower=getValue(ctx,"divePowerValue",1.9),
+				enabled=getValue(app,"gameParamsEnabled",true),
+				selectedPage=getValue(app,"paramsSelectedPage","speed"),
+				speedEnabled=getValue(app,"speedParamsEnabled",false),
+				gravityJumpEnabled=getValue(app,"gravityJumpParamsEnabled",false),
+				staminaEnabled=getValue(app,"staminaParamsEnabled",false),
+				speedSettingEnabled=getValue(app,"speedSettingEnabled",false),
+				diveSettingEnabled=getValue(app,"diveSettingEnabled",false),
+				gravitySettingEnabled=getValue(app,"gravitySettingEnabled",false),
+				jumpPowerSettingEnabled=getValue(app,"jumpPowerSettingEnabled",false),
+				staminaRegenSettingEnabled=getValue(app,"staminaRegenSettingEnabled",false),
+				staminaDepleteSettingEnabled=getValue(app,"staminaDepleteSettingEnabled",false),
+				staminaRegen=getValue(app,"staminaRegenValue",10),
+				staminaDeplete=getValue(app,"staminaDepleteValue",10),
+				jumpPower=getValue(app,"jumpPowerValue",53.5),
+				divePower=getValue(app,"divePowerValue",1.9),
 			},
 
 			boost={
-				enabled=getValue(ctx,"jumpBoostOn",false),
-				always=getValue(ctx,"jumpBoostTradeMode",false),
-				forceY=getValue(ctx,"boostForceY",32),
-				cooldown=getValue(ctx,"boostCooldown",5),
-				chance=getValue(ctx,"boostChance",100),
-				radius=getValue(ctx,"ballDetectionRadius",10),
+				enabled=getValue(app,"jumpBoostOn",false),
+				always=getValue(app,"jumpBoostTradeMode",false),
+				forceY=getValue(app,"boostForceY",32),
+				cooldown=getValue(app,"boostCooldown",5),
+				chance=getValue(app,"boostChance",100),
+				radius=getValue(app,"ballDetectionRadius",10),
 			},
 
 			esp={
-				enabled=getValue(ctx,"actionStatusOn",false),
+				enabled=getValue(app,"actionStatusOn",false),
 			},
 
 			qbAim={
-				enabled=getValue(ctx,"qbAimEnabled",false),
-				teamFilter=getValue(ctx,"qbAimTeamFilter",true),
-				showArc=getValue(ctx,"qbAimShowArc",true),
-				safeArc=getValue(ctx,"qbAimSafeArc",true),
-				targetHighlight=getValue(ctx,"qbAimTargetHighlight",true),
-				leadDelay=getValue(ctx,"qbAimLeadDelay",0.38),
-				peakHeight=getValue(ctx,"qbAimPeakHeight",14.00),
-				xyzDrift=getValue(ctx,"qbAimQBDrift",0),
+				enabled=getValue(app,"qbAimEnabled",false),
+				teamFilter=getValue(app,"qbAimTeamFilter",true),
+				showArc=getValue(app,"qbAimShowArc",true),
+				safeArc=getValue(app,"qbAimSafeArc",true),
+				targetHighlight=getValue(app,"qbAimTargetHighlight",true),
+				leadDelay=getValue(app,"qbAimLeadDelay",0.38),
+				peakHeight=getValue(app,"qbAimPeakHeight",14.00),
+				xyzDrift=getValue(app,"qbAimQBDrift",0),
 			},
 
 			testing={
-				enabled=getValue(ctx,"testingEnabled",false),
-				wr=getValue(ctx,"testingWREnabled",true),
-				qb=getValue(ctx,"testingQBEnabled",true),
+				enabled=getValue(app,"testingEnabled",false),
+				wr=getValue(app,"testingWREnabled",true),
+				qb=getValue(app,"testingQBEnabled",true),
 			},
 
 			keybinds={
-				toggleUI=encodeBinding(getValue(ctx,"TOGGLE_UI_KEY",Enum.KeyCode.Unknown)),
-				toggleHitbox=encodeBinding(getValue(ctx,"TOGGLE_HB_KEY",Enum.KeyCode.Unknown)),
-				toggleJumpBoost=encodeBinding(getValue(ctx,"TOGGLE_JB_KEY",Enum.KeyCode.Unknown)),
-				toggleAlwaysBoost=encodeBinding(getValue(ctx,"TOGGLE_AB_KEY",Enum.KeyCode.Unknown)),
-				toggleESP=encodeBinding(getValue(ctx,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
-				toggleActionStatus=encodeBinding(getValue(ctx,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
-				qbAimLock=encodeBinding(getValue(ctx,"QB_AIM_LOCK_KEY",Enum.KeyCode.H)),
-				qbAimThrow=encodeBinding(getValue(ctx,"QB_AIM_THROW_KEY",Enum.KeyCode.T)),
-				qbAimToggle=encodeBinding(getValue(ctx,"QB_AIM_TOGGLE_KEY",Enum.KeyCode.P)),
+				toggleUI=encodeBinding(getValue(app,"TOGGLE_UI_KEY",Enum.KeyCode.Unknown)),
+				toggleHitbox=encodeBinding(getValue(app,"TOGGLE_HB_KEY",Enum.KeyCode.Unknown)),
+				toggleJumpBoost=encodeBinding(getValue(app,"TOGGLE_JB_KEY",Enum.KeyCode.Unknown)),
+				toggleAlwaysBoost=encodeBinding(getValue(app,"TOGGLE_AB_KEY",Enum.KeyCode.Unknown)),
+				toggleESP=encodeBinding(getValue(app,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
+				toggleActionStatus=encodeBinding(getValue(app,"TOGGLE_ACTION_KEY",Enum.KeyCode.Unknown)),
+				qbAimLock=encodeBinding(getValue(app,"QB_AIM_LOCK_KEY",Enum.KeyCode.H)),
+				qbAimThrow=encodeBinding(getValue(app,"QB_AIM_THROW_KEY",Enum.KeyCode.T)),
+				qbAimToggle=encodeBinding(getValue(app,"QB_AIM_TOGGLE_KEY",Enum.KeyCode.P)),
 			},
 
-			presetEditor=collectPresetEditor(ctx),
+			presetEditor=collectPresetEditor(app),
 			uiStyle=collectUIStylePayload(uiStyle,defaultUIStyle),
 
 			workspace={
-				smoothPlastic=ctx.WORLD_SETTINGS and ctx.WORLD_SETTINGS.SmoothPlastic and true or false,
+				smoothPlastic=app.WORLD_SETTINGS and app.WORLD_SETTINGS.SmoothPlastic and true or false,
 			},
 
 			window={
@@ -758,8 +758,8 @@ function DataSave.new(ctx)
 	end
 
 	function api.Apply(settings)
-		if ctx.applySavedPlayerSettings then
-			local ok=pcall(ctx.applySavedPlayerSettings,settings)
+		if app.applySavedPlayerSettings then
+			local ok=pcall(app.applySavedPlayerSettings,settings)
 			if ok then return end
 		end
 
@@ -769,35 +769,35 @@ function DataSave.new(ctx)
 
 		api.SetLoading(true)
 
-		if ctx.applyCurrentModeLocalDefaults then
-			pcall(ctx.applyCurrentModeLocalDefaults)
+		if app.applyCurrentModeLocalDefaults then
+			pcall(app.applyCurrentModeLocalDefaults)
 		end
 
 		local hitbox=settings.hitbox or {}
-		local hx=clampNumber(hitbox.x or hitbox.X,0.1,50,getValue(ctx,"sizeX",2.52))
-		local hy=clampNumber(hitbox.y or hitbox.Y,0.1,50,getValue(ctx,"sizeY",5.4))
-		local hz=clampNumber(hitbox.z or hitbox.Z,0.1,50,getValue(ctx,"sizeZ",1.41))
+		local hx=clampNumber(hitbox.x or hitbox.X,0.1,50,getValue(app,"sizeX",2.52))
+		local hy=clampNumber(hitbox.y or hitbox.Y,0.1,50,getValue(app,"sizeY",5.4))
+		local hz=clampNumber(hitbox.z or hitbox.Z,0.1,50,getValue(app,"sizeZ",1.41))
 
-		if ctx.setHitboxSize then
-			pcall(ctx.setHitboxSize,hx,hy,hz)
+		if app.setHitboxSize then
+			pcall(app.setHitboxSize,hx,hy,hz)
 		else
-			setValue(ctx,"sizeX",hx)
-			setValue(ctx,"sizeY",hy)
-			setValue(ctx,"sizeZ",hz)
+			setValue(app,"sizeX",hx)
+			setValue(app,"sizeY",hy)
+			setValue(app,"sizeZ",hz)
 		end
 
-		applyClamped(ctx,"setTransparency","targetTransparency",hitbox.transparency,0,1,getValue(ctx,"targetTransparency",0.7))
-		applyBoolean(ctx,"setHitboxLock","hitboxOn",hitbox.enabled)
-		applyClamped(ctx,"setGravity","gravityValue",settings.gravity,0,1000,196.2)
-		applyBoolean(ctx,"setGravityState","gravityEnabled",settings.gravityEnabled)
+		applyClamped(app,"setTransparency","targetTransparency",hitbox.transparency,0,1,getValue(app,"targetTransparency",0.7))
+		applyBoolean(app,"setHitboxLock","hitboxOn",hitbox.enabled)
+		applyClamped(app,"setGravity","gravityValue",settings.gravity,0,1000,196.2)
+		applyBoolean(app,"setGravityState","gravityEnabled",settings.gravityEnabled)
 
 		local speed=settings.speed or {}
-		applyClamped(ctx,"setSpeedValue","speedValue",speed.value,0,100,18)
-		applyBoolean(ctx,"setSpeedState","speedEnabled",speed.enabled)
+		applyClamped(app,"setSpeedValue","speedValue",speed.value,0,100,18)
+		applyBoolean(app,"setSpeedState","speedEnabled",speed.enabled)
 
 		local gameParams=settings.gameParams or {}
 		if gameParams.selectedPage~=nil then
-			applyValue(ctx,"setParamsSelectedPage","paramsSelectedPage",gameParams.selectedPage)
+			applyValue(app,"setParamsSelectedPage","paramsSelectedPage",gameParams.selectedPage)
 		end
 		local legacyGameParamsEnabled=gameParams.enabled
 		local speedParamsEnabled=gameParams.speedEnabled
@@ -806,9 +806,9 @@ function DataSave.new(ctx)
 		if speedParamsEnabled==nil then speedParamsEnabled=legacyGameParamsEnabled end
 		if gravityJumpParamsEnabled==nil then gravityJumpParamsEnabled=legacyGameParamsEnabled end
 		if staminaParamsEnabled==nil then staminaParamsEnabled=legacyGameParamsEnabled end
-		applyBoolean(ctx,"setSpeedParamsState","speedParamsEnabled",speedParamsEnabled)
-		applyBoolean(ctx,"setGravityJumpParamsState","gravityJumpParamsEnabled",gravityJumpParamsEnabled)
-		applyBoolean(ctx,"setStaminaParamsState","staminaParamsEnabled",staminaParamsEnabled)
+		applyBoolean(app,"setSpeedParamsState","speedParamsEnabled",speedParamsEnabled)
+		applyBoolean(app,"setGravityJumpParamsState","gravityJumpParamsEnabled",gravityJumpParamsEnabled)
+		applyBoolean(app,"setStaminaParamsState","staminaParamsEnabled",staminaParamsEnabled)
 		local diveSettingEnabled=gameParams.diveEnabled
 		if diveSettingEnabled==nil then diveSettingEnabled=gameParams.diveSettingEnabled end
 		local jumpPowerSettingEnabled=gameParams.jumpPowerEnabled
@@ -817,50 +817,50 @@ function DataSave.new(ctx)
 		if staminaRegenSettingEnabled==nil then staminaRegenSettingEnabled=gameParams.staminaRegenSettingEnabled end
 		local staminaDepleteSettingEnabled=gameParams.staminaDepleteEnabled
 		if staminaDepleteSettingEnabled==nil then staminaDepleteSettingEnabled=gameParams.staminaDepleteSettingEnabled end
-		applyBoolean(ctx,"setSpeedSettingState","speedSettingEnabled",gameParams.speedSettingEnabled)
-		applyBoolean(ctx,"setDiveSettingState","diveSettingEnabled",diveSettingEnabled)
-		applyBoolean(ctx,"setGravitySettingState","gravitySettingEnabled",gameParams.gravitySettingEnabled)
-		applyBoolean(ctx,"setJumpPowerSettingState","jumpPowerSettingEnabled",jumpPowerSettingEnabled)
-		applyBoolean(ctx,"setStaminaRegenSettingState","staminaRegenSettingEnabled",staminaRegenSettingEnabled)
-		applyBoolean(ctx,"setStaminaDepleteSettingState","staminaDepleteSettingEnabled",staminaDepleteSettingEnabled)
+		applyBoolean(app,"setSpeedSettingState","speedSettingEnabled",gameParams.speedSettingEnabled)
+		applyBoolean(app,"setDiveSettingState","diveSettingEnabled",diveSettingEnabled)
+		applyBoolean(app,"setGravitySettingState","gravitySettingEnabled",gameParams.gravitySettingEnabled)
+		applyBoolean(app,"setJumpPowerSettingState","jumpPowerSettingEnabled",jumpPowerSettingEnabled)
+		applyBoolean(app,"setStaminaRegenSettingState","staminaRegenSettingEnabled",staminaRegenSettingEnabled)
+		applyBoolean(app,"setStaminaDepleteSettingState","staminaDepleteSettingEnabled",staminaDepleteSettingEnabled)
 		if legacyGameParamsEnabled~=nil or speedParamsEnabled~=nil or gravityJumpParamsEnabled~=nil or staminaParamsEnabled~=nil then
-			applyBoolean(ctx,"setGameParamsState","gameParamsEnabled",true)
+			applyBoolean(app,"setGameParamsState","gameParamsEnabled",true)
 		end
-		applyClamped(ctx,"setStaminaRegenValue","staminaRegenValue",gameParams.staminaRegen,0,50,10)
-		applyClamped(ctx,"setStaminaDepleteValue","staminaDepleteValue",gameParams.staminaDeplete,0,50,10,clampStaminaDeplete)
-		applyClamped(ctx,"setJumpPowerValue","jumpPowerValue",gameParams.jumpPower,0,300,53.5)
-		applyClamped(ctx,"setDivePowerValue","divePowerValue",gameParams.divePower,0,15,1.9)
+		applyClamped(app,"setStaminaRegenValue","staminaRegenValue",gameParams.staminaRegen,0,50,10)
+		applyClamped(app,"setStaminaDepleteValue","staminaDepleteValue",gameParams.staminaDeplete,0,50,10,clampStaminaDeplete)
+		applyClamped(app,"setJumpPowerValue","jumpPowerValue",gameParams.jumpPower,0,300,53.5)
+		applyClamped(app,"setDivePowerValue","divePowerValue",gameParams.divePower,0,15,1.9)
 
 		local boost=settings.boost or {}
-		applyBoolean(ctx,"setJumpBoostState","jumpBoostOn",boost.enabled)
-		setBoolean(ctx,"jumpBoostTradeMode",boost.always)
-		setClamped(ctx,"boostForceY",boost.forceY,10,100,32)
-		setClamped(ctx,"boostCooldown",boost.cooldown,0,60,5)
-		setClamped(ctx,"boostChance",boost.chance,0,100,100)
-		setClamped(ctx,"ballDetectionRadius",boost.radius,1,50,10)
+		applyBoolean(app,"setJumpBoostState","jumpBoostOn",boost.enabled)
+		setBoolean(app,"jumpBoostTradeMode",boost.always)
+		setClamped(app,"boostForceY",boost.forceY,10,100,32)
+		setClamped(app,"boostCooldown",boost.cooldown,0,60,5)
+		setClamped(app,"boostChance",boost.chance,0,100,100)
+		setClamped(app,"ballDetectionRadius",boost.radius,1,50,10)
 
 		local esp=settings.esp or {}
-		applyBoolean(ctx,"setESPState","actionStatusOn",esp.enabled)
+		applyBoolean(app,"setESPState","actionStatusOn",esp.enabled)
 
 		local qbAim=settings.qbAim or {}
-		applyBoolean(ctx,"setQBAimState","qbAimEnabled",qbAim.enabled)
-		applyBoolean(ctx,"setQBAimTeamFilter","qbAimTeamFilter",qbAim.teamFilter)
-		applyBoolean(ctx,"setQBAimShowArc","qbAimShowArc",qbAim.showArc)
-		applyBoolean(ctx,"setQBAimSafeArc","qbAimSafeArc",qbAim.safeArc)
-		applyBoolean(ctx,"setQBAimTargetHighlight","qbAimTargetHighlight",qbAim.targetHighlight)
-		applyClamped(ctx,"setQBAimLeadDelay","qbAimLeadDelay",qbAim.leadDelay,0,1.5,0.38)
-		applyClamped(ctx,"setQBAimPeakHeight","qbAimPeakHeight",qbAim.peakHeight,8,20,14.00)
+		applyBoolean(app,"setQBAimState","qbAimEnabled",qbAim.enabled)
+		applyBoolean(app,"setQBAimTeamFilter","qbAimTeamFilter",qbAim.teamFilter)
+		applyBoolean(app,"setQBAimShowArc","qbAimShowArc",qbAim.showArc)
+		applyBoolean(app,"setQBAimSafeArc","qbAimSafeArc",qbAim.safeArc)
+		applyBoolean(app,"setQBAimTargetHighlight","qbAimTargetHighlight",qbAim.targetHighlight)
+		applyClamped(app,"setQBAimLeadDelay","qbAimLeadDelay",qbAim.leadDelay,0,1.5,0.38)
+		applyClamped(app,"setQBAimPeakHeight","qbAimPeakHeight",qbAim.peakHeight,8,20,14.00)
 		local savedDrift=qbAim.xyzDrift
 		if savedDrift==nil then savedDrift=qbAim.qbDrift end
 		if savedDrift==nil then savedDrift=qbAim.serverXZLead end
 		if savedDrift==nil then savedDrift=qbAim.serverYLead end
-		applyClamped(ctx,"setQBAimXYZDrift","qbAimQBDrift",savedDrift,-0.2,0.2,0)
-		ctx.qbAimQBYDrift=ctx.qbAimQBDrift
+		applyClamped(app,"setQBAimXYZDrift","qbAimQBDrift",savedDrift,-0.2,0.2,0)
+		app.qbAimQBYDrift=app.qbAimQBDrift
 
 		local testing=settings.testing or {}
-		applyBoolean(ctx,"setTestingState","testingEnabled",testing.enabled)
-		applyBoolean(ctx,"setTestingWRState","testingWREnabled",testing.wr)
-		applyBoolean(ctx,"setTestingQBState","testingQBEnabled",testing.qb)
+		applyBoolean(app,"setTestingState","testingEnabled",testing.enabled)
+		applyBoolean(app,"setTestingWRState","testingWREnabled",testing.wr)
+		applyBoolean(app,"setTestingQBState","testingQBEnabled",testing.qb)
 
 		local keybinds=settings.keybinds or {}
 		local keyMap={
@@ -875,109 +875,109 @@ function DataSave.new(ctx)
 
 		for savedName,stateName in pairs(keyMap) do
 			if keybinds[savedName]~=nil then
-				setValue(ctx,stateName,decodeBinding(keybinds[savedName]))
+				setValue(app,stateName,decodeBinding(keybinds[savedName]))
 			end
 		end
 
 		if keybinds.toggleESP~=nil then
-			setValue(ctx,"TOGGLE_ACTION_KEY",decodeBinding(keybinds.toggleESP))
+			setValue(app,"TOGGLE_ACTION_KEY",decodeBinding(keybinds.toggleESP))
 		elseif keybinds.toggleActionStatus~=nil then
-			setValue(ctx,"TOGGLE_ACTION_KEY",decodeBinding(keybinds.toggleActionStatus))
+			setValue(app,"TOGGLE_ACTION_KEY",decodeBinding(keybinds.toggleActionStatus))
 		end
 
-		applyPresetEditor(ctx,settings.presetEditor or settings.PresetEditor)
+		applyPresetEditor(app,settings.presetEditor or settings.PresetEditor)
 
 		local uiStyle=type(settings.uiStyle)=="table" and settings.uiStyle or {}
 		local hasSavedUIStyle=hasAnyKey(uiStyle)
 
-		local defaultUIStyle=getDefaultUIStyle(ctx)
-		if ctx.UI_STYLE then
+		local defaultUIStyle=getDefaultUIStyle(app)
+		if app.UI_STYLE then
 			for key,value in pairs(defaultUIStyle) do
-				if not hasSavedUIStyle or ctx.UI_STYLE[key]==nil then
-					ctx.UI_STYLE[key]=value
+				if not hasSavedUIStyle or app.UI_STYLE[key]==nil then
+					app.UI_STYLE[key]=value
 				end
 			end
 
 			for _,field in ipairs(UI_STYLE_NUMBER_FIELDS) do
 				local savedKey,styleKey,min,max,fallback=field[1],field[2],field[3],field[4],field[5]
 				if uiStyle[savedKey]~=nil then
-					ctx.UI_STYLE[styleKey]=clampNumber(uiStyle[savedKey],min,max,ctx.UI_STYLE[styleKey] or fallback)
+					app.UI_STYLE[styleKey]=clampNumber(uiStyle[savedKey],min,max,app.UI_STYLE[styleKey] or fallback)
 				end
 			end
 
 			for _,field in ipairs(UI_STYLE_BOOL_FIELDS) do
 				if uiStyle[field[1]]~=nil then
-					ctx.UI_STYLE[field[2]]=uiStyle[field[1]] and true or false
+					app.UI_STYLE[field[2]]=uiStyle[field[1]] and true or false
 				end
 			end
 
-			if uiStyle.liquidStrokeDirection~=nil then ctx.UI_STYLE.LiquidStrokeDirection=tostring(uiStyle.liquidStrokeDirection) end
+			if uiStyle.liquidStrokeDirection~=nil then app.UI_STYLE.LiquidStrokeDirection=tostring(uiStyle.liquidStrokeDirection) end
 			local themeExpanded=uiStyle.themePanelExpanded
 			if themeExpanded==nil then themeExpanded=uiStyle.ThemePanelExpanded end
-			if themeExpanded~=nil then ctx.UI_STYLE.ThemePanelExpanded=themeExpanded and true or false end
+			if themeExpanded~=nil then app.UI_STYLE.ThemePanelExpanded=themeExpanded and true or false end
 
 			local coloursExpanded=uiStyle.coloursPanelExpanded
 			if coloursExpanded==nil then coloursExpanded=uiStyle.ColorsPanelExpanded end
 			if coloursExpanded==nil then coloursExpanded=uiStyle.ColoursPanelExpanded end
-			if coloursExpanded~=nil then ctx.UI_STYLE.ColoursPanelExpanded=coloursExpanded and true or false end
+			if coloursExpanded~=nil then app.UI_STYLE.ColoursPanelExpanded=coloursExpanded and true or false end
 
 			local highlightExpanded=uiStyle.highlightPanelExpanded
 			if highlightExpanded==nil then highlightExpanded=uiStyle.HighlightPanelExpanded end
-			if highlightExpanded~=nil then ctx.UI_STYLE.HighlightPanelExpanded=highlightExpanded and true or false end
+			if highlightExpanded~=nil then app.UI_STYLE.HighlightPanelExpanded=highlightExpanded and true or false end
 
 			if uiStyle.highlightSelectedMode~=nil then
-				ctx.UI_STYLE.HighlightSelectedMode=tostring(uiStyle.highlightSelectedMode)
+				app.UI_STYLE.HighlightSelectedMode=tostring(uiStyle.highlightSelectedMode)
 			elseif uiStyle.HighlightSelectedMode~=nil then
-				ctx.UI_STYLE.HighlightSelectedMode=tostring(uiStyle.HighlightSelectedMode)
+				app.UI_STYLE.HighlightSelectedMode=tostring(uiStyle.HighlightSelectedMode)
 			end
 
 			if uiStyle.highlightSelectedState~=nil then
-				ctx.UI_STYLE.HighlightSelectedState=tostring(uiStyle.highlightSelectedState)
+				app.UI_STYLE.HighlightSelectedState=tostring(uiStyle.highlightSelectedState)
 			elseif uiStyle.HighlightSelectedState~=nil then
-				ctx.UI_STYLE.HighlightSelectedState=tostring(uiStyle.HighlightSelectedState)
+				app.UI_STYLE.HighlightSelectedState=tostring(uiStyle.HighlightSelectedState)
 			end
 
 			if uiStyle.uiLib~=nil and tostring(uiStyle.uiLib)~="" then
-				ctx.UI_STYLE.UILib=tostring(uiStyle.uiLib)
+				app.UI_STYLE.UILib=tostring(uiStyle.uiLib)
 			else
-				ctx.UI_STYLE.UILib=tostring(defaultUIStyle.UILib or "original")
+				app.UI_STYLE.UILib=tostring(defaultUIStyle.UILib or "original")
 			end
-			ctx.UI_STYLE.CornerRadius=0
+			app.UI_STYLE.CornerRadius=0
 		end
 
 		local workspaceSettings=settings.workspace or settings.Workspace or {}
-		if ctx.WORLD_SETTINGS then
-			ctx.WORLD_SETTINGS.SmoothPlastic=workspaceSettings.smoothPlastic and true or false
+		if app.WORLD_SETTINGS then
+			app.WORLD_SETTINGS.SmoothPlastic=workspaceSettings.smoothPlastic and true or false
 		end
 
 		local window=settings.window or {}
-		if ctx.UI_WINDOW then
-			if window.w~=nil then ctx.UI_WINDOW.W=clampNumber(window.w,ctx.UI_WINDOW.MinW or 560,ctx.UI_WINDOW.MaxW or 1220,ctx.UI_WINDOW.W or 880) end
-			if window.h~=nil then ctx.UI_WINDOW.H=clampNumber(window.h,ctx.UI_WINDOW.MinH or 360,ctx.UI_WINDOW.MaxH or 820,ctx.UI_WINDOW.H or 540) end
+		if app.UI_WINDOW then
+			if window.w~=nil then app.UI_WINDOW.W=clampNumber(window.w,app.UI_WINDOW.MinW or 560,app.UI_WINDOW.MaxW or 1220,app.UI_WINDOW.W or 880) end
+			if window.h~=nil then app.UI_WINDOW.H=clampNumber(window.h,app.UI_WINDOW.MinH or 360,app.UI_WINDOW.MaxH or 820,app.UI_WINDOW.H or 540) end
 		end
 
-		if ctx.root and window.posXScale~=nil then
-			ctx.root.Position=UDim2.new(
-				tonumber(window.posXScale) or ctx.root.Position.X.Scale,
-				tonumber(window.posXOffset) or ctx.root.Position.X.Offset,
-				tonumber(window.posYScale) or ctx.root.Position.Y.Scale,
-				tonumber(window.posYOffset) or ctx.root.Position.Y.Offset
+		if app.root and window.posXScale~=nil then
+			app.root.Position=UDim2.new(
+				tonumber(window.posXScale) or app.root.Position.X.Scale,
+				tonumber(window.posXOffset) or app.root.Position.X.Offset,
+				tonumber(window.posYScale) or app.root.Position.Y.Scale,
+				tonumber(window.posYOffset) or app.root.Position.Y.Offset
 			)
 		end
 
 		api.SetLoading(false)
 
 		for _,hookName in ipairs(APPLY_REFRESH_HOOKS) do
-			if ctx[hookName] then
-				pcall(ctx[hookName])
+			if app[hookName] then
+				pcall(app[hookName])
 			end
 		end
 	end
 
 	function api.SaveNow()
-		if loading or ctx.PLAYER_SETTINGS_LOADING then return false,"loading" end
-		if ctx.toolAlive==false then return false,"tool not alive" end
-		if not ctx.BOT_API or not ctx.BOT_API.Post then return false,"missing BOT_API.Post" end
+		if loading or app.PLAYER_SETTINGS_LOADING then return false,"loading" end
+		if app.toolAlive==false then return false,"tool not alive" end
+		if not app.BOT_API or not app.BOT_API.Post then return false,"missing BOT_API.Post" end
 
 		local currentSettings=api.Collect()
 		local settingsRoot=api.BuildRootForSave(currentSettings)
@@ -993,8 +993,8 @@ function DataSave.new(ctx)
 		autosaveLastPayload=ok and encoded or nil
 
 		task.spawn(function()
-			local response=ctx.BOT_API.Post("/player/save",{
-				playerId=getPlayerId(ctx),
+			local response=app.BOT_API.Post("/player/save",{
+				playerId=getPlayerId(app),
 				settings=settingsRoot,
 			})
 
@@ -1007,8 +1007,8 @@ function DataSave.new(ctx)
 	end
 
 	function api.Schedule()
-		if loading or ctx.PLAYER_SETTINGS_LOADING then return end
-		if ctx.toolAlive==false then return end
+		if loading or app.PLAYER_SETTINGS_LOADING then return end
+		if app.toolAlive==false then return end
 		if autosaveQueued then return end
 
 		autosaveQueued=true
@@ -1020,7 +1020,7 @@ function DataSave.new(ctx)
 	end
 
 	function api.SetPresetSize(index,x,y,z,skipSave)
-		local presets=ctx.PRESETS or {}
+		local presets=app.PRESETS or {}
 		local i=tonumber(index)
 		local preset=i and presets[i]
 
@@ -1043,7 +1043,7 @@ function DataSave.new(ctx)
 	end
 
 	function api.SetPresetKey(index,binding,skipSave)
-		local presets=ctx.PRESETS or {}
+		local presets=app.PRESETS or {}
 		local i=tonumber(index)
 		local preset=i and presets[i]
 
@@ -1061,8 +1061,8 @@ function DataSave.new(ctx)
 	end
 
 	function api.ResetPreset(index,skipSave)
-		local presets=ctx.PRESETS or {}
-		local defaults=ctx.DEFAULT_PRESETS or {}
+		local presets=app.PRESETS or {}
+		local defaults=app.DEFAULT_PRESETS or {}
 		local i=tonumber(index)
 		local preset=i and presets[i]
 		local default=i and defaults[i]
@@ -1090,18 +1090,18 @@ function DataSave.new(ctx)
 			api.Schedule()
 		end
 
-		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
+		if app.refreshPage2UI then pcall(app.refreshPage2UI) end
 		return true
 	end
 
 	function api.ApplyPresetEditor(presetEditor,skipSave)
-		applyPresetEditor(ctx,presetEditor)
+		applyPresetEditor(app,presetEditor)
 
 		if skipSave~=true then
 			api.Schedule()
 		end
 
-		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
+		if app.refreshPage2UI then pcall(app.refreshPage2UI) end
 		return true
 	end
 
@@ -1111,12 +1111,12 @@ function DataSave.new(ctx)
 			return false,"name missing"
 		end
 
-		local editorForApi=encodePresetEditor(presetEditor or collectPresetEditor(ctx))
+		local editorForApi=encodePresetEditor(presetEditor or collectPresetEditor(app))
 		local preset=nil
 
-		if ctx.BOT_API and ctx.BOT_API.Post then
-			local response=ctx.BOT_API.Post("/preset/create",{
-				playerId=getPlayerId(ctx),
+		if app.BOT_API and app.BOT_API.Post then
+			local response=app.BOT_API.Post("/preset/create",{
+				playerId=getPlayerId(app),
 				name=cleanName,
 				presetEditor=editorForApi,
 			})
@@ -1142,12 +1142,12 @@ function DataSave.new(ctx)
 			return false,"preset save broke"
 		end
 
-		if ctx.OWNED_PRESETS then
-			table.insert(ctx.OWNED_PRESETS,preset)
+		if app.OWNED_PRESETS then
+			table.insert(app.OWNED_PRESETS,preset)
 		end
 
-		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
-		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
+		if app.refreshPage2UI then pcall(app.refreshPage2UI) end
+		if app.rebuildOwnedList then pcall(app.rebuildOwnedList) end
 
 		return true,preset
 	end
@@ -1158,12 +1158,12 @@ function DataSave.new(ctx)
 			return false,"paste a preset code"
 		end
 
-		if not(ctx.BOT_API and ctx.BOT_API.Post) then
+		if not(app.BOT_API and app.BOT_API.Post) then
 			return false,"preset import needs bot"
 		end
 
-		local response=ctx.BOT_API.Post("/preset/load",{
-			playerId=getPlayerId(ctx),
+		local response=app.BOT_API.Post("/preset/load",{
+			playerId=getPlayerId(app),
 			code=cleanCode,
 		})
 
@@ -1171,13 +1171,13 @@ function DataSave.new(ctx)
 			return false,response and response.error or "import failed"
 		end
 
-		if response.presets and type(response.presets)=="table" and ctx.OWNED_PRESETS then
-			clearArray(ctx.OWNED_PRESETS)
+		if response.presets and type(response.presets)=="table" and app.OWNED_PRESETS then
+			clearArray(app.OWNED_PRESETS)
 
 			for _,rawPreset in ipairs(response.presets) do
 				local normalized=normalizePreset(rawPreset)
 				if normalized then
-					table.insert(ctx.OWNED_PRESETS,normalized)
+					table.insert(app.OWNED_PRESETS,normalized)
 				end
 			end
 		else
@@ -1186,28 +1186,28 @@ function DataSave.new(ctx)
 				return false,"preset data broke"
 			end
 
-			if ctx.OWNED_PRESETS then
+			if app.OWNED_PRESETS then
 				local replaced=false
-				for index,owned in ipairs(ctx.OWNED_PRESETS) do
+				for index,owned in ipairs(app.OWNED_PRESETS) do
 					if tostring(owned.Code or owned.code or "")==tostring(preset.Code or preset.code or "") then
-						ctx.OWNED_PRESETS[index]=preset
+						app.OWNED_PRESETS[index]=preset
 						replaced=true
 						break
 					end
 				end
 
 				if not replaced then
-					table.insert(ctx.OWNED_PRESETS,preset)
+					table.insert(app.OWNED_PRESETS,preset)
 				end
 			end
 
-			if ctx.expandedOwned then
-				ctx.expandedOwned[tostring(preset.Code or preset.code or cleanCode)]=true
+			if app.expandedOwned then
+				app.expandedOwned[tostring(preset.Code or preset.code or cleanCode)]=true
 			end
 		end
 
-		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
-		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
+		if app.refreshPage2UI then pcall(app.refreshPage2UI) end
+		if app.rebuildOwnedList then pcall(app.rebuildOwnedList) end
 
 		return true,response
 	end
@@ -1220,10 +1220,10 @@ function DataSave.new(ctx)
 
 		api.ApplyPresetEditor(normalized.Data.PresetEditor,true)
 
-		if ctx.BOT_API and ctx.BOT_API.Post then
+		if app.BOT_API and app.BOT_API.Post then
 			task.spawn(function()
-				local response=ctx.BOT_API.Post("/preset/equip",{
-					playerId=getPlayerId(ctx),
+				local response=app.BOT_API.Post("/preset/equip",{
+					playerId=getPlayerId(app),
 					code=normalized.Code,
 				})
 
@@ -1234,7 +1234,7 @@ function DataSave.new(ctx)
 		end
 
 		api.Schedule()
-		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
+		if app.refreshPage2UI then pcall(app.refreshPage2UI) end
 
 		return true,normalized
 	end
@@ -1243,60 +1243,60 @@ function DataSave.new(ctx)
 		local response=nil
 		local usedApi=false
 
-		if ctx.BOT_API and ctx.BOT_API.Post then
+		if app.BOT_API and app.BOT_API.Post then
 			usedApi=true
-			response=ctx.BOT_API.Post("/preset/delete",{
-				playerId=getPlayerId(ctx),
+			response=app.BOT_API.Post("/preset/delete",{
+				playerId=getPlayerId(app),
 				code=code,
 			})
 		end
 
-		if response and response.ok and type(response.presets)=="table" and ctx.OWNED_PRESETS then
-			clearArray(ctx.OWNED_PRESETS)
+		if response and response.ok and type(response.presets)=="table" and app.OWNED_PRESETS then
+			clearArray(app.OWNED_PRESETS)
 
 			for _,rawPreset in ipairs(response.presets) do
 				local normalized=normalizePreset(rawPreset)
 				if normalized then
-					table.insert(ctx.OWNED_PRESETS,normalized)
+					table.insert(app.OWNED_PRESETS,normalized)
 				end
 			end
 		elseif usedApi then
 			warn("preset delete failed:",response and response.error or "unknown")
 			return false,response and response.error or "delete failed"
-		elseif ctx.OWNED_PRESETS then
+		elseif app.OWNED_PRESETS then
 			local removed=false
 
-			for i=#ctx.OWNED_PRESETS,1,-1 do
-				local preset=ctx.OWNED_PRESETS[i]
+			for i=#app.OWNED_PRESETS,1,-1 do
+				local preset=app.OWNED_PRESETS[i]
 				if tostring(preset.Code or preset.code or "")==tostring(code or "") then
-					table.remove(ctx.OWNED_PRESETS,i)
+					table.remove(app.OWNED_PRESETS,i)
 					removed=true
 				end
 			end
 
-			if not removed and index and ctx.OWNED_PRESETS[index] then
-				table.remove(ctx.OWNED_PRESETS,index)
+			if not removed and index and app.OWNED_PRESETS[index] then
+				table.remove(app.OWNED_PRESETS,index)
 			end
 		end
 
-		if ctx.expandedOwned then
-			ctx.expandedOwned[tostring(code or "")]=nil
+		if app.expandedOwned then
+			app.expandedOwned[tostring(code or "")]=nil
 		end
 
-		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
-		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
+		if app.refreshPage2UI then pcall(app.refreshPage2UI) end
+		if app.rebuildOwnedList then pcall(app.rebuildOwnedList) end
 
 		return true
 	end
 
 	function api.Load()
-		if not ctx.BOT_API or not ctx.BOT_API.Post then
+		if not app.BOT_API or not app.BOT_API.Post then
 			api.Apply(api.GetSavedSettingsForCurrentMode())
 			return false,"missing BOT_API.Post"
 		end
 
-		local response=ctx.BOT_API.Post("/player/load",{
-			playerId=getPlayerId(ctx),
+		local response=app.BOT_API.Post("/player/load",{
+			playerId=getPlayerId(app),
 		})
 
 		if not response or not response.ok then
@@ -1313,7 +1313,7 @@ function DataSave.new(ctx)
 
 	function api.SetMode(modeKey,applyNow)
 		if modeKey then
-			setValue(ctx,"CURRENT_MODE_KEY",tostring(modeKey))
+			setValue(app,"CURRENT_MODE_KEY",tostring(modeKey))
 		end
 
 		if applyNow~=false then
@@ -1322,12 +1322,12 @@ function DataSave.new(ctx)
 	end
 
 	function api.LoadOwnedPresets()
-		if not ctx.BOT_API or not ctx.BOT_API.Post then
+		if not app.BOT_API or not app.BOT_API.Post then
 			return false,"missing BOT_API.Post"
 		end
 
-		local response=ctx.BOT_API.Post("/preset/list-owned",{
-			playerId=getPlayerId(ctx),
+		local response=app.BOT_API.Post("/preset/list-owned",{
+			playerId=getPlayerId(app),
 		})
 
 		if not response or not response.ok then
@@ -1335,19 +1335,19 @@ function DataSave.new(ctx)
 			return false,response and response.error or "unknown"
 		end
 
-		if ctx.OWNED_PRESETS then
-			clearArray(ctx.OWNED_PRESETS)
+		if app.OWNED_PRESETS then
+			clearArray(app.OWNED_PRESETS)
 
 			for _,preset in ipairs(response.presets or {}) do
 				local normalized=normalizePreset(preset)
 				if normalized then
-					table.insert(ctx.OWNED_PRESETS,normalized)
+					table.insert(app.OWNED_PRESETS,normalized)
 				end
 			end
 		end
 
-		if ctx.rebuildOwnedList then pcall(ctx.rebuildOwnedList) end
-		if ctx.refreshPage2UI then pcall(ctx.refreshPage2UI) end
+		if app.rebuildOwnedList then pcall(app.rebuildOwnedList) end
+		if app.refreshPage2UI then pcall(app.refreshPage2UI) end
 
 		return true,response
 	end
@@ -1358,11 +1358,11 @@ function DataSave.new(ctx)
 	api.NormalizeRoot=normalizeRoot
 	api.NormalizePreset=normalizePreset
 	api.CollectPresetEditor=function()
-		return collectPresetEditor(ctx)
+		return collectPresetEditor(app)
 	end
 
-	ctx.DataSave=api
-	ctx.requestPlayerAutosave=function()
+	app.DataSave=api
+	app.requestPlayerAutosave=function()
 		api.Schedule()
 	end
 

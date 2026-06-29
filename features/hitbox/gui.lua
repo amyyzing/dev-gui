@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- hitbox size and transparency controls.
 
-return{new=function(ctx,...)
-	return ctx.Page1HitboxLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.Page1HitboxLogicModule.new(app,...)
 end}

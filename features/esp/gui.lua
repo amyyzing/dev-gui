@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- esp switch and highlight settings.
 
-return{new=function(ctx,...)
-	return ctx.Page1ESPLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.Page1ESPLogicModule.new(app,...)
 end}

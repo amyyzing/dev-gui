@@ -1,9 +1,9 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- simplifies map materials and restores them when turned off.
 
 local AntiMaterial={}
 
-local function ensureWorldSettings(ctx)
-	local ws=ctx.WORLD_SETTINGS or ctx.WorldSettings or {}
+local function ensureWorldSettings(app)
+	local ws=app.WORLD_SETTINGS or app.WorldSettings or {}
 
 	if ws.SmoothPlastic==nil then
 		ws.SmoothPlastic=false
@@ -13,7 +13,7 @@ local function ensureWorldSettings(ctx)
 		ws.OriginalMaterials={}
 	end
 
-	ctx.WORLD_SETTINGS=ws
+	app.WORLD_SETTINGS=ws
 	return ws
 end
 
@@ -35,13 +35,13 @@ local function applySmoothPlasticToPart(worldSettings,part)
 	part.Material=Enum.Material.SmoothPlastic
 end
 
-function AntiMaterial.new(ctx,page)
-	local THEME=ctx.THEME
-	local safeDisconnect=ctx.safeDisconnect
-	local makeSection=ctx.makeSection
-	local buildToggleRow=ctx.buildToggleRow
+function AntiMaterial.new(app,page)
+	local THEME=app.THEME
+	local safeDisconnect=app.safeDisconnect
+	local makeSection=app.makeSection
+	local buildToggleRow=app.buildToggleRow
 
-	local worldSettings=ensureWorldSettings(ctx)
+	local worldSettings=ensureWorldSettings(app)
 	local api={}
 	local materialToggle=nil
 
@@ -75,8 +75,8 @@ function AntiMaterial.new(ctx,page)
 			materialToggle.set(worldSettings.SmoothPlastic)
 		end
 
-		if fire~=false and ctx.onChanged then
-			pcall(ctx.onChanged,worldSettings.SmoothPlastic)
+		if fire~=false and app.onChanged then
+			pcall(app.onChanged,worldSettings.SmoothPlastic)
 		end
 	end
 

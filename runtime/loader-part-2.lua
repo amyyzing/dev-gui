@@ -1,7 +1,6 @@
 -- HB_RUNTIME_PART_2
--- second boot chunk. mostly ui plumbing and saved-state restore helpers.
+-- boot step 2: saved settings, page one helpers, and restore setup.
 
--- Runtime chunk 2. Loaded by loader.lua with a shared environment.
 GuiLogic=GuiLogicModule.new({
 	New=New,
 	Fusion=FusionModule,
@@ -494,13 +493,13 @@ function getPage1Column(name)
 	return name=="left" and leftCol or rightCol
 end
 
-function buildPage1Module(spec,ctx)
+function buildPage1Module(spec,app)
 	local parent=getPage1Column(spec.column)
 	local env=getfenv()
-	local module=rawget(env,moduleGlobalName(spec.name))
-	if module and module.new then
+	local featureModule=rawget(env,moduleGlobalName(spec.name))
+	if featureModule and featureModule.new then
 		local ok,result=pcall(function()
-			return module.new(ctx,parent)
+			return featureModule.new(app,parent)
 		end)
 		if ok then
 			PAGE1_APIS[spec.api]=result
@@ -513,10 +512,10 @@ function buildPage1Module(spec,ctx)
 end
 
 function buildPage1()
-	local ctx=makePage1Ctx()
+	local app=makePage1Ctx()
 
 	for _,spec in ipairs(PAGE1_MODULE_SPECS) do
-		buildPage1Module(spec,ctx)
+		buildPage1Module(spec,app)
 	end
 
 	syncPage1State()

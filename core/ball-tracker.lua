@@ -1,4 +1,4 @@
--- small core helper. these modules are deliberately plain so features can share them.
+-- tracks held balls, live balls, and current quarterback.
 
 local BallTracker = {}
 BallTracker.__index = BallTracker

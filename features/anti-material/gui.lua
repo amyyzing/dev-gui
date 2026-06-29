@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- anti material switch for the map editor page.
 
-return{new=function(ctx,...)
-	return ctx.AntiMaterialLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.AntiMaterialLogicModule.new(app,...)
 end}

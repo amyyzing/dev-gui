@@ -94,25 +94,25 @@ local hitSpamEnabled=false
 local hitSpamButton=nil
 
 local function connect(signal,fn)
-	local conn=signal:Connect(fn)
-	connections[#connections+1]=conn
-	return conn
+	local connection=signal:Connect(fn)
+	connections[#connections+1]=connection
+	return connection
 end
 
 local function disconnectAll()
-	for _,conn in ipairs(connections) do
-		pcall(function() conn:Disconnect() end)
+	for _,connection in ipairs(connections) do
+		pcall(function() connection:Disconnect() end)
 	end
 	connections={}
 end
 
-local function new(className,props,parent)
-	local obj=Instance.new(className)
-	for key,value in pairs(props or {}) do
-		obj[key]=value
+local function new(className,properties,parent)
+	local instance=Instance.new(className)
+	for key,value in pairs(properties or {}) do
+		instance[key]=value
 	end
-	obj.Parent=parent
-	return obj
+	instance.Parent=parent
+	return instance
 end
 
 local function bindingToText(binding)
@@ -216,8 +216,8 @@ end
 local function worldCFrame(instance)
 	if not instance then return nil end
 	if instance:IsA("Attachment") then
-		local ok,cf=pcall(function() return instance.WorldCFrame end)
-		if ok and typeof(cf)=="CFrame" then return cf end
+		local ok,cframeValue=pcall(function() return instance.WorldCFrame end)
+		if ok and typeof(cframeValue)=="CFrame" then return cframeValue end
 		local parent=instance.Parent
 		if parent and parent:IsA("BasePart") then
 			return parent.CFrame*instance.CFrame
@@ -232,8 +232,8 @@ local function centerC2Position(workspaceGame)
 	local localFolder=workspaceGame and workspaceGame:FindFirstChild("Local")
 	local center=localFolder and localFolder:FindFirstChild("Center")
 	local c2=center and center:FindFirstChild("C2",true)
-	local cf=worldCFrame(c2)
-	return cf and cf.Position
+	local cframeValue=worldCFrame(c2)
+	return cframeValue and cframeValue.Position
 end
 
 local function releaseOrigin(workspaceGame)
@@ -299,13 +299,13 @@ end
 local function closestTaggedTouch(position,tagged)
 	local best=nil
 	local bestDist=nil
-	for _,obj in ipairs(tagged or {}) do
-		if obj and obj.Parent then
+	for _,instance in ipairs(tagged or {}) do
+		if instance and instance.Parent then
 			local touch=nil
-			if obj:IsA("BasePart") and obj.Name=="TouchDetect" then
-				touch=obj
+			if instance:IsA("BasePart") and instance.Name=="TouchDetect" then
+				touch=instance
 			else
-				local found=obj:FindFirstChild("TouchDetect",true)
+				local found=instance:FindFirstChild("TouchDetect",true)
 				if found then
 					touch=touchDetectPart(found)
 				end
@@ -777,10 +777,10 @@ local function landingAtY(origin,velocity,y)
 	local disc=b*b-4*a*c
 	if disc<0 then return nil,nil end
 	local root=math.sqrt(disc)
-	local t1=(-b+root)/(2*a)
-	local t2=(-b-root)/(2*a)
-	local time=math.max(t1,t2)
-	if time<=0 then time=math.min(t1,t2) end
+	local lateLandingTime=(-b+root)/(2*a)
+	local earlyLandingTime=(-b-root)/(2*a)
+	local time=math.max(lateLandingTime,earlyLandingTime)
+	if time<=0 then time=math.min(lateLandingTime,earlyLandingTime) end
 	if time<=0 then return nil,nil end
 	return origin+velocity*time+0.5*G*time*time,time
 end

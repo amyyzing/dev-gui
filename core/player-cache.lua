@@ -1,4 +1,4 @@
--- small core helper. these modules are deliberately plain so features can share them.
+-- cached player, character, root, and team lookup.
 
 local PlayerCache = {}
 PlayerCache.__index = PlayerCache

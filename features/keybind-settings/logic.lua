@@ -1,4 +1,4 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- keybind capture, clear, and restore actions.
 
 local KeybindSettings={}
 
@@ -6,9 +6,9 @@ local UIS=game:GetService("UserInputService")
 local TweenService=game:GetService("TweenService")
 local TextService=game:GetService("TextService")
 
-local function defaultBindingRows(ctx)
-	local state=ctx.State or {}
-	ctx.State=state
+local function defaultBindingRows(app)
+	local state=app.State or {}
+	app.State=state
 	local function ensure(name)
 		if state[name]==nil then state[name]=Enum.KeyCode.Unknown end
 	end
@@ -26,28 +26,28 @@ local function defaultBindingRows(ctx)
 	}
 end
 
-local function getBinding(ctx,item)
+local function getBinding(app,item)
 	if item.get then return item.get() end
-	if item.key and ctx.State then return ctx.State[item.key] end
+	if item.key and app.State then return app.State[item.key] end
 	return Enum.KeyCode.Unknown
 end
 
-local function setBinding(ctx,item,value)
+local function setBinding(app,item,value)
 	if item.set then
 		item.set(value)
-	elseif item.key and ctx.State then
-		ctx.State[item.key]=value
+	elseif item.key and app.State then
+		app.State[item.key]=value
 	end
 end
 
-function KeybindSettings.new(ctx,bindSection)
-	local New=ctx.New
-	local THEME=ctx.THEME
-	local bindingToLabel=ctx.bindingToLabel
-	local inputToBinding=ctx.inputToBinding
-	local wrapTextButton=ctx.wrapTextButton
-	local placeWrappedButton=ctx.placeWrappedButton
-	local setWrappedButtonBg=ctx.setWrappedButtonBg
+function KeybindSettings.new(app,bindSection)
+	local New=app.New
+	local THEME=app.THEME
+	local bindingToLabel=app.bindingToLabel
+	local inputToBinding=app.inputToBinding
+	local wrapTextButton=app.wrapTextButton
+	local placeWrappedButton=app.placeWrappedButton
+	local setWrappedButtonBg=app.setWrappedButtonBg
 
 	local api={}
 	local bindRows={}
@@ -57,9 +57,9 @@ function KeybindSettings.new(ctx,bindSection)
 	local suppressMouseButton1ClickUntil=0
 	local connections={}
 	local function connect(signal,fn)
-		local conn=signal:Connect(fn)
-		table.insert(connections,conn)
-		return conn
+		local connection=signal:Connect(fn)
+		table.insert(connections,connection)
+		return connection
 	end
 
 	function api.GetActiveCapture()
@@ -104,31 +104,31 @@ function KeybindSettings.new(ctx,bindSection)
 
 	function api.MakeBindButton(parent,x,y,w)
 		local normalBg=THEME.BUTTON or THEME.BG
-		local btn=New("TextButton",{BackgroundColor3=normalBg,BorderSizePixel=0,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w or 122,28),Text="NIL",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6,ThemeRole="BUTTON"},parent)
-		local wrap=wrapTextButton(btn,normalBg,2)
+		local button=New("TextButton",{BackgroundColor3=normalBg,BorderSizePixel=0,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w or 122,28),Text="NIL",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.TEXT,AutoButtonColor=false,ZIndex=6,ThemeRole="BUTTON"},parent)
+		local wrap=wrapTextButton(button,normalBg,2)
 		wrap:SetAttribute("ThemeRole","BUTTON")
 
-		connect(btn.MouseEnter,function()
-			if activeCapture and activeCapture.button==btn then return end
+		connect(button.MouseEnter,function()
+			if activeCapture and activeCapture.button==button then return end
 			wrap.BackgroundColor3=THEME.CARD
 		end)
 
-		connect(btn.MouseLeave,function()
-			if activeCapture and activeCapture.button==btn then return end
+		connect(button.MouseLeave,function()
+			if activeCapture and activeCapture.button==button then return end
 			wrap.BackgroundColor3=THEME.BUTTON or THEME.BG
 		end)
 
-		return btn
+		return button
 	end
 
-	local function setButtonCaptureState(btn,waiting)
-		btn.Text=waiting and"PRESS..." or btn.Text
-		setWrappedButtonBg(btn,THEME.BUTTON or THEME.BG)
-		btn.TextColor3=THEME.TEXT
+	local function setButtonCaptureState(button,waiting)
+		button.Text=waiting and"PRESS..." or button.Text
+		setWrappedButtonBg(button,THEME.BUTTON or THEME.BG)
+		button.TextColor3=THEME.TEXT
 	end
 
-	function api.StartCapture(btn,getter,setter)
-		if activeCapture and activeCapture.button and activeCapture.button~=btn then
+	function api.StartCapture(button,getter,setter)
+		if activeCapture and activeCapture.button and activeCapture.button~=button then
 			setWrappedButtonBg(activeCapture.button,THEME.BUTTON or THEME.BG)
 			activeCapture.button.TextColor3=THEME.TEXT
 			if activeCapture.getter then
@@ -136,8 +136,8 @@ function KeybindSettings.new(ctx,bindSection)
 			end
 		end
 
-		activeCapture={button=btn,getter=getter,setter=setter}
-		setButtonCaptureState(btn,true)
+		activeCapture={button=button,getter=getter,setter=setter}
+		setButtonCaptureState(button,true)
 	end
 
 	function api.CancelCapture()
@@ -189,11 +189,11 @@ function KeybindSettings.new(ctx,bindSection)
 			return math.max(0,math.floor(measured+0.5))
 		end
 
-		local function tweenLabel(props)
+		local function tweenLabel(properties)
 			if hoverTween then
 				hoverTween:Cancel()
 			end
-			hoverTween=TweenService:Create(labelButton,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),props)
+			hoverTween=TweenService:Create(labelButton,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),properties)
 			hoverTween:Play()
 		end
 
@@ -222,30 +222,30 @@ function KeybindSettings.new(ctx,bindSection)
 			requestRefresh()
 		end)
 
-		local btn=api.MakeBindButton(row,0,0,122)
-		placeWrappedButton(btn,UDim2.new(1,-122,0.5,-14))
+		local button=api.MakeBindButton(row,0,0,122)
+		placeWrappedButton(button,UDim2.new(1,-122,0.5,-14))
 
-		connect(btn.Activated,function()
+		connect(button.Activated,function()
 			if os.clock()<suppressMouseButton1ClickUntil then
 				return
 			end
 
-			if activeCapture and activeCapture.button==btn then
+			if activeCapture and activeCapture.button==button then
 				finishCapture("MouseButton1")
 				return
 			end
 
-			api.StartCapture(btn,getter,setter)
+			api.StartCapture(button,getter,setter)
 		end)
 
-		connect(btn.InputBegan,function(input)
-			if not(activeCapture and activeCapture.button==btn) then return end
+		connect(button.InputBegan,function(input)
+			if not(activeCapture and activeCapture.button==button) then return end
 
 			api.CaptureInput(input)
 		end)
 
-		table.insert(bindRows,{button=btn,getter=getter,label=labelButton,strike=strike,displayLabel=string.upper(tostring(label or ""))})
-		return btn
+		table.insert(bindRows,{button=button,getter=getter,label=labelButton,strike=strike,displayLabel=string.upper(tostring(label or ""))})
+		return button
 	end
 
 	function api.Refresh()
@@ -268,12 +268,12 @@ function KeybindSettings.new(ctx,bindSection)
 	end
 
 	function api.Build(rows)
-		rows=rows or ctx.Bindings or defaultBindingRows(ctx)
+		rows=rows or app.Bindings or defaultBindingRows(app)
 		for _,item in ipairs(rows) do
 			api.AddBindRow(item.label,function()
-				return getBinding(ctx,item)
+				return getBinding(app,item)
 			end,function(v)
-				setBinding(ctx,item,v)
+				setBinding(app,item,v)
 			end)
 		end
 		api.Refresh()
@@ -297,9 +297,9 @@ function KeybindSettings.new(ctx,bindSection)
 	end)
 
 	function api.Destroy()
-		for _,conn in ipairs(connections) do
+		for _,connection in ipairs(connections) do
 			pcall(function()
-				conn:Disconnect()
+				connection:Disconnect()
 			end)
 		end
 		table.clear(connections)

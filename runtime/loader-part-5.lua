@@ -1,7 +1,6 @@
 -- HB_RUNTIME_PART_5
--- final boot chunk. this is where the panel becomes usable.
+-- boot step 5: data save hooks, announcements, and final startup.
 
--- Runtime chunk 5. Loaded by loader.lua with a shared environment.
 function shutdownTool()
 	if not toolAlive then return end
 
@@ -245,8 +244,8 @@ local function refreshPage2RuntimeUI()
 	if refreshPage2UI then refreshPage2UI() end
 end
 
-local function attachDataSaveSetters(ctx)
-	ctx.setHitboxSize=function(x,y,z)
+local function attachDataSaveSetters(app)
+	app.setHitboxSize=function(x,y,z)
 		PAGE1_STATE.sizeX=x
 		PAGE1_STATE.sizeY=y
 		PAGE1_STATE.sizeZ=z
@@ -254,7 +253,7 @@ local function attachDataSaveSetters(ctx)
 	end
 
 	for setterName,spec in pairs(DATA_SAVE_STATE_SETTERS) do
-		ctx[setterName]=function(value)
+		app[setterName]=function(value)
 			local stateValue=setPage1Field(spec[1],value,spec[2])
 			if spec[3] then
 				if spec[5] then
@@ -266,7 +265,7 @@ local function attachDataSaveSetters(ctx)
 		end
 	end
 
-	ctx.setSpeedState=function(value)
+	app.setSpeedState=function(value)
 		local stateValue=setPage1Field("speedEnabled",value,true)
 		PAGE1_STATE.speedParamsEnabled=stateValue
 		PAGE1_STATE.speedSettingEnabled=stateValue
@@ -274,7 +273,7 @@ local function attachDataSaveSetters(ctx)
 		callPage1Api("GameParams","SetSpeedState",stateValue,false)
 	end
 
-	ctx.setGravityState=function(value)
+	app.setGravityState=function(value)
 		local stateValue=setPage1Field("gravityEnabled",value,true)
 		PAGE1_STATE.gravityJumpParamsEnabled=stateValue
 		PAGE1_STATE.gravitySettingEnabled=stateValue
@@ -282,17 +281,17 @@ local function attachDataSaveSetters(ctx)
 		callPage1Api("GameParams","SetGravityState",stateValue,false)
 	end
 
-	ctx.setGameParamsState=function()
+	app.setGameParamsState=function()
 		local stateValue=setPage1Field("gameParamsEnabled",true,true)
 		callPage1Api("GameParams","SetGameParamsState",stateValue,false)
 	end
 
-	ctx.setParamsSelectedPage=function(value)
+	app.setParamsSelectedPage=function(value)
 		local stateValue=setPage1Field("paramsSelectedPage",tostring(value or "speed"),false)
 		callPage1Api("GameParams","SetParamsSelectedPage",stateValue,false)
 	end
 
-	ctx.setSpeedParamsState=function(value)
+	app.setSpeedParamsState=function(value)
 		local stateValue=setPage1Field("speedParamsEnabled",value,true)
 		PAGE1_STATE.speedEnabled=stateValue
 		PAGE1_STATE.speedSettingEnabled=stateValue
@@ -301,7 +300,7 @@ local function attachDataSaveSetters(ctx)
 		callPage1Api("GameParams","SetParamsPageEnabled","speed",stateValue,false)
 	end
 
-	ctx.setGravityJumpParamsState=function(value)
+	app.setGravityJumpParamsState=function(value)
 		local stateValue=setPage1Field("gravityJumpParamsEnabled",value,true)
 		PAGE1_STATE.gravityEnabled=stateValue
 		PAGE1_STATE.gravitySettingEnabled=stateValue
@@ -310,7 +309,7 @@ local function attachDataSaveSetters(ctx)
 		callPage1Api("GameParams","SetParamsPageEnabled","gravity",stateValue,false)
 	end
 
-	ctx.setStaminaParamsState=function(value)
+	app.setStaminaParamsState=function(value)
 		local stateValue=setPage1Field("staminaParamsEnabled",value,true)
 		PAGE1_STATE.staminaRegenSettingEnabled=stateValue
 		PAGE1_STATE.staminaDepleteSettingEnabled=stateValue
@@ -332,31 +331,31 @@ local function attachDataSaveSetters(ctx)
 		callPage1Api("GameParams","SetParamSettingEnabled",stateKey,stateValue,false)
 	end
 
-	ctx.setSpeedSettingState=function(value)
+	app.setSpeedSettingState=function(value)
 		setParamSettingState("speedSettingEnabled",value)
 	end
 
-	ctx.setDiveSettingState=function(value)
+	app.setDiveSettingState=function(value)
 		setParamSettingState("diveSettingEnabled",value)
 	end
 
-	ctx.setGravitySettingState=function(value)
+	app.setGravitySettingState=function(value)
 		setParamSettingState("gravitySettingEnabled",value)
 	end
 
-	ctx.setJumpPowerSettingState=function(value)
+	app.setJumpPowerSettingState=function(value)
 		setParamSettingState("jumpPowerSettingEnabled",value)
 	end
 
-	ctx.setStaminaRegenSettingState=function(value)
+	app.setStaminaRegenSettingState=function(value)
 		setParamSettingState("staminaRegenSettingEnabled",value)
 	end
 
-	ctx.setStaminaDepleteSettingState=function(value)
+	app.setStaminaDepleteSettingState=function(value)
 		setParamSettingState("staminaDepleteSettingEnabled",value)
 	end
 
-	return ctx
+	return app
 end
 
 function buildDataSaveContext()

@@ -1,4 +1,4 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- player param wheel and param sliders.
 
 local GameParamsGui={}
 
@@ -177,16 +177,16 @@ function GameParamsGui.GetDialSliceAssets()
 	return getDialSliceAssets()
 end
 
-function GameParamsGui.new(ctx,parent)
-	local runtime=ctx.Page1GameParamsLogicModule.new(ctx)
-	local New=ctx.New
-	local THEME=ctx.THEME or {}
-	local safeDisconnect=ctx.safeDisconnect
-	local makeSection=ctx.makeSection
-	local buildSlider=ctx.buildSlider
-	local buildToggleLabel=ctx.buildToggleLabel
-	local buildToggleRow=ctx.buildToggleRow
-	local state=runtime.GetState and runtime.GetState() or ctx.State
+function GameParamsGui.new(app,parent)
+	local runtime=app.Page1GameParamsLogicModule.new(app)
+	local New=app.New
+	local THEME=app.THEME or {}
+	local safeDisconnect=app.safeDisconnect
+	local makeSection=app.makeSection
+	local buildSlider=app.buildSlider
+	local buildToggleLabel=app.buildToggleLabel
+	local buildToggleRow=app.buildToggleRow
+	local state=runtime.GetState and runtime.GetState() or app.State
 	local api={}
 	local gravitySlider=nil
 	local speedSlider=nil
@@ -212,24 +212,24 @@ function GameParamsGui.new(ctx,parent)
 	local connections={}
 	local destroyed=false
 
-	local function disconnect(conn)
+	local function disconnect(connection)
 		if safeDisconnect then
-			safeDisconnect(conn)
-		elseif conn then
+			safeDisconnect(connection)
+		elseif connection then
 			pcall(function()
-				conn:Disconnect()
+				connection:Disconnect()
 			end)
 		end
 	end
 
-	local function trackConnection(conn)
-		connections[#connections+1]=conn
-		return conn
+	local function trackConnection(connection)
+		connections[#connections+1]=connection
+		return connection
 	end
 
 	local function disconnectConnections()
-		for _,conn in ipairs(connections) do
-			disconnect(conn)
+		for _,connection in ipairs(connections) do
+			disconnect(connection)
 		end
 
 		table.clear(connections)
@@ -518,8 +518,8 @@ function GameParamsGui.new(ctx,parent)
 		local function pageAtPosition(position)
 			local absoluteSize=canvas.AbsoluteSize
 			local x,y
-			if type(ctx.objectLocalPointer)=="function" then
-				x,y=ctx.objectLocalPointer(canvas,position)
+			if type(app.objectLocalPointer)=="function" then
+				x,y=app.objectLocalPointer(canvas,position)
 			else
 				local absolutePosition=canvas.AbsolutePosition
 				x=(position.X or 0)-absolutePosition.X

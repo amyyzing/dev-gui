@@ -1,7 +1,6 @@
 -- HB_RUNTIME_PART_3
--- page wiring chunk; keep it boring so refresh does not leave residue.
+-- boot step 3: map editor page and shared runtime services.
 
--- Runtime chunk 3. Loaded by loader.lua with a shared environment.
 function tintSlider(slider, color)
 	if not slider then return end
 	if slider.fill then
@@ -64,17 +63,17 @@ function refreshRuntimeAPIs(apiNames)
 	end
 end
 
-function buildRuntimeModule(spec,ctx,parent,...)
+function buildRuntimeModule(spec,app,parent,...)
 	local extra={...}
 	local env=getfenv()
-	local module=rawget(env,moduleGlobalName(spec.name))
-	if not module then
-		module=loadDeferredModuleByName(spec.name)
+	local featureModule=rawget(env,moduleGlobalName(spec.name))
+	if not featureModule then
+		featureModule=loadDeferredModuleByName(spec.name)
 	end
 
-	if module and module.new then
+	if featureModule and featureModule.new then
 		local ok,result=pcall(function()
-			return module.new(ctx,parent,table.unpack(extra))
+			return featureModule.new(app,parent,table.unpack(extra))
 		end)
 		if ok then
 			getfenv()[spec.api]=result
@@ -222,7 +221,7 @@ function resetMapRuntimeState()
 end
 
 function makeMapCtx(name)
-	local ctx={
+	local app={
 		New=New,
 		Fusion=FusionModule,
 		Services=RuntimeServices,
@@ -245,11 +244,11 @@ function makeMapCtx(name)
 	}
 
 	if name=="MapEditor" then
-		ctx.MapEditorLogicModule=MapEditorLogicModule
+		app.MapEditorLogicModule=MapEditorLogicModule
 	elseif name=="AntiMaterial" then
-		ctx.WORLD_SETTINGS=WORLD_SETTINGS
-		ctx.AntiMaterialLogicModule=AntiMaterialLogicModule
-		ctx.onChanged=function(state)
+		app.WORLD_SETTINGS=WORLD_SETTINGS
+		app.AntiMaterialLogicModule=AntiMaterialLogicModule
+		app.onChanged=function(state)
 			potatoMode=state and true or false
 			if WORLD_SETTINGS then
 				WORLD_SETTINGS.SmoothPlastic=potatoMode
@@ -257,12 +256,12 @@ function makeMapCtx(name)
 			requestPlayerAutosave()
 		end
 	elseif name=="MapCleaner" then
-		ctx.MapCleanerLogicModule=MapCleanerLogicModule
+		app.MapCleanerLogicModule=MapCleanerLogicModule
 	elseif name=="RemoveAds" then
-		ctx.RemoveAdsLogicModule=RemoveAdsLogicModule
+		app.RemoveAdsLogicModule=RemoveAdsLogicModule
 	end
 
-	return ctx
+	return app
 end
 
 function buildMapPage()

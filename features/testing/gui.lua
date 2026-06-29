@@ -1,10 +1,10 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- testing switches for wr and qb checks.
 
 local TestingGui={}
 
-function TestingGui.build(ctx,parent,state,api)
-	local makeSection=ctx.makeSection
-	local buildToggleRow=ctx.buildToggleRow
+function TestingGui.build(app,parent,state,api)
+	local makeSection=app.makeSection
+	local buildToggleRow=app.buildToggleRow
 
 	local body,controls=makeSection(parent,5,"Testing","WR C1 and QB arc safety",{
 		headerToggle={
@@ -38,8 +38,8 @@ function TestingGui.build(ctx,parent,state,api)
 	}
 end
 
-function TestingGui.new(ctx,...)
-	return ctx.Page1TestingLogicModule.new(ctx,...,TestingGui)
+function TestingGui.new(app,...)
+	return app.Page1TestingLogicModule.new(app,...,TestingGui)
 end
 
 return TestingGui

@@ -1,12 +1,12 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- loads, copies, and opens the community invite.
 
 local Discord={}
 
-function Discord.new(ctx,page)
-	local New=ctx.New
-	local THEME=ctx.THEME
-	local makeSection=ctx.makeSection
-	local wrapTextButton=ctx.wrapTextButton
+function Discord.new(app,page)
+	local New=app.New
+	local THEME=app.THEME
+	local makeSection=app.makeSection
+	local wrapTextButton=app.wrapTextButton
 
 	local api={}
 	local alive=true
@@ -17,9 +17,9 @@ function Discord.new(ctx,page)
 	local connections={}
 
 	local function connect(signal,fn)
-		local conn=signal:Connect(fn)
-		table.insert(connections,conn)
-		return conn
+		local connection=signal:Connect(fn)
+		table.insert(connections,connection)
+		return connection
 	end
 
 	local function getClipboardSetter()
@@ -73,13 +73,13 @@ function Discord.new(ctx,page)
 	end
 
 	function api.Refresh()
-		if not(ctx.BOT_API and ctx.BOT_API.Post) then
+		if not(app.BOT_API and app.BOT_API.Post) then
 			paint()
 			return
 		end
 
 		local ok,result=pcall(function()
-			return ctx.BOT_API.Post("/invite-link/get",{})
+			return app.BOT_API.Post("/invite-link/get",{})
 		end)
 
 		if ok and result and result.ok then
@@ -93,9 +93,9 @@ function Discord.new(ctx,page)
 
 	function api.Destroy()
 		alive=false
-		for _,conn in ipairs(connections) do
+		for _,connection in ipairs(connections) do
 			pcall(function()
-				conn:Disconnect()
+				connection:Disconnect()
 			end)
 		end
 		table.clear(connections)

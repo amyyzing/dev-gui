@@ -1,4 +1,4 @@
--- tiny reactive helper layer. only the bits this gui actually uses are in here.
+-- small reactive gui layer used by the panel.
 
 local Fusion={}
 
@@ -219,71 +219,71 @@ local function applyChild(parent,child)
 	return nil
 end
 
-local function applyProps(scope,obj,props)
-	props=props or {}
-	local parent=props.Parent
+local function applyProps(scope,instance,properties)
+	properties=properties or {}
+	local parent=properties.Parent
 	local children=nil
 
-	for key,value in pairs(props) do
+	for key,value in pairs(properties) do
 		if key==Fusion.Children then
 			children=value
 		elseif key=="Parent" then
 			parent=value
 		elseif type(key)=="table" and key.__fusion_key then
 			if key.kind=="OnEvent" then
-				local signal=obj[key.name]
+				local signal=instance[key.name]
 				if signal and type(value)=="function" then
-					local conn=signal:Connect(value)
+					local connection=signal:Connect(value)
 					if scope then
-						scope:addCleanup(conn)
+						scope:addCleanup(connection)
 					end
 				end
 			elseif key.kind=="OnChange" and type(value)=="function" then
-				local conn=obj:GetPropertyChangedSignal(key.name):Connect(function()
-					value(obj[key.name])
+				local connection=instance:GetPropertyChangedSignal(key.name):Connect(function()
+					value(instance[key.name])
 				end)
 				if scope then
-					scope:addCleanup(conn)
+					scope:addCleanup(connection)
 				end
 			end
 		else
 			local current=peek(value)
 			if current~=nil then
-				obj[key]=current
+				instance[key]=current
 			end
 
 			if isState(value) then
-				local conn=value:onChange(function(nextValue)
-					if obj and obj.Parent and nextValue~=nil then
-						obj[key]=nextValue
+				local connection=value:onChange(function(nextValue)
+					if instance and instance.Parent and nextValue~=nil then
+						instance[key]=nextValue
 					end
 				end)
 				if scope then
-					scope:addCleanup(conn)
+					scope:addCleanup(connection)
 				end
 			end
 		end
 	end
 
 	if children~=nil then
-		applyChild(obj,children)
+		applyChild(instance,children)
 	end
 
 	if parent~=nil then
-		obj.Parent=peek(parent)
+		instance.Parent=peek(parent)
 	end
 
-	return obj
+	return instance
 end
 
 local function newWithScope(scope,className)
-	return function(props)
-		local obj=Instance.new(className)
+	return function(properties)
+		local instance=Instance.new(className)
 		if scope then
-			scope:addCleanup(obj)
+			scope:addCleanup(instance)
 		end
-		applyProps(scope,obj,props)
-		return obj
+		applyProps(scope,instance,properties)
+		return instance
 	end
 end
 
@@ -291,9 +291,9 @@ function Fusion.New(className)
 	return newWithScope(nil,className)
 end
 
-function Fusion.Hydrate(obj)
-	return function(props)
-		return applyProps(nil,obj,props)
+function Fusion.Hydrate(instance)
+	return function(properties)
+		return applyProps(nil,instance,properties)
 	end
 end
 
@@ -314,9 +314,9 @@ function Fusion.scoped(base)
 		return newWithScope(self,className)
 	end
 
-	function scope:Hydrate(obj)
-		return function(props)
-			return applyProps(self,obj,props)
+	function scope:Hydrate(instance)
+		return function(properties)
+			return applyProps(self,instance,properties)
 		end
 	end
 

@@ -1,7 +1,6 @@
 -- HB_RUNTIME_PART_4
--- feature binding chunk. gameplay modules should stay quiet until toggled.
+-- boot step 4: feature modules and page wiring.
 
--- Runtime chunk 4. Loaded by loader.lua with a shared environment.
 refreshPage2UI=function() end
 PAGE2_EXPANDED_OWNED={}
 PAGE2_APIS={}
@@ -10,22 +9,22 @@ ResetPositionAPI=nil
 DiscordAPI=nil
 SETTINGS_CONNECTIONS={}
 
-function trackSettingsConnection(conn)
-	if conn then
-		table.insert(SETTINGS_CONNECTIONS,conn)
+function trackSettingsConnection(connection)
+	if connection then
+		table.insert(SETTINGS_CONNECTIONS,connection)
 		if trackRuntimeConnection then
-			trackRuntimeConnection(conn)
+			trackRuntimeConnection(connection)
 		end
 	end
 
-	return conn
+	return connection
 end
 
 function disconnectSettingsConnections()
-	for _,conn in ipairs(SETTINGS_CONNECTIONS) do
-		safeDisconnect(conn)
+	for _,connection in ipairs(SETTINGS_CONNECTIONS) do
+		safeDisconnect(connection)
 		if untrackRuntimeConnection then
-			untrackRuntimeConnection(conn)
+			untrackRuntimeConnection(connection)
 		end
 	end
 	table.clear(SETTINGS_CONNECTIONS)
@@ -62,21 +61,21 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	local modalConnections={}
 	local closed=false
 	local function connectModal(signal,fn)
-		local conn=signal:Connect(fn)
-		table.insert(modalConnections,conn)
+		local connection=signal:Connect(fn)
+		table.insert(modalConnections,connection)
 		if trackRuntimeConnection then
-			trackRuntimeConnection(conn)
+			trackRuntimeConnection(connection)
 		end
-		return conn
+		return connection
 	end
 	local function closeModal()
 		if closed then return end
 		closed=true
 
-		for _,conn in ipairs(modalConnections) do
-			safeDisconnect(conn)
+		for _,connection in ipairs(modalConnections) do
+			safeDisconnect(connection)
 			if untrackRuntimeConnection then
-				untrackRuntimeConnection(conn)
+				untrackRuntimeConnection(connection)
 			end
 		end
 		table.clear(modalConnections)
@@ -418,19 +417,19 @@ function makePage2Ctx()
 	}
 end
 
-function buildPage2Module(spec,ctx,sections)
+function buildPage2Module(spec,app,sections)
 	if spec.requires and not PAGE2_APIS[spec.requires] then
 		addPage2Error(sections[spec.section],spec.title.." needs "..tostring(spec.requires).." first.")
 		return nil
 	end
 
 	local env=getfenv()
-	local module=rawget(env,moduleGlobalName(spec.name))
-	if not module then
-		module=loadDeferredModuleByName(spec.name)
+	local featureModule=rawget(env,moduleGlobalName(spec.name))
+	if not featureModule then
+		featureModule=loadDeferredModuleByName(spec.name)
 	end
 
-	if not(module and type(module.new)=="function") then
+	if not(featureModule and type(featureModule.new)=="function") then
 		addPage2Error(sections[spec.section],"missing module: "..tostring(MODULE_PATHS[spec.name] or spec.name))
 		return nil
 	end
@@ -440,7 +439,7 @@ function buildPage2Module(spec,ctx,sections)
 		extra={spec.extras(PAGE2_APIS)}
 	end
 	local ok,result=pcall(function()
-		return module.new(ctx,sections[spec.section],table.unpack(extra))
+		return featureModule.new(app,sections[spec.section],table.unpack(extra))
 	end)
 	if ok then
 		PAGE2_APIS[spec.api]=result

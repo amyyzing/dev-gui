@@ -1,8 +1,8 @@
--- logic half for this feature. avoid starting loops unless the feature is enabled.
+-- applies map editor settings after the map is ready.
 
 local MapEditor={}
 
-function MapEditor.new(ctx,parent)
+function MapEditor.new(app,parent)
 	return{
 		Refresh=function() end,
 		Destroy=function() end,

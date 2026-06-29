@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- community invite buttons.
 
-return{new=function(ctx,...)
-	return ctx.DiscordLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.DiscordLogicModule.new(app,...)
 end}

@@ -1,5 +1,5 @@
--- gui half for this feature. logic stays next door in logic.lua.
+-- qb aim switches and tuning sliders.
 
-return{new=function(ctx,...)
-	return ctx.Page1QBAimLogicModule.new(ctx,...)
+return{new=function(app,...)
+	return app.Page1QBAimLogicModule.new(app,...)
 end}
