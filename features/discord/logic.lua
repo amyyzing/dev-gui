@@ -45,7 +45,7 @@ function Discord.new(ctx,page)
 			if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
 			setStatus("Click the invite link to copy it.",THEME.MUTED)
 		else
-			linkButton.Text="No invite link set."
+			linkButton.Text="no invite link set"
 			linkButton.TextColor3=THEME.MUTED
 			if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
 			setStatus("Use /invite-link create in Discord to set this.",THEME.MUTED)
@@ -68,7 +68,7 @@ function Discord.new(ctx,page)
 		if ok then
 			setStatus("Copied Discord invite link.",THEME.GREEN)
 		else
-			setStatus("Copy failed: "..tostring(err),THEME.RED)
+			setStatus("copy failed: "..tostring(err),THEME.RED)
 		end
 	end
 
@@ -108,7 +108,7 @@ function Discord.new(ctx,page)
 		BorderSizePixel=0,
 		Size=UDim2.new(1,-10,0,30),
 		Position=UDim2.fromOffset(5,0),
-		Text="Loading invite link...",
+		Text="loading invite...",
 		Font=Enum.Font.Gotham,
 		TextSize=12,
 		TextColor3=THEME.MUTED,
@@ -127,13 +127,13 @@ function Discord.new(ctx,page)
 	connect(linkButton.MouseEnter,function()
 		if linkWrap then linkWrap.BackgroundColor3=THEME.CARD end
 		if inviteLink and inviteLink~="" then
-			setStatus("Click to Copy",THEME.GREEN)
+			setStatus("copy",THEME.GREEN)
 		end
 	end)
 
 	connect(linkButton.MouseLeave,function()
 		if linkWrap then linkWrap.BackgroundColor3=THEME.BG end
-		if statusLabel and statusLabel.Text=="Click to Copy" then
+		if statusLabel and statusLabel.Text=="copy" then
 			paint()
 		end
 	end)
@@ -143,7 +143,7 @@ function Discord.new(ctx,page)
 	statusLabel=New("TextLabel",{
 		BackgroundTransparency=1,
 		Size=UDim2.new(1,0,0,18),
-		Text="Fetching invite link...",
+		Text="getting invite...",
 		Font=Enum.Font.Gotham,
 		TextSize=11,
 		TextColor3=THEME.MUTED,

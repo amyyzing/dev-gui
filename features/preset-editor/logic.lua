@@ -42,9 +42,9 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			end
 
 			if not ok then
-				warn("PresetEditor: setPresetSize failed:",success)
+				warn("preset size failed:",success)
 			elseif err then
-				warn("PresetEditor: setPresetSize failed:",err)
+				warn("preset size failed:",err)
 			end
 		end
 
@@ -70,9 +70,9 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			end
 
 			if not ok then
-				warn("PresetEditor: setPresetKey failed:",success)
+				warn("preset key failed:",success)
 			elseif err then
-				warn("PresetEditor: setPresetKey failed:",err)
+				warn("preset key failed:",err)
 			end
 		end
 
@@ -93,9 +93,9 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 			end
 
 			if not ok then
-				warn("PresetEditor: resetPreset failed:",success)
+				warn("preset reset failed:",success)
 			elseif err then
-				warn("PresetEditor: resetPreset failed:",err)
+				warn("preset reset failed:",err)
 			end
 		end
 
@@ -159,7 +159,7 @@ function PresetEditor.new(ctx,editorSection,keybinds,hitboxPresets)
 		elseif hitboxPresets and hitboxPresets.AddPreset then
 			hitboxPresets.AddPreset("Custom Preset",api.Collect)
 		else
-			warn("PresetEditor: hitboxPresets module is missing ShowSaveConfirm/AddPreset.")
+			warn("preset editor missing save helper")
 		end
 	end)
 

@@ -62,7 +62,7 @@ local function fetchModule(path)
 
 	local requestFn = clientRequest()
 	if not requestFn then
-		return nil,"No client HTTP request function found."
+		return nil,"no http request found"
 	end
 
 	local apiBody={
@@ -87,7 +87,7 @@ local function fetchModule(path)
 
 	local responseBody = response and (response.Body or response.body)
 	if not responseBody then
-		return nil,"Empty response from API."
+		return nil,"api sent nothing"
 	end
 
 	local decodeOk,payload = pcall(function()
@@ -95,11 +95,11 @@ local function fetchModule(path)
 	end)
 
 	if not decodeOk then
-		return nil, "Could not decode API response: "..tostring(responseBody)
+		return nil, "api decode failed: "..tostring(responseBody)
 	end
 
 	if not payload or payload.ok ~= true or type(payload.source) ~= "string" then
-		return nil, (payload and payload.error) or "Runtime source missing."
+		return nil, (payload and payload.error) or "runtime missing"
 	end
 
 	return payload.source, nil
@@ -107,7 +107,7 @@ end
 
 local function validateSource(path, source)
 	if type(source) ~= "string" or source == "" then
-		return false, "Runtime source missing."
+		return false, "runtime missing"
 	end
 
 	if #source > MAX_SOURCE_SIZE then
@@ -116,7 +116,7 @@ local function validateSource(path, source)
 
 	local marker = RUNTIME_MARKERS[path]
 	if marker and not source:find(marker, 1, true) then
-		return false, "Runtime marker verification failed."
+		return false, "runtime marker failed"
 	end
 
 	return true,nil
@@ -148,29 +148,29 @@ runtimeEnv._G = runtimeEnv
 for _,path in ipairs(RUNTIME_PATHS) do
 	local source, fetchError = fetchModule(path)
 	if not source then
-		error("Loader failed to fetch "..path..": "..tostring(fetchError))
+		error("loader fetch failed "..path..": "..tostring(fetchError))
 	end
 
 	local valid, validateError = validateSource(path, source)
 	if not valid then
-		error("Loader rejected "..path..": "..tostring(validateError))
+		error("loader blocked "..path..": "..tostring(validateError))
 	end
 
 	runtimeSources[path]=source
 
 	local chunk,compileError = loadstring(source)
 	if not chunk then
-		error("Loader failed to compile "..path..": "..tostring(compileError))
+		error("loader compile failed "..path..": "..tostring(compileError))
 	end
 
 	if setfenv then setfenv(chunk, runtimeEnv) end
 
 	local ran, runError = pcall(chunk)
 	if not ran then
-		error("Loader failed while running "..path..": "..tostring(runError))
+		error("loader run failed "..path..": "..tostring(runError))
 	end
 end
 
 if debugEnv.HB_LOADER_DEBUG == true then
-	warn("HB loader complete: "..tostring(#RUNTIME_PATHS).." runtime chunks loaded.")
+	warn("loader done: "..tostring(#RUNTIME_PATHS).." runtime chunks loaded.")
 end

@@ -407,11 +407,11 @@ function rebuildDataSaveFromModule(loadRemoteData)
 			DataSaveAPI=result
 		else
 			DataSaveAPI=previous
-			warn("DataSave module failed:",result)
+			warn("data save failed:",result)
 			return false
 		end
 	else
-		warn("Missing remote module: data-save/data-save.lua")
+		warn("missing module: data-save/data-save.lua")
 		return false
 	end
 
@@ -441,7 +441,7 @@ if buildAllRuntimePages then
 	local ok,result=pcall(buildAllRuntimePages)
 	pagesReady=ok and result~=false
 	if not pagesReady then
-		warn("Complete GUI page build failed:",ok and result or result)
+		warn("gui build failed:",ok and result or result)
 	end
 end
 
@@ -472,10 +472,10 @@ if AnnouncementModule and AnnouncementModule.new then
 	if ok then
 		AnnouncementAPI=result
 	else
-		warn("Announcement module failed:",result)
+		warn("announcement failed:",result)
 	end
 else
-	warn("Missing remote module: announcement.lua")
+	warn("missing module: announcement.lua")
 end
 
 playerLogSent=false
@@ -493,7 +493,7 @@ sendPlayerSessionUpdate=function(final)
 	end)
 
 	if not ok or not result or not result.ok then
-		warn("Player session update failed:",ok and result and result.error or result)
+		warn("session update failed:",ok and result and result.error or result)
 	end
 end
 
@@ -529,7 +529,7 @@ function sendPlayerLog()
 		end)
 
 		if not ok or not result or not result.ok then
-			warn("Player log failed:",ok and result and result.error or result)
+			warn("player log failed:",ok and result and result.error or result)
 			return
 		end
 
@@ -540,7 +540,7 @@ end
 
 setActivePage("main")
 if setLoaderProgress then
-	setLoaderProgress("Applying theme and refresh state.",LOADER_TOTAL-1,LOADER_TOTAL,false)
+	setLoaderProgress("applying theme",LOADER_TOTAL-1,LOADER_TOTAL,false)
 end
 applyUIStrokeTheme()
 refreshAllUI()
@@ -553,10 +553,10 @@ end
 sendPlayerLog()
 initManualRefresh()
 if LOADER_MODULES_READY==false then
-	setLoaderProgress("Required modules failed to load. Run /update, then re-execute.",LOADER_TOTAL,LOADER_TOTAL,true)
+	setLoaderProgress("modules failed. press update, then run again.",LOADER_TOTAL,LOADER_TOTAL,true)
 elseif pagesReady==false or #RUNTIME_BUILD_ERRORS>0 then
-	setLoaderProgress("One or more GUI pages failed to build.",LOADER_TOTAL,LOADER_TOTAL,true)
+	setLoaderProgress("some gui pages failed",LOADER_TOTAL,LOADER_TOTAL,true)
 else
-	setLoaderProgress("Runtime ready. Scheduler jobs: "..tostring(RuntimeScheduler.Count()),LOADER_TOTAL,LOADER_TOTAL,false)
+	setLoaderProgress("ready. jobs: "..tostring(RuntimeScheduler.Count()),LOADER_TOTAL,LOADER_TOTAL,false)
 	finishLoader()
 end

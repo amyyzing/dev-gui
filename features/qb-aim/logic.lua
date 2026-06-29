@@ -750,15 +750,15 @@ function QBAim.new(ctx,parent)
 	local LEAD_DELAY_MAX=1.50
 	local PEAK_HEIGHT_MIN=8.00
 	local PEAK_HEIGHT_MAX=20.00
-	local QB_DRIFT_MIN=0.00
-	local QB_DRIFT_MAX=0.25
-	local QB_Y_DRIFT_MIN=0.00
-	local QB_Y_DRIFT_MAX=0.35
+	local QB_DRIFT_MIN=-0.20
+	local QB_DRIFT_MAX=0.20
+	local QB_Y_DRIFT_MIN=-0.20
+	local QB_Y_DRIFT_MAX=0.20
 	local updateTargetHighlight=function() end
 	local schedulerJobs={}
 
 	if not mathCore then
-		error("Page1QBAimMathModule missing")
+		error("qb aim math missing")
 	end
 
 	if state.qbAimTeamFilter==nil then
@@ -1666,13 +1666,13 @@ function QBAim.new(ctx,parent)
 		end
 
 		local dx,dz=0,0
-		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and xzReleaseOffset>0 then
+		if QB_RELEASE_EXTRAPOLATE_HORIZONTAL and xzReleaseOffset~=0 then
 			local rootVelocity=movementAwareRootVelocity(qbRoot)
 			dx=rootVelocity.X*xzReleaseOffset
 			dz=rootVelocity.Z*xzReleaseOffset
 		end
 
-		if QB_RELEASE_EXTRAPOLATE_VERTICAL and yReleaseOffset>0 then
+		if QB_RELEASE_EXTRAPOLATE_VERTICAL and yReleaseOffset~=0 then
 			local verticalVelocity=releaseVerticalVelocity(qbRoot,ball)
 			local airborne=math.abs(verticalVelocity)>=QB_AIRBORNE_VY_EPSILON or qbRoot.Position.Y>QB_GROUND_ROOT_Y+QB_AIRBORNE_Y_EPSILON
 			if airborne then
@@ -2198,14 +2198,14 @@ function QBAim.new(ctx,parent)
 		local receiverRoot=rootOfPlayer(receiver)
 		local data=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
 		if not data then
-			return nil,"receiver tracking unavailable"
+			return nil,"receiver tracking missing"
 		end
 
 		local timing=getTimingWindow()
 		local age=receiverAge(data)
 		local mid=buildTwoPassPlan(receiver,ballPower,releaseBall,age+timing.mid)
 		if not mid then
-			return nil,"no release throw solution"
+			return nil,"no throw found"
 		end
 
 		if state.qbAimSafeArc==false then
@@ -2218,14 +2218,14 @@ function QBAim.new(ctx,parent)
 
 		local uncertainty=receiverUncertainty(data,timing)
 		if uncertainty>RECEIVER_UNCERTAINTY_MAX then
-			return nil,"receiver uncertainty too high"
+			return nil,"receiver too uncertain"
 		end
 
 		local early=buildTwoPassPlan(receiver,ballPower,releaseBall,age+timing.min)
 		local late=buildTwoPassPlan(receiver,ballPower,releaseBall,age+timing.max)
 		local stable=stableAcrossWindow(early,mid,late)
 		if not stable then
-			return nil,"timing window unstable"
+			return nil,"timing unstable"
 		end
 
 		return{
@@ -2267,7 +2267,7 @@ function QBAim.new(ctx,parent)
 	local function fireGameplayThrow(plan)
 		local reEvent=getGameReEvent()
 		if not reEvent then
-			return false,"Gameplay ReEvent missing"
+			return false,"game remote missing"
 		end
 
 		reEvent:FireServer("Mechanics","ThrowBall",{
@@ -2284,7 +2284,7 @@ function QBAim.new(ctx,parent)
 	local function fireSquadsThrow(plan)
 		local reEvent=getSquadsReEvent()
 		if not reEvent then
-			return false,"Squads MiniGames ReEvent missing"
+			return false,"squads remote missing"
 		end
 
 		reEvent:FireServer("Mechanics","ThrowBall",{
@@ -2315,7 +2315,7 @@ function QBAim.new(ctx,parent)
 
 		local heldBall=currentHeldBall()
 		if not heldBall then
-			clearPreviewForMissingBall("No ball held")
+			clearPreviewForMissingBall("no ball")
 			return
 		end
 		noteHeldBallState(heldBall,os.clock())
@@ -2371,7 +2371,7 @@ function QBAim.new(ctx,parent)
 		if not fired then
 			local thrownErr=ok
 			ok=false
-			err=thrownErr or "Throw failed"
+			err=thrownErr or "throw failed"
 		end
 
 		if ok then
@@ -2379,7 +2379,7 @@ function QBAim.new(ctx,parent)
 			waitForHeldBallRelease()
 			setStatus(currentModeText().." release-time throw sent")
 		else
-			setStatus(err or "Throw failed")
+			setStatus(err or "throw failed")
 		end
 
 		releaseThrowLock()
@@ -2757,7 +2757,7 @@ function QBAim.new(ctx,parent)
 		end
 
 		if not currentHeldBall() then
-			clearPreviewForMissingBall("No ball held")
+			clearPreviewForMissingBall("no ball")
 			return true
 		end
 

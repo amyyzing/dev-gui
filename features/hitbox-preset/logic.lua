@@ -155,9 +155,9 @@ function HitboxPreset.new(ctx,ownedSection)
 			end
 
 			if not ok then
-				warn("HitboxPreset: equip failed:",success)
+				warn("preset equip failed:",success)
 			elseif err then
-				warn("HitboxPreset: equip failed:",err)
+				warn("preset equip failed:",err)
 			end
 		elseif ctx.applyPresetEditor then
 			local ok,success,err=pcall(ctx.applyPresetEditor,editor)
@@ -166,9 +166,9 @@ function HitboxPreset.new(ctx,ownedSection)
 			end
 
 			if not ok then
-				warn("HitboxPreset: applyPresetEditor failed:",success)
+				warn("preset editor apply failed:",success)
 			elseif err then
-				warn("HitboxPreset: applyPresetEditor failed:",err)
+				warn("preset editor apply failed:",err)
 			end
 		end
 
@@ -184,9 +184,9 @@ function HitboxPreset.new(ctx,ownedSection)
 			end
 
 			if not ok then
-				warn("HitboxPreset: delete failed:",success)
+				warn("preset delete failed:",success)
 			elseif err then
-				warn("HitboxPreset: delete failed:",err)
+				warn("preset delete failed:",err)
 			end
 
 			return false
@@ -346,7 +346,7 @@ function HitboxPreset.new(ctx,ownedSection)
 			return true,result
 		end
 
-		return false,"Preset import is unavailable."
+		return false,"preset import missing"
 	end
 
 	local function closePresetModal()
@@ -407,7 +407,7 @@ function HitboxPreset.new(ctx,ownedSection)
 	requestImport=function()
 		local code=trim(importBox and importBox.Text or "")
 		if code=="" then
-			if importWarning then importWarning.Text="Enter a preset code." end
+			if importWarning then importWarning.Text="enter a preset code" end
 			return
 		end
 

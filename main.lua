@@ -45,7 +45,7 @@ end
 local function fetchLoader()
 	local requestFn=clientRequest()
 	if not requestFn then
-		return nil,"No client HTTP request function found."
+		return nil,"no http request found"
 	end
 
 	local body=HttpService:JSONEncode({
@@ -70,7 +70,7 @@ local function fetchLoader()
 
 	local raw=response and (response.Body or response.body)
 	if not raw then
-		return nil,"Empty response from API."
+		return nil,"api sent nothing"
 	end
 
 	local decodeOk,payload=pcall(function()
@@ -78,11 +78,11 @@ local function fetchLoader()
 	end)
 
 	if not decodeOk then
-		return nil,"Could not decode API response: "..tostring(raw)
+		return nil,"api decode failed: "..tostring(raw)
 	end
 
 	if not payload or payload.ok~=true or type(payload.source)~="string" then
-		return nil,(payload and payload.error) or "Loader source missing."
+		return nil,(payload and payload.error) or "loader missing"
 	end
 
 	return payload.source,nil
@@ -90,23 +90,23 @@ end
 
 local source,fetchError=fetchLoader()
 if not source then
-	error("Loader fetch failed: "..tostring(fetchError))
+	error("loader fetch failed: "..tostring(fetchError))
 end
 
 if #source>MAX_LOADER_SIZE then
-	error("Loader verification failed: source too large.")
+	error("loader too big")
 end
 
 if not source:find(LOADER_MARKER,1,true) then
-	error("Loader verification failed: marker missing.")
+	error("loader marker missing")
 end
 
 local chunk,compileError=loadstring(source)
 if not chunk then
-	error("Loader compile failed: "..tostring(compileError))
+	error("loader compile failed: "..tostring(compileError))
 end
 
 local ok,runError=pcall(chunk)
 if not ok then
-	error("Loader run failed: "..tostring(runError))
+	error("loader run failed: "..tostring(runError))
 end

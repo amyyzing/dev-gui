@@ -856,8 +856,8 @@ function DataSave.new(ctx)
 		if savedXZLead==nil then savedXZLead=legacyDrift end
 		local savedYLead=qbAim.serverYLead
 		if savedYLead==nil then savedYLead=savedXZLead end
-		applyClamped(ctx,"setQBAimQBDrift","qbAimQBDrift",savedXZLead,0,0.25,0)
-		applyClamped(ctx,"setQBAimQBYDrift","qbAimQBYDrift",savedYLead,0,0.35,0)
+		applyClamped(ctx,"setQBAimQBDrift","qbAimQBDrift",savedXZLead,-0.2,0.2,0)
+		applyClamped(ctx,"setQBAimQBYDrift","qbAimQBYDrift",savedYLead,-0.2,0.2,0)
 
 		local testing=settings.testing or {}
 		applyBoolean(ctx,"setTestingState","testingEnabled",testing.enabled)
@@ -1001,7 +1001,7 @@ function DataSave.new(ctx)
 			})
 
 			if not response or not response.ok then
-				warn("Player settings autosave failed:",response and response.error or "unknown error")
+				warn("settings save failed:",response and response.error or "unknown")
 			end
 		end)
 
@@ -1124,7 +1124,7 @@ function DataSave.new(ctx)
 			})
 
 			if not response or not response.ok then
-				return false,response and response.error or "Save failed."
+				return false,response and response.error or "save failed"
 			end
 
 			preset=normalizePreset(response.preset or {
@@ -1157,11 +1157,11 @@ function DataSave.new(ctx)
 	function api.ImportOwnedPreset(code)
 		local cleanCode=trim(code)
 		if cleanCode=="" then
-			return false,"Preset code cannot be empty."
+			return false,"paste a preset code"
 		end
 
 		if not(ctx.BOT_API and ctx.BOT_API.Post) then
-			return false,"Preset import needs the remote preset service."
+			return false,"preset import needs bot"
 		end
 
 		local response=ctx.BOT_API.Post("/preset/load",{
@@ -1170,7 +1170,7 @@ function DataSave.new(ctx)
 		})
 
 		if not response or not response.ok then
-			return false,response and response.error or "Import failed."
+			return false,response and response.error or "import failed"
 		end
 
 		if response.presets and type(response.presets)=="table" and ctx.OWNED_PRESETS then
@@ -1185,7 +1185,7 @@ function DataSave.new(ctx)
 		else
 			local preset=normalizePreset(response.preset or response.Preset or response)
 			if not preset then
-				return false,"Import returned invalid preset data."
+				return false,"preset data broke"
 			end
 
 			if ctx.OWNED_PRESETS then
@@ -1230,7 +1230,7 @@ function DataSave.new(ctx)
 				})
 
 				if not response or not response.ok then
-					warn("Preset API equip failed:",response and response.error or "unknown error")
+					warn("preset equip failed:",response and response.error or "unknown")
 				end
 			end)
 		end
@@ -1263,8 +1263,8 @@ function DataSave.new(ctx)
 				end
 			end
 		elseif usedApi then
-			warn("Preset API delete failed:",response and response.error or "unknown error")
-			return false,response and response.error or "Delete failed."
+			warn("preset delete failed:",response and response.error or "unknown")
+			return false,response and response.error or "delete failed"
 		elseif ctx.OWNED_PRESETS then
 			local removed=false
 
@@ -1302,9 +1302,9 @@ function DataSave.new(ctx)
 		})
 
 		if not response or not response.ok then
-			warn("Player settings load failed:",response and response.error or "unknown error")
+			warn("settings load failed:",response and response.error or "unknown")
 			api.Apply(api.GetSavedSettingsForCurrentMode())
-			return false,response and response.error or "unknown error"
+			return false,response and response.error or "unknown"
 		end
 
 		api.SetRoot(response.settings or {})
@@ -1333,8 +1333,8 @@ function DataSave.new(ctx)
 		})
 
 		if not response or not response.ok then
-			warn("Owned presets load failed:",response and response.error or "unknown error")
-			return false,response and response.error or "unknown error"
+			warn("presets load failed:",response and response.error or "unknown")
+			return false,response and response.error or "unknown"
 		end
 
 		if ctx.OWNED_PRESETS then

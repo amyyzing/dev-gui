@@ -64,7 +64,7 @@ function ensureRuntimePageBuilt(name)
 	local ok,err=pcall(builder)
 	if not ok then
 		LAZY_PAGE_BUILT[name]=false
-		warn("Lazy page build failed:",name,err)
+		warn("page build failed:",name,err)
 	else
 		built=true
 	end
@@ -261,7 +261,7 @@ function importOwnedPresetFromDataSave(code)
 		return DataSaveAPI.ImportOwnedPreset(code)
 	end
 
-	return false,"Preset import is unavailable."
+	return false,"preset import missing"
 end
 
 function equipOwnedPresetFromDataSave(preset)
@@ -477,8 +477,8 @@ end
 
 function addPage1Error(parent,order,title,path)
 	table.insert(RUNTIME_BUILD_ERRORS,"Main/"..tostring(title)..": "..tostring(path))
-	local section=makeSection(parent,order,title,"module failed to load")
-	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),Text=path.." could not be loaded.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	local section=makeSection(parent,order,title,"module did not load")
+	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),Text=path.." did not load.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 end
 
 PAGE1_MODULE_SPECS={

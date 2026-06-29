@@ -225,13 +225,13 @@ function PlayerData.new(ctx,page,deps)
 
 			if not ok then
 				busy=false
-				setStatus("Wipe failed: "..tostring(result),THEME.RED)
+				setStatus("wipe failed: "..tostring(result),THEME.RED)
 				return
 			end
 
 			if not result or not result.ok then
 				busy=false
-				setStatus("Wipe failed: "..tostring(result and result.error or "unknown error"),THEME.RED)
+				setStatus("wipe failed: "..tostring(result and result.error or "unknown"),THEME.RED)
 				return
 			end
 		end

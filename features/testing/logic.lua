@@ -903,7 +903,7 @@ function Testing.new(ctx,parent,guiBuilder)
 		if ok and type(result)=="table" then
 			builtGui=result
 		else
-			warn("Testing GUI build failed:",result)
+			warn("testing gui failed:",result)
 		end
 	end
 

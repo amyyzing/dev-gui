@@ -142,7 +142,7 @@ function disconnectRuntimeConnections()
 
 	if CoreScope and CoreScope.new then
 		RUNTIME_ROOT_SCOPE=CoreScope.new("runtime",function(err,scopeName)
-			warn("Runtime cleanup failed:",scopeName,err)
+			warn("cleanup failed:",scopeName,err)
 		end)
 	end
 end
@@ -262,7 +262,7 @@ function New(class, props, parent)
 		if ok and typeof(result)=="Instance" then
 			obj=result
 		else
-			warn("Fusion New failed; using Instance.new fallback:",class,result)
+			warn("ui create failed, using backup:",class,result)
 		end
 	end
 
@@ -456,32 +456,32 @@ end
 
 function BOT_API.Post(path,body)
 	if type(path)~="string" or not API_ALLOWED_PATHS[path] then
-		return{ok=false,error="API path blocked: "..tostring(path)}
+		return{ok=false,error="api path blocked: "..tostring(path)}
 	end
 
 	if BOT_API.Url~=TRUSTED_API_URL then
-		return{ok=false,error="API URL verification failed."}
+		return{ok=false,error="api url failed"}
 	end
 
 	if type(BOT_API.Key)~="string" or BOT_API.Key=="" then
-		return{ok=false,error="API key verification failed."}
+		return{ok=false,error="api key failed"}
 	end
 
 	if path=="/module/get" and isAllowedModulePath and not isAllowedModulePath(body and body.path) then
-		return{ok=false,error="Module path blocked: "..tostring(body and body.path)}
+		return{ok=false,error="module path blocked: "..tostring(body and body.path)}
 	end
 
 	if (path=="/module/manifest" or path=="/module/batch") and isAllowedModulePath and type(body)=="table" and type(body.paths)=="table" then
 		for _,modulePath in ipairs(body.paths) do
 			if not isAllowedModulePath(modulePath) then
-				return{ok=false,error="Module path blocked: "..tostring(modulePath)}
+				return{ok=false,error="module path blocked: "..tostring(modulePath)}
 			end
 		end
 	end
 
 	local requestFn=BOT_API.GetRequestFunction()
 	if not requestFn then
-		return{ok=false,error="No client HTTP request function found."}
+		return{ok=false,error="no http request found"}
 	end
 
 	body=body or{}
@@ -504,7 +504,7 @@ function BOT_API.Post(path,body)
 
 	local raw=response and(response.Body or response.body)
 	if not raw then
-		return{ok=false,error="Empty response from API."}
+		return{ok=false,error="api sent nothing"}
 	end
 
 	local decodeOk,decoded=pcall(function()
@@ -512,7 +512,7 @@ function BOT_API.Post(path,body)
 	end)
 
 	if not decodeOk then
-		return{ok=false,error="Could not decode API response: "..tostring(raw)}
+		return{ok=false,error="api decode failed: "..tostring(raw)}
 	end
 
 	return decoded
@@ -705,7 +705,7 @@ function verifyRemoteModuleSource(modulePath,source)
 	end
 
 	if type(source)~="string" or source=="" then
-		return false,"Module source missing: "..tostring(modulePath)
+		return false,"module missing: "..tostring(modulePath)
 	end
 
 	if #source>MAX_REMOTE_MODULE_BYTES then
@@ -714,7 +714,7 @@ function verifyRemoteModuleSource(modulePath,source)
 
 	local marker=(type(APP_RUNTIME_MARKERS)=="table" and APP_RUNTIME_MARKERS[modulePath]) or REMOTE_MODULE_MARKERS[modulePath]
 	if marker and not source:find(marker,1,true) then
-		return false,"Module marker verification failed: "..tostring(modulePath)
+		return false,"module marker failed: "..tostring(modulePath)
 	end
 
 	return true,nil
@@ -762,16 +762,16 @@ function loadRemoteModule(modulePath)
 	if not result or not result.ok then
 		REMOTE_MODULE_SOURCES[modulePath]=false
 		if OPTIONAL_MODULE_PATH_SET[modulePath] then
-			warn("Optional remote module unavailable:",modulePath,result and result.error or"unknown")
+			warn("optional module missing:",modulePath,result and result.error or"unknown")
 		else
-			warn("Failed to load remote module:",modulePath,result and result.error or"unknown")
+			warn("module load failed:",modulePath,result and result.error or"unknown")
 		end
 		return nil
 	end
 
 	local module,err=loadModuleFromSource(modulePath,result.source)
 	if not module then
-		warn("Remote module failed while loading:",modulePath,err)
+		warn("module broke while loading:",modulePath,err)
 		return nil
 	end
 
@@ -787,7 +787,7 @@ function loadRemoteModuleBatch(paths)
 
 	local result=BOT_API.Post("/module/batch",{paths=paths})
 	if not(result and result.ok and type(result.modules)=="table") then
-		return false,result and result.error or "Module batch unavailable."
+		return false,result and result.error or "module batch missing"
 	end
 
 	local loaded=0
@@ -801,7 +801,7 @@ function loadRemoteModuleBatch(paths)
 		if item and type(item.source)=="string" then
 			module,err=loadModuleFromSource(modulePath,item.source)
 		else
-			err=result.errors and result.errors[modulePath] or "Module source missing from batch."
+			err=result.errors and result.errors[modulePath] or "batch module missing"
 		end
 
 		if module then
@@ -810,15 +810,15 @@ function loadRemoteModuleBatch(paths)
 		else
 			REMOTE_MODULE_SOURCES[modulePath]=false
 			if OPTIONAL_MODULE_PATH_SET[modulePath] then
-				warn("Optional batched module unavailable:",modulePath,err)
+				warn("optional batch module missing:",modulePath,err)
 			else
 				failed=failed+1
-				warn("Batched module failed while loading:",modulePath,err)
+				warn("batch module failed:",modulePath,err)
 			end
 		end
 
 		if index%8==0 or index==#paths then
-			setLoaderProgress("Loaded remote module batch ("..tostring(loaded).."/"..tostring(#paths)..")",math.min(index,LOADER_TOTAL),LOADER_TOTAL,failed>0)
+			setLoaderProgress("module batch loaded ("..tostring(loaded).."/"..tostring(#paths)..")",math.min(index,LOADER_TOTAL),LOADER_TOTAL,failed>0)
 		end
 	end
 
@@ -873,7 +873,7 @@ LOADER_TOTAL=#STARTUP_MODULE_PATHS+#LOADER_PAGE_BUILD_NAMES+4
 loaderCurrent=0
 loaderPhaseCurrent=#STARTUP_MODULE_PATHS
 loaderPhaseItems={}
-loaderPhaseNames={"Setup","Modules","Interface","Ready"}
+loaderPhaseNames={"setup","modules","gui","ready"}
 loaderOverlay=New("Frame",{
 	Name="Loader",
 	BackgroundColor3=Color3.fromRGB(8,10,18),
@@ -964,7 +964,7 @@ loaderSubtitle=New("TextLabel",{
 	BackgroundTransparency=1,
 	Position=UDim2.fromOffset(0,42),
 	Size=UDim2.new(1,-88,0,18),
-	Text="Preparing modules and interface",
+	Text="loading files and gui",
 	Font=Enum.Font.Gotham,
 	TextSize=11,
 	TextColor3=THEME.MUTED,
@@ -977,7 +977,7 @@ loaderStatus=New("TextLabel",{
 	BackgroundTransparency=1,
 	Position=UDim2.fromOffset(0,84),
 	Size=UDim2.new(1,0,0,46),
-	Text="Preparing remote modules...",
+	Text="loading modules...",
 	Font=Enum.Font.Gotham,
 	TextSize=12,
 	TextColor3=THEME.MUTED,
@@ -1204,7 +1204,7 @@ function setLoaderProgress(text,current,total,isProblem)
 	total=math.max(tonumber(total) or LOADER_TOTAL,1)
 
 	local pct=math.clamp(current/total,0,1)
-	loaderStatus.Text=tostring(text or "Loading...")
+	loaderStatus.Text=tostring(text or "loading...")
 	loaderStatus.TextColor3=isProblem and THEME.RED or THEME.MUTED
 	loaderPercent.Text=math.floor(pct*100+0.5).."%"
 	loaderFill.BackgroundColor3=isProblem and THEME.RED or THEME.GREEN
@@ -1240,9 +1240,9 @@ end
 function finishLoader()
 	if not loaderOverlay or not loaderOverlay.Parent then return end
 
-	loaderTitle.Text="Ready"
+	loaderTitle.Text="ready"
 	loaderSubtitle.Text="All pages and modules are available"
-	setLoaderProgress("Everything is loaded and up to date.",LOADER_TOTAL,LOADER_TOTAL,false)
+	setLoaderProgress("all loaded",LOADER_TOTAL,LOADER_TOTAL,false)
 
 	playLoaderKeyframes({
 		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.18,{BackgroundTransparency=0.88,Size=UDim2.fromOffset(540,374)}},
@@ -1279,20 +1279,20 @@ function loadRemoteModuleStep(name,path)
 	loaderCurrent=loaderCurrent+1
 	local cached=REMOTE_MODULE_CACHE[path]
 	if cached then
-		setLoaderProgress("Loaded cached module.",loaderCurrent,LOADER_TOTAL,false)
+		setLoaderProgress("cached module loaded",loaderCurrent,LOADER_TOTAL,false)
 		return cached
 	end
 
 	setLoaderProgress("Fetching required module.",loaderCurrent-0.35,LOADER_TOTAL,false)
 	local module=loadRemoteModule(path)
-	setLoaderProgress(module and "Loaded required module." or "Required module unavailable.",loaderCurrent,LOADER_TOTAL,not module)
+	setLoaderProgress(module and "module loaded" or "module missing",loaderCurrent,LOADER_TOTAL,not module)
 	return module
 end
 
 function loadRemoteModuleStepByName(name)
 	local path=MODULE_PATHS[name]
 	if not path then
-		warn("Missing module path for:",name)
+		warn("module path missing:",name)
 		return nil
 	end
 
@@ -1306,14 +1306,14 @@ function loadDeferredModule(name,path,current)
 
 	local module=loadRemoteModule(path)
 	if not module and not OPTIONAL_MODULE_PATH_SET[path] then
-		warn("Deferred module unavailable:",name,path)
+		warn("deferred module missing:",name,path)
 	end
 	return module
 end
 
 local batchLoaded,batchErr=loadRemoteModuleBatch(STARTUP_MODULE_PATHS)
 if not batchLoaded then
-	warn("Module batch unavailable; falling back to individual loads:",batchErr)
+	warn("batch missing, loading one by one:",batchErr)
 end
 
 for _,name in ipairs(STARTUP_MODULE_NAMES) do
@@ -1323,7 +1323,7 @@ end
 function installRuntimeArchitecture()
 	if CoreScope and CoreScope.new then
 		RUNTIME_ROOT_SCOPE=RUNTIME_ROOT_SCOPE or CoreScope.new("runtime",function(err,scopeName)
-			warn("Runtime cleanup failed:",scopeName,err)
+			warn("cleanup failed:",scopeName,err)
 		end)
 
 		RuntimeJanitor={}
@@ -1331,7 +1331,7 @@ function installRuntimeArchitecture()
 
 		function RuntimeJanitor.new(name)
 			return setmetatable({_scope=CoreScope.new(name or "janitor",function(err,scopeName)
-				warn("Runtime janitor cleanup failed:",scopeName,err)
+				warn("janitor cleanup failed:",scopeName,err)
 			end)},RuntimeJanitor)
 		end
 
@@ -1385,7 +1385,7 @@ function installRuntimeArchitecture()
 				state.elapsed=0
 				local ok,err=pcall(fn,elapsed,dt)
 				if not ok then
-					warn("Runtime scheduler job failed:",id,err)
+					warn("scheduler job failed:",id,err)
 				end
 			end
 
@@ -1550,11 +1550,11 @@ function runLoaderCheck()
 
 	if #missing>0 then
 		table.sort(missing)
-		warn("Loader check found missing modules:",table.concat(missing,", "))
-		setLoaderProgress("Required modules unavailable. Run /update, then re-execute.",LOADER_TOTAL,LOADER_TOTAL,true)
+		warn("missing modules:",table.concat(missing,", "))
+		setLoaderProgress("modules missing. press update, then run again.",LOADER_TOTAL,LOADER_TOTAL,true)
 		return false
 	else
-		warn("Loader check complete: all startup modules loaded.")
+		warn("loader check done: all modules loaded")
 		setLoaderProgress("Verified startup modules.",#STARTUP_MODULE_PATHS,LOADER_TOTAL,false)
 		return true
 	end
@@ -1941,7 +1941,7 @@ end
 function refreshRemoteModulesNow()
 	local result=BOT_API.Post("/module/get",{path=MANUAL_REFRESH_RELOAD_PATH})
 	if not result or not result.ok or type(result.source)~="string" then
-		warn("Manual update failed:",result and result.error or "unknown")
+		warn("update failed:",result and result.error or "unknown")
 		return false
 	end
 
@@ -1953,7 +1953,7 @@ function refreshRemoteModulesNow()
 
 	local chunk,err=loadstring(result.source)
 	if not chunk then
-		warn("Manual update compile failed:",err)
+		warn("update compile failed:",err)
 		return false
 	end
 
@@ -1962,7 +1962,7 @@ function refreshRemoteModulesNow()
 	task.defer(function()
 		local ok,reloadErr=pcall(chunk)
 		if not ok then
-			warn("Manual update runtime failed:",reloadErr)
+			warn("update run failed:",reloadErr)
 		end
 	end)
 
@@ -2243,7 +2243,7 @@ function requireGuiModule(name,path,module)
 		return module
 	end
 
-	error("Loader failed: "..name.." did not load from "..path)
+	error("loader failed: "..name.." did not load: "..path)
 end
 
 GuiLogicModule=requireGuiModule("GuiLogic",MODULE_PATHS.GuiLogic,GuiLogicModule)

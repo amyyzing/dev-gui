@@ -50,7 +50,7 @@ end
 
 function addRuntimeModuleError(parent,order,title,text)
 	table.insert(RUNTIME_BUILD_ERRORS,tostring(title)..": "..tostring(text))
-	local section=makeSection(parent,order,title,"Remote module failed to load.")
+	local section=makeSection(parent,order,title,"module did not load")
 	New("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,22),Text=text,Font=Enum.Font.Gotham,TextSize=12,TextColor3=THEME.RED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 end
 
@@ -82,7 +82,7 @@ function buildRuntimeModule(spec,ctx,parent,...)
 		end
 		addRuntimeModuleError(parent,spec.order or 1,spec.title,spec.title.." module failed: "..tostring(result))
 	else
-		addRuntimeModuleError(parent,spec.order or 1,spec.title,"Missing remote module: "..tostring(MODULE_PATHS[spec.name] or spec.name))
+		addRuntimeModuleError(parent,spec.order or 1,spec.title,"missing module: "..tostring(MODULE_PATHS[spec.name] or spec.name))
 	end
 
 	return nil
@@ -310,9 +310,9 @@ function buildAllRuntimePages()
 			if not ok or result==false then
 				okAll=false
 				if setLoaderProgress then
-					setLoaderProgress("Interface page failed to build.",loaderPhaseCurrent,LOADER_TOTAL,true)
+					setLoaderProgress("gui page failed",loaderPhaseCurrent,LOADER_TOTAL,true)
 				end
-				warn("Page build failed:",pageName,ok and result or result)
+				warn("page build failed:",pageName,ok and result or result)
 			end
 		end
 	end
@@ -320,7 +320,7 @@ function buildAllRuntimePages()
 	if #RUNTIME_BUILD_ERRORS>0 then
 		okAll=false
 		if setLoaderProgress then
-			setLoaderProgress("One or more GUI pages failed to build.",LOADER_TOTAL,LOADER_TOTAL,true)
+			setLoaderProgress("some gui pages failed",LOADER_TOTAL,LOADER_TOTAL,true)
 		end
 	elseif okAll and setLoaderProgress then
 		setLoaderProgress("Built all GUI pages.",#STARTUP_MODULE_PATHS+pageCount,LOADER_TOTAL,false)

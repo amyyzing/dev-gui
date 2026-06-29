@@ -199,9 +199,9 @@ function buildUpdateSection()
 				return
 			end
 
-			warn("Manual refresh failed:",ok and "refresh returned false" or result)
+			warn("update failed:",ok and "refresh returned false" or result)
 			if MainFrame and MainFrame.ShowToast then
-				MainFrame.ShowToast("Update failed. Run /update, then try again.", "error", 3)
+				MainFrame.ShowToast("update failed. run /update then try again.", "error", 3)
 			end
 			if button and button.Parent then
 				button.Text="UPDATE FAILED"
@@ -420,7 +420,7 @@ end
 
 function buildPage2Module(spec,ctx,sections)
 	if spec.requires and not PAGE2_APIS[spec.requires] then
-		addPage2Error(sections[spec.section],spec.title.." needs "..tostring(spec.requires).." to load first.")
+		addPage2Error(sections[spec.section],spec.title.." needs "..tostring(spec.requires).." first.")
 		return nil
 	end
 
@@ -431,7 +431,7 @@ function buildPage2Module(spec,ctx,sections)
 	end
 
 	if not(module and type(module.new)=="function") then
-		addPage2Error(sections[spec.section],"Missing remote module: "..tostring(MODULE_PATHS[spec.name] or spec.name))
+		addPage2Error(sections[spec.section],"missing module: "..tostring(MODULE_PATHS[spec.name] or spec.name))
 		return nil
 	end
 

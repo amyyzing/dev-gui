@@ -93,11 +93,11 @@ Description.Categories={
 		},
 
 		Loader={
-			["Loading GUI"]="Loading GUI",
-			["Preparing remote modules..."]="Preparing remote modules...",
-			["Loading..."]="Loading...",
-			["Closing... encountered error"]="Closing... encountered error",
-			["Auto-refresh failed."]="Auto-refresh failed.",
+			["Loading GUI"]="loading gui",
+			["Preparing remote modules..."]="loading modules...",
+			["Loading..."]="loading...",
+			["Closing... encountered error"]="close had an error",
+			["Auto-refresh failed."]="auto refresh failed",
 		},
 
 		Common={
@@ -216,8 +216,8 @@ Description.Categories={
 			["Stroke transparency"]="Stroke transparency",
 			["Gradient Stroke"]="Gradient stroke",
 			["Pulse Accent"]="Pulse Accent",
-			["Primary colour module missing."]="Primary colour module missing.",
-			["Secondary colour module missing."]="Secondary colour module missing.",
+			["Primary colour module missing."]="primary colour missing",
+			["Secondary colour module missing."]="secondary colour missing",
 		},
 
 		Presets={
@@ -247,10 +247,10 @@ Description.Categories={
 		},
 
 		Discord={
-			["Loading invite link..."]="Loading invite link...",
-			["Fetching invite link..."]="Fetching invite link...",
-			["No invite link set."]="No invite link set.",
-			["Click to Copy"]="Click to Copy",
+			["Loading invite link..."]="loading invite...",
+			["Fetching invite link..."]="getting invite...",
+			["No invite link set."]="no invite link set",
+			["Click to Copy"]="copy",
 			["Copied"]="Copied",
 			["Click the invite link to copy it."]="Click the invite link to copy it.",
 			["Use /invite-link create in Discord to set this."]="Use /invite-link create in Discord to set this.",
