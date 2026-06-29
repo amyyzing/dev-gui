@@ -18,9 +18,9 @@ local function clampText(value,maxLen)
 end
 
 function announcement.new(app)
-	local make=app.New
+	local make=app.New or app.make
 	local colors=app.colors
-	local screenGui=app.SG
+	local screenGui=app.SG or app.screenGui
 	local botApi=app.botApi
 	local textService=game:GetService("TextService")
 	local playerId=tostring(app.playerId or "")

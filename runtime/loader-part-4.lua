@@ -40,7 +40,7 @@ end
 
 function destroyPage2APIs()
 	for key,api in pairs(keybindPageApis) do
-		if api and api.Destroy then
+		if api and type(api.Destroy)=="function" then
 			pcall(function()
 				api.Destroy()
 			end)
@@ -282,7 +282,7 @@ function makeResetGuiCtx()
 		makeSection=makeSection,
 		wrapTextButton=wrapTextButton,
 		scheduleSave=function()
-			if DataSaveAPI and DataSaveAPI.Schedule then
+			if DataSaveAPI and type(DataSaveAPI.Schedule)=="function" then
 				DataSaveAPI.Schedule()
 			end
 		end,
@@ -466,7 +466,7 @@ function buildPage2()
 
 	refreshPage2UI=function()
 		for _,api in pairs(keybindPageApis) do
-			if api and api.Refresh then pcall(api.Refresh) end
+			if api and type(api.Refresh)=="function" then pcall(api.Refresh) end
 		end
 	end
 
@@ -510,7 +510,7 @@ resetKeybindPresetPageDefaults=function()
 	qbAimThrowKey=Enum.KeyCode.T
 	qbAimToggleKey=Enum.KeyCode.P
 
-	if DataSaveAPI and DataSaveAPI.ResetPresetEditor then
+	if DataSaveAPI and type(DataSaveAPI.ResetPresetEditor)=="function" then
 		DataSaveAPI.ResetPresetEditor(true)
 	else
 		for i=1,4 do

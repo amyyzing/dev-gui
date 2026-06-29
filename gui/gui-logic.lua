@@ -1,8 +1,8 @@
 local guiLogic={}
 
 function guiLogic.new(app)
-	local make=app.New
-	local fusion=app.Fusion
+	local make=app.New or app.make
+	local fusion=app.Fusion or app.fusion
 	local colors=app.colors
 	local style=app.style or {}
 	local inputService=app.inputService
@@ -774,7 +774,7 @@ function guiLogic.new(app)
 			sectionDestroyed=true
 			cancelBodyTween()
 
-			if controls.toggle and controls.toggle.Destroy then
+			if controls.toggle and type(controls.toggle.Destroy)=="function" then
 				pcall(controls.toggle.Destroy)
 			end
 

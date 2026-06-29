@@ -689,7 +689,7 @@ function qbAim._playThrowAnimation()
 end
 
 function qbAim.new(app,parent)
-	local make=app.New
+	local make=app.New or app.make
 	local colors=app.colors
 	local style=app.style
 	local safeDisconnect=app.safeDisconnect

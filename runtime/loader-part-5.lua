@@ -4,13 +4,13 @@ function shutdownTool()
 	sendPlayerSessionUpdate(true)
 	toolAlive=false
 
-	if AnnouncementAPI and AnnouncementAPI.Destroy then
+	if AnnouncementAPI and type(AnnouncementAPI.Destroy)=="function" then
 		pcall(function()
 			AnnouncementAPI.Destroy()
 		end)
 	end
 
-	if mainFrame and mainFrame.Destroy then
+	if mainFrame and type(mainFrame.Destroy)=="function" then
 		pcall(function()
 			mainFrame.Destroy()
 		end)
@@ -40,11 +40,11 @@ function applyHitboxPreset(index)
 	mainPageState.sizeY=size.Y
 	mainPageState.sizeZ=size.Z
 
-	if mainPageApis.hitbox and mainPageApis.hitbox.SetHitboxSize then
+	if mainPageApis.hitbox and type(mainPageApis.hitbox.SetHitboxSize)=="function" then
 		pcall(function()
 			mainPageApis.hitbox.SetHitboxSize(size.X,size.Y,size.Z,true)
 		end)
-	elseif mainPageApis.hitbox and mainPageApis.hitbox.Refresh then
+	elseif mainPageApis.hitbox and type(mainPageApis.hitbox.Refresh)=="function" then
 		syncMainState()
 		pcall(mainPageApis.hitbox.Refresh)
 		requestPlayerAutosave()
@@ -179,7 +179,7 @@ function refreshAllUI()
 		pcall(refreshRuntimePageControls,"main")
 	else
 		for _,api in pairs(mainPageApis) do
-			if api and api.Refresh then pcall(api.Refresh) end
+			if api and type(api.Refresh)=="function" then pcall(api.Refresh) end
 		end
 		syncMainState()
 	end
@@ -414,8 +414,12 @@ function rebuildDataSaveFromModule(loadRemoteData)
 
 	if loadRemoteData and DataSaveAPI then
 		pcall(function()
-			DataSaveAPI.Load()
-			DataSaveAPI.LoadOwnedPresets()
+			if type(DataSaveAPI.Load)=="function" then
+				DataSaveAPI.Load()
+			end
+			if type(DataSaveAPI.LoadOwnedPresets)=="function" then
+				DataSaveAPI.LoadOwnedPresets()
+			end
 		end)
 
 		if mapSettings and mapSettings.SmoothPlastic and ensureRuntimePageBuilt then
@@ -542,7 +546,7 @@ end
 applyUIStrokeTheme()
 refreshAllUI()
 refreshActionStatus()
-if mainFrame and mainFrame.RefreshText then
+if mainFrame and type(mainFrame.RefreshText)=="function" then
 	mainFrame.RefreshText(description)
 elseif modeSubtitle then
 	modeSubtitle.Text=getMainDescriptionText()

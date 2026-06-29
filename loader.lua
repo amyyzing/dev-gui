@@ -160,14 +160,21 @@ for _,path in ipairs(runtimeFiles) do
 
 	runtimeSources[path]=source
 
-	local chunk,compileError = loadstring(source)
+	local chunk,compileError = loadstring(source,"@"..path)
 	if not chunk then
 		error("loader compile failed "..path..": "..tostring(compileError))
 	end
 
 	if setfenv then setfenv(chunk, runtimeEnv) end
 
-	local ran, runError = pcall(chunk)
+	runtimeEnv.bootingFile=path
+	local ran, runError = xpcall(chunk,function(err)
+		if debug and type(debug.traceback)=="function" then
+			return debug.traceback(tostring(err),2)
+		end
+
+		return tostring(err)
+	end)
 	if not ran then
 		error("loader run failed "..path.." line281=["..sourceLine(source,281).."]: "..tostring(runError))
 	end

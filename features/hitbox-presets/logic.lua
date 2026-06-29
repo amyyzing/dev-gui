@@ -11,9 +11,9 @@ local function makeCode(name)
 end
 
 function hitboxPresets.new(app,ownedSection)
-	local make=app.New
+	local make=app.New or app.make
 	local colors=app.colors
-	local screenGui=app.SG
+	local screenGui=app.SG or app.screenGui
 	local hitboxPresets=app.hitboxPresets
 	local savedPresets=app.savedPresets or {}
 	app.savedPresets=savedPresets

@@ -305,7 +305,7 @@ local function readableTextColor(color)
 end
 
 function colors.new(app,page)
-	local make=app.New
+	local make=app.New or app.make
 	local colors=app.colors
 	local style=app.style
 	local inputService=app.inputService or game:GetService("UserInputService")

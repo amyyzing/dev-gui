@@ -762,7 +762,7 @@ function loadModuleFromSource(modulePath,source)
 		return nil,verifyErr
 	end
 
-	local chunk,err=loadstring(source)
+	local chunk,err=loadstring(source,"@"..modulePath)
 	if not chunk then
 		moduleSources[modulePath]=source
 		return nil,err
@@ -772,7 +772,13 @@ function loadModuleFromSource(modulePath,source)
 		setfenv(chunk,getfenv())
 	end
 
-	local loadedOk,loadedModule=pcall(chunk)
+	local loadedOk,loadedModule=xpcall(chunk,function(err)
+		if debug and type(debug.traceback)=="function" then
+			return debug.traceback(tostring(err),2)
+		end
+
+		return tostring(err)
+	end)
 	if not loadedOk then
 		moduleSources[modulePath]=source
 		return nil,loadedModule
@@ -1916,7 +1922,7 @@ function cleanupForManualReload()
 
 	if mainPageApis then
 		for key,api in pairs(mainPageApis) do
-			if api and api.Destroy then
+			if api and type(api.Destroy)=="function" then
 				pcall(function()
 					api.Destroy()
 				end)
@@ -1946,13 +1952,13 @@ function cleanupForManualReload()
 		})
 	end
 
-	if AnnouncementAPI and AnnouncementAPI.Destroy then
+	if AnnouncementAPI and type(AnnouncementAPI.Destroy)=="function" then
 		pcall(function()
 			AnnouncementAPI.Destroy()
 		end)
 	end
 
-	if mainFrame and mainFrame.Destroy then
+	if mainFrame and type(mainFrame.Destroy)=="function" then
 		pcall(function()
 			mainFrame.Destroy()
 		end)
@@ -1986,7 +1992,7 @@ function refreshRemoteModulesNow()
 		return false
 	end
 
-	local chunk,err=loadstring(result.source)
+	local chunk,err=loadstring(result.source,"@"..manualReloadPath)
 	if not chunk then
 		warn("update compile failed:",err)
 		return false

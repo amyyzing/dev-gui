@@ -130,13 +130,13 @@ function getMainDescriptionText()
 end
 
 function setActivePage(name)
-	if mainFrame and mainFrame.SetActivePage then
+	if mainFrame and type(mainFrame.SetActivePage)=="function" then
 		mainFrame.SetActivePage(name)
 	end
 end
 
 function getActivePageName()
-	if mainFrame and mainFrame.GetActivePageName then
+	if mainFrame and type(mainFrame.GetActivePageName)=="function" then
 		return mainFrame.GetActivePageName()
 	end
 
@@ -144,13 +144,13 @@ function getActivePageName()
 end
 
 updateResponsiveLayout=function()
-	if mainFrame and mainFrame.UpdateResponsiveLayout then
+	if mainFrame and type(mainFrame.UpdateResponsiveLayout)=="function" then
 		mainFrame.UpdateResponsiveLayout()
 	end
 end
 
 refreshFooterResetButton=function()
-	if mainFrame and mainFrame.RefreshFooterResetButton then
+	if mainFrame and type(mainFrame.RefreshFooterResetButton)=="function" then
 		mainFrame.RefreshFooterResetButton()
 	end
 end
@@ -358,7 +358,7 @@ function refreshRuntimePageControls(name,forceTheme)
 	if name=="main" then
 		syncMainState()
 		for _,api in pairs(mainPageApis) do
-			if api and api.Refresh then
+			if api and type(api.Refresh)=="function" then
 				pcall(api.Refresh)
 			end
 		end
@@ -371,7 +371,7 @@ function refreshRuntimePageControls(name,forceTheme)
 			pcall(refreshRuntimeAPIs,mapApiNames)
 		end
 	elseif name=="customize" then
-		if ColorsAPI and ColorsAPI.Refresh then
+		if ColorsAPI and type(ColorsAPI.Refresh)=="function" then
 			pcall(ColorsAPI.Refresh)
 		end
 	elseif name=="page2" then
@@ -379,10 +379,10 @@ function refreshRuntimePageControls(name,forceTheme)
 			pcall(refreshPage2UI)
 		end
 	elseif name=="settings" then
-		if PlayerDataAPI and PlayerDataAPI.Refresh then
+		if PlayerDataAPI and type(PlayerDataAPI.Refresh)=="function" then
 			pcall(PlayerDataAPI.Refresh)
 		end
-		if DiscordAPI and DiscordAPI.Refresh then
+		if DiscordAPI and type(DiscordAPI.Refresh)=="function" then
 			pcall(DiscordAPI.Refresh)
 		end
 	end
@@ -447,18 +447,18 @@ function makeMainCtx()
 		setCurrentMode=function(key,label)
 			currentModeKey=tostring(key or"mode1")
 			currentModeLabel=tostring(label or"Gameplay")
-			if mainFrame and mainFrame.RefreshText then
+			if mainFrame and type(mainFrame.RefreshText)=="function" then
 				mainFrame.RefreshText(description)
 			elseif modeSubtitle then
 				modeSubtitle.Text=getMainDescriptionText()
 			end
-			if mainPageApis.gameParams and mainPageApis.gameParams.Refresh then
+			if mainPageApis.gameParams and type(mainPageApis.gameParams.Refresh)=="function" then
 				pcall(mainPageApis.gameParams.Refresh)
 			end
-			if mainPageApis.esp and mainPageApis.esp.Refresh then
+			if mainPageApis.esp and type(mainPageApis.esp.Refresh)=="function" then
 				pcall(mainPageApis.esp.Refresh)
 			end
-			if mainPageApis.QBAim and mainPageApis.QBAim.Refresh then
+			if mainPageApis.QBAim and type(mainPageApis.QBAim.Refresh)=="function" then
 				pcall(mainPageApis.QBAim.Refresh)
 			end
 			refreshActionStatus()
@@ -494,7 +494,7 @@ function buildMainModule(spec,app)
 	local parent=getMainColumn(spec.column)
 	local env=getfenv()
 	local featureModule=rawget(env,moduleGlobalName(spec.name))
-	if featureModule and featureModule.new then
+	if featureModule and type(featureModule.new)=="function" then
 		local ok,result=pcall(function()
 			return featureModule.new(app,parent)
 		end)
@@ -531,7 +531,7 @@ end
 
 rebuildMainFromModules=function()
 	for _,api in pairs(mainPageApis) do
-		if api and api.Destroy then
+		if api and type(api.Destroy)=="function" then
 			pcall(api.Destroy)
 		end
 	end
@@ -554,7 +554,7 @@ function resetMainPageDefaults()
 	end
 
 	for _,api in pairs(mainPageApis) do
-		if api and api.Refresh then
+		if api and type(api.Refresh)=="function" then
 			pcall(api.Refresh)
 		end
 	end

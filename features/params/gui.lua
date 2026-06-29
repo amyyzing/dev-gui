@@ -185,7 +185,7 @@ end
 
 function paramsGui.new(app,parent)
 	local runtime=app.ParamsLogicModule.new(app)
-	local make=app.New
+	local make=app.New or app.make
 	local colors=app.colors or {}
 	local safeDisconnect=app.safeDisconnect
 	local makeSection=app.makeSection

@@ -1,12 +1,12 @@
 local mainFrame={}
 
 function mainFrame.new(app)
-	local make=app.New
-	local fusion=app.Fusion
+	local make=app.New or app.make
+	local fusion=app.Fusion or app.fusion
 	local colors=app.colors
-	local description=app.Description or {}
+	local description=app.Description or app.description or {}
 	local windowState=app.windowState
-	local screenGui=app.SG
+	local screenGui=app.SG or app.screenGui
 	local inputService=app.inputService
 	local tweenService=app.TweenService
 	local runService=app.RunService

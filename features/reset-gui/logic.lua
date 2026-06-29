@@ -1,7 +1,7 @@
 local resetGui={}
 
 function resetGui.new(app,page)
-	local make=app.New
+	local make=app.New or app.make
 	local colors=app.colors
 	local makeSection=app.makeSection
 	local wrapTextButton=app.wrapTextButton

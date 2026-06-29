@@ -39,7 +39,7 @@ local function setBinding(app,item,value)
 end
 
 function keybinds.new(app,bindSection)
-	local make=app.New
+	local make=app.New or app.make
 	local colors=app.colors
 	local bindingToLabel=app.bindingToLabel
 	local inputToBinding=app.inputToBinding

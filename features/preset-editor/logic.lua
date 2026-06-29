@@ -1,7 +1,7 @@
 local presetEditor={}
 
 function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
-	local make=app.New
+	local make=app.New or app.make
 	local colors=app.colors
 	local hitboxPresets=app.hitboxPresets
 	local defaultHitboxPresets=app.defaultHitboxPresets

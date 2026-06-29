@@ -38,7 +38,7 @@ end
 function hitbox.new(app,parent)
 	local safeDisconnect=app.safeDisconnect
 	local inputToBinding=app.inputToBinding
-	local make=app.New
+	local make=app.New or app.make
 	local colors=app.colors
 	local makeSection=app.makeSection
 	local buildSlider=app.buildSlider

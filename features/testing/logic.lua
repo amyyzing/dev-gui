@@ -233,7 +233,7 @@ local function findCenter()
 end
 
 function testing.new(app,parent,guiBuilder)
-	local make=app.New
+	local make=app.New or app.make
 	local colors=app.colors
 	local safeDisconnect=app.safeDisconnect
 	local makeSection=app.makeSection

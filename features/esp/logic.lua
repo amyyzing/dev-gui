@@ -301,8 +301,8 @@ function esp.new(app,parent)
 			if activeMode~=nextMode then
 				stopBoth()
 				activeMode=nextMode
-				if nextApi and nextApi.Start then pcall(nextApi.Start) end
-			elseif nextApi and nextApi.Refresh then
+				if nextApi and type(nextApi.Start)=="function" then pcall(nextApi.Start) end
+			elseif nextApi and type(nextApi.Refresh)=="function" then
 				pcall(nextApi.Refresh)
 			end
 			setStatus(nextMode=="defense" and "Defense active" or "Offense active",colors.green or colors.text)
@@ -351,8 +351,8 @@ function esp.new(app,parent)
 		heartbeatConn=nil
 		stopBoth()
 
-		if defenseApi and defenseApi.Destroy then pcall(defenseApi.Destroy) end
-		if offenseApi and offenseApi.Destroy then pcall(offenseApi.Destroy) end
+		if defenseApi and type(defenseApi.Destroy)=="function" then pcall(defenseApi.Destroy) end
+		if offenseApi and type(offenseApi.Destroy)=="function" then pcall(offenseApi.Destroy) end
 
 		destroyControl(toggle)
 

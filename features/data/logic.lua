@@ -9,9 +9,9 @@ end
 function playerData.new(app,page,deps)
 	deps=deps or {}
 
-	local make=app.New
+	local make=app.New or app.make
 	local colors=app.colors
-	local screenGui=app.SG
+	local screenGui=app.SG or app.screenGui
 	local makeSection=app.makeSection
 	local wrapTextButton=app.wrapTextButton
 

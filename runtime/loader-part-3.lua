@@ -24,7 +24,7 @@ function destroyRuntimeAPIs(apiNames)
 	local env=getfenv()
 	for _,apiName in ipairs(apiNames or {}) do
 		local api=env[apiName]
-		if api and api.Destroy then
+		if api and type(api.Destroy)=="function" then
 			pcall(function()
 				api.Destroy()
 			end)
@@ -54,7 +54,7 @@ function refreshRuntimeAPIs(apiNames)
 	local env=getfenv()
 	for _,apiName in ipairs(apiNames or {}) do
 		local api=env[apiName]
-		if api and api.Refresh then
+		if api and type(api.Refresh)=="function" then
 			pcall(api.Refresh)
 		end
 	end
@@ -119,10 +119,10 @@ function makeCustomizeCtx()
 		tintSlider=tintSlider,
 		onChanged=function()
 			applyUIStrokeTheme()
-			if mainPageApis and mainPageApis.esp and mainPageApis.esp.Refresh then
+			if mainPageApis and mainPageApis.esp and type(mainPageApis.esp.Refresh)=="function" then
 				pcall(mainPageApis.esp.Refresh)
 			end
-			if mainPageApis and mainPageApis.QBAim and mainPageApis.QBAim.Refresh then
+			if mainPageApis and mainPageApis.QBAim and type(mainPageApis.QBAim.Refresh)=="function" then
 				pcall(mainPageApis.QBAim.Refresh)
 			end
 			requestPlayerAutosave()
