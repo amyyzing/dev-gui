@@ -3,7 +3,7 @@ local HttpService=game:GetService("HttpService")
 local botUrl="https://lint-bot-production.up.railway.app"
 local moduleGetPath="/module/get"
 local loaderPath="loader.lua"
-local apiKey="nydayohmy"
+local apiKey="mydayohmy"
 local maxLoaderBytes=160000
 
 local function typeOf(value)
