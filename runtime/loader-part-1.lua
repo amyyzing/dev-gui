@@ -947,11 +947,11 @@ loaderPercentPill=New("Frame",{
 New("UICorner",{CornerRadius=UDim.new(0,0)},loaderPercentPill)
 loaderPercentPillStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=1},loaderPercentPill)
 
-loaderTitle=New("TextLabel",{
+local titleText=New("TextLabel",{
 	BackgroundTransparency=1,
 	Position=UDim2.fromOffset(0,16),
 	Size=UDim2.new(1,-88,0,24),
-	Text="Control Panel",
+	Text="untitled gui",
 	Font=Enum.Font.GothamMedium,
 	TextSize=16,
 	TextColor3=THEME.TEXT,
@@ -960,7 +960,7 @@ loaderTitle=New("TextLabel",{
 	ZIndex=LOADER_Z+2,
 },loaderBox)
 
-loaderSubtitle=New("TextLabel",{
+local subtitleText=New("TextLabel",{
 	BackgroundTransparency=1,
 	Position=UDim2.fromOffset(0,42),
 	Size=UDim2.new(1,-88,0,18),
@@ -1170,8 +1170,8 @@ function showLoader()
 
 	local ti=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 	TweenService:Create(loaderBoxStroke,ti,{Transparency=0.08}):Play()
-	TweenService:Create(loaderTitle,ti,{TextTransparency=0}):Play()
-	TweenService:Create(loaderSubtitle,ti,{TextTransparency=0}):Play()
+	TweenService:Create(titleText,ti,{TextTransparency=0}):Play()
+	TweenService:Create(subtitleText,ti,{TextTransparency=0}):Play()
 	TweenService:Create(loaderStatus,ti,{TextTransparency=0}):Play()
 	TweenService:Create(loaderPercent,ti,{TextTransparency=0}):Play()
 	TweenService:Create(loaderPercentPill,ti,{BackgroundTransparency=0.18}):Play()
@@ -1240,8 +1240,8 @@ end
 function finishLoader()
 	if not loaderOverlay or not loaderOverlay.Parent then return end
 
-	loaderTitle.Text="ready"
-	loaderSubtitle.Text=""
+	titleText.Text="ready"
+	subtitleText.Text=""
 	setLoaderProgress("all loaded",LOADER_TOTAL,LOADER_TOTAL,false)
 
 	playLoaderKeyframes({

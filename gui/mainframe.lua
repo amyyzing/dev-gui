@@ -371,9 +371,9 @@ function MainFrame.new(ctx)
 	New("UICorner",{CornerRadius=UDim.new(0,0)},header)
 	local headerStroke=New("UIStroke",{Color=THEME.STROKE,Thickness=1,Transparency=headerStrokeTransparency},header)
 	headerStroke:SetAttribute("BaseStrokeTransparency",headerStrokeTransparency)
-	local titleLabel=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerTitleY),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=headerTitleSize,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+	local titleText=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerTitleY),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=headerTitleSize,TextColor3=THEME.TEXT,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
 
-	local modeSubtitle=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerSubtitleY),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
+	local subtitleText=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerSubtitleY),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
 
 	local function makeTopButton(text,xOffset)
 		local b=New("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=THEME.BUTTON or THEME.BG,BorderSizePixel=0,Text=text,Font=controlFont,TextSize=17,TextColor3=THEME.TEXT,AutoButtonColor=false,Selectable=true,ZIndex=6,ThemeRole="BUTTON"},header)
@@ -415,7 +415,7 @@ function MainFrame.new(ctx)
 	headerSearchStroke:SetAttribute("BaseStrokeTransparency",0.78)
 	local headerSearchLabel=New("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(12,0),Size=UDim2.new(1,-24,1,0),Text=headerSearchPlaceholder,Font=textFont,TextSize=12,TextColor3=THEME.MUTED,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6,TextRole="MUTED"},headerSearch)
 
-	hydrateFusion(titleLabel,{
+	hydrateFusion(titleText,{
 		Text=makeFusionComputed(function(use)
 			use(descriptionVersionValue)
 			return text(desc("Main.Title","untitled gui"))
@@ -434,7 +434,7 @@ function MainFrame.new(ctx)
 		end),
 	})
 
-	hydrateFusion(modeSubtitle,{
+	hydrateFusion(subtitleText,{
 		Text=makeFusionComputed(function(use)
 			use(descriptionVersionValue)
 			return text(desc("Main.Description",getModeLabel().." loaded"))
@@ -686,11 +686,11 @@ function MainFrame.new(ctx)
 			resizeHandle.Visible=resizeHandleVisible
 		end
 
-		titleLabel.Position=UDim2.fromOffset(headerTitleX,headerTitleY)
-		titleLabel.TextSize=headerTitleSize
-		modeSubtitle.Position=UDim2.fromOffset(headerTitleX,headerSubtitleY)
-		modeSubtitle.TextSize=headerSubtitleSize
-		modeSubtitle.Visible=headerSubtitleVisible
+		titleText.Position=UDim2.fromOffset(headerTitleX,headerTitleY)
+		titleText.TextSize=headerTitleSize
+		subtitleText.Position=UDim2.fromOffset(headerTitleX,headerSubtitleY)
+		subtitleText.TextSize=headerSubtitleSize
+		subtitleText.Visible=headerSubtitleVisible
 
 		headerSearch.Visible=headerSearchVisible
 		headerSearch.Size=UDim2.fromOffset(headerSearchWidth,headerSearchHeight)
@@ -1198,8 +1198,8 @@ function MainFrame.new(ctx)
 		closeWrap.Position=UDim2.new(1,topButtonX(1),0.5,-topButtonSize/2)
 		closeBtn.Size=UDim2.new(1,0,1,0)
 		closeBtn.Position=UDim2.fromOffset(0,0)
-		titleLabel.Font=titleFont
-		modeSubtitle.Font=textFont
+		titleText.Font=titleFont
+		subtitleText.Font=textFont
 		pageShell.BackgroundTransparency=pageShellTransparency
 		pageSlider.BackgroundTransparency=pageSliderTransparency
 		applyChromeProfile()
@@ -1214,8 +1214,8 @@ function MainFrame.new(ctx)
 	function api.RefreshText(newDescription)
 		Description=newDescription or Description
 		bumpFusionValue(descriptionVersionValue)
-		titleLabel.Text=text(desc("Main.Title","untitled gui"))
-		modeSubtitle.Text=text(desc("Main.Description",getModeLabel().." loaded"))
+		titleText.Text=text(desc("Main.Title","untitled gui"))
+		subtitleText.Text=text(desc("Main.Description",getModeLabel().." loaded"))
 		settingsTab.Text=text(desc("Pages.Main","MAIN"))
 		mapsPageTab.Text=text(desc("Pages.Maps","MAPS"))
 		serverPageTab.Text=text(desc("Pages.Server","SERVER"))
@@ -1239,7 +1239,8 @@ function MainFrame.new(ctx)
 	api.uiScale=uiScale
 	api.main=main
 	api.header=header
-	api.modeSubtitle=modeSubtitle
+	api.subtitleText=subtitleText
+	api.modeSubtitle=subtitleText
 	api.closeBtn=closeBtn
 	api.resetBtn=resetBtn
 	api.toastHost=toastHost

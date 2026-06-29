@@ -6,7 +6,7 @@ local Description={}
 
 Description.Categories={
 	Main={
-		Title="Control Panel",
+		Title="untitled gui",
 		Description=EMPTY,
 		LoadedSuffix=EMPTY,
 	},
@@ -79,7 +79,7 @@ Description.Categories={
 
 	Text={
 		MainFrame={
-			["untitled gui"]="Control Panel",
+			["untitled gui"]="untitled gui",
 			["MAIN"]="Main",
 			["MAPS"]="Maps",
 			["SERVER"]="Server",
