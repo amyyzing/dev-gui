@@ -651,11 +651,9 @@ externalModuleFiles={
 	["design/themes/midnight.lua"]=uiLibrarySource,
 	["design/themes/sakura.lua"]=uiLibrarySource,
 	["design/tokens.lua"]=uiLibrarySource,
-	["gui/description.lua"]=uiLibrarySource,
 	["gui/fusion.lua"]=uiLibrarySource,
 	["gui/gui-logic.lua"]=uiLibrarySource,
 }
-externalModuleFiles[modulePaths.MainFrame]=uiLibrarySource
 moduleGlobalNames={
 	CoreScope="CoreScope",
 	CoreSignal="CoreSignal",
