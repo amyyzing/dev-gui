@@ -293,13 +293,26 @@ function buildActualSettingsPage()
 	loadDeferredModuleNames(settingsReloadNames)
 	buildUpdateSection()
 
-	ResetGuiAPI=buildRuntimeModule({name="ResetGui",api="ResetGuiAPI",order=2,title="GUI Position"},makeResetGuiCtx(),actualSettingsPage)
-	PlayerDataAPI=buildRuntimeModule({name="PlayerData",api="PlayerDataAPI",order=3,title="Player Data"},makePlayerDataCtx(),actualSettingsPage,{
-		Workspace=MaterialsAPI,
-		materials=MaterialsAPI,
-		mapCleaner=MapCleanerAPI,
-	})
-	DiscordAPI=buildRuntimeModule({name="Discord",api="DiscordAPI",order=4,title="Discord"},makeDiscordCtx(),actualSettingsPage)
+	local settingsModules=(UIMapModule and UIMapModule.SettingsPage and UIMapModule.SettingsPage.Modules) or {
+		{name="ResetGui",api="ResetGuiAPI",order=2,title="GUI Position"},
+		{name="PlayerData",api="PlayerDataAPI",order=3,title="Player Data"},
+		{name="Discord",api="DiscordAPI",order=4,title="Discord"},
+	}
+
+	for _,spec in ipairs(settingsModules) do
+		if spec.name=="ResetGui" then
+			ResetGuiAPI=buildRuntimeModule(spec,makeResetGuiCtx(),actualSettingsPage)
+		elseif spec.name=="PlayerData" then
+			PlayerDataAPI=buildRuntimeModule(spec,makePlayerDataCtx(),actualSettingsPage,{
+				Workspace=MaterialsAPI,
+				materials=MaterialsAPI,
+				mapCleaner=MapCleanerAPI,
+			})
+		elseif spec.name=="Discord" then
+			DiscordAPI=buildRuntimeModule(spec,makeDiscordCtx(),actualSettingsPage)
+		end
+	end
+
 	refreshSettingsPage()
 end
 
@@ -338,13 +351,13 @@ keybindRows={
 	{label="QB AIM TOGGLE",key="qbAimToggleKey"},
 }
 
-keybindSections={
+keybindSections=(UIMapModule and UIMapModule.KeybindPage and UIMapModule.KeybindPage.Sections) or {
 	owned={order=1,title="Hitbox Presets",subtitle="Your saved presets"},
 	editor={order=2,title="Preset Editor",subtitle="edit hotkeys and hitbox sizes and save (maybe?)"},
 	bind={order=3,title="Keybind Settings",subtitle=""},
 }
 
-keybindPageModules={
+keybindPageModules=(UIMapModule and UIMapModule.KeybindPage and UIMapModule.KeybindPage.Modules) or {
 	{api="hitboxPresets",name="HitboxPresets",section="owned",title="Hitbox Presets"},
 	{api="keybinds",name="Keybinds",section="bind",title="Keybind Settings"},
 	{api="presetEditor",name="PresetEditor",section="editor",title="Preset Editor",requires="keybinds",extras=function(apis) return apis.keybinds,apis.hitboxPresets end},
@@ -432,7 +445,9 @@ function buildPage2Module(spec,app,sections)
 	end
 
 	local extra={nil,nil}
-	if spec.extras then
+	if spec.extras=="keybindPresetEditor" then
+		extra={keybindPageApis.keybinds,keybindPageApis.hitboxPresets}
+	elseif spec.extras then
 		extra={spec.extras(keybindPageApis)}
 	end
 	local ok,result=pcall(function()

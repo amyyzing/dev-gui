@@ -23,6 +23,7 @@ function mainFrame.new(app)
 	local getCurrentUILibProfile=app.getCurrentUILibProfile
 	local onPageActivated=app.onPageActivated
 	local uiProfile=type(app.uiProfile)=="table" and app.uiProfile or {}
+	local uiMap=type(app.uiMap)=="table" and app.uiMap or {}
 	local mainFrameProfile={}
 	local windowProfile={}
 	local layoutProfile={}
@@ -556,8 +557,24 @@ function mainFrame.new(app)
 	local activePageName="main"
 	local activePageValue=makeFusionValue(activePageName)
 	local resizeHandle=nil
+
+	local pageSpecs=type(uiMap.Pages)=="table" and uiMap.Pages or {
+		{Id="main",DescriptionKey="Pages.Main",Fallback="MAIN"},
+		{Id="maps",DescriptionKey="Pages.Maps",Fallback="MAPS"},
+		{Id="server",DescriptionKey="Pages.Server",Fallback="SERVER"},
+		{Id="customize",DescriptionKey="Pages.Customize",Fallback="CUSTOMIZE"},
+		{Id="page2",DescriptionKey="Pages.Keybinds",Fallback="KEYBINDS"},
+		{Id="settings",DescriptionKey="Pages.Settings",Fallback="SETTINGS"},
+	}
+
 	local function getPageIndex(name)
-		return ({main=1,maps=2,server=3,customize=4,page2=5,settings=6})[name] or 1
+		for index,spec in ipairs(pageSpecs) do
+			if spec.Id==name or spec.id==name then
+				return index
+			end
+		end
+
+		return 1
 	end
 
 	local function activePageIs(name)
@@ -580,14 +597,20 @@ function mainFrame.new(app)
 		end)
 	end
 
-	local pageTabSpecs={
-		{button=settingsTab,page="main",descriptionKey="Pages.Main",fallback="MAIN"},
-		{button=mapsPageTab,page="maps",descriptionKey="Pages.Maps",fallback="MAPS"},
-		{button=serverPageTab,page="server",descriptionKey="Pages.Server",fallback="SERVER"},
-		{button=uiSettingsTab,page="customize",descriptionKey="Pages.Customize",fallback="CUSTOMIZE"},
-		{button=futureTab,page="page2",descriptionKey="Pages.Keybinds",fallback="KEYBINDS"},
-		{button=settingsPageTab,page="settings",descriptionKey="Pages.Settings",fallback="SETTINGS"},
-	}
+	local tabButtons={settingsTab,mapsPageTab,serverPageTab,uiSettingsTab,futureTab,settingsPageTab}
+	local pageTabSpecs={}
+
+	for index,spec in ipairs(pageSpecs) do
+		local button=tabButtons[index]
+		if button then
+			pageTabSpecs[index]={
+				button=button,
+				page=spec.Id or spec.id,
+				descriptionKey=spec.DescriptionKey or spec.descriptionKey,
+				fallback=spec.Fallback or spec.fallback,
+			}
+		end
+	end
 
 	for _,spec in ipairs(pageTabSpecs) do
 		local button=spec.button
@@ -1217,12 +1240,9 @@ function mainFrame.new(app)
 		bumpFusionValue(descriptionVersionValue)
 		titleText.Text=text(desc("Main.Title","untitled gui"))
 		subtitleText.Text=text(desc("Main.Description",getModeLabel().." loaded"))
-		settingsTab.Text=text(desc("Pages.Main","MAIN"))
-		mapsPageTab.Text=text(desc("Pages.Maps","MAPS"))
-		serverPageTab.Text=text(desc("Pages.Server","SERVER"))
-		uiSettingsTab.Text=text(desc("Pages.Customize","CUSTOMIZE"))
-		futureTab.Text=text(desc("Pages.Keybinds","KEYBINDS"))
-		settingsPageTab.Text=text(desc("Pages.Settings","SETTINGS"))
+		for _,spec in ipairs(pageTabSpecs) do
+			spec.button.Text=text(desc(spec.descriptionKey,spec.fallback))
+		end
 		paintPageTabs()
 		refreshFooterResetButton()
 	end

@@ -602,7 +602,8 @@ modulePaths={
 	Announcement="announcement.lua",
 	GuiFusion="gui/fusion.lua",
 	GuiLogic="gui/gui-logic.lua",
-	UIMap="gui/ui-map.lua",
+	UILibraryMap="gui/library-map.lua",
+	UIMap="gui/"..runtimePlatform..".luau",
 	MainFrame="platforms/"..runtimePlatform.."/gui/mainframe.lua",
 	Description="gui/description.lua",
 	HitboxPresets="features/hitbox-presets/gui.lua",
@@ -658,6 +659,7 @@ local uiLibraryModulePaths={
 	"design/tokens.lua",
 	"gui/fusion.lua",
 	"gui/gui-logic.lua",
+	"gui/library-map.lua",
 }
 
 externalModuleFiles={}
@@ -685,7 +687,7 @@ moduleGlobalNames={
 startupModuleNames={
 	"CoreScope","CoreSignal","CoreScheduler","CorePlayerCache","CoreBallTracker",
 	"StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura",
-	"GuiFusion","GuiLogic","UIMap","MainFrame","Description","Announcement",
+	"GuiFusion","GuiLogic","UILibraryMap","UIMap","MainFrame","Description","Announcement",
 	"HitboxLogic","Hitbox","ParamsLogic","Params","BoostLogic","Boost",
 	"ESPDefenseLogic","ESPDefense","ESPOffenseLogic","ESPOffense","ESPLogic","ESP",
 	"QBAimMath","QBAimLogic","QBAim","TestingLogic","Testing",

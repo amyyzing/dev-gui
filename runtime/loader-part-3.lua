@@ -171,7 +171,7 @@ MaterialsAPI=nil
 MapCleanerAPI=nil
 AdsAPI=nil
 mapApiNames={"MapEditorAPI","MaterialsAPI","MapCleanerAPI","AdsAPI"}
-mapPageModules={
+mapPageModules=(UIMapModule and UIMapModule.MapPage and UIMapModule.MapPage.Modules) or {
 	{name="MapEditor",api="MapEditorAPI",order=0,title="Map Editor"},
 	{name="Materials",api="MaterialsAPI",order=1,title="Anti Material"},
 	{name="MapCleaner",api="MapCleanerAPI",order=2,title="Map Cleaner"},
