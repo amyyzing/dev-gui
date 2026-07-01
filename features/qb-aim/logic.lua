@@ -76,9 +76,9 @@ local arcMaxCurve=400
 local previewSmoothAmount=0.72
 local catchMarkerEnabled=true
 local catchMarkerSize=1.65
-local landingInfoEnabled=false
-local landingInfoSize=UDim2.new(0,220,0,78)
-local landingInfoOffset=Vector3.new(0,3.2,0)
+local landingInfoEnabled=true
+local landingInfoSize=UDim2.new(0,320,0,150)
+local landingInfoOffset=Vector3.new(0,4.1,0)
 local circleTangentMargin=1e-6
 local catchAnchorMaxOffset=10
 local catchAnchorBlend=1.00
@@ -1790,11 +1790,12 @@ function qbAim.new(app,parent)
 			label.Position=UDim2.new(0,8,0,4)
 			label.Size=UDim2.new(1,-16,1,-8)
 			label.Font=Enum.Font.GothamMedium
-			label.TextSize=12
+			label.TextSize=10
 			label.TextColor3=Color3.fromRGB(255,235,205)
 			label.TextStrokeTransparency=0.85
-			label.TextXAlignment=Enum.TextXAlignment.Center
-			label.TextYAlignment=Enum.TextYAlignment.Center
+			label.TextWrapped=true
+			label.TextXAlignment=Enum.TextXAlignment.Left
+			label.TextYAlignment=Enum.TextYAlignment.Top
 			label.Parent=frame
 		else
 			billboard.Enabled=true
@@ -1807,10 +1808,63 @@ function qbAim.new(app,parent)
 			billboard.StudsOffset=landingInfoOffset
 		end
 		if label then
-			label.TextXAlignment=Enum.TextXAlignment.Center
-			label.TextYAlignment=Enum.TextYAlignment.Center
+			label.TextWrapped=true
+			label.TextXAlignment=Enum.TextXAlignment.Left
+			label.TextYAlignment=Enum.TextYAlignment.Top
 		end
 		return anchor,label
+	end
+
+	local function formatNumber(value,places)
+		local number=tonumber(value)
+		if number==nil then
+			return "?"
+		end
+
+		return string.format("%."..tostring(places or 1).."f",number)
+	end
+
+	local function formatVector(value)
+		if typeof(value)~="Vector3" then
+			return "(?, ?, ?)"
+		end
+
+		return "("..formatNumber(value.X,1)..", "..formatNumber(value.Y,1)..", "..formatNumber(value.Z,1)..")"
+	end
+
+	local function formatVectorXZ(value)
+		if typeof(value)~="Vector3" then
+			return "(?, ?)"
+		end
+
+		return "("..formatNumber(value.X,1)..", "..formatNumber(value.Z,1)..")"
+	end
+
+	local function planMathProblem(plan,c1Pos,c3Pos)
+		local originPoint=plan.origin
+		local catchPoint=plan.target or plan.c1Point or c1Pos
+		local landingPoint=plan.landing or c3Pos
+		local velocity=plan.velocity or plan.worldVelocity or plan.throwVelocity
+		local speed=velocity and velocity.Magnitude or plan.speed
+		local catchTime=plan.time
+		local leadTime=plan.receiverPredictionDelay or leadDelay
+		local angle=plan.angleDeg or plan.preferredAngle
+		local miss=plan.targetMiss or plan.totalErr or plan.missEstimate
+		local residual=plan.interceptResidual or 0
+		local landingTime=plan.landingTime or catchTime
+
+		return table.concat({
+			"QB Aim: solve the throw",
+			"B(t) = O + Vt + 0.5gt^2",
+			"WR(t) = R + Vr(t + lead)",
+			"Find t: B("..formatNumber(catchTime,2)..") = WR("..formatNumber(catchTime,2)..")",
+			"O = "..formatVector(originPoint),
+			"C1 = "..formatVector(catchPoint),
+			"V = "..formatVector(velocity).." | |V| = "..formatNumber(speed,1),
+			"angle = "..formatNumber(angle,1).." deg | lead = "..formatNumber(leadTime,2).."s",
+			"miss = "..formatNumber(miss,2).." | residual = "..formatNumber(residual,2),
+			"C3 = "..formatVectorXZ(landingPoint).." | land t = "..formatNumber(landingTime,2).."s",
+		},"\n")
 	end
 
 	local function updateC1AndC3Info(plan,c1Pos,c3Pos)
@@ -1822,6 +1876,15 @@ function qbAim.new(app,parent)
 			marker.Transparency=0
 		end
 
+		local anchor,label=ensureC3InfoGui()
+		if anchor and typeof(c3Pos)=="Vector3" then
+			anchor.CFrame=CFrame.new(c3Pos)
+			anchor.Transparency=1
+		end
+
+		if label then
+			label.Text=planMathProblem(plan,c1Pos,c3Pos)
+		end
 	end
 
 	local function hideC1AndC3Info()
