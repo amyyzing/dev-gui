@@ -87,7 +87,6 @@ local throwAnimationName="UF_QuarterbackThrow"
 local throwAnimationSpeed=1.35
 -- Anim Time
 local throwReleaseWait=0.26666666666666666
-local throwRemoteLeadTime=0.00 -- fire wait
 local livePreviewDuringThrow=false -- freeze arc
 local fireThrowImmediately=false
 local noAnimationThrowFallback=true
@@ -100,10 +99,17 @@ local releaseTimingRadiusMin=1/60
 local releaseTimingRadiusMax=0.06
 local releaseTimingPingScale=0.25
 local receiverUncertaintyMax=3
-local releaseTargetSpreadMax=3
-local releaseAngleSpreadMax=2.0
 local safeArcSampleStep=0.04
 local safeArcCatchYMargin=0.25
+local releaseMarkerName="Release"
+local releaseMarkerGraceTime=0.18
+local commitDelay=0
+local catchVolumeHorizontalRadius=1.65
+local catchVolumeVerticalRange=1.85
+local catchVolumeTimeWindow=0.06
+local telemetryMaxRecords=60
+local physicsSampleCount=12
+local physicsSampleInterval=1/30
 local centerMaxReleaseDistance=12.00
 -- QB Drift
 local qbDriftTime=0
@@ -666,7 +672,7 @@ function qbAim._playLocalThrowAnimation()
 		track.Priority=Enum.AnimationPriority.Action
 	end)
 	track:Play(0.05,1,throwAnimationSpeed)
-	return true
+	return true,track
 end
 
 function qbAim._playThrowAnimation()
@@ -674,17 +680,17 @@ function qbAim._playThrowAnimation()
 
 	local mechanics=qbAim._getGlobalMechanics()
 	if mechanics and type(mechanics.PlayAnimation)=="function" then
-		local ok=pcall(function()
-			mechanics:PlayAnimation(throwAnimationName,throwAnimationSpeed)
+		local ok,track=pcall(function()
+			return mechanics:PlayAnimation(throwAnimationName,throwAnimationSpeed)
 		end)
 		if ok then
-			return true,"mechanics"
+			return true,"mechanics",track
 		end
 	end
 
 	if useLocalThrowFallback then
-		local ok=qbAim._playLocalThrowAnimation()
-		return ok,"local"
+		local ok,track=qbAim._playLocalThrowAnimation()
+		return ok,"local",track
 	end
 
 	return false,"none"
@@ -715,6 +721,7 @@ function qbAim.new(app,parent)
 	local previewFrozen=false
 	local previewFreezeStarted=0
 	local lastHeldBall=nil
+	local lastStableC2Offset=nil
 	local possessionSettleUntil=0
 	local throwInProgress=false
 	local lastThrowAt=-math.huge
@@ -752,6 +759,7 @@ function qbAim.new(app,parent)
 	local qbYDriftMax=0.20
 	local updateTargetHighlight=function() end
 	local schedulerJobs={}
+	local telemetryRecords={}
 
 	if not mathCore then
 		error("qb aim math missing")
@@ -914,6 +922,65 @@ function qbAim.new(app,parent)
 
 	local function setTargetText()
 		updateTargetHighlight()
+	end
+
+	local function vectorLog(value)
+		if typeof(value)~="Vector3" then
+			return nil
+		end
+
+		return{
+			x=value.X,
+			y=value.Y,
+			z=value.Z,
+		}
+	end
+
+	local function appendTelemetry(record)
+		if not record then return end
+		record.closedAt=os.clock()
+		telemetryRecords[#telemetryRecords+1]=record
+		while #telemetryRecords>telemetryMaxRecords do
+			table.remove(telemetryRecords,1)
+		end
+	end
+
+	local function addTelemetryWarning(record,message)
+		if not record then return end
+		record.warnings=record.warnings or {}
+		record.warnings[#record.warnings+1]=message
+	end
+
+	local function newTelemetryRecord(receiver,modeKey)
+		local now=os.clock()
+		return{
+			id=string.format("%.3f:%s",now,receiver and receiver.Name or "none"),
+			inputTime=now,
+			receiverName=receiver and receiver.Name or nil,
+			modeKey=modeKey,
+			solveMode="preview",
+			timingMode="input",
+			warnings={},
+		}
+	end
+
+	local function noteSolveTelemetry(record,label,plan)
+		if not(record and plan) then return end
+
+		record[label]={
+			solveMode=plan.solveMode,
+			timingMode=plan.timingMode,
+			origin=vectorLog(plan.origin),
+			target=vectorLog(plan.target or plan.c1Point),
+			aimPoint=vectorLog(plan.aimPoint),
+			flightTime=plan.time,
+			angle=plan.angleDeg,
+			velocity=vectorLog(plan.velocity),
+			catchVolume=plan.catchVolume,
+			receiverUncertainty=plan.receiverUncertainty,
+			dataConfidence=plan.dataConfidence,
+			riskBreakdown=plan.riskBreakdown,
+		}
 	end
 
 	local function updateLeadDelayVisuals()
@@ -1178,6 +1245,57 @@ function qbAim.new(app,parent)
 		return seedReceiverData(player,receiverRoot)
 	end
 
+	local function sampleReceiverData(player,receiverRoot,now)
+		local data=ensureReceiverData(player,receiverRoot)
+		if not(data and receiverRoot) then return data end
+
+		now=now or os.clock()
+		local sampleDt=math.min(now-data.t,0.1)
+		if sampleDt<=0 then
+			return data
+		end
+
+		local positionVelocity=(receiverRoot.Position-data.pos)/sampleDt
+		local assemblyVelocity=receiverRoot.AssemblyLinearVelocity or Vector3.zero
+		local positionMoving=flat(positionVelocity).Magnitude>=movingSpeedMin
+		local assemblyMoving=flat(assemblyVelocity).Magnitude>=movingSpeedMin
+		local chosenVelocity=Vector3.zero
+
+		if positionMoving then
+			chosenVelocity=positionVelocity
+		elseif rootHasMoveInput(receiverRoot) and assemblyMoving and now>=possessionSettleUntil then
+			chosenVelocity=assemblyVelocity
+		end
+
+		if flat(chosenVelocity).Magnitude>=movingSpeedMin then
+			data.movingSamples=(data.movingSamples or 0)+1
+		else
+			data.movingSamples=0
+		end
+
+		if (data.movingSamples or 0)<movingConfirmSamples then
+			chosenVelocity=Vector3.zero
+		end
+
+		local previousRawVelocity=data.rawVel or Vector3.zero
+		local rawAcceleration=(chosenVelocity-previousRawVelocity)/sampleDt
+
+		data.rawVel=clampMagnitude(chosenVelocity,maxRunSpeed)
+		data.vel=data.rawVel
+		data.accel=clampMagnitude(rawAcceleration,receiverAccelMax)
+		data.confidence=flat(data.rawVel).Magnitude>=movingSpeedMin and receiverConfidenceMax or receiverConfidenceMin
+		data.pos=receiverRoot.Position
+		data.t=now
+		data.lastSeen=now
+		table.insert(data.ph,{t=now,pos=receiverRoot.Position})
+
+		while #data.ph>0 and now-data.ph[1].t>receiverHistoryMaxAge do
+			table.remove(data.ph,1)
+		end
+
+		return data
+	end
+
 	local function reseedReceiverTracking(now)
 		now=now or os.clock()
 		for _,player in ipairs(currentPlayers()) do
@@ -1290,6 +1408,51 @@ function qbAim.new(app,parent)
 		local c2=center and center:FindFirstChild("C2",true)
 		local cframeValue=c2 and attachmentCFrame(c2)
 		return cframeValue and cframeValue.Position
+	end
+
+	local function vectorIsFinite(value)
+		return typeof(value)=="Vector3"
+			and value.X==value.X
+			and value.Y==value.Y
+			and value.Z==value.Z
+	end
+
+	local function c2LooksUsable(qbRoot,ball,c2Pos)
+		if not(qbRoot and vectorIsFinite(c2Pos)) then
+			return false
+		end
+
+		local rootOffset=c2Pos-qbRoot.Position
+		if math.abs(rootOffset.Y)>centerMaxYDelta then
+			return false
+		end
+
+		if rootOffset.Magnitude>centerMaxReleaseDistance then
+			return false
+		end
+
+		return true
+	end
+
+	local function artificialC2Position(qbRoot,ball)
+		if not qbRoot then
+			return ball and ball.Position or nil
+		end
+
+		local offset=lastStableC2Offset
+		if not offset then
+			if ball then
+				offset=ball.Position-qbRoot.Position
+			else
+				offset=Vector3.new(0,3,0)
+			end
+		end
+
+		if offset.Magnitude>centerMaxReleaseDistance then
+			offset=offset.Unit*centerMaxReleaseDistance
+		end
+
+		return qbRoot.Position+offset
 	end
 
 	local function setPreviewCenterVisible(visible)
@@ -1625,19 +1788,11 @@ function qbAim.new(app,parent)
 		local fallbackPosition=ball and ball.Position or qbRoot.Position
 		local c2Pos=c2Position()
 		local basePosition=fallbackPosition
-
-		if c2Pos then
-			local referencePosition=fallbackPosition
-			local yValid=c2Pos.Y>=referencePosition.Y-centerGroundFallbackMargin
-				and c2Pos.Y<=referencePosition.Y+centerMaxAboveBall
-				and math.abs(c2Pos.Y-referencePosition.Y)<=centerMaxYDelta
-			local distanceValid=(c2Pos-referencePosition).Magnitude<=centerMaxReleaseDistance
-
-			if yValid and distanceValid then
-				basePosition=c2Pos
-			elseif yValid then
-				basePosition=Vector3.new(fallbackPosition.X,c2Pos.Y,fallbackPosition.Z)
-			end
+		if c2LooksUsable(qbRoot,ball,c2Pos) then
+			lastStableC2Offset=c2Pos-qbRoot.Position
+			basePosition=c2Pos
+		else
+			basePosition=artificialC2Position(qbRoot,ball) or fallbackPosition
 		end
 
 		local dx,dz=0,0
@@ -2071,62 +2226,101 @@ function qbAim.new(app,parent)
 		return sampleAge*maxRunSpeed+timingWidth*maxRunSpeed+accelFactor*2
 	end
 
-	local function stableAcrossWindow(early,mid,late)
-		if not(early and mid and late and early.target and mid.target and late.target and early.angleDeg and mid.angleDeg and late.angleDeg) then
-			return false
-		end
-
-		local targetSpread=math.max(
-			(early.target-mid.target).Magnitude,
-			(late.target-mid.target).Magnitude,
-			(early.target-late.target).Magnitude
-		)
-		local angleSpread=math.max(
-			math.abs(early.angleDeg-mid.angleDeg),
-			math.abs(late.angleDeg-mid.angleDeg),
-			math.abs(early.angleDeg-late.angleDeg)
-		)
-
-		return targetSpread<=releaseTargetSpreadMax and angleSpread<=releaseAngleSpreadMax,targetSpread,angleSpread
+	local function catchVolumeFor(catchY)
+		return{
+			horizontalRadius=catchVolumeHorizontalRadius,
+			verticalRange=catchVolumeVerticalRange,
+			timeWindow=catchVolumeTimeWindow,
+			centerY=catchY,
+		}
 	end
 
-	local function buildPlan(receiver,ballPower,releaseOffset,releaseBall,receiverReleaseOffset,yReleaseOffset,originOverride)
+	local function receiverConfidenceFromUncertainty(uncertainty,timingMode,predictorState)
+		local base=math.clamp(predictorState and predictorState.confidence or receiverConfidenceMax,0,1)
+		local penalty=math.clamp((uncertainty or 0)/math.max(receiverUncertaintyMax*1.5,0.01),0,0.75)
+		if timingMode~="marker" and timingMode~="input" and timingMode~="predicted" then
+			penalty=math.min(penalty+0.15,0.9)
+		end
+
+		return math.clamp(base-penalty,0,1)
+	end
+
+	local function buildSolveRequest(receiver,options)
+		options=options or {}
 		if not canTargetReceiver(receiver) then
 			return nil,nil
 		end
 
 		local character=localPlayer.Character
 		local qbRoot=rootOfPlayer(localPlayer) or root(character)
-		local ball=releaseBall or currentHeldBall()
+		local ball=options.releaseBall or currentHeldBall()
 		local receiverRoot=rootOfPlayer(receiver)
-		local data=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
+		local data=nil
+		if options.refreshReceiver==false then
+			data=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
+		else
+			data=sampleReceiverData(receiver,receiverRoot,options.sampleTime or os.clock())
+		end
 
 		if not(qbRoot and ball and receiverRoot and data) then
 			return nil
 		end
 
-		releaseOffset=releaseOffset or 0
-		receiverReleaseOffset=receiverReleaseOffset==nil and releaseOffset or receiverReleaseOffset
-		yReleaseOffset=yReleaseOffset or 0
-		local originPosition=originOverride or origin(qbRoot,ball,0,yReleaseOffset)
-		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
-		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
+		local releaseOffset=options.qbReleaseOffset or 0
+		local receiverReleaseOffset=options.receiverReleaseOffset
+		if receiverReleaseOffset==nil then
+			receiverReleaseOffset=releaseOffset
+		end
+
+		local yReleaseOffset=options.yReleaseOffset or 0
+		local originPosition=options.originOverride or origin(qbRoot,ball,options.originDriftXZ or 0,yReleaseOffset)
+		local receiverPosition=options.receiverPositionOverride or receiverRoot.Position
+		local receiverAnchorPosition=options.receiverAnchorPositionOverride
+		local receiverAnchorSource=options.receiverAnchorSourceOverride
+		if not receiverAnchorPosition then
+			receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
+		end
+
+		local targetVelocity=nil
+		local shape=nil
+		local predictorState=nil
+		if options.targetVelocityOverride then
+			local rawVelocity=clampMagnitude(flat(options.targetVelocityOverride),maxRunSpeed)
+			targetVelocity=rawVelocity.Magnitude>=movingSpeedMin and rawVelocity.Unit*maxRunSpeed or Vector3.zero
+			shape=movementShape(originPosition,receiverPosition,targetVelocity)
+			predictorState={
+				position=receiverPosition,
+				velocity=targetVelocity,
+				rawVelocity=rawVelocity,
+				rawSpeed=rawVelocity.Magnitude,
+				acceleration=clampMagnitude(flat(data and data.accel or Vector3.zero),receiverAccelMax),
+				confidence=targetVelocity.Magnitude>=movingSpeedMin and receiverConfidenceMax or receiverConfidenceMin,
+				lsQuality=0,
+				sampleAge=receiverAge(data),
+				source="release_sample",
+				routeVelocity=targetVelocity,
+			}
+		else
+			targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
+		end
 		local catchY=catchYForPosition(receiverAnchorPosition or receiverRoot.Position)
-		return mathCore.solve({
+		local timing=options.timingWindow or getTimingWindow()
+		local uncertainty=receiverUncertainty(data,timing)
+		local request={
 			originPosition=originPosition,
-			receiverPosition=receiverRoot.Position,
+			receiverPosition=receiverPosition,
 			receiverAnchorPosition=receiverAnchorPosition,
 			receiverAnchorSource=receiverAnchorSource,
 			targetVelocity=targetVelocity,
 			shape=shape,
-			ballPower=ballPower or currentBallPower(),
+			ballPower=options.ballPower or currentBallPower(),
 			qbVelocity=movementAwareRootVelocity(qbRoot),
 			qbReleaseOffset=releaseOffset,
 			receiverReleaseOffset=receiverReleaseOffset,
 			predictorState=predictorState,
 			catchY=catchY,
 			solveYBias=catchSolveYBias,
-			leadDelay=leadDelay,
+			leadDelay=options.leadDelayOverride==nil and leadDelay or options.leadDelayOverride,
 			leadDelayBaseline=leadDelayBaseline,
 			maxRunSpeed=maxRunSpeed,
 			minTime=minTime,
@@ -2140,11 +2334,71 @@ function qbAim.new(app,parent)
 			catchYTolerance=catchYTolerance,
 			targetMissTolerance=targetMissTolerance,
 			nearTargetMissTolerance=nearTargetMissTolerance,
+			catchVolume=catchVolumeFor(catchY),
 			predictorConfidenceMin=receiverConfidenceMin,
 			predictorConfidenceMax=receiverConfidenceMax,
 			tangentDominanceEpsilon=circleTangentMargin,
 			remoteFireDelayed=not fireThrowImmediately,
-		}),ball
+			solveMode=options.solveMode or "preview",
+			timingMode=options.timingMode or "predicted",
+			manualLeadCorrection=options.manualLeadCorrection or 0,
+			commitDelay=options.commitDelay or 0,
+			releaseTimestamp=options.releaseTime,
+			framePhase=options.framePhase,
+			animationTime=options.animationTime,
+			c2Position=options.c2Position,
+			receiverUncertaintyBase=uncertainty,
+			receiverSampleAge=receiverAge(data),
+			velocityConfidence=predictorState and predictorState.confidence or nil,
+		}
+
+		return request,ball,data
+	end
+
+	local function applyFinalSolveInvariants(request,plan,record)
+		if not(request and plan and request.solveMode=="final") then return end
+
+		if math.abs(request.qbReleaseOffset or 0)>1e-6 then
+			addTelemetryWarning(record,"final solve used qbReleaseOffset")
+		end
+
+		if math.abs(request.receiverReleaseOffset or 0)>1e-6 then
+			addTelemetryWarning(record,"final solve used receiverReleaseOffset")
+		end
+
+		if math.abs(request.leadDelay or 0)>1e-6 then
+			addTelemetryWarning(record,"final solve used leadDelay")
+		end
+
+		if math.abs(request.manualLeadCorrection or 0)>1e-6 then
+			addTelemetryWarning(record,"final solve used manualLeadCorrection")
+		end
+
+		if request.c2Position and request.originPosition and (request.originPosition-request.c2Position).Magnitude>0.05 then
+			addTelemetryWarning(record,"final origin differs from marker C2")
+		end
+	end
+
+	local function solveRequest(request,record)
+		if not request then return nil end
+
+		local plan=mathCore.solve(request)
+		if not plan then return nil end
+
+		local flightGrowth=math.max((plan.time or 0)-0.75,0)*0.6
+		local uncertainty=(request.receiverUncertaintyBase or 0)+flightGrowth
+		plan.solveRequest=request
+		plan.solveMode=request.solveMode
+		plan.timingMode=request.timingMode
+		plan.catchVolume=request.catchVolume
+		plan.receiverUncertainty=uncertainty
+		plan.dataConfidence=receiverConfidenceFromUncertainty(uncertainty,request.timingMode,request.predictorState)
+		plan.framePhase=request.framePhase
+		plan.releaseTimestamp=request.releaseTimestamp
+		plan.animationTime=request.animationTime
+		plan.manualLeadCorrection=request.manualLeadCorrection or 0
+		applyFinalSolveInvariants(request,plan,record)
+		return plan
 	end
 
 	local function buildTwoPassPlan(receiver,ballPower,releaseBall,wrOffset)
@@ -2156,7 +2410,18 @@ function qbAim.new(app,parent)
 		local xzDrift=math.clamp(tonumber(state.qbAimQBDrift) or qbDriftTime,qbDriftMin,qbDriftMax)
 		local yDrift=math.clamp(tonumber(state.qbAimQBYDrift) or qbVerticalDriftTime,qbYDriftMin,qbYDriftMax)
 		local sampledOrigin=origin(qbRoot,releaseBall or currentHeldBall(),xzDrift,yDrift)
-		local plan=buildPlan(receiver,ballPower,0,releaseBall,wrOffset,0,sampledOrigin)
+		local request=buildSolveRequest(receiver,{
+			ballPower=ballPower,
+			releaseBall=releaseBall,
+			qbReleaseOffset=0,
+			receiverReleaseOffset=wrOffset,
+			yReleaseOffset=0,
+			originOverride=sampledOrigin,
+			solveMode="preview",
+			timingMode="predicted",
+			refreshReceiver=false,
+		})
+		local plan=solveRequest(request)
 		if plan then
 			plan.centerReleaseOrigin=sampledOrigin
 			plan.originDriftXZ=xzDrift
@@ -2169,80 +2434,327 @@ function qbAim.new(app,parent)
 		return plan
 	end
 
-	local function buildReleaseWindowPlans(receiver,ballPower,releaseBall)
-		local receiverRoot=rootOfPlayer(receiver)
-		local data=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
-		if not data then
-			return nil,"receiver tracking missing"
+	local function animationTimePosition(track)
+		if not track then return nil end
+
+		local ok,value=pcall(function()
+			return track.TimePosition
+		end)
+
+		if ok then
+			return value
 		end
 
-		local timing=getTimingWindow()
-		local age=receiverAge(data)
-		local mid=buildTwoPassPlan(receiver,ballPower,releaseBall,age+timing.mid)
-		if not mid then
-			return nil,"no throw found"
-		end
-
-		if state.qbAimSafeArc==false then
-			return{
-				mid=mid,
-				timing=timing,
-				uncertainty=0,
-			}
-		end
-
-		local uncertainty=receiverUncertainty(data,timing)
-		if uncertainty>receiverUncertaintyMax then
-			return nil,"receiver too uncertain"
-		end
-
-		local early=buildTwoPassPlan(receiver,ballPower,releaseBall,age+timing.min)
-		local late=buildTwoPassPlan(receiver,ballPower,releaseBall,age+timing.max)
-		local stable=stableAcrossWindow(early,mid,late)
-		if not stable then
-			return nil,"timing unstable"
-		end
-
-		return{
-			early=early,
-			mid=mid,
-			late=late,
-			timing=timing,
-			uncertainty=uncertainty,
-		}
+		return nil
 	end
 
-	local function buildReleasePlan(receiver,ballPower,releaseBall,releaseWaitOverride)
-		local releaseWait=releaseWaitOverride
-		if releaseWait==nil then
-			releaseWait=throwReleaseWait
+	local function sampleReleaseSnapshot(receiver,releaseBall,timingMode,animationInfo,record,framePhase)
+		local now=os.clock()
+		local qbRoot=rootOfPlayer(localPlayer) or root(localPlayer.Character)
+		local receiverRoot=rootOfPlayer(receiver)
+		local ball=releaseBall or currentHeldBall()
+		local data=sampleReceiverData(receiver,receiverRoot,now)
+		local c2Pos=c2Position()
+		local originPosition=nil
+		if c2LooksUsable(qbRoot,ball,c2Pos) then
+			lastStableC2Offset=c2Pos-qbRoot.Position
+			originPosition=c2Pos
+		else
+			originPosition=artificialC2Position(qbRoot,ball) or (qbRoot and origin(qbRoot,ball,0,0)) or nil
 		end
+		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
+		local receiverVelocity=flat(data and data.rawVel or Vector3.zero)
+		local track=animationInfo and animationInfo.track or nil
+		local snapshot={
+			time=now,
+			timingMode=timingMode,
+			framePhase=framePhase,
+			animationSource=animationInfo and animationInfo.source or nil,
+			animationTime=animationTimePosition(track),
+			originPosition=originPosition,
+			c2Position=c2Pos,
+			receiverPosition=receiverRoot and receiverRoot.Position or nil,
+			receiverAnchorPosition=receiverAnchorPosition,
+			receiverAnchorSource=receiverAnchorSource,
+			receiverVelocity=receiverVelocity,
+			receiverSampleAge=receiverAge(data),
+		}
+
+		if record then
+			if timingMode=="marker" then
+				record.markerTime=now
+				record.C2_marker=vectorLog(c2Pos)
+				record.receiver_marker=vectorLog(snapshot.receiverPosition)
+			else
+				record.fallbackTime=now
+				record.C2_fallback=vectorLog(c2Pos)
+				record.receiver_fallback=vectorLog(snapshot.receiverPosition)
+			end
+
+			record.releaseFramePhase=framePhase
+			record.releaseAnimationTime=snapshot.animationTime
+			record.releaseOrigin=vectorLog(originPosition)
+		end
+
+		if not c2Pos then
+			addTelemetryWarning(record,"C2 missing at release sample; fallback origin used")
+		end
+
+		return snapshot
+	end
+
+	local function markerSignalForTrack(track)
+		if not track then return nil end
+
+		local ok,signal=pcall(function()
+			return track:GetMarkerReachedSignal(releaseMarkerName)
+		end)
+
+		if ok and signal then
+			return signal
+		end
+
+		return nil
+	end
+
+	local function waitForReleaseState(receiver,releaseBall,releaseWait,animationInfo,record,ballPower)
 		releaseWait=math.max(0,tonumber(releaseWait) or 0)
+		local startedAt=os.clock()
+		local markerState=nil
+		local markerConnection=nil
+		local signal=markerSignalForTrack(animationInfo and animationInfo.track or nil)
 
-		if not fireThrowImmediately and releaseWait>0 then
-			local endAt=os.clock()+releaseWait
-			local fireAt=endAt-math.clamp(throwRemoteLeadTime,0,releaseWait)
+		if record then
+			record.animationStartedTime=startedAt
+			record.animationSource=animationInfo and animationInfo.source or nil
+			record.animationPlayed=animationInfo and animationInfo.played or false
+			record.releaseWait=releaseWait
+		end
 
-			while os.clock()<fireAt do
-				if livePreviewDuringThrow then
-					local data=receiverData[receiver]
-					local timing=getTimingWindow()
-					local livePlan=buildTwoPassPlan(receiver,ballPower,releaseBall,receiverAge(data)+timing.mid)
-					if livePlan then
-						previewPlan(livePlan)
+		if signal then
+			local ok,connection=pcall(function()
+				return signal:Connect(function()
+					if not markerState then
+						markerState=sampleReleaseSnapshot(receiver,releaseBall,"marker",animationInfo,record,"marker_signal")
 					end
-				end
+				end)
+			end)
 
-				runService.Heartbeat:Wait()
+			if ok then
+				markerConnection=connection
+			end
+		elseif animationInfo and animationInfo.played then
+			addTelemetryWarning(record,"release marker unavailable; timer fallback used")
+		end
+
+		local fallbackAt=startedAt+releaseWait
+		local deadline=markerConnection and fallbackAt+releaseMarkerGraceTime or fallbackAt
+
+		while os.clock()<deadline do
+			if markerState then
+				break
+			end
+
+			if livePreviewDuringThrow and os.clock()<fallbackAt then
+				local data=receiverData[receiver]
+				local timing=getTimingWindow()
+				local livePlan=buildTwoPassPlan(receiver,ballPower,releaseBall,receiverAge(data)+timing.mid)
+				if livePlan then
+					previewPlan(livePlan)
+				end
+			end
+
+			runService.Heartbeat:Wait()
+		end
+
+		if markerConnection then
+			safeDisconnect(markerConnection)
+		end
+
+		if markerState then
+			return markerState
+		end
+
+		if markerConnection then
+			addTelemetryWarning(record,"release marker not reached before fallback deadline")
+		end
+
+		return sampleReleaseSnapshot(receiver,releaseBall,"fallback",animationInfo,record,"heartbeat_fallback")
+	end
+
+	local function buildReleasePlan(receiver,ballPower,releaseBall,releaseState,record)
+		if not releaseState then
+			releaseState=sampleReleaseSnapshot(receiver,releaseBall,"fallback",nil,record,"release_missing")
+		end
+
+		local zeroTiming={min=0,mid=0,max=0,radius=0,width=0}
+		local request=buildSolveRequest(receiver,{
+			ballPower=ballPower,
+			releaseBall=releaseBall or currentHeldBall(),
+			originOverride=releaseState.originPosition,
+			qbReleaseOffset=0,
+			receiverReleaseOffset=0,
+			yReleaseOffset=0,
+			leadDelayOverride=0,
+			solveMode="final",
+			timingMode=releaseState.timingMode or "fallback",
+			refreshReceiver=false,
+			sampleTime=releaseState.time,
+			timingWindow=zeroTiming,
+			c2Position=releaseState.c2Position,
+			receiverPositionOverride=releaseState.receiverPosition,
+			receiverAnchorPositionOverride=releaseState.receiverAnchorPosition,
+			receiverAnchorSourceOverride=releaseState.receiverAnchorSource,
+			targetVelocityOverride=releaseState.receiverVelocity,
+			releaseTime=releaseState.time,
+			framePhase=releaseState.framePhase,
+			animationTime=releaseState.animationTime,
+			commitDelay=commitDelay,
+		})
+
+		local plan=solveRequest(request,record)
+		if not plan then
+			return nil,releaseBall,"no release throw found"
+		end
+
+		if plan.receiverUncertainty and plan.receiverUncertainty>receiverUncertaintyMax then
+			addTelemetryWarning(record,string.format("receiver uncertainty %.2f",plan.receiverUncertainty))
+			if plan.receiverUncertainty>receiverUncertaintyMax*2 then
+				return nil,releaseBall,"receiver too uncertain"
 			end
 		end
 
-		local plans,reason=buildReleaseWindowPlans(receiver,ballPower,releaseBall or currentHeldBall())
-		if not plans then
-			return nil,releaseBall,reason
+		return plan,releaseBall,nil,{
+			mid=plan,
+			timing=zeroTiming,
+			uncertainty=plan.receiverUncertainty or 0,
+		}
+	end
+
+	local function solve3x3(matrix,values)
+		for column=1,3 do
+			local pivot=column
+			for row=column+1,3 do
+				if math.abs(matrix[row][column])>math.abs(matrix[pivot][column]) then
+					pivot=row
+				end
+			end
+
+			if math.abs(matrix[pivot][column])<1e-8 then
+				return nil
+			end
+
+			if pivot~=column then
+				matrix[column],matrix[pivot]=matrix[pivot],matrix[column]
+				values[column],values[pivot]=values[pivot],values[column]
+			end
+
+			local divisor=matrix[column][column]
+			for col=column,3 do
+				matrix[column][col]=matrix[column][col]/divisor
+			end
+			values[column]=values[column]/divisor
+
+			for row=1,3 do
+				if row~=column then
+					local factor=matrix[row][column]
+					for col=column,3 do
+						matrix[row][col]=matrix[row][col]-factor*matrix[column][col]
+					end
+					values[row]=values[row]-factor*values[column]
+				end
+			end
 		end
 
-		return plans.mid,releaseBall,nil,plans
+		return values
+	end
+
+	local function fitBallPhysics(samples,plan)
+		if not(samples and #samples>=4) then return nil end
+
+		local n=#samples
+		local s1,s2,s3,s4=0,0,0,0
+		local sy,sty,st2y=0,0,0
+		for _,sample in ipairs(samples) do
+			local t=sample.t
+			local t2=t*t
+			s1=s1+t
+			s2=s2+t2
+			s3=s3+t2*t
+			s4=s4+t2*t2
+			sy=sy+sample.pos.Y
+			sty=sty+t*sample.pos.Y
+			st2y=st2y+t2*sample.pos.Y
+		end
+
+		local solution=solve3x3({
+			{n,s1,s2},
+			{s1,s2,s3},
+			{s2,s3,s4},
+		},{sy,sty,st2y})
+		if not solution then return nil end
+
+		local fittedGravity=-2*solution[3]
+		local observedSpeed=nil
+		if samples[2] and samples[2].t>samples[1].t then
+			observedSpeed=(samples[2].pos-samples[1].pos).Magnitude/(samples[2].t-samples[1].t)
+		end
+
+		local gravityDelta=math.abs(fittedGravity-ballGravity)
+		local speedDelta=observedSpeed and math.abs(observedSpeed-modelBallSpeed) or 0
+		local mismatch="none"
+		if gravityDelta>4 then
+			mismatch="gravity"
+		elseif speedDelta>8 then
+			mismatch="speed"
+		elseif plan and plan.origin and samples[1] and (samples[1].pos-plan.origin).Magnitude>8 then
+			mismatch="origin_or_sample_delay"
+		end
+
+		return{
+			fittedGravity=fittedGravity,
+			observedInitialSpeed=observedSpeed,
+			gravityDelta=gravityDelta,
+			speedDelta=speedDelta,
+			mismatch=mismatch,
+		}
+	end
+
+	local function collectPhysicsTelemetry(record,ball,plan)
+		if not(record and ball and plan) then return end
+
+		local function sample()
+			local samples={}
+			record.ballSamples={}
+			local launchTime=record.launchCommitTime or os.clock()
+
+			for _=1,physicsSampleCount do
+				runService.Heartbeat:Wait()
+				if not(ball and ball.Parent) then
+					break
+				end
+
+				local t=math.max(os.clock()-launchTime,0)
+				local position=ball.Position
+				samples[#samples+1]={t=t,pos=position}
+				record.ballSamples[#record.ballSamples+1]={t=t,position=vectorLog(position)}
+
+				if physicsSampleInterval>0 then
+					local untilTime=os.clock()+physicsSampleInterval
+					while os.clock()<untilTime do
+						runService.Heartbeat:Wait()
+					end
+				end
+			end
+
+			record.physicsFit=fitBallPhysics(samples,plan)
+		end
+
+		if task and task.spawn then
+			task.spawn(sample)
+		else
+			coroutine.wrap(sample)()
+		end
 	end
 
 	local function fireGameplayThrow(plan)
@@ -2309,6 +2821,11 @@ function qbAim.new(app,parent)
 			return
 		end
 
+		local telemetry=newTelemetryRecord(receiver,modeKey)
+		telemetry.C2_input=vectorLog(c2Position())
+		telemetry.receiver_input=vectorLog(receiverRoot.Position)
+		telemetry.ball_input=vectorLog(heldBall.Position)
+
 		throwInProgress=true
 
 		local function releaseThrowLock()
@@ -2316,17 +2833,30 @@ function qbAim.new(app,parent)
 			lastThrowAt=os.clock()
 		end
 
+		local function finishTelemetry(statusText,reasonText)
+			if telemetry then
+				telemetry.status=statusText
+				telemetry.reason=reasonText
+				appendTelemetry(telemetry)
+				telemetry=nil
+			end
+		end
+
 		local previewData=receiverData[receiver] or ensureReceiverData(receiver,receiverRoot)
 		local previewTiming=getTimingWindow()
 		local previewReleasePlan=buildTwoPassPlan(receiver,power,heldBall,receiverAge(previewData)+previewTiming.mid)
 		if previewReleasePlan then
+			noteSolveTelemetry(telemetry,"previewSolve",previewReleasePlan)
 			previewPlan(previewReleasePlan)
 		end
 
 		local skipAnimation=options.skipAnimation==true or options.noAnimation==true
 		local animationPlayed=false
+		local animationSource="none"
+		local animationTrack=nil
 		if not skipAnimation then
-			animationPlayed=qbAim._playThrowAnimation()
+			animationPlayed,animationSource,animationTrack=qbAim._playThrowAnimation()
+			animationSource=animationSource or "none"
 		end
 
 		local releaseWait=throwReleaseWait
@@ -2334,20 +2864,35 @@ function qbAim.new(app,parent)
 			releaseWait=noAnimationReleaseWait
 		end
 
-		local plan,_,reason=buildReleasePlan(receiver,power,heldBall,releaseWait)
+		local releaseState=waitForReleaseState(receiver,heldBall,releaseWait,{
+			played=animationPlayed,
+			source=animationSource,
+			track=animationTrack,
+			skipped=skipAnimation,
+		},telemetry,power)
+
+		local plan,_,reason=buildReleasePlan(receiver,power,heldBall,releaseState,telemetry)
 		if not plan then
 			releaseThrowLock()
 			setStatus(reason or "no throw")
+			finishTelemetry("cancelled",reason or "no throw")
 			return
 		end
 
-		if trajectoryCanBeDefended(plan,receiver) then
+		local blockedBySafeArc=trajectoryCanBeDefended(plan,receiver)
+		noteSolveTelemetry(telemetry,"finalSolve",plan)
+		if blockedBySafeArc then
+			noteSolveTelemetry(telemetry,"riskRejectedSolve",plan)
 			previewPlan(plan)
 			releaseThrowLock()
 			setStatus("not safe")
+			finishTelemetry("blocked","not safe")
 			return
 		end
 
+		telemetry.launchCommitTime=os.clock()
+		telemetry.C2_commit=vectorLog(c2Position())
+		telemetry.receiver_commit=vectorLog((rootOfPlayer(receiver) or receiverRoot).Position)
 		local fired,ok,err=pcall(function()
 			if modeKey=="mode1" then
 				return fireGameplayThrow(plan)
@@ -2365,11 +2910,14 @@ function qbAim.new(app,parent)
 		end
 
 		if ok then
+			collectPhysicsTelemetry(telemetry,heldBall,plan)
 			freezePreviewAtCurrentPlan(plan)
 			waitForHeldBallRelease()
 			setStatus(currentModeText().." throw sent")
+			finishTelemetry("sent",nil)
 		else
 			setStatus(err or "throw failed")
+			finishTelemetry("failed",err or "throw failed")
 		end
 
 		releaseThrowLock()
@@ -2433,6 +2981,14 @@ function qbAim.new(app,parent)
 
 	function api.SetQBAimState(value)
 		setEnabled(value)
+	end
+
+	function api.GetQBAimTelemetry()
+		return telemetryRecords
+	end
+
+	function api.ClearQBAimTelemetry()
+		table.clear(telemetryRecords)
 	end
 
 	function api.SetTeamFilterState(value,fire)
@@ -2609,52 +3165,7 @@ function qbAim.new(app,parent)
 			if player~=localPlayer then
 				local receiverRoot=rootOfPlayer(player)
 				if receiverRoot then
-					local data=receiverData[player]
-
-					if not data then
-						data=seedReceiverData(player,receiverRoot,now)
-					end
-
-					local sampleDt=math.min(now-data.t,0.1)
-					if sampleDt>0 then
-						local positionVelocity=(receiverRoot.Position-data.pos)/sampleDt
-						local assemblyVelocity=receiverRoot.AssemblyLinearVelocity or Vector3.zero
-						local positionMoving=flat(positionVelocity).Magnitude>=movingSpeedMin
-						local assemblyMoving=flat(assemblyVelocity).Magnitude>=movingSpeedMin
-						local chosenVelocity=Vector3.zero
-
-						if positionMoving then
-							chosenVelocity=positionVelocity
-						elseif rootHasMoveInput(receiverRoot) and assemblyMoving and now>=possessionSettleUntil then
-							chosenVelocity=assemblyVelocity
-						end
-
-						if flat(chosenVelocity).Magnitude>=movingSpeedMin then
-							data.movingSamples=(data.movingSamples or 0)+1
-						else
-							data.movingSamples=0
-						end
-
-						if (data.movingSamples or 0)<movingConfirmSamples then
-							chosenVelocity=Vector3.zero
-						end
-
-						local previousRawVelocity=data.rawVel or Vector3.zero
-						local rawAcceleration=(chosenVelocity-previousRawVelocity)/sampleDt
-
-						data.rawVel=clampMagnitude(chosenVelocity,maxRunSpeed)
-						data.vel=data.rawVel
-						data.accel=clampMagnitude(rawAcceleration,receiverAccelMax)
-						data.confidence=flat(data.rawVel).Magnitude>=movingSpeedMin and receiverConfidenceMax or receiverConfidenceMin
-						data.pos=receiverRoot.Position
-						data.t=now
-						data.lastSeen=now
-						table.insert(data.ph,{t=now,pos=receiverRoot.Position})
-
-						while #data.ph>0 and now-data.ph[1].t>receiverHistoryMaxAge do
-							table.remove(data.ph,1)
-						end
-					end
+					sampleReceiverData(player,receiverRoot,now)
 				end
 			end
 		end

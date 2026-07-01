@@ -13,6 +13,9 @@ local defenderSpeed=21
 local testingBallSpeed=95
 local qbSafetyJobName="TestingQBCenterSafety"
 local qbSafetyInterval=0
+local qbArcSampleCount=96
+local defenderArrivalBuffer=0.03
+local defenderReachYMargin=0.25
 local catchMarkerHeight=80
 local catchMarkerThickness=0.12
 local groundMarkerDiameter=5.5
@@ -54,6 +57,21 @@ end
 
 local function flat(v)
 	return Vector3.new(v.X,0,v.Z)
+end
+
+local function distancePointToSegmentXZ(point,a,b)
+	local pointXZ=flat(point)
+	local aXZ=flat(a)
+	local bXZ=flat(b)
+	local segment=bXZ-aXZ
+	local lengthSquared=segment:Dot(segment)
+	if lengthSquared<=1e-6 then
+		return (pointXZ-aXZ).Magnitude,0
+	end
+
+	local alpha=math.clamp((pointXZ-aXZ):Dot(segment)/lengthSquared,0,1)
+	local closest=aXZ+segment*alpha
+	return (pointXZ-closest).Magnitude,alpha
 end
 
 local function rootOfPlayer(player)
@@ -386,30 +404,169 @@ function testing.new(app,parent,guiBuilder)
 		restoreCenterBeams()
 	end
 
+	local function fieldGroundYAt(position)
+		local params=RaycastParams.new()
+		local ignore={}
+		params.FilterType=Enum.RaycastFilterType.Exclude
+
+		for _,player in ipairs(players:GetPlayers()) do
+			local character=player.Character or workspace:FindFirstChild(player.Name)
+			if character then
+				ignore[#ignore+1]=character
+			end
+		end
+
+		if marker then ignore[#ignore+1]=marker end
+		if groundMarker then ignore[#ignore+1]=groundMarker end
+		params.FilterDescendantsInstances=ignore
+
+		local result=workspace:Raycast(position+Vector3.new(0,30,0),Vector3.new(0,-220,0),params)
+		if result then
+			return result.Position.Y
+		end
+
+		return 0
+	end
+
+	local function defenderReachYRange(defenderRoot)
+		local groundY=fieldGroundYAt(defenderRoot.Position)
+		return groundY-defenderReachYMargin,groundY+testingCatchY+defenderReachYMargin
+	end
+
+	local function defenderCanReachY(defenderRoot,position)
+		if not(defenderRoot and position) then
+			return false
+		end
+
+		local minY,maxY=defenderReachYRange(defenderRoot)
+		return position.Y>=minY and position.Y<=maxY
+	end
+
+	local function collectDefenderRoots(throwerOverride)
+		local roots={}
+		local thrower=throwerOverride or playerByName(lastThrower) or localPlayer
+		local throwerTeam=teamOf(thrower) or teamOf(localPlayer)
+
+		for _,player in ipairs(players:GetPlayers()) do
+			local playerTeam=teamOf(player)
+			local isDefender=player~=thrower and player~=localPlayer and (not throwerTeam or not playerTeam or playerTeam~=throwerTeam)
+			if isDefender then
+				local defenderRoot=rootOfPlayer(player)
+				if defenderRoot then
+					roots[#roots+1]=defenderRoot
+				end
+			end
+		end
+
+		return roots
+	end
+
+	local function defenderCanReachPoint(defenderRoot,point,ballTime)
+		if not(defenderRoot and point and ballTime and ballTime>0) then
+			return false,math.huge
+		end
+
+		if not defenderCanReachY(defenderRoot,point) then
+			return false,math.huge
+		end
+
+		local arrival=(flat(defenderRoot.Position)-flat(point)).Magnitude/defenderSpeed
+		return arrival+defenderArrivalBuffer<=ballTime,arrival
+	end
+
 	local function c1IsDefended(c1Position,flightTime,throwerOverride)
 		if not(c1Position and flightTime and flightTime>0) then
 			return false
 		end
 
-		local thrower=throwerOverride or playerByName(lastThrower)
-		local throwerTeam=teamOf(thrower)
-		if not throwerTeam then
-			throwerTeam=teamOf(localPlayer)
-		end
-
-		local reach=defenderSpeed*flightTime
-		for _,player in ipairs(players:GetPlayers()) do
-			local playerTeam=teamOf(player)
-			local isDefender=player~=thrower and player~=localPlayer and (not throwerTeam or playerTeam~=throwerTeam)
-			if isDefender then
-				local defenderRoot=rootOfPlayer(player)
-				if defenderRoot and (flat(defenderRoot.Position)-flat(c1Position)).Magnitude<=reach then
-					return true
-				end
+		for _,defenderRoot in ipairs(collectDefenderRoots(throwerOverride)) do
+			local canReach=defenderCanReachPoint(defenderRoot,c1Position,flightTime)
+			if canReach then
+				return true
 			end
 		end
 
 		return false
+	end
+
+	local function beamArcData(beam)
+		if not(beam and beam:IsA("Beam") and beam.Attachment0 and beam.Attachment1) then
+			return nil
+		end
+
+		local c2Frame=attachmentCFrame(beam.Attachment0)
+		local c3Frame=attachmentCFrame(beam.Attachment1)
+		if not(c2Frame and c3Frame) then
+			return nil
+		end
+
+		local arcStart=c2Frame.Position
+		local arcEnd=c3Frame.Position
+		return{
+			startPoint=arcStart,
+			firstHandle=arcStart+c2Frame.RightVector*beam.CurveSize0,
+			secondHandle=arcEnd-c3Frame.RightVector*beam.CurveSize1,
+			endPoint=arcEnd,
+		}
+	end
+
+	local function estimatedArcPointTime(arcStart,point,progress)
+		local flatDistance=(flat(point)-flat(arcStart)).Magnitude
+		local distanceTime=flatDistance/testingBallSpeed
+		local heightDelta=math.max(point.Y-arcStart.Y,0)
+		local verticalTime=heightDelta>0 and math.sqrt((2*heightDelta)/ballGravity) or 0
+		return math.max(distanceTime,verticalTime,progress*distanceTime)
+	end
+
+	local function beamPathIsDefended(beam,throwerOverride)
+		local arc=beamArcData(beam)
+		if not arc then return false end
+
+		local defenderRoots=collectDefenderRoots(throwerOverride)
+		if #defenderRoots==0 then
+			return false
+		end
+
+		local previousPoint=arc.startPoint
+		local previousProgress=0
+		for i=1,qbArcSampleCount do
+			local progress=i/qbArcSampleCount
+			local point=cubicBezier(arc.startPoint,arc.firstHandle,arc.secondHandle,arc.endPoint,progress)
+
+			for _,defenderRoot in ipairs(defenderRoots) do
+				local _,alpha=distancePointToSegmentXZ(defenderRoot.Position,previousPoint,point)
+				local pathProgress=previousProgress+(progress-previousProgress)*alpha
+				local pathPoint=cubicBezier(arc.startPoint,arc.firstHandle,arc.secondHandle,arc.endPoint,pathProgress)
+				local ballTime=estimatedArcPointTime(arc.startPoint,pathPoint,pathProgress)
+				local canReach=defenderCanReachPoint(defenderRoot,pathPoint,ballTime)
+				if canReach then
+					return true
+				end
+			end
+
+			previousPoint=point
+			previousProgress=progress
+		end
+
+		return false
+	end
+
+	local currentCenterC1AndTime=nil
+
+	local function centerArcIsDefended(throwerOverride)
+		local center=findCenter()
+		if not center then
+			return false
+		end
+
+		for _,beam in ipairs(centerArcBeams(center)) do
+			if beamPathIsDefended(beam,throwerOverride) then
+				return true
+			end
+		end
+
+		local c1Position,flightTime=currentCenterC1AndTime()
+		return c1IsDefended(c1Position,flightTime,throwerOverride)
 	end
 
 	local function beamC1Position(beam)
@@ -474,7 +631,7 @@ function testing.new(app,parent,guiBuilder)
 		return c1Point,estimatedTime
 	end
 
-	local function currentCenterC1AndTime()
+	currentCenterC1AndTime=function()
 		local center=findCenter()
 		if not center then
 			return nil,nil
@@ -506,6 +663,17 @@ function testing.new(app,parent,guiBuilder)
 	local function updateQBCenterSafety()
 		if not(state.testingEnabled and state.testingQBEnabled~=false) then
 			disconnectQBSafety()
+			return
+		end
+
+		local center=findCenter()
+		if not center then
+			restoreCenterBeams()
+			return
+		end
+
+		if #centerArcBeams(center)>0 then
+			setCenterBeamUnsafe(centerArcIsDefended(localPlayer))
 			return
 		end
 
