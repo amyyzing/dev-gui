@@ -18,6 +18,7 @@ local defenderArrivalBuffer=0.03
 local defenderReachYMargin=0.25
 local defenderCatchRadius=4.50
 local defenderRootGroundOffset=3.00
+local maxProjectileSafetyTime=5.00
 local catchMarkerHeight=80
 local catchMarkerThickness=0.12
 local groundMarkerDiameter=5.5
@@ -117,11 +118,6 @@ local function projectileAt(origin,velocity,time)
 	return origin+velocity*time+Vector3.new(0,-0.5*ballGravity*time*time,0)
 end
 
-local function cubicBezier(startPoint,firstHandle,secondHandle,endPoint,progress)
-	local remaining=1-progress
-	return startPoint*(remaining*remaining*remaining)+firstHandle*(3*remaining*remaining*progress)+secondHandle*(3*remaining*progress*progress)+endPoint*(progress*progress*progress)
-end
-
 local function c1FromPayload(payload)
 	if type(payload)~="table" then return nil,nil end
 	if typeof(payload.SpawnPos)~="Vector3" or typeof(payload.Target)~="Vector3" then return nil,nil end
@@ -151,6 +147,48 @@ local function c1FromPayload(payload)
 	if time<=0 then return nil,nil end
 
 	return projectileAt(payload.SpawnPos,velocity,time),time
+end
+
+local function projectileTimeAtY(origin,velocity,y)
+	if not(origin and velocity and y) then
+		return nil
+	end
+
+	local a=0.5*ballGravity
+	local b=-velocity.Y
+	local c=y-origin.Y
+	local disc=b*b-4*a*c
+	if disc<0 then
+		return nil
+	end
+
+	local root=math.sqrt(disc)
+	local early=(-b-root)/(2*a)
+	local late=(-b+root)/(2*a)
+	local time=math.max(early,late)
+	if time<=0 then
+		time=math.min(early,late)
+	end
+
+	return time>0 and time or nil
+end
+
+local function payloadProjectilePlan(payload)
+	if type(payload)~="table" then return nil end
+	if typeof(payload.SpawnPos)~="Vector3" or typeof(payload.Target)~="Vector3" then return nil end
+
+	local power=tonumber(payload.Power) or testingBallSpeed
+	local delta=payload.Target-payload.SpawnPos
+	if delta.Magnitude<1e-6 or power<=0 then return nil end
+
+	local velocity=delta.Unit*power
+	local catchTime=projectileTimeAtY(payload.SpawnPos,velocity,testingCatchY)
+	return{
+		origin=payload.SpawnPos,
+		velocity=velocity,
+		maxTime=math.clamp(catchTime or 2.5,0.05,maxProjectileSafetyTime),
+		source="payload",
+	}
 end
 
 local function instanceName(value)
@@ -498,74 +536,147 @@ function testing.new(app,parent,guiBuilder)
 		return false
 	end
 
-	local function beamArcData(beam)
-		if not(beam and beam:IsA("Beam") and beam.Attachment0 and beam.Attachment1) then
+	local function projectilePlanFromDirection(origin,endPoint,direction,source,axisName)
+		if direction.Magnitude<1e-6 then
+			return nil
+		end
+		direction=direction.Unit
+
+		local flatDirection=flat(direction)
+		if flatDirection.Magnitude<1e-6 then
 			return nil
 		end
 
-		local c2Frame=attachmentCFrame(beam.Attachment0)
-		local c3Frame=attachmentCFrame(beam.Attachment1)
+		local delta=endPoint-origin
+		local forwardDistance=flat(delta):Dot(flatDirection.Unit)
+		if forwardDistance<=0 then
+			return nil
+		end
+
+		local speedTime=forwardDistance/flatDirection.Magnitude
+		local verticalDrop=direction.Y*speedTime-delta.Y
+		if verticalDrop<=0 then
+			return nil
+		end
+
+		local time=math.sqrt((2*verticalDrop)/ballGravity)
+		if not(time and time>0) then
+			return nil
+		end
+
+		local speed=speedTime/time
+		if not(speed and speed>0) then
+			return nil
+		end
+
+		return{
+			origin=origin,
+			velocity=direction*speed,
+			maxTime=math.clamp(time,0.05,maxProjectileSafetyTime),
+			endPoint=endPoint,
+			speed=speed,
+			axis=axisName,
+			source=source or "center",
+		}
+	end
+
+	local function projectilePlanFromFrames(c2Frame,c3Frame,source)
 		if not(c2Frame and c3Frame) then
 			return nil
 		end
 
-		local arcStart=c2Frame.Position
-		local arcEnd=c3Frame.Position
-		return{
-			startPoint=arcStart,
-			firstHandle=arcStart+c2Frame.RightVector*beam.CurveSize0,
-			secondHandle=arcEnd-c3Frame.RightVector*beam.CurveSize1,
-			endPoint=arcEnd,
+		local origin=c2Frame.Position
+		local endPoint=c3Frame.Position
+		local candidates={
+			{name="right",direction=c2Frame.RightVector},
+			{name="look",direction=c2Frame.LookVector},
+			{name="-right",direction=-c2Frame.RightVector},
+			{name="-look",direction=-c2Frame.LookVector},
 		}
+		local best=nil
+		local bestScore=math.huge
+
+		for _,candidate in ipairs(candidates) do
+			local plan=projectilePlanFromDirection(origin,endPoint,candidate.direction,source,candidate.name)
+			if plan then
+				local speedScore=math.abs(plan.speed-testingBallSpeed)
+				local unreasonablePenalty=(plan.speed<35 or plan.speed>160) and 1000 or 0
+				local score=speedScore+unreasonablePenalty
+				if score<bestScore then
+					best=plan
+					bestScore=score
+				end
+			end
+		end
+
+		return best
 	end
 
-	local function estimatedArcPointTime(arcStart,point,progress)
-		local flatDistance=(flat(point)-flat(arcStart)).Magnitude
-		local distanceTime=flatDistance/testingBallSpeed
-		local heightDelta=math.max(point.Y-arcStart.Y,0)
-		local verticalTime=heightDelta>0 and math.sqrt((2*heightDelta)/ballGravity) or 0
-		return math.max(distanceTime,verticalTime,progress*distanceTime)
+	local function projectilePlanFromCenter(center)
+		if not center then return nil end
+
+		local c2=center:FindFirstChild("C2",true)
+		local c3=center:FindFirstChild("C3",true)
+		local c2Frame=c2 and attachmentCFrame(c2)
+		local c3Frame=c3 and attachmentCFrame(c3)
+		local plan=projectilePlanFromFrames(c2Frame,c3Frame,"center")
+		if plan then
+			return plan
+		end
+
+		for _,beam in ipairs(centerArcBeams(center)) do
+			local beamC2=beam.Attachment0 and attachmentCFrame(beam.Attachment0)
+			local beamC3=beam.Attachment1 and attachmentCFrame(beam.Attachment1)
+			plan=projectilePlanFromFrames(beamC2,beamC3,"beam attachments")
+			if plan then
+				return plan
+			end
+		end
+
+		return nil
 	end
 
-	local function beamPathIsDefended(beam,throwerOverride)
-		local arc=beamArcData(beam)
-		if not arc then return false end
+	local function projectilePathIsDefended(plan,throwerOverride)
+		if not(plan and plan.origin and plan.velocity and plan.maxTime and plan.maxTime>0) then
+			return false
+		end
 
 		local defenderRoots=collectDefenderRoots(throwerOverride)
 		if #defenderRoots==0 then
 			return false
 		end
 
-		local function segmentIsDefended(previousPoint,point,previousProgress,progress,useBezierPoint)
+		local origin=plan.origin
+		local velocity=plan.velocity
+		local forward=flat(velocity)
+		if forward.Magnitude<1e-6 then
+			return false
+		end
+		forward=forward.Unit
+
+		local previousTime=0
+		local previousPoint=origin
+		for i=1,qbArcSampleCount do
+			local time=plan.maxTime*(i/qbArcSampleCount)
+			local point=projectileAt(origin,velocity,time)
+
 			for _,defenderRoot in ipairs(defenderRoots) do
 				local _,alpha=distancePointToSegmentXZ(defenderRoot.Position,previousPoint,point)
-				local pathProgress=previousProgress+(progress-previousProgress)*alpha
-				local pathPoint=useBezierPoint and cubicBezier(arc.startPoint,arc.firstHandle,arc.secondHandle,arc.endPoint,pathProgress) or previousPoint:Lerp(point,alpha)
-				local ballTime=estimatedArcPointTime(arc.startPoint,pathPoint,pathProgress)
-				local canReach=defenderCanReachPoint(defenderRoot,pathPoint,ballTime)
-				if canReach then
-					return true
+				local pathTime=previousTime+(time-previousTime)*alpha
+				local pathPoint=projectileAt(origin,velocity,pathTime)
+				if flat(pathPoint-origin):Dot(forward)>=-0.05 then
+					local canReach=defenderCanReachPoint(defenderRoot,pathPoint,pathTime)
+					if canReach then
+						return true
+					end
 				end
 			end
 
-			return false
-		end
-
-		local previousPoint=arc.startPoint
-		local previousProgress=0
-		for i=1,qbArcSampleCount do
-			local progress=i/qbArcSampleCount
-			local point=cubicBezier(arc.startPoint,arc.firstHandle,arc.secondHandle,arc.endPoint,progress)
-
-			if segmentIsDefended(previousPoint,point,previousProgress,progress,true) then
-				return true
-			end
-
+			previousTime=time
 			previousPoint=point
-			previousProgress=progress
 		end
 
-		return segmentIsDefended(arc.startPoint,arc.endPoint,0,1,false)
+		return false
 	end
 
 	local currentCenterC1AndTime=nil
@@ -576,76 +687,13 @@ function testing.new(app,parent,guiBuilder)
 			return false
 		end
 
-		for _,beam in ipairs(centerArcBeams(center)) do
-			if beamPathIsDefended(beam,throwerOverride) then
-				return true
-			end
+		local plan=projectilePlanFromCenter(center)
+		if plan then
+			return projectilePathIsDefended(plan,throwerOverride)
 		end
 
 		local c1Position,flightTime=currentCenterC1AndTime()
 		return c1IsDefended(c1Position,flightTime,throwerOverride)
-	end
-
-	local function beamC1Position(beam)
-		if not(beam and beam:IsA("Beam") and beam.Attachment0 and beam.Attachment1) then
-			return nil,nil
-		end
-
-		local c2Frame=attachmentCFrame(beam.Attachment0)
-		local c3Frame=attachmentCFrame(beam.Attachment1)
-		if not(c2Frame and c3Frame) then
-			return nil,nil
-		end
-
-		local arcStart=c2Frame.Position
-		local arcEnd=c3Frame.Position
-		local firstHandle=arcStart+c2Frame.RightVector*beam.CurveSize0
-		local secondHandle=arcEnd-c3Frame.RightVector*beam.CurveSize1
-		local bestPoint=nil
-		local bestProgress=0
-		local bestDiff=math.huge
-		local crossingPoint=nil
-		local crossingProgress=nil
-		local previousPoint=arcStart
-		local previousProgress=0
-		local previousY=previousPoint.Y-testingCatchY
-
-		for i=1,96 do
-			local progress=i/96
-			local point=cubicBezier(arcStart,firstHandle,secondHandle,arcEnd,progress)
-			local y=point.Y-testingCatchY
-			local diff=math.abs(y)
-			if diff<bestDiff then
-				bestDiff=diff
-				bestPoint=point
-				bestProgress=progress
-			end
-
-			if previousY==0 or y==0 or (previousY<0 and y>0) or (previousY>0 and y<0) then
-				local denom=math.abs(previousY)+math.abs(y)
-				local alpha=denom>1e-6 and math.abs(previousY)/denom or 0
-				crossingProgress=previousProgress+(progress-previousProgress)*alpha
-				crossingPoint=previousPoint:Lerp(point,alpha)
-			end
-
-			previousPoint=point
-			previousProgress=progress
-			previousY=y
-		end
-
-		local c1Point=crossingPoint or bestPoint
-		local c1Progress=crossingProgress or bestProgress
-		if not c1Point then
-			return nil,nil
-		end
-
-		c1Point=Vector3.new(c1Point.X,testingCatchY,c1Point.Z)
-		local flatDistance=(flat(c1Point)-flat(arcStart)).Magnitude
-		local distanceTime=flatDistance/testingBallSpeed
-		local heightDelta=math.max(c1Point.Y-arcStart.Y,0)
-		local verticalTime=heightDelta>0 and math.sqrt((2*heightDelta)/ballGravity) or 0
-		local estimatedTime=math.max(distanceTime,verticalTime,c1Progress*distanceTime)
-		return c1Point,estimatedTime
 	end
 
 	currentCenterC1AndTime=function()
@@ -654,10 +702,11 @@ function testing.new(app,parent,guiBuilder)
 			return nil,nil
 		end
 
-		for _,beam in ipairs(centerArcBeams(center)) do
-			local point,time=beamC1Position(beam)
-			if point and time and time>0 then
-				return point,time
+		local plan=projectilePlanFromCenter(center)
+		if plan then
+			local time=projectileTimeAtY(plan.origin,plan.velocity,testingCatchY)
+			if time and time>0 and time<=plan.maxTime+0.05 then
+				return projectileAt(plan.origin,plan.velocity,time),time
 			end
 		end
 
@@ -846,7 +895,8 @@ function testing.new(app,parent,guiBuilder)
 		ensureGroundMarker(folder).CFrame=CFrame.new(pos.X,groundYAt(pos),pos.Z)*CFrame.Angles(0,0,math.rad(90))
 		local powerText=payload and (" "..fmtPower(payload.Power)) or ""
 		local timeText=flightTime and string.format(" %.2fs",flightTime) or ""
-		local unsafe=c1IsDefended(pos,flightTime)
+		local payloadPlan=payloadProjectilePlan(payload)
+		local unsafe=payloadPlan and projectilePathIsDefended(payloadPlan) or c1IsDefended(pos,flightTime)
 		local safetyText=unsafe and " unsafe" or " safe"
 		local label=(lastThrower and (lastThrower.." ") or "")..(fromPayload and "C1 calc" or "C1")..safetyText..powerText..timeText..": "..fmtVector(pos)
 		setStatus(label,unsafe and (colors.red or Color3.fromRGB(254,94,86)) or (colors.green or colors.text))
