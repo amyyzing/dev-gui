@@ -1,3 +1,6 @@
+-- Mobile platform shell.
+-- It currently mirrors the desktop shell, but this file is the place for
+-- touch-first navigation and layout changes instead of changing the UI library.
 local mainFrame={}
 
 function mainFrame.new(app)

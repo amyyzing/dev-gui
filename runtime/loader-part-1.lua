@@ -561,6 +561,9 @@ end
 
 manualReloadPath="loader.lua"
 
+-- Keep the source split explicit:
+-- app layout, pages, and descriptions live in /gui;
+-- reusable styling/building blocks live in /495-ui-library.
 local function normalizePlatformName(value)
 	value=tostring(value or "pc"):lower()
 	if value=="mobile" then
@@ -642,18 +645,25 @@ modulePaths={
 	DiscordLogic="features/discord/logic.lua",
 	DataSave="data-save/data-save.lua",
 }
-externalModuleFiles={
-	["design/resolver.lua"]=uiLibrarySource,
-	["design/themes/crimson.lua"]=uiLibrarySource,
-	["design/themes/dark.lua"]=uiLibrarySource,
-	["design/themes/evergreen.lua"]=uiLibrarySource,
-	["design/themes/light.lua"]=uiLibrarySource,
-	["design/themes/midnight.lua"]=uiLibrarySource,
-	["design/themes/sakura.lua"]=uiLibrarySource,
-	["design/tokens.lua"]=uiLibrarySource,
-	["gui/fusion.lua"]=uiLibrarySource,
-	["gui/gui-logic.lua"]=uiLibrarySource,
+
+local uiLibraryModulePaths={
+	"design/resolver.lua",
+	"design/themes/crimson.lua",
+	"design/themes/dark.lua",
+	"design/themes/evergreen.lua",
+	"design/themes/light.lua",
+	"design/themes/midnight.lua",
+	"design/themes/sakura.lua",
+	"design/tokens.lua",
+	"gui/fusion.lua",
+	"gui/gui-logic.lua",
 }
+
+externalModuleFiles={}
+for _,modulePath in ipairs(uiLibraryModulePaths) do
+	externalModuleFiles[modulePath]=uiLibrarySource
+end
+
 moduleGlobalNames={
 	CoreScope="CoreScope",
 	CoreSignal="CoreSignal",

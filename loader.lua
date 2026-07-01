@@ -1,17 +1,20 @@
-local HttpService = game:GetService( "HttpService" )
+-- Small bootstrapper only:
+-- fetch the runtime chunks, tell them which platform we are on, and hand over
+-- the shared UI library repo coordinates. App/layout code stays out of here.
+local HttpService = game:GetService("HttpService")
 local UserInputService = game:GetService("UserInputService")
 
 local botUrl = "https://lint-bot-production.up.railway.app"
-local moduleGetPath="/module/get"
+local moduleGetPath = "/module/get"
 local apiKey = "mydayohmy"
-local maxSourceBytes=300000
+local maxSourceBytes = 300000
 
 local runtimeFiles = {
 	"runtime/loader-part-1.lua",
 	"runtime/loader-part-2.lua",
 	"runtime/loader-part-3.lua",
 	"runtime/loader-part-4.lua",
-	"runtime/loader-part-5.lua" ,
+	"runtime/loader-part-5.lua",
 }
 
 local function detectClientPlatform()
@@ -43,7 +46,8 @@ local function typeOf(value)
 end
 
 local function clientRequest()
-	-- Request funcs
+	-- Executors expose HTTP through different globals. Keep this list boring and
+	-- explicit so the runtime does not need executor-specific branches.
 	if typeOf(syn)=="table" and type(syn.request) == "function" then
 		return syn.request
 	end
@@ -69,7 +73,7 @@ local function fetchModule(path)
 
 	local requestFn = clientRequest()
 	if not requestFn then
-		return nil,"no http request found"
+		return nil, "no http request found"
 	end
 
 	local apiBody={

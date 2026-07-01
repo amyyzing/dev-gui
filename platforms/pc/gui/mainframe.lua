@@ -1,3 +1,6 @@
+-- Desktop platform shell.
+-- This composes the app's pages and window chrome using the reusable controls
+-- injected from 495-ui-library.
 local mainFrame={}
 
 function mainFrame.new(app)
