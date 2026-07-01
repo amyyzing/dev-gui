@@ -1,6 +1,4 @@
--- App-owned UI copy.
--- The library decides how sections render; this file decides what the app calls
--- its pages, sections, labels, and status text.
+-- Just the descriptions
 local blank=""
 
 local description={}
