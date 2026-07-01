@@ -16,7 +16,7 @@ local qbSafetyInterval=0
 local qbArcSampleCount=96
 local defenderArrivalBuffer=0.03
 local defenderReachYMargin=0.25
-local defenderCatchRadius=2.75
+local defenderCatchRadius=4.50
 local defenderRootGroundOffset=3.00
 local catchMarkerHeight=80
 local catchMarkerThickness=0.12
@@ -446,21 +446,27 @@ function testing.new(app,parent,guiBuilder)
 
 	local function collectDefenderRoots(throwerOverride)
 		local roots={}
+		local unknownTeamRoots={}
 		local thrower=throwerOverride or playerByName(lastThrower) or localPlayer
 		local throwerTeam=teamOf(thrower) or teamOf(localPlayer)
 
 		for _,player in ipairs(players:GetPlayers()) do
 			local playerTeam=teamOf(player)
-			local isOpponent=throwerTeam~=nil and playerTeam~=nil and playerTeam~=throwerTeam
-			if player~=thrower and player~=localPlayer and isOpponent then
+			if player~=thrower and player~=localPlayer then
 				local defenderRoot=rootOfPlayer(player)
 				if defenderRoot then
-					roots[#roots+1]=defenderRoot
+					if throwerTeam~=nil and playerTeam~=nil then
+						if playerTeam~=throwerTeam then
+							roots[#roots+1]=defenderRoot
+						end
+					else
+						unknownTeamRoots[#unknownTeamRoots+1]=defenderRoot
+					end
 				end
 			end
 		end
 
-		return roots
+		return #roots>0 and roots or unknownTeamRoots
 	end
 
 	local function defenderCanReachPoint(defenderRoot,point,ballTime)
@@ -530,16 +536,11 @@ function testing.new(app,parent,guiBuilder)
 			return false
 		end
 
-		local previousPoint=arc.startPoint
-		local previousProgress=0
-		for i=1,qbArcSampleCount do
-			local progress=i/qbArcSampleCount
-			local point=cubicBezier(arc.startPoint,arc.firstHandle,arc.secondHandle,arc.endPoint,progress)
-
+		local function segmentIsDefended(previousPoint,point,previousProgress,progress,useBezierPoint)
 			for _,defenderRoot in ipairs(defenderRoots) do
 				local _,alpha=distancePointToSegmentXZ(defenderRoot.Position,previousPoint,point)
 				local pathProgress=previousProgress+(progress-previousProgress)*alpha
-				local pathPoint=cubicBezier(arc.startPoint,arc.firstHandle,arc.secondHandle,arc.endPoint,pathProgress)
+				local pathPoint=useBezierPoint and cubicBezier(arc.startPoint,arc.firstHandle,arc.secondHandle,arc.endPoint,pathProgress) or previousPoint:Lerp(point,alpha)
 				local ballTime=estimatedArcPointTime(arc.startPoint,pathPoint,pathProgress)
 				local canReach=defenderCanReachPoint(defenderRoot,pathPoint,ballTime)
 				if canReach then
@@ -547,11 +548,24 @@ function testing.new(app,parent,guiBuilder)
 				end
 			end
 
+			return false
+		end
+
+		local previousPoint=arc.startPoint
+		local previousProgress=0
+		for i=1,qbArcSampleCount do
+			local progress=i/qbArcSampleCount
+			local point=cubicBezier(arc.startPoint,arc.firstHandle,arc.secondHandle,arc.endPoint,progress)
+
+			if segmentIsDefended(previousPoint,point,previousProgress,progress,true) then
+				return true
+			end
+
 			previousPoint=point
 			previousProgress=progress
 		end
 
-		return false
+		return segmentIsDefended(arc.startPoint,arc.endPoint,0,1,false)
 	end
 
 	local currentCenterC1AndTime=nil
