@@ -9,22 +9,32 @@ local localPlayer=players.LocalPlayer
 
 local ballGravity=28
 local testingCatchY=14.30
-local defenderSpeed=21
-local testingBallSpeed=95
 local qbSafetyJobName="TestingQBCenterSafety"
 local qbSafetyInterval=0
-local qbArcSampleCount=96
-local defenderArrivalBuffer=0.03
-local defenderReachYMargin=0.25
-local defenderCatchRadius=4.50
-local defenderRootGroundOffset=3.00
-local maxProjectileSafetyTime=5.00
+local USE_LEGACY_VISUAL_ARC_FALLBACK=false
+local SAFETY={
+	defenderSpeed=21,
+	reactionTime=0,
+	catchRadius=2.75,
+	bodyCatchMinYOffset=-2.5,
+	standingCatchMaxYOffset=6.5,
+	maxSegmentLength=1.25,
+	maxTimeStep=1/120,
+	maxSegments=700,
+	staleArcMaxAge=0.075,
+	forwardEpsilon=-0.05,
+	verticalSlack=0.25,
+}
+local WHITE_ARC=ColorSequence.new(Color3.new(1,1,1))
+local RED_ARC=ColorSequence.new(Color3.fromRGB(255,70,70))
 local catchMarkerHeight=80
 local catchMarkerThickness=0.12
 local groundMarkerDiameter=5.5
 local groundMarkerThickness=0.05
 local markerTransparency=0.75
 local groundMarkerTransparency=0.75
+local CurrentThrowArcState=nil
+local throwArcGeneration=0
 
 local function destroyControl(control)
 	if control and type(control.destroy)=="function" then
@@ -53,6 +63,21 @@ local function fmtVector(v)
 	return string.format("%.1f, %.1f, %.1f",v.X,v.Y,v.Z)
 end
 
+local function fmtMaybeVector(v)
+	return typeof(v)=="Vector3" and fmtVector(v) or "nil"
+end
+
+local function instancePath(instance)
+	if typeof(instance)~="Instance" then
+		return "nil"
+	end
+
+	local ok,path=pcall(function()
+		return instance:GetFullName()
+	end)
+	return ok and path or instance.Name
+end
+
 local function fmtPower(power)
 	local n=tonumber(power)
 	return n and string.format("P%.0f",n) or "P?"
@@ -62,27 +87,26 @@ local function flat(v)
 	return Vector3.new(v.X,0,v.Z)
 end
 
-local function distancePointToSegmentXZ(point,a,b)
+local function horizontalDistance(a,b)
+	local dx=a.X-b.X
+	local dz=a.Z-b.Z
+	return math.sqrt(dx*dx+dz*dz)
+end
+
+local function closestAlphaXZ(point,a,b)
 	local pointXZ=flat(point)
 	local aXZ=flat(a)
 	local bXZ=flat(b)
 	local segment=bXZ-aXZ
 	local lengthSquared=segment:Dot(segment)
 	if lengthSquared<=1e-6 then
-		return (pointXZ-aXZ).Magnitude,0
+		return 0
 	end
 
-	local alpha=math.clamp((pointXZ-aXZ):Dot(segment)/lengthSquared,0,1)
-	local closest=aXZ+segment*alpha
-	return (pointXZ-closest).Magnitude,alpha
+	return math.clamp((pointXZ-aXZ):Dot(segment)/lengthSquared,0,1)
 end
 
-local function rootOfPlayer(player)
-	local character=player and (workspace:FindFirstChild(player.Name) or player.Character)
-	return character and (character.PrimaryPart or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso"))
-end
-
-local function teamOf(player)
+local function customTeamOf(player)
 	if not player then return nil end
 
 	local replicated=player:FindFirstChild("Replicated")
@@ -94,28 +118,83 @@ local function teamOf(player)
 		return tostring(value)
 	end
 
-	if player.Team then
-		return tostring(player.Team)
-	end
-	if player.TeamColor then
-		return tostring(player.TeamColor)
-	end
-
 	return nil
 end
 
-local function playerByName(name)
-	if not name then return nil end
-	for _,player in ipairs(players:GetPlayers()) do
-		if player.Name==name or player.DisplayName==name then
-			return player
+local function sameTeam(a,b)
+	if not(a and b) then
+		return nil
+	end
+
+	local customA=customTeamOf(a)
+	local customB=customTeamOf(b)
+	if customA~=nil and customB~=nil then
+		return customA==customB
+	end
+
+	if a.Team~=nil and b.Team~=nil then
+		if a.Neutral or b.Neutral then
+			return nil
 		end
+
+		return a.Team==b.Team
 	end
+
+	if not a.Neutral and not b.Neutral then
+		return a.TeamColor==b.TeamColor
+	end
+
 	return nil
 end
 
-local function projectileAt(origin,velocity,time)
+local function isOpponentOfThrower(player,thrower)
+	if not(player and thrower) or player==thrower then
+		return false
+	end
+
+	local result=sameTeam(player,thrower)
+	if result==nil then
+		return false
+	end
+
+	return result==false
+end
+
+local function hasAnyRoleData(player)
+	local character=player and player.Character
+	return player and (
+		player:GetAttribute("Position")~=nil
+			or player:GetAttribute("Role")~=nil
+			or (character and character:GetAttribute("Position")~=nil)
+			or (character and character:GetAttribute("Role")~=nil)
+	)
+end
+
+local function isDB(player)
+	local character=player and player.Character
+	if not character then
+		return false
+	end
+
+	if not hasAnyRoleData(player) then
+		return true
+	end
+
+	local role=player:GetAttribute("Position")
+		or player:GetAttribute("Role")
+		or character:GetAttribute("Position")
+		or character:GetAttribute("Role")
+
+	role=string.upper(tostring(role))
+	return role=="DB" or role=="CB" or role=="FS" or role=="SS" or role=="S"
+end
+
+local function legacyProjectileAt(origin,velocity,time)
 	return origin+velocity*time+Vector3.new(0,-0.5*ballGravity*time*time,0)
+end
+
+local function projectileAt(arc,time)
+	return arc.origin+arc.velocity*time+0.5*arc.gravity*time*time
 end
 
 local function c1FromPayload(payload)
@@ -134,7 +213,7 @@ local function c1FromPayload(payload)
 	if disc<0 then
 		local apexTime=math.max(velocity.Y/ballGravity,0)
 		if apexTime<=0 then return nil,nil end
-		return projectileAt(payload.SpawnPos,velocity,apexTime),apexTime
+		return legacyProjectileAt(payload.SpawnPos,velocity,apexTime),apexTime
 	end
 
 	local root=math.sqrt(disc)
@@ -146,50 +225,58 @@ local function c1FromPayload(payload)
 	end
 	if time<=0 then return nil,nil end
 
-	return projectileAt(payload.SpawnPos,velocity,time),time
+	return legacyProjectileAt(payload.SpawnPos,velocity,time),time
 end
 
-local function projectileTimeAtY(origin,velocity,y)
-	if not(origin and velocity and y) then
+local function normalizeArcGravity(gravity)
+	if typeof(gravity)=="Vector3" then
+		return gravity
+	end
+	if type(gravity)=="number" then
+		return Vector3.new(0,-math.abs(gravity),0)
+	end
+	return Vector3.new(0,-ballGravity,0)
+end
+
+local function publishThrowArcState(beam,C2,C1,C3,velocity,gravity,flightTime,power)
+	if typeof(C2)~="Vector3" or typeof(velocity)~="Vector3" then
+		CurrentThrowArcState=nil
 		return nil
 	end
 
-	local a=0.5*ballGravity
-	local b=-velocity.Y
-	local c=y-origin.Y
-	local disc=b*b-4*a*c
-	if disc<0 then
+	gravity=normalizeArcGravity(gravity)
+	if type(flightTime)~="number" or flightTime<=0 then
+		CurrentThrowArcState=nil
 		return nil
 	end
 
-	local root=math.sqrt(disc)
-	local early=(-b-root)/(2*a)
-	local late=(-b+root)/(2*a)
-	local time=math.max(early,late)
-	if time<=0 then
-		time=math.min(early,late)
+	local flatVelocity=flat(velocity)
+	if flatVelocity.Magnitude<=1e-6 then
+		CurrentThrowArcState=nil
+		return nil
 	end
 
-	return time>0 and time or nil
-end
-
-local function payloadProjectilePlan(payload)
-	if type(payload)~="table" then return nil end
-	if typeof(payload.SpawnPos)~="Vector3" or typeof(payload.Target)~="Vector3" then return nil end
-
-	local power=tonumber(payload.Power) or testingBallSpeed
-	local delta=payload.Target-payload.SpawnPos
-	if delta.Magnitude<1e-6 or power<=0 then return nil end
-
-	local velocity=delta.Unit*power
-	local catchTime=projectileTimeAtY(payload.SpawnPos,velocity,testingCatchY)
-	return{
-		origin=payload.SpawnPos,
+	throwArcGeneration+=1
+	CurrentThrowArcState={
+		beam=beam,
+		C2=C2,
+		C1=typeof(C1)=="Vector3" and C1 or nil,
+		C3=typeof(C3)=="Vector3" and C3 or nil,
+		power=power,
+		origin=C2,
 		velocity=velocity,
-		maxTime=math.clamp(catchTime or 2.5,0.05,maxProjectileSafetyTime),
-		source="payload",
+		gravity=gravity,
+		flightTime=flightTime,
+		forward=flatVelocity.Unit,
+		updatedAt=os.clock(),
+		generation=throwArcGeneration,
+		source="original_throwing_arc",
 	}
+
+	return CurrentThrowArcState
 end
+
+testing.PublishThrowArcState=publishThrowArcState
 
 local function instanceName(value)
 	if typeof(value)=="Instance" then
@@ -320,6 +407,7 @@ function testing.new(app,parent,guiBuilder)
 	state.testingEnabled=state.testingEnabled and true or false
 	if state.testingWREnabled==nil then state.testingWREnabled=true end
 	if state.testingQBEnabled==nil then state.testingQBEnabled=true end
+	if state.testingQBDebug==nil then state.testingQBDebug=false end
 
 	local function changed()
 		if app.onChanged then
@@ -381,47 +469,17 @@ function testing.new(app,parent,guiBuilder)
 		groundMarker=nil
 	end
 
-	local function addBeamTarget(list,seen,instance)
-		if not instance then return end
-		if instance:IsA("Beam") and not seen[instance] then
-			seen[instance]=true
-			list[#list+1]=instance
-		end
-		for _,descendant in ipairs(instance:GetDescendants()) do
-			if descendant:IsA("Beam") and not seen[descendant] then
-				seen[descendant]=true
-				list[#list+1]=descendant
-			end
-		end
-	end
-
-	local function centerArcBeams(center)
-		local beams={}
-		local seen={}
-		addBeamTarget(beams,seen,center:FindFirstChild("ThrowingArc"))
-		addBeamTarget(beams,seen,center:FindFirstChild("ThrowingArc",true))
-
-		if #beams==0 then
-			for _,descendant in ipairs(center:GetDescendants()) do
-				if descendant:IsA("Beam") then
-					addBeamTarget(beams,seen,descendant)
-				end
-			end
+	local function setThrowingArcUnsafe(arc,unsafe)
+		local beam=arc and arc.beam
+		if not(beam and beam.Parent) then
+			return
 		end
 
-		return beams
-	end
-
-	local function setCenterBeamUnsafe(unsafe)
-		local center=findCenter()
-		if not center then return end
-
-		for _,beam in ipairs(centerArcBeams(center)) do
-			if not centerBeamDefaults[beam] then
-				centerBeamDefaults[beam]=beam.Color
-			end
-			beam.Color=unsafe and ColorSequence.new(colors.red or Color3.fromRGB(254,94,86)) or centerBeamDefaults[beam]
+		if not centerBeamDefaults[beam] then
+			centerBeamDefaults[beam]=beam.Color
 		end
+
+		beam.Color=unsafe and RED_ARC or (centerBeamDefaults[beam] or WHITE_ARC)
 	end
 
 	local function restoreCenterBeams()
@@ -444,286 +502,221 @@ function testing.new(app,parent,guiBuilder)
 		restoreCenterBeams()
 	end
 
-	local function fieldGroundYAt(position)
-		local params=RaycastParams.new()
-		local ignore={}
-		params.FilterType=Enum.RaycastFilterType.Exclude
+	local function debugQB(reason,details)
+		if not state.testingQBDebug then
+			return
+		end
 
-		for _,player in ipairs(players:GetPlayers()) do
-			local character=player.Character or workspace:FindFirstChild(player.Name)
-			if character then
-				ignore[#ignore+1]=character
+		local parts={"[TestingQB]",reason}
+		if details then
+			for key,value in pairs(details) do
+				parts[#parts+1]=tostring(key).."="..tostring(value)
 			end
 		end
 
-		if marker then ignore[#ignore+1]=marker end
-		if groundMarker then ignore[#ignore+1]=groundMarker end
-		params.FilterDescendantsInstances=ignore
+		warn(table.concat(parts," "))
+	end
 
-		local result=workspace:Raycast(position+Vector3.new(0,30,0),Vector3.new(0,-220,0),params)
-		if result then
-			return result.Position.Y
+	local function getJumpPeakHeight(humanoid)
+		if not humanoid then
+			return 7.2
 		end
 
-		return nil
-	end
-
-	local function defenderReachYRange(defenderRoot)
-		local groundY=fieldGroundYAt(defenderRoot.Position) or (defenderRoot.Position.Y-defenderRootGroundOffset)
-		return groundY-defenderReachYMargin,groundY+testingCatchY+defenderReachYMargin
-	end
-
-	local function defenderCanReachY(defenderRoot,position)
-		if not(defenderRoot and position) then
-			return false
-		end
-
-		local minY,maxY=defenderReachYRange(defenderRoot)
-		return position.Y>=minY and position.Y<=maxY
-	end
-
-	local function collectDefenderRoots(throwerOverride)
-		local roots={}
-		local unknownTeamRoots={}
-		local thrower=throwerOverride or playerByName(lastThrower) or localPlayer
-		local throwerTeam=teamOf(thrower) or teamOf(localPlayer)
-
-		for _,player in ipairs(players:GetPlayers()) do
-			local playerTeam=teamOf(player)
-			if player~=thrower and player~=localPlayer then
-				local defenderRoot=rootOfPlayer(player)
-				if defenderRoot then
-					if throwerTeam~=nil and playerTeam~=nil then
-						if playerTeam~=throwerTeam then
-							roots[#roots+1]=defenderRoot
-						end
-					else
-						unknownTeamRoots[#unknownTeamRoots+1]=defenderRoot
-					end
-				end
+		if humanoid.UseJumpPower then
+			local g=workspace.Gravity
+			if g<=0 then
+				return 7.2
 			end
+
+			return (humanoid.JumpPower*humanoid.JumpPower)/(2*g)
 		end
 
-		return #roots>0 and roots or unknownTeamRoots
+		return humanoid.JumpHeight
 	end
 
-	local function defenderCanReachPoint(defenderRoot,point,ballTime)
-		if not(defenderRoot and point and ballTime and ballTime>0) then
-			return false,math.huge
+	local function maxJumpOffsetByTime(humanoid,time)
+		local peakHeight=math.max(0,getJumpPeakHeight(humanoid))
+		if peakHeight<=0 then
+			return 0
 		end
 
-		if not defenderCanReachY(defenderRoot,point) then
-			return false,math.huge
+		local g=workspace.Gravity
+		if g<=0 then
+			return peakHeight
 		end
 
-		local distance=math.max((flat(defenderRoot.Position)-flat(point)).Magnitude-defenderCatchRadius,0)
-		local arrival=distance/defenderSpeed
-		return arrival+defenderArrivalBuffer<=ballTime,arrival
+		local v0=math.sqrt(2*g*peakHeight)
+		local timeToPeak=v0/g
+		if time>=timeToPeak then
+			return peakHeight
+		end
+
+		return math.max(0,v0*time-0.5*g*time*time)
 	end
 
-	local function c1IsDefended(c1Position,flightTime,throwerOverride)
-		if not(c1Position and flightTime and flightTime>0) then
+	local function getCatchYRange(character,time)
+		local root=character and character:FindFirstChild("HumanoidRootPart")
+		if not root then
+			return nil
+		end
+
+		local humanoid=character:FindFirstChildOfClass("Humanoid")
+		local jumpOffset=maxJumpOffsetByTime(humanoid,time)
+		local minY=root.Position.Y+SAFETY.bodyCatchMinYOffset
+		local maxY=root.Position.Y+SAFETY.standingCatchMaxYOffset+jumpOffset
+		return minY,maxY,root,humanoid
+	end
+
+	local function estimateSegmentCount(arc)
+		local flightTime=math.max(0,arc and arc.flightTime or 0)
+		if flightTime<=0 then
+			return 0
+		end
+
+		local maxSpeedEstimate=arc.velocity.Magnitude+arc.gravity.Magnitude*flightTime
+		local approxPathLength=maxSpeedEstimate*flightTime
+		local byTime=math.ceil(flightTime/SAFETY.maxTimeStep)
+		local byLength=math.ceil(approxPathLength/SAFETY.maxSegmentLength)
+		return math.clamp(math.max(byTime,byLength,8),8,SAFETY.maxSegments)
+	end
+
+	local function isForwardFromC2(arc,point)
+		local offset=flat(point-arc.origin)
+		return offset:Dot(arc.forward)>=SAFETY.forwardEpsilon
+	end
+
+	local function canDefenderReachSegment(arc,player,t0,t1)
+		local character=player and player.Character
+		if not character then
 			return false
 		end
 
-		for _,defenderRoot in ipairs(collectDefenderRoots(throwerOverride)) do
-			local canReach=defenderCanReachPoint(defenderRoot,c1Position,flightTime)
-			if canReach then
-				return true
+		local humanoid=character:FindFirstChildOfClass("Humanoid")
+		local root=character:FindFirstChild("HumanoidRootPart")
+		if not(humanoid and root) or humanoid.Health<=0 then
+			return false
+		end
+
+		local p0=projectileAt(arc,t0)
+		local p1=projectileAt(arc,t1)
+		local alpha=closestAlphaXZ(root.Position,p0,p1)
+		local tBall=t0+(t1-t0)*alpha
+		local ballPoint=projectileAt(arc,tBall)
+		if not isForwardFromC2(arc,ballPoint) then
+			return false
+		end
+
+		local minY,maxY=getCatchYRange(character,tBall)
+		if not(minY and maxY) then
+			return false
+		end
+
+		if ballPoint.Y<minY-SAFETY.verticalSlack or ballPoint.Y>maxY+SAFETY.verticalSlack then
+			return false
+		end
+
+		local availableTime=math.max(0,tBall-SAFETY.reactionTime)
+		local reachableRadius=SAFETY.catchRadius+SAFETY.defenderSpeed*availableTime
+		local distance=horizontalDistance(root.Position,ballPoint)
+		if distance<=reachableRadius then
+			return true,{
+				player=player,
+				time=tBall,
+				point=ballPoint,
+				distance=distance,
+				reachableRadius=reachableRadius,
+				yMin=minY,
+				yMax=maxY,
+			}
+		end
+
+		return false
+	end
+
+	local function defenderCanInterceptArc(arc,player)
+		local segmentCount=estimateSegmentCount(arc)
+		if segmentCount<=0 then
+			return false
+		end
+
+		for i=0,segmentCount-1 do
+			local t0=arc.flightTime*(i/segmentCount)
+			local t1=arc.flightTime*((i+1)/segmentCount)
+			local hit,info=canDefenderReachSegment(arc,player,t0,t1)
+			if hit then
+				info.segmentCount=segmentCount
+				return true,info
 			end
 		end
 
 		return false
 	end
 
-	local function projectilePlanFromDirection(origin,endPoint,direction,source,axisName)
-		if direction.Magnitude<1e-6 then
-			return nil
-		end
-		direction=direction.Unit
-
-		local flatDirection=flat(direction)
-		if flatDirection.Magnitude<1e-6 then
-			return nil
-		end
-
-		local delta=endPoint-origin
-		local forwardDistance=flat(delta):Dot(flatDirection.Unit)
-		if forwardDistance<=0 then
-			return nil
-		end
-
-		local speedTime=forwardDistance/flatDirection.Magnitude
-		local verticalDrop=direction.Y*speedTime-delta.Y
-		if verticalDrop<=0 then
-			return nil
-		end
-
-		local time=math.sqrt((2*verticalDrop)/ballGravity)
-		if not(time and time>0) then
-			return nil
-		end
-
-		local speed=speedTime/time
-		if not(speed and speed>0) then
-			return nil
-		end
-
-		return{
-			origin=origin,
-			velocity=direction*speed,
-			maxTime=math.clamp(time,0.05,maxProjectileSafetyTime),
-			endPoint=endPoint,
-			speed=speed,
-			axis=axisName,
-			source=source or "center",
-		}
+	local function isArcStateFresh(arc)
+		return arc and arc.updatedAt and os.clock()-arc.updatedAt<=SAFETY.staleArcMaxAge
 	end
 
-	local function projectilePlanFromFrames(c2Frame,c3Frame,source)
-		if not(c2Frame and c3Frame) then
+	local function validateC3Direction(arc)
+		if typeof(arc.C3)~="Vector3" or typeof(arc.C2)~="Vector3" then
 			return nil
 		end
 
-		local origin=c2Frame.Position
-		local endPoint=c3Frame.Position
-		local candidates={
-			{name="right",direction=c2Frame.RightVector},
-			{name="look",direction=c2Frame.LookVector},
-			{name="-right",direction=-c2Frame.RightVector},
-			{name="-look",direction=-c2Frame.LookVector},
-		}
-		local best=nil
-		local bestScore=math.huge
-
-		for _,candidate in ipairs(candidates) do
-			local plan=projectilePlanFromDirection(origin,endPoint,candidate.direction,source,candidate.name)
-			if plan then
-				local speedScore=math.abs(plan.speed-testingBallSpeed)
-				local unreasonablePenalty=(plan.speed<35 or plan.speed>160) and 1000 or 0
-				local score=speedScore+unreasonablePenalty
-				if score<bestScore then
-					best=plan
-					bestScore=score
-				end
-			end
-		end
-
-		return best
-	end
-
-	local function projectilePlanFromCenter(center)
-		if not center then return nil end
-
-		local c2=center:FindFirstChild("C2",true)
-		local c3=center:FindFirstChild("C3",true)
-		local c2Frame=c2 and attachmentCFrame(c2)
-		local c3Frame=c3 and attachmentCFrame(c3)
-		local plan=projectilePlanFromFrames(c2Frame,c3Frame,"center")
-		if plan then
-			return plan
-		end
-
-		for _,beam in ipairs(centerArcBeams(center)) do
-			local beamC2=beam.Attachment0 and attachmentCFrame(beam.Attachment0)
-			local beamC3=beam.Attachment1 and attachmentCFrame(beam.Attachment1)
-			plan=projectilePlanFromFrames(beamC2,beamC3,"beam attachments")
-			if plan then
-				return plan
-			end
-		end
-
-		return nil
-	end
-
-	local function projectilePathIsDefended(plan,throwerOverride)
-		if not(plan and plan.origin and plan.velocity and plan.maxTime and plan.maxTime>0) then
+		local c3Dir=flat(arc.C3-arc.C2)
+		local vDir=flat(arc.velocity)
+		if c3Dir.Magnitude<=1e-6 or vDir.Magnitude<=1e-6 then
 			return false
 		end
 
-		local defenderRoots=collectDefenderRoots(throwerOverride)
-		if #defenderRoots==0 then
-			return false
+		return c3Dir.Unit:Dot(vDir.Unit)>0.98
+	end
+
+	local function isArcUnsafe(arc,thrower)
+		if not isArcStateFresh(arc) then
+			return false,{reason="stale_or_missing_arc"}
+		end
+		if not(arc.origin and arc.velocity and arc.gravity and arc.flightTime) then
+			return false,{reason="invalid_arc_fields"}
+		end
+		if arc.flightTime<=0 then
+			return false,{reason="invalid_flight_time"}
 		end
 
-		local origin=plan.origin
-		local velocity=plan.velocity
-		local forward=flat(velocity)
-		if forward.Magnitude<1e-6 then
-			return false
+		local flatVelocity=flat(arc.velocity)
+		if flatVelocity.Magnitude<=1e-6 then
+			return false,{reason="no_forward_velocity"}
 		end
-		forward=forward.Unit
+		arc.forward=arc.forward or flatVelocity.Unit
 
-		local previousTime=0
-		local previousPoint=origin
-		for i=1,qbArcSampleCount do
-			local time=plan.maxTime*(i/qbArcSampleCount)
-			local point=projectileAt(origin,velocity,time)
+		local c3Valid=validateC3Direction(arc)
+		if c3Valid==false then
+			debugQB("c3_mismatch",{
+				generation=arc.generation,
+				source=arc.source,
+			})
+		end
 
-			for _,defenderRoot in ipairs(defenderRoots) do
-				local _,alpha=distancePointToSegmentXZ(defenderRoot.Position,previousPoint,point)
-				local pathTime=previousTime+(time-previousTime)*alpha
-				local pathPoint=projectileAt(origin,velocity,pathTime)
-				if flat(pathPoint-origin):Dot(forward)>=-0.05 then
-					local canReach=defenderCanReachPoint(defenderRoot,pathPoint,pathTime)
-					if canReach then
-						return true
+		for _,player in ipairs(players:GetPlayers()) do
+			if player~=thrower then
+				local teamResult=sameTeam(player,thrower)
+				local opponent=isOpponentOfThrower(player,thrower)
+				local db=opponent and isDB(player) or false
+				debugQB("consider_player",{
+					player=player.Name,
+					team=tostring(teamResult),
+					opponent=opponent,
+					db=db,
+				})
+
+				if opponent and db then
+					local hit,info=defenderCanInterceptArc(arc,player)
+					if hit then
+						return true,info
 					end
 				end
 			end
-
-			previousTime=time
-			previousPoint=point
 		end
 
-		return false
-	end
-
-	local currentCenterC1AndTime=nil
-
-	local function centerArcIsDefended(throwerOverride)
-		local center=findCenter()
-		if not center then
-			return false
-		end
-
-		local plan=projectilePlanFromCenter(center)
-		if plan then
-			return projectilePathIsDefended(plan,throwerOverride)
-		end
-
-		local c1Position,flightTime=currentCenterC1AndTime()
-		return c1IsDefended(c1Position,flightTime,throwerOverride)
-	end
-
-	currentCenterC1AndTime=function()
-		local center=findCenter()
-		if not center then
-			return nil,nil
-		end
-
-		local plan=projectilePlanFromCenter(center)
-		if plan then
-			local time=projectileTimeAtY(plan.origin,plan.velocity,testingCatchY)
-			if time and time>0 and time<=plan.maxTime+0.05 then
-				return projectileAt(plan.origin,plan.velocity,time),time
-			end
-		end
-
-		local c1=center:FindFirstChild("C1",true)
-		local c2=center:FindFirstChild("C2",true)
-		local c1Frame=c1 and attachmentCFrame(c1)
-		local c2Frame=c2 and attachmentCFrame(c2)
-		if not(c1Frame and c2Frame) then
-			return nil,nil
-		end
-
-		local c1Position=Vector3.new(c1Frame.Position.X,testingCatchY,c1Frame.Position.Z)
-		local flatDistance=(flat(c1Position)-flat(c2Frame.Position)).Magnitude
-		local heightDelta=math.max(c1Position.Y-c2Frame.Position.Y,0)
-		local distanceTime=flatDistance/testingBallSpeed
-		local verticalTime=heightDelta>0 and math.sqrt((2*heightDelta)/ballGravity) or 0
-		return c1Position,math.max(distanceTime,verticalTime)
+		return false,{reason="no_interceptor"}
 	end
 
 	local function updateQBCenterSafety()
@@ -732,24 +725,54 @@ function testing.new(app,parent,guiBuilder)
 			return
 		end
 
-		local center=findCenter()
-		if not center then
+		local arc=CurrentThrowArcState
+		local unsafe,info=isArcUnsafe(arc,localPlayer)
+		if not isArcStateFresh(arc) then
+			if USE_LEGACY_VISUAL_ARC_FALLBACK then
+				debugQB("legacy_visual_arc_fallback_disabled")
+			end
 			restoreCenterBeams()
+			debugQB("no_fresh_projectile_source",{
+				reason=info and info.reason or "missing",
+				generation=arc and arc.generation or "nil",
+				age=arc and arc.updatedAt and string.format("%.4f",os.clock()-arc.updatedAt) or "nil",
+				source=arc and arc.source or "nil",
+			})
 			return
 		end
 
-		if #centerArcBeams(center)>0 then
-			setCenterBeamUnsafe(centerArcIsDefended(localPlayer))
-			return
-		end
-
-		local c1Position,flightTime=currentCenterC1AndTime()
-		if not(c1Position and flightTime and flightTime>0) then
+		if not(arc and arc.beam and arc.beam.Parent) then
 			restoreCenterBeams()
+			debugQB("missing_beam",{
+				generation=arc and arc.generation or "nil",
+			})
 			return
 		end
 
-		setCenterBeamUnsafe(c1IsDefended(c1Position,flightTime,localPlayer))
+		setThrowingArcUnsafe(arc,unsafe)
+		debugQB("arc_decision",{
+			unsafe=unsafe,
+			reason=info and info.reason or "intercept",
+			generation=arc.generation,
+			age=string.format("%.4f",os.clock()-arc.updatedAt),
+			source=arc.source,
+			beam=instancePath(arc.beam),
+			C2=fmtMaybeVector(arc.C2),
+			C1=fmtMaybeVector(arc.C1),
+			C3=fmtMaybeVector(arc.C3),
+			velocity=fmtMaybeVector(arc.velocity),
+			gravity=fmtMaybeVector(arc.gravity),
+			flightTime=arc.flightTime,
+			power=arc.power or "nil",
+			interceptor=info and info.player and info.player.Name or "none",
+			interceptTime=info and info.time or "nil",
+			interceptPoint=info and fmtMaybeVector(info.point) or "nil",
+			yMin=info and info.yMin or "nil",
+			yMax=info and info.yMax or "nil",
+			distance=info and info.distance or "nil",
+			reachableRadius=info and info.reachableRadius or "nil",
+			segmentCount=info and info.segmentCount or estimateSegmentCount(arc),
+		})
 	end
 
 	local function syncQBSafety()
@@ -895,11 +918,10 @@ function testing.new(app,parent,guiBuilder)
 		ensureGroundMarker(folder).CFrame=CFrame.new(pos.X,groundYAt(pos),pos.Z)*CFrame.Angles(0,0,math.rad(90))
 		local powerText=payload and (" "..fmtPower(payload.Power)) or ""
 		local timeText=flightTime and string.format(" %.2fs",flightTime) or ""
-		local payloadPlan=payloadProjectilePlan(payload)
-		local unsafe=payloadPlan and projectilePathIsDefended(payloadPlan) or c1IsDefended(pos,flightTime)
-		local safetyText=unsafe and " unsafe" or " safe"
+		local arcUnsafe,arcInfo=isArcUnsafe(CurrentThrowArcState,localPlayer)
+		local safetyText=isArcStateFresh(CurrentThrowArcState) and (arcUnsafe and " unsafe" or " safe") or " no arc"
 		local label=(lastThrower and (lastThrower.." ") or "")..(fromPayload and "C1 calc" or "C1")..safetyText..powerText..timeText..": "..fmtVector(pos)
-		setStatus(label,unsafe and (colors.red or Color3.fromRGB(254,94,86)) or (colors.green or colors.text))
+		setStatus(label,arcUnsafe and (colors.red or Color3.fromRGB(254,94,86)) or (arcInfo and arcInfo.reason=="stale_or_missing_arc" and colors.muted or (colors.green or colors.text)))
 	end
 
 	local function captureSoon(source,payload)
@@ -1059,6 +1081,7 @@ function testing.new(app,parent,guiBuilder)
 			disconnectAll()
 			disconnectQBSafety()
 			destroyMarker()
+			CurrentThrowArcState=nil
 			lastThrower=nil
 			lastThrowAt=0
 			setStatus("off",colors.muted)
@@ -1102,6 +1125,19 @@ function testing.new(app,parent,guiBuilder)
 		end
 	end
 
+	function api.PublishThrowArcState(beam,C2,C1,C3,velocity,gravity,flightTime,power)
+		local arc=publishThrowArcState(beam,C2,C1,C3,velocity,gravity,flightTime,power)
+		if state.testingEnabled and state.testingQBEnabled~=false then
+			updateQBCenterSafety()
+		end
+		return arc
+	end
+
+	function api.ClearThrowArcState()
+		CurrentThrowArcState=nil
+		restoreCenterBeams()
+	end
+
 	function api.Refresh()
 		syncControls()
 		if state.testingEnabled then
@@ -1120,6 +1156,7 @@ function testing.new(app,parent,guiBuilder)
 	function api.Destroy()
 		disconnectAll()
 		disconnectQBSafety()
+		CurrentThrowArcState=nil
 		for _,connection in ipairs(lifetimeConnections) do
 			safeDisconnect(connection)
 		end
