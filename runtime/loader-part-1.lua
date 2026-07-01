@@ -561,6 +561,26 @@ end
 
 manualReloadPath="loader.lua"
 
+local function normalizePlatformName(value)
+	value=tostring(value or "pc"):lower()
+	if value=="mobile" then
+		return "mobile"
+	end
+	return "pc"
+end
+
+runtimePlatform=normalizePlatformName(rawget(getfenv(),"bootPlatform"))
+uiLibraryConfig=rawget(getfenv(),"bootUiLibrary")
+if type(uiLibraryConfig)~="table" then
+	uiLibraryConfig={}
+end
+uiLibrarySource={
+	id="ui-library",
+	owner=tostring(uiLibraryConfig.Owner or uiLibraryConfig.owner or "amyyzing"),
+	repo=tostring(uiLibraryConfig.Repo or uiLibraryConfig.repo or "495-ui-library"),
+	branch=tostring(uiLibraryConfig.Branch or uiLibraryConfig.branch or "main"),
+}
+
 modulePaths={
 	CoreScope="core/scope.lua",
 	CoreSignal="core/signal.lua",
@@ -579,7 +599,7 @@ modulePaths={
 	Announcement="announcement.lua",
 	GuiFusion="gui/fusion.lua",
 	GuiLogic="gui/gui-logic.lua",
-	MainFrame="gui/mainframe.lua",
+	MainFrame="platforms/"..runtimePlatform.."/gui/mainframe.lua",
 	Description="gui/description.lua",
 	HitboxPresets="features/hitbox-presets/gui.lua",
 	HitboxPresetsLogic="features/hitbox-presets/logic.lua",
@@ -622,6 +642,20 @@ modulePaths={
 	DiscordLogic="features/discord/logic.lua",
 	DataSave="data-save/data-save.lua",
 }
+externalModuleFiles={
+	["design/resolver.lua"]=uiLibrarySource,
+	["design/themes/crimson.lua"]=uiLibrarySource,
+	["design/themes/dark.lua"]=uiLibrarySource,
+	["design/themes/evergreen.lua"]=uiLibrarySource,
+	["design/themes/light.lua"]=uiLibrarySource,
+	["design/themes/midnight.lua"]=uiLibrarySource,
+	["design/themes/sakura.lua"]=uiLibrarySource,
+	["design/tokens.lua"]=uiLibrarySource,
+	["gui/description.lua"]=uiLibrarySource,
+	["gui/fusion.lua"]=uiLibrarySource,
+	["gui/gui-logic.lua"]=uiLibrarySource,
+}
+externalModuleFiles[modulePaths.MainFrame]=uiLibrarySource
 moduleGlobalNames={
 	CoreScope="CoreScope",
 	CoreSignal="CoreSignal",
@@ -789,6 +823,31 @@ function loadModuleFromSource(modulePath,source)
 	return loadedModule,nil
 end
 
+function getExternalModuleSource(modulePath)
+	return externalModuleFiles and externalModuleFiles[modulePath] or nil
+end
+
+function isExternalModulePath(modulePath)
+	return getExternalModuleSource(modulePath)~=nil
+end
+
+function fetchExternalModule(modulePath)
+	local source=getExternalModuleSource(modulePath)
+	if not source then
+		return nil,"not external"
+	end
+
+	local result=botApi.Post("/module/get",{
+		path=modulePath,
+		source=source.id or "ui-library",
+	})
+	if not(result and result.ok and type(result.source)=="string") then
+		return nil,result and result.error or "external module missing"
+	end
+
+	return result.source,nil
+end
+
 function loadRemoteModule(modulePath)
 	if not isAllowedModulePath(modulePath) then
 		warn("module path blocked:",modulePath)
@@ -799,18 +858,31 @@ function loadRemoteModule(modulePath)
 		return moduleCache[modulePath]
 	end
 
-	local result=botApi.Post("/module/get",{path=modulePath})
-	if not result or not result.ok then
+	local moduleSource=nil
+	local loadError=nil
+
+	if isExternalModulePath(modulePath) then
+		moduleSource,loadError=fetchExternalModule(modulePath)
+	else
+		local result=botApi.Post("/module/get",{path=modulePath})
+		if result and result.ok then
+			moduleSource=result.source
+		else
+			loadError=result and result.error or "unknown"
+		end
+	end
+
+	if type(moduleSource)~="string" then
 		moduleSources[modulePath]=false
 		if optionalModuleFileSet[modulePath] then
-			warn("optional module missing:",modulePath,result and result.error or"unknown")
+			warn("optional module missing:",modulePath,loadError or"unknown")
 		else
-			warn("module load failed:",modulePath,result and result.error or"unknown")
+			warn("module load failed:",modulePath,loadError or"unknown")
 		end
 		return nil
 	end
 
-	local loadedModule,err=loadModuleFromSource(modulePath,result.source)
+	local loadedModule,err=loadModuleFromSource(modulePath,moduleSource)
 	if not loadedModule then
 		warn("module broke while loading:",modulePath,err)
 		return nil
@@ -826,20 +898,37 @@ function loadRemoteModuleBatch(paths)
 
 	setLoaderProgress("loading files...",0.2,loaderStepTotal,false)
 
-	local result=botApi.Post("/module/batch",{paths=paths})
-	if not(result and result.ok and type(result.modules)=="table") then
-		return false,result and result.error or "module batch missing"
+	local apiPaths={}
+	for _,modulePath in ipairs(paths) do
+		if not isExternalModulePath(modulePath) then
+			table.insert(apiPaths,modulePath)
+		end
+	end
+
+	local result={ok=true,modules={},errors={}}
+	if #apiPaths>0 then
+		result=botApi.Post("/module/batch",{paths=apiPaths})
+		if not(result and result.ok and type(result.modules)=="table") then
+			return false,result and result.error or "module batch missing"
+		end
 	end
 
 	local loaded=0
 	local failed=0
 
 	for index,modulePath in ipairs(paths) do
-		local item=result.modules[modulePath]
 		local loadedModule=nil
 		local err=nil
+		local item=result.modules and result.modules[modulePath]
 
-		if item and type(item.source)=="string" then
+		if isExternalModulePath(modulePath) then
+			local source,sourceErr=fetchExternalModule(modulePath)
+			if source then
+				loadedModule,err=loadModuleFromSource(modulePath,source)
+			else
+				err=sourceErr
+			end
+		elseif item and type(item.source)=="string" then
 			loadedModule,err=loadModuleFromSource(modulePath,item.source)
 		else
 			err=result.errors and result.errors[modulePath] or "batch module missing"

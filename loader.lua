@@ -1,4 +1,5 @@
 local HttpService = game:GetService( "HttpService" )
+local UserInputService = game:GetService("UserInputService")
 
 local botUrl = "https://lint-bot-production.up.railway.app"
 local moduleGetPath="/module/get"
@@ -12,6 +13,24 @@ local runtimeFiles = {
 	"runtime/loader-part-4.lua",
 	"runtime/loader-part-5.lua" ,
 }
+
+local function detectClientPlatform()
+	local touch=false
+	local keyboard=false
+	local mouse=false
+
+	pcall(function()
+		touch=UserInputService.TouchEnabled==true
+		keyboard=UserInputService.KeyboardEnabled==true
+		mouse=UserInputService.MouseEnabled==true
+	end)
+
+	if touch and not keyboard and not mouse then
+		return "mobile"
+	end
+
+	return "pc"
+end
 
 local allowedRuntimeFiles={}
 for _, path in ipairs(runtimeFiles) do
@@ -139,6 +158,12 @@ end
 local runtimeEnv = setmetatable({
 	runtimeFilesFromLoader = runtimeFiles,
 	runtimeSourcesFromLoader=runtimeSources,
+	bootPlatform=detectClientPlatform(),
+	bootUiLibrary={
+		Owner="amyyzing",
+		Repo="495-ui-library",
+		Branch="main",
+	},
 	bootApi={
 		Url=botUrl,
 		Key = apiKey,
