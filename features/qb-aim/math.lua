@@ -32,19 +32,6 @@ local function distXZ(a,b)
 	return (flat(b)-flat(a)).Magnitude
 end
 
-local function catchVolumeMiss(params,catchPosition,target)
-	local volume=params.catchVolume
-	if type(volume)~="table" then
-		return (catchPosition-target).Magnitude,math.abs(catchPosition.Y-target.Y),false
-	end
-
-	local radius=math.max(tonumber(volume.horizontalRadius) or 0,0)
-	local verticalRange=math.max(tonumber(volume.verticalRange) or params.catchYTolerance or 0,0)
-	local horizontalMiss=math.max(distXZ(catchPosition,target)-radius,0)
-	local verticalMiss=math.max(math.abs(catchPosition.Y-target.Y)-verticalRange,0)
-	return math.sqrt(horizontalMiss*horizontalMiss+verticalMiss*verticalMiss),verticalMiss,true
-end
-
 local function ballAt(originPosition,velocity,time)
 	return originPosition+velocity*time+0.5*gravityVector*time*time
 end
@@ -179,7 +166,6 @@ local function interceptCandidate(params,originPosition,receiverStart,wrVel,qbVe
 	local targetMiss=(catchPosition-target).Magnitude
 	local catchY=(params.catchY or receiverStart.Y)+(params.solveYBias or 0)
 	local yError=math.abs(catchPosition.Y-catchY)
-	local catchVolumeMissValue,catchVerticalMiss,usesCatchVolume=catchVolumeMiss(params,catchPosition,target)
 	local speedError=math.abs(requiredSpeed-ballSpeed)
 	local residual=math.abs(interceptValue(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time))
 	local verticalVelocityAtCatch=worldVelocity.Y+gravityVector.Y*time
@@ -187,7 +173,7 @@ local function interceptCandidate(params,originPosition,receiverStart,wrVel,qbVe
 	local leadDistance=flat(wrVel).Magnitude*receiverLeadDelay
 
 	return{
-		score=(usesCatchVolume and catchVolumeMissValue or targetMiss)*1000+speedError*100+time*0.5+math.max(verticalVelocityAtCatch-10,0)*0.25,
+		score=targetMiss*1000+speedError*100+time*0.5+math.max(verticalVelocityAtCatch-10,0)*0.25,
 		time=time,
 		totalLeadTime=time+receiverLeadDelay,
 		receiverPredictionDelay=receiverLeadDelay,
@@ -210,9 +196,6 @@ local function interceptCandidate(params,originPosition,receiverStart,wrVel,qbVe
 		maxAngle=params.maxAngle or 55,
 		totalErr=targetMiss,
 		targetMiss=targetMiss,
-		catchVolumeMiss=catchVolumeMissValue,
-		catchVerticalMiss=catchVerticalMiss,
-		usesCatchVolume=usesCatchVolume,
 		yError=yError,
 		speedError=speedError,
 		verticalVelocityAtCatch=verticalVelocityAtCatch,
@@ -293,18 +276,14 @@ function qbAimMath.solve(params)
 
 	local function considerNear(time)
 		local candidate=interceptCandidate(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,params.shape,params.predictorState,false)
-		local miss=candidate and (candidate.usesCatchVolume and candidate.catchVolumeMiss or candidate.targetMiss)
-		local yMiss=candidate and (candidate.usesCatchVolume and candidate.catchVerticalMiss or candidate.yError)
-		if candidate and miss<=(params.nearTargetMissTolerance or 0.05) and yMiss<=(params.catchYTolerance or 0.35) and betterIntercept(candidate,bestNear) then
+		if candidate and candidate.targetMiss<=(params.nearTargetMissTolerance or 0.05) and candidate.yError<=(params.catchYTolerance or 0.35) and betterIntercept(candidate,bestNear) then
 			bestNear=candidate
 		end
 	end
 
 	local function considerRoot(time)
 		local candidate=interceptCandidate(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,params.shape,params.predictorState,false)
-		local miss=candidate and (candidate.usesCatchVolume and candidate.catchVolumeMiss or candidate.targetMiss)
-		local yMiss=candidate and (candidate.usesCatchVolume and candidate.catchVerticalMiss or candidate.yError)
-		if candidate and miss<=(params.targetMissTolerance or 0.35) and yMiss<=(params.catchYTolerance or 0.35) and betterIntercept(candidate,bestRoot) then
+		if candidate and candidate.targetMiss<=(params.targetMissTolerance or 0.35) and candidate.yError<=(params.catchYTolerance or 0.35) and betterIntercept(candidate,bestRoot) then
 			bestRoot=candidate
 		end
 	end

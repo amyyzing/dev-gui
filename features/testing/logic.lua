@@ -447,9 +447,12 @@ function testing.new(app,parent,guiBuilder)
 	local function collectDefenderRoots(throwerOverride)
 		local roots={}
 		local thrower=throwerOverride or playerByName(lastThrower) or localPlayer
+		local throwerTeam=teamOf(thrower) or teamOf(localPlayer)
 
 		for _,player in ipairs(players:GetPlayers()) do
-			if player~=thrower and player~=localPlayer then
+			local playerTeam=teamOf(player)
+			local isOpponent=throwerTeam~=nil and playerTeam~=nil and playerTeam~=throwerTeam
+			if player~=thrower and player~=localPlayer and isOpponent then
 				local defenderRoot=rootOfPlayer(player)
 				if defenderRoot then
 					roots[#roots+1]=defenderRoot
