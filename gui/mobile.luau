@@ -10,67 +10,30 @@ uiMap.Platform="mobile"
 uiMap.LibraryProfileId="original"
 uiMap.DefaultProfileId=uiMap.LibraryProfileId
 
-uiMap.Shell={
-	Module="platforms/mobile/gui/mainframe.lua",
-}
+uiMap.LoaderGui={
+	PreloadPages={"maps","customize","page2","settings","server"},
+	Phases={"setup","modules","gui","ready"},
 
-uiMap.Pages={
-	{Id="main",Host="settingsPage",Order=1,DescriptionKey="Pages.Main",Fallback="MAIN",DefaultVisible=true},
-	{Id="maps",Host="mapPage",Order=2,DescriptionKey="Pages.Maps",Fallback="MAPS"},
-	{Id="server",Host="serverPage",Order=3,DescriptionKey="Pages.Server",Fallback="SERVER"},
-	{Id="customize",Host="uiSettingsPage",Order=4,DescriptionKey="Pages.Customize",Fallback="CUSTOMIZE"},
-	{Id="page2",Host="futurePage",Order=5,DescriptionKey="Pages.Keybinds",Fallback="KEYBINDS"},
-	{Id="settings",Host="actualSettingsPage",Order=6,DescriptionKey="Pages.Settings",Fallback="SETTINGS"},
-}
-
-uiMap.MainPage={
-	Columns={
-		left={Order=1},
-		right={Order=2},
+	Text={
+		Title="untitled gui",
+		Subtitle="loading files and gui",
+		InitialStatus="loading modules...",
+		ReadyTitle="ready",
+		ReadySubtitle="",
+		ReadyStatus="all loaded",
 	},
 
-	Modules={
-		{api="Hitbox",name="Hitbox",column="left",order=1,title="Hitbox"},
-		{api="GameParams",name="Params",column="left",order=2,title="Game Params"},
-		{api="Boost",name="Boost",column="right",order=2,title="Boost"},
-		{api="ESP",name="ESP",column="right",order=3,title="ESP"},
-		{api="QBAim",name="QBAim",column="right",order=4,title="QB Aim"},
-		{api="Testing",name="Testing",column="right",order=5,title="Testing"},
+	Box={
+		W=480,
+		H=320,
 	},
 }
 
-uiMap.MapPage={
-	Modules={
-		{name="MapEditor",api="MapEditorAPI",order=0,title="Map Editor"},
-		{name="Materials",api="MaterialsAPI",order=1,title="Anti Material"},
-		{name="MapCleaner",api="MapCleanerAPI",order=2,title="Map Cleaner"},
-		{name="Ads",api="AdsAPI",order=3,title="Remove Ads"},
-	},
-}
-
-uiMap.KeybindPage={
-	Sections={
-		owned={order=1,title="Hitbox Presets",subtitle="Your saved presets"},
-		editor={order=2,title="Preset Editor",subtitle="edit hotkeys and hitbox sizes and save (maybe?)"},
-		bind={order=3,title="Keybind Settings",subtitle=""},
+uiMap.MainBackgroundGui={
+	Shell={
+		Module="platforms/mobile/gui/mainframe.lua",
 	},
 
-	Modules={
-		{api="hitboxPresets",name="HitboxPresets",section="owned",title="Hitbox Presets"},
-		{api="keybinds",name="Keybinds",section="bind",title="Keybind Settings"},
-		{api="presetEditor",name="PresetEditor",section="editor",title="Preset Editor",requires="keybinds",extras="keybindPresetEditor"},
-	},
-}
-
-uiMap.SettingsPage={
-	Modules={
-		{name="ResetGui",api="ResetGuiAPI",order=2,title="GUI Position"},
-		{name="PlayerData",api="PlayerDataAPI",order=3,title="Player Data"},
-		{name="Discord",api="DiscordAPI",order=4,title="Discord"},
-	},
-}
-
-uiMap.MainFrame={
 	Window={
 		W=880,
 		H=540,
@@ -98,6 +61,115 @@ uiMap.MainFrame={
 		TopButtonOuter=10,
 	},
 }
+
+uiMap.CategoryStructure={
+	main={
+		Columns={
+			left={Order=1},
+			right={Order=2},
+		},
+	},
+
+	keybinds={
+		Sections={
+			owned={order=1,title="Hitbox Presets",subtitle="Your saved presets"},
+			editor={order=2,title="Preset Editor",subtitle="edit hotkeys and hitbox sizes and save (maybe?)"},
+			bind={order=3,title="Keybind Settings",subtitle=""},
+		},
+	},
+}
+
+uiMap.PageStructure={
+	Tabs={
+		{Id="main",Host="settingsPage",Order=1,DescriptionKey="Pages.Main",Fallback="MAIN",DefaultVisible=true},
+		{Id="maps",Host="mapPage",Order=2,DescriptionKey="Pages.Maps",Fallback="MAPS"},
+		{Id="server",Host="serverPage",Order=3,DescriptionKey="Pages.Server",Fallback="SERVER"},
+		{Id="customize",Host="uiSettingsPage",Order=4,DescriptionKey="Pages.Customize",Fallback="CUSTOMIZE"},
+		{Id="page2",Host="futurePage",Order=5,DescriptionKey="Pages.Keybinds",Fallback="KEYBINDS"},
+		{Id="settings",Host="actualSettingsPage",Order=6,DescriptionKey="Pages.Settings",Fallback="SETTINGS"},
+	},
+
+	Pages={
+		main={
+			Host="settingsPage",
+			Categories="main",
+			Modules={
+				{api="Hitbox",name="Hitbox",column="left",order=1,title="Hitbox"},
+				{api="GameParams",name="Params",column="left",order=2,title="Game Params"},
+				{api="Boost",name="Boost",column="right",order=2,title="Boost"},
+				{api="ESP",name="ESP",column="right",order=3,title="ESP"},
+				{api="QBAim",name="QBAim",column="right",order=4,title="QB Aim"},
+				{api="Testing",name="Testing",column="right",order=5,title="Testing"},
+			},
+		},
+
+		maps={
+			Host="mapPage",
+			Modules={
+				{name="MapEditor",api="MapEditorAPI",order=0,title="Map Editor"},
+				{name="Materials",api="MaterialsAPI",order=1,title="Anti Material"},
+				{name="MapCleaner",api="MapCleanerAPI",order=2,title="Map Cleaner"},
+				{name="Ads",api="AdsAPI",order=3,title="Remove Ads"},
+			},
+		},
+
+		server={
+			Host="serverPage",
+			Modules={},
+		},
+
+		customize={
+			Host="uiSettingsPage",
+			Modules={
+				{name="Colors",api="ColorsAPI",order=1,title="Colors"},
+			},
+		},
+
+		page2={
+			Host="futurePage",
+			Categories="keybinds",
+			Modules={
+				{api="hitboxPresets",name="HitboxPresets",section="owned",title="Hitbox Presets"},
+				{api="keybinds",name="Keybinds",section="bind",title="Keybind Settings"},
+				{api="presetEditor",name="PresetEditor",section="editor",title="Preset Editor",requires="keybinds",extras="keybindPresetEditor"},
+			},
+		},
+
+		settings={
+			Host="actualSettingsPage",
+			Modules={
+				{name="ResetGui",api="ResetGuiAPI",order=2,title="GUI Position"},
+				{name="PlayerData",api="PlayerDataAPI",order=3,title="Player Data"},
+				{name="Discord",api="DiscordAPI",order=4,title="Discord"},
+			},
+		},
+	},
+}
+
+uiMap.Structure={
+	LoaderGui=uiMap.LoaderGui,
+	MainBackgroundGui=uiMap.MainBackgroundGui,
+	PageStructure=uiMap.PageStructure,
+	CategoryStructure=uiMap.CategoryStructure,
+}
+
+uiMap.Shell=uiMap.MainBackgroundGui.Shell
+uiMap.MainBackground=uiMap.MainBackgroundGui
+uiMap.MainFrame={
+	Window=uiMap.MainBackgroundGui.Window,
+	Layout=uiMap.MainBackgroundGui.Layout,
+}
+uiMap.Pages=uiMap.PageStructure.Tabs
+uiMap.MainPage={
+	Columns=uiMap.CategoryStructure.main.Columns,
+	Modules=uiMap.PageStructure.Pages.main.Modules,
+}
+uiMap.MapPage=uiMap.PageStructure.Pages.maps
+uiMap.KeybindPage={
+	Sections=uiMap.CategoryStructure.keybinds.Sections,
+	Modules=uiMap.PageStructure.Pages.page2.Modules,
+}
+uiMap.SettingsPage=uiMap.PageStructure.Pages.settings
 
 uiMap.AppStyleDefaults={
 	ThemePanelExpanded=false,
@@ -201,6 +273,61 @@ local function mergeTables(...)
 	return result
 end
 
+function uiMap.GetLoaderGui()
+	return uiMap.LoaderGui or {}
+end
+
+function uiMap.GetMainBackgroundGui()
+	return uiMap.MainBackgroundGui or uiMap.MainBackground or {}
+end
+
+function uiMap.GetPageStructure()
+	return uiMap.PageStructure or {}
+end
+
+function uiMap.GetCategoryStructure(id)
+	local categories=uiMap.CategoryStructure or {}
+	if id then
+		return categories[tostring(id)] or {}
+	end
+
+	return categories
+end
+
+function uiMap.GetPages()
+	local pageStructure=uiMap.GetPageStructure()
+	return pageStructure.Tabs or uiMap.Pages or {}
+end
+
+function uiMap.GetPage(id)
+	local pageStructure=uiMap.GetPageStructure()
+	local pages=pageStructure.Pages or {}
+	return pages[tostring(id or "")] or {}
+end
+
+function uiMap.GetPageModules(id)
+	return uiMap.GetPage(id).Modules
+end
+
+function uiMap.GetPageCategories(id)
+	local page=uiMap.GetPage(id)
+	if type(page.Categories)=="table" then
+		return page.Categories
+	end
+
+	local category=uiMap.GetCategoryStructure(page.Categories)
+	return category.Sections or category
+end
+
+function uiMap.GetPageColumns(id)
+	local page=uiMap.GetPage(id)
+	if type(page.Columns)=="table" then
+		return page.Columns
+	end
+
+	return uiMap.GetCategoryStructure(page.Categories).Columns
+end
+
 function uiMap.GetLibraryProfile(id)
 	if type(libraryMap.GetProfile)=="function" then
 		return libraryMap.GetProfile(id or uiMap.LibraryProfileId)
@@ -211,9 +338,10 @@ end
 
 function uiMap.GetProfile(id)
 	local profile=copyTable(uiMap.GetLibraryProfile(id))
+	local mainBackground=uiMap.GetMainBackgroundGui()
 	profile.mainFrame={
-		Window=copyTable(uiMap.MainFrame.Window),
-		Layout=copyTable(uiMap.MainFrame.Layout),
+		Window=copyTable(mainBackground.Window),
+		Layout=copyTable(mainBackground.Layout),
 	}
 	profile.Defaults=uiMap.GetDefaultStyle(id)
 	return profile
@@ -238,7 +366,7 @@ function uiMap.GetDefaultStyle(id)
 end
 
 function uiMap.GetDefaultWindow()
-	return copyTable(uiMap.MainFrame.Window)
+	return copyTable(uiMap.GetMainBackgroundGui().Window)
 end
 
 return uiMap

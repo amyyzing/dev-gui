@@ -966,6 +966,118 @@ function loadRemoteModuleBatch(paths)
 	return failed==0,nil
 end
 
+function loadUIMapForStructure()
+	if not UILibraryMapModule then
+		local ok,result=pcall(loadRemoteModule,modulePaths.UILibraryMap)
+		if ok and type(result)=="table" then
+			UILibraryMapModule=result
+		end
+	end
+
+	if not UIMapModule then
+		local ok,result=pcall(loadRemoteModule,modulePaths.UIMap)
+		if ok and type(result)=="table" then
+			UIMapModule=result
+		end
+	end
+end
+
+function callUIMap(method,...)
+	if UIMapModule and type(UIMapModule[method])=="function" then
+		local ok,result=pcall(UIMapModule[method],...)
+		if ok and type(result)=="table" then
+			return result
+		end
+	end
+
+	return nil
+end
+
+function getUIMapLoaderGui()
+	local result=callUIMap("GetLoaderGui")
+	if result then
+		return result
+	end
+
+	return UIMapModule and (UIMapModule.LoaderGui or UIMapModule.Loader or {}) or {}
+end
+
+function getUIMapMainBackgroundGui()
+	local result=callUIMap("GetMainBackgroundGui")
+	if result then
+		return result
+	end
+
+	return UIMapModule and (UIMapModule.MainBackgroundGui or UIMapModule.MainBackground or {}) or {}
+end
+
+function getUIMapPages()
+	local result=callUIMap("GetPages")
+	if result then
+		return result
+	end
+
+	if UIMapModule and UIMapModule.PageStructure and type(UIMapModule.PageStructure.Tabs)=="table" then
+		return UIMapModule.PageStructure.Tabs
+	end
+
+	return UIMapModule and UIMapModule.Pages or nil
+end
+
+function getUIMapPageModules(pageId,legacyKey)
+	local result=callUIMap("GetPageModules",pageId)
+	if result then
+		return result
+	end
+
+	local page=callUIMap("GetPage",pageId)
+	if page and type(page.Modules)=="table" then
+		return page.Modules
+	end
+
+	if UIMapModule and UIMapModule.PageStructure and UIMapModule.PageStructure.Pages then
+		page=UIMapModule.PageStructure.Pages[tostring(pageId or "")]
+		if page and type(page.Modules)=="table" then
+			return page.Modules
+		end
+	end
+
+	local legacy=UIMapModule and UIMapModule[legacyKey]
+	return legacy and legacy.Modules or nil
+end
+
+function getUIMapPageCategories(pageId,legacyKey)
+	local result=callUIMap("GetPageCategories",pageId)
+	if result then
+		return result
+	end
+
+	local legacy=UIMapModule and UIMapModule[legacyKey]
+	return legacy and legacy.Sections or nil
+end
+
+loadUIMapForStructure()
+
+do
+	local background=getUIMapMainBackgroundGui()
+	local shell=type(background.Shell)=="table" and background.Shell or {}
+	local shellModule=type(shell.Module)=="string" and shell.Module or nil
+	if shellModule and shellModule~="" and shellModule~=modulePaths.MainFrame then
+		local oldPath=modulePaths.MainFrame
+		modulePaths.MainFrame=shellModule
+		allowedModuleFiles[shellModule]=true
+		startupModuleFileSet[oldPath]=nil
+		startupModuleFileSet[shellModule]=true
+		deferredModuleFileSet[shellModule]=nil
+
+		for index,path in ipairs(startupModuleFiles) do
+			if path==oldPath then
+				startupModuleFiles[index]=shellModule
+			end
+		end
+	end
+end
+
 screenGuiName="HitboxUI"
 for _,existingName in ipairs({"HitboxUI_DarkInfluenced_GUIOnly","1",screenGuiName}) do
 	old=guiParent:FindFirstChild(existingName)
@@ -1008,13 +1120,18 @@ function playLoaderKeyframes(sequence,asynchronous)
 	end
 end
 
-loaderPageNames={"maps","customize","page2","settings","server"}
+loaderGuiMap=getUIMapLoaderGui()
+loaderText=type(loaderGuiMap.Text)=="table" and loaderGuiMap.Text or {}
+loaderBoxConfig=type(loaderGuiMap.Box)=="table" and loaderGuiMap.Box or {}
+loaderBoxW=tonumber(loaderBoxConfig.W) or 480
+loaderBoxH=tonumber(loaderBoxConfig.H) or 320
+loaderPageNames=type(loaderGuiMap.PreloadPages)=="table" and loaderGuiMap.PreloadPages or {"maps","customize","page2","settings","server"}
 loaderStepTotal=#startupModuleFiles+#loaderPageNames+4
 
 loaderCurrent=0
 loaderPhaseCurrent=#startupModuleFiles
 loaderPhaseItems={}
-loaderPhaseNames={"setup","modules","gui","ready"}
+loaderPhaseNames=type(loaderGuiMap.Phases)=="table" and loaderGuiMap.Phases or {"setup","modules","gui","ready"}
 loaderOverlay=make("Frame",{
 	Name="Loader",
 	BackgroundColor3=Color3.fromRGB(8,10,18),
@@ -1049,7 +1166,7 @@ make("UICorner",{CornerRadius=UDim.new(0,0)},loaderBackdropB)
 loaderBox=make("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,0,0.5,0),
-	Size=UDim2.fromOffset(480,320),
+	Size=UDim2.fromOffset(loaderBoxW,loaderBoxH),
 	BackgroundColor3=colors.bg,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
@@ -1092,7 +1209,7 @@ local titleText=make("TextLabel",{
 	BackgroundTransparency=1,
 	Position=UDim2.fromOffset(0,16),
 	Size=UDim2.new(1,-88,0,24),
-	Text="untitled gui",
+	Text=tostring(loaderText.Title or "untitled gui"),
 	Font=Enum.Font.GothamMedium,
 	TextSize=16,
 	TextColor3=colors.text,
@@ -1105,7 +1222,7 @@ local subtitleText=make("TextLabel",{
 	BackgroundTransparency=1,
 	Position=UDim2.fromOffset(0,42),
 	Size=UDim2.new(1,-88,0,18),
-	Text="loading files and gui",
+	Text=tostring(loaderText.Subtitle or "loading files and gui"),
 	Font=Enum.Font.Gotham,
 	TextSize=11,
 	TextColor3=colors.muted,
@@ -1118,7 +1235,7 @@ loaderStatus=make("TextLabel",{
 	BackgroundTransparency=1,
 	Position=UDim2.fromOffset(0,84),
 	Size=UDim2.new(1,0,0,46),
-	Text="loading modules...",
+	Text=tostring(loaderText.InitialStatus or "loading modules..."),
 	Font=Enum.Font.Gotham,
 	TextSize=12,
 	TextColor3=colors.muted,
@@ -1179,7 +1296,7 @@ make("UIGradient",{
 loaderPulse=make("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,0,0.5,0),
-	Size=UDim2.fromOffset(480,320),
+	Size=UDim2.fromOffset(loaderBoxW,loaderBoxH),
 	BackgroundColor3=colors.green,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
@@ -1364,10 +1481,10 @@ function setLoaderProgress(text,current,total,isProblem)
 	if loaderPulse then
 		loaderPulse.BackgroundColor3=isProblem and colors.red or colors.green
 		loaderPulse.BackgroundTransparency=0.95
-		loaderPulse.Size=UDim2.fromOffset(480,320)
+		loaderPulse.Size=UDim2.fromOffset(loaderBoxW,loaderBoxH)
 		TweenService:Create(loaderPulse,TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
 			BackgroundTransparency=1,
-			Size=UDim2.fromOffset(540,374),
+			Size=UDim2.fromOffset(loaderBoxW+60,loaderBoxH+54),
 		}):Play()
 	end
 
@@ -1381,13 +1498,13 @@ end
 function finishLoader()
 	if not loaderOverlay or not loaderOverlay.Parent then return end
 
-	titleText.Text="ready"
-	subtitleText.Text=""
-	setLoaderProgress("all loaded",loaderStepTotal,loaderStepTotal,false)
+	titleText.Text=tostring(loaderText.ReadyTitle or "ready")
+	subtitleText.Text=tostring(loaderText.ReadySubtitle or "")
+	setLoaderProgress(tostring(loaderText.ReadyStatus or "all loaded"),loaderStepTotal,loaderStepTotal,false)
 
 	playLoaderKeyframes({
-		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.18,{BackgroundTransparency=0.88,Size=UDim2.fromOffset(540,374)}},
-		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.28,{BackgroundTransparency=1,Size=UDim2.fromOffset(620,430)}},
+		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.18,{BackgroundTransparency=0.88,Size=UDim2.fromOffset(loaderBoxW+60,loaderBoxH+54)}},
+		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.28,{BackgroundTransparency=1,Size=UDim2.fromOffset(loaderBoxW+140,loaderBoxH+110)}},
 	},true)
 
 	task.delay(0.48,function()

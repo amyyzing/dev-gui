@@ -86,6 +86,9 @@ end
 
 ColorsAPI=nil
 resetCustomizePageDefaults=function() end
+customizePageModules=(getUIMapPageModules and getUIMapPageModules("customize","CustomizePage")) or {
+	{name="Colors",api="ColorsAPI",order=1,title="Colors"},
+}
 
 function clearCustomizePage()
 	clearRuntimePage(uiSettingsPage,true)
@@ -136,7 +139,12 @@ function buildCustomizePage()
 	clearCustomizePage()
 	loadDeferredModuleNames(customizeReloadNames)
 
-	ColorsAPI=buildRuntimeModule({name="Colors",api="ColorsAPI",order=1,title="Colors"},makeCustomizeCtx(),uiSettingsPage)
+	for _,spec in ipairs(customizePageModules) do
+		if spec.name=="Colors" then
+			ColorsAPI=buildRuntimeModule(spec,makeCustomizeCtx(),uiSettingsPage)
+		end
+	end
+
 	if ColorsAPI then
 		resetCustomizePageDefaults=function()
 			if ColorsAPI and ColorsAPI.Reset then
@@ -171,7 +179,7 @@ MaterialsAPI=nil
 MapCleanerAPI=nil
 AdsAPI=nil
 mapApiNames={"MapEditorAPI","MaterialsAPI","MapCleanerAPI","AdsAPI"}
-mapPageModules=(UIMapModule and UIMapModule.MapPage and UIMapModule.MapPage.Modules) or {
+mapPageModules=(getUIMapPageModules and getUIMapPageModules("maps","MapPage")) or (UIMapModule and UIMapModule.MapPage and UIMapModule.MapPage.Modules) or {
 	{name="MapEditor",api="MapEditorAPI",order=0,title="Map Editor"},
 	{name="Materials",api="MaterialsAPI",order=1,title="Anti Material"},
 	{name="MapCleaner",api="MapCleanerAPI",order=2,title="Map Cleaner"},

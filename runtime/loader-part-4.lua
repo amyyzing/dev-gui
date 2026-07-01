@@ -293,7 +293,7 @@ function buildActualSettingsPage()
 	loadDeferredModuleNames(settingsReloadNames)
 	buildUpdateSection()
 
-	local settingsModules=(UIMapModule and UIMapModule.SettingsPage and UIMapModule.SettingsPage.Modules) or {
+	local settingsModules=(getUIMapPageModules and getUIMapPageModules("settings","SettingsPage")) or (UIMapModule and UIMapModule.SettingsPage and UIMapModule.SettingsPage.Modules) or {
 		{name="ResetGui",api="ResetGuiAPI",order=2,title="GUI Position"},
 		{name="PlayerData",api="PlayerDataAPI",order=3,title="Player Data"},
 		{name="Discord",api="DiscordAPI",order=4,title="Discord"},
@@ -351,13 +351,13 @@ keybindRows={
 	{label="QB AIM TOGGLE",key="qbAimToggleKey"},
 }
 
-keybindSections=(UIMapModule and UIMapModule.KeybindPage and UIMapModule.KeybindPage.Sections) or {
+keybindSections=(getUIMapPageCategories and getUIMapPageCategories("page2","KeybindPage")) or (UIMapModule and UIMapModule.KeybindPage and UIMapModule.KeybindPage.Sections) or {
 	owned={order=1,title="Hitbox Presets",subtitle="Your saved presets"},
 	editor={order=2,title="Preset Editor",subtitle="edit hotkeys and hitbox sizes and save (maybe?)"},
 	bind={order=3,title="Keybind Settings",subtitle=""},
 }
 
-keybindPageModules=(UIMapModule and UIMapModule.KeybindPage and UIMapModule.KeybindPage.Modules) or {
+keybindPageModules=(getUIMapPageModules and getUIMapPageModules("page2","KeybindPage")) or (UIMapModule and UIMapModule.KeybindPage and UIMapModule.KeybindPage.Modules) or {
 	{api="hitboxPresets",name="HitboxPresets",section="owned",title="Hitbox Presets"},
 	{api="keybinds",name="Keybinds",section="bind",title="Keybind Settings"},
 	{api="presetEditor",name="PresetEditor",section="editor",title="Preset Editor",requires="keybinds",extras=function(apis) return apis.keybinds,apis.hitboxPresets end},

@@ -558,7 +558,19 @@ function mainFrame.new(app)
 	local activePageValue=makeFusionValue(activePageName)
 	local resizeHandle=nil
 
-	local pageSpecs=type(uiMap.Pages)=="table" and uiMap.Pages or {
+	local mappedPages=nil
+	if type(uiMap.GetPages)=="function" then
+		local ok,result=pcall(uiMap.GetPages)
+		if ok and type(result)=="table" then
+			mappedPages=result
+		end
+	end
+
+	if not mappedPages and type(uiMap.PageStructure)=="table" and type(uiMap.PageStructure.Tabs)=="table" then
+		mappedPages=uiMap.PageStructure.Tabs
+	end
+
+	local pageSpecs=type(mappedPages)=="table" and mappedPages or type(uiMap.Pages)=="table" and uiMap.Pages or {
 		{Id="main",DescriptionKey="Pages.Main",Fallback="MAIN"},
 		{Id="maps",DescriptionKey="Pages.Maps",Fallback="MAPS"},
 		{Id="server",DescriptionKey="Pages.Server",Fallback="SERVER"},

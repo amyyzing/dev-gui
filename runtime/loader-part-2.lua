@@ -478,7 +478,7 @@ function addMainError(parent,order,title,path)
 	make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),Text=path.." did not load.",Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.red,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
 end
 
-mainPageModules=(UIMapModule and UIMapModule.MainPage and UIMapModule.MainPage.Modules) or {
+mainPageModules=(getUIMapPageModules and getUIMapPageModules("main","MainPage")) or (UIMapModule and UIMapModule.MainPage and UIMapModule.MainPage.Modules) or {
 	{api="Hitbox",name="Hitbox",column="left",order=1,title="Hitbox"},
 	{api="GameParams",name="Params",column="left",order=2,title="Game Params"},
 	{api="Boost",name="Boost",column="right",order=2,title="Boost"},
