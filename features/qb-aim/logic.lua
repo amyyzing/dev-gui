@@ -2820,6 +2820,8 @@ function qbAim.new(app,parent)
 			setStatus("no wr")
 			return
 		end
+		sampleReceiverData(receiver,receiverRoot,os.clock())
+		selectedRouteLock=lockRoute(receiver)
 
 		local telemetry=newTelemetryRecord(receiver,modeKey)
 		telemetry.C2_input=vectorLog(c2Position())
@@ -2923,9 +2925,7 @@ function qbAim.new(app,parent)
 		releaseThrowLock()
 	end
 
-	local function lockReceiverUnderCursor()
-		if not(enabled and isAvailable()) then return end
-
+	local function receiverUnderCursor()
 		local camera=workspace.CurrentCamera
 		local mouse=localPlayer:GetMouse()
 		local best=nil
@@ -2945,15 +2945,35 @@ function qbAim.new(app,parent)
 			end
 		end
 
+		return best,bestDistance
+	end
+
+	local function applyTrackedReceiver(receiver,statusPrefix)
+		if not receiver then
+			return false
+		end
+
+		local receiverRoot=rootOfPlayer(receiver)
+		ensureReceiverData(receiver,receiverRoot)
+		sampleReceiverData(receiver,receiverRoot,os.clock())
+		trackedReceiver=receiver
+		selectedRouteLock=lockRoute(receiver)
+		previewFrozen=false
+		preview.ballMissingSince=nil
+		preview.lastCatchPoint,preview.lastStartPoint,preview.lastLandingPoint=nil,nil,nil
+		setTargetText()
+		if statusPrefix then
+			setStatus(statusPrefix.." "..receiver.Name)
+		end
+		return true
+	end
+
+	local function lockReceiverUnderCursor()
+		if not(enabled and isAvailable()) then return end
+
+		local best=receiverUnderCursor()
 		if best then
-			ensureReceiverData(best,rootOfPlayer(best))
-			trackedReceiver=best
-			selectedRouteLock=lockRoute(best)
-			previewFrozen=false
-			preview.ballMissingSince=nil
-			preview.lastCatchPoint,preview.lastStartPoint,preview.lastLandingPoint=nil,nil,nil
-			setTargetText()
-			setStatus("locked "..best.Name)
+			applyTrackedReceiver(best,"locked")
 		else
 			setStatus(state.qbAimTeamFilter~=false and "no teammate" or "no wr")
 		end
@@ -3279,8 +3299,10 @@ function qbAim.new(app,parent)
 		end
 
 		if wantsThrow then
-			if trackedReceiver then
-				throwTo(trackedReceiver,{
+			local currentReceiver=receiverUnderCursor() or trackedReceiver
+			if currentReceiver then
+				applyTrackedReceiver(currentReceiver)
+				throwTo(currentReceiver,{
 					noAnimation=inputWasProcessed,
 				})
 			else

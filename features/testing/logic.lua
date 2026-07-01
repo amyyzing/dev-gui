@@ -16,6 +16,8 @@ local qbSafetyInterval=0
 local qbArcSampleCount=96
 local defenderArrivalBuffer=0.03
 local defenderReachYMargin=0.25
+local defenderCatchRadius=2.75
+local defenderRootGroundOffset=3.00
 local catchMarkerHeight=80
 local catchMarkerThickness=0.12
 local groundMarkerDiameter=5.5
@@ -425,11 +427,11 @@ function testing.new(app,parent,guiBuilder)
 			return result.Position.Y
 		end
 
-		return 0
+		return nil
 	end
 
 	local function defenderReachYRange(defenderRoot)
-		local groundY=fieldGroundYAt(defenderRoot.Position)
+		local groundY=fieldGroundYAt(defenderRoot.Position) or (defenderRoot.Position.Y-defenderRootGroundOffset)
 		return groundY-defenderReachYMargin,groundY+testingCatchY+defenderReachYMargin
 	end
 
@@ -445,12 +447,9 @@ function testing.new(app,parent,guiBuilder)
 	local function collectDefenderRoots(throwerOverride)
 		local roots={}
 		local thrower=throwerOverride or playerByName(lastThrower) or localPlayer
-		local throwerTeam=teamOf(thrower) or teamOf(localPlayer)
 
 		for _,player in ipairs(players:GetPlayers()) do
-			local playerTeam=teamOf(player)
-			local isDefender=player~=thrower and player~=localPlayer and (not throwerTeam or not playerTeam or playerTeam~=throwerTeam)
-			if isDefender then
+			if player~=thrower and player~=localPlayer then
 				local defenderRoot=rootOfPlayer(player)
 				if defenderRoot then
 					roots[#roots+1]=defenderRoot
@@ -470,7 +469,8 @@ function testing.new(app,parent,guiBuilder)
 			return false,math.huge
 		end
 
-		local arrival=(flat(defenderRoot.Position)-flat(point)).Magnitude/defenderSpeed
+		local distance=math.max((flat(defenderRoot.Position)-flat(point)).Magnitude-defenderCatchRadius,0)
+		local arrival=distance/defenderSpeed
 		return arrival+defenderArrivalBuffer<=ballTime,arrival
 	end
 
