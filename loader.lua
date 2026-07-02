@@ -6,6 +6,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local botUrl = "https://lint-bot-production.up.railway.app"
 local moduleGetPath = "/module/get"
+local moduleBatchPath = "/module/batch"
 local apiKey = "mydayohmy"
 local maxSourceBytes = 300000
 
@@ -66,28 +67,20 @@ local function clientRequest()
 	return nil
 end
 
-local function fetchModule(path)
-	if not allowedRuntimeFiles[path] then
-		return nil, "runtime path blocked: " .. tostring(path)
-	end
-
+local function postModuleApi(path,apiBody)
 	local requestFn = clientRequest()
 	if not requestFn then
 		return nil, "no http request found"
 	end
 
-	local apiBody={
-		path = path,
-		apiKey=apiKey,
-		fresh=true,
-		cacheBust=tostring(os.clock())..":"..tostring(path),
-	}
+	apiBody=apiBody or {}
+	apiBody.apiKey=apiBody.apiKey or apiKey
 
 	local body = HttpService:JSONEncode(apiBody)
 
 	local ok, response = pcall(function()
 		return requestFn({
-			Url = botUrl .. moduleGetPath,
+			Url = botUrl .. path,
 			Method="POST",
 			Headers={ ["Content-Type"] = "application/json" },
 			Body = body,
@@ -111,11 +104,54 @@ local function fetchModule(path)
 		return nil, "api decode failed: "..tostring(responseBody)
 	end
 
+	return payload,nil
+end
+
+local function fetchModule(path)
+	if not allowedRuntimeFiles[path] then
+		return nil, "runtime path blocked: " .. tostring(path)
+	end
+
+	local payload,apiError=postModuleApi(moduleGetPath,{
+		path=path,
+	})
+
+	if not payload then
+		return nil,apiError
+	end
+
 	if not payload or payload.ok ~= true or type(payload.source) ~= "string" then
 		return nil, (payload and payload.error) or "runtime missing"
 	end
 
 	return payload.source, nil
+end
+
+local function fetchRuntimeBatch()
+	local payload,apiError=postModuleApi(moduleBatchPath,{
+		paths=runtimeFiles,
+	})
+
+	if not payload then
+		return nil,apiError
+	end
+
+	if payload.ok~=true or type(payload.modules)~="table" then
+		return nil,(payload and payload.error) or "runtime batch missing"
+	end
+
+	local sources={}
+	for _,path in ipairs(runtimeFiles) do
+		local item=payload.modules[path]
+		if not item or type(item.source)~="string" then
+			local errors=type(payload.errors)=="table" and payload.errors or {}
+			return nil,errors[path] or ("runtime batch missing "..tostring(path))
+		end
+
+		sources[path]=item.source
+	end
+
+	return sources,nil
 end
 
 local function validateSource(path, source)
@@ -176,8 +212,18 @@ local runtimeEnv = setmetatable({
 
 runtimeEnv._G = runtimeEnv
 
+local batchedRuntimeSources,batchError=fetchRuntimeBatch()
+if not batchedRuntimeSources and debugEnv.loaderDebug == true then
+	warn("runtime batch failed, falling back:",batchError)
+end
+
 for _,path in ipairs(runtimeFiles) do
-	local source, fetchError = fetchModule(path)
+	local source=batchedRuntimeSources and batchedRuntimeSources[path]
+	local fetchError=nil
+	if not source then
+		source, fetchError = fetchModule(path)
+	end
+
 	if not source then
 		error("loader fetch failed "..path..": "..tostring(fetchError))
 	end

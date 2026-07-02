@@ -523,8 +523,7 @@ function botApi.Post(path,body)
 
 	body=body or{}
 	body.apiKey=botApi.Key
-	if path=="/module/get" or path=="/module/batch" or path=="/module/manifest" then
-		body.fresh=true
+	if (path=="/module/get" or path=="/module/batch" or path=="/module/manifest") and body.fresh==true and body.cacheBust==nil then
 		body.cacheBust=tostring(os.clock())..":"..tostring(path)
 	end
 
@@ -2150,7 +2149,10 @@ function cleanupForManualReload()
 end
 
 function refreshRemoteModulesNow()
-	local result=botApi.Post("/module/get",{path=manualReloadPath})
+	local result=botApi.Post("/module/get",{
+		path=manualReloadPath,
+		fresh=true,
+	})
 	if not result or not result.ok or type(result.source)~="string" then
 		warn("update failed:",result and result.error or "unknown")
 		return false
