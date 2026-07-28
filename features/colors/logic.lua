@@ -537,6 +537,17 @@ function colors.new(app,page)
 		gradientValue.Value=getUIStrokeGradientColor()
 
 		style.StrokeGradient=false
+		local applyQueued=false
+		local tweenFinished=false
+
+		local function flushStep()
+			applyQueued=false
+			if tweenFinished or token~=colourTweenToken then return end
+
+			syncColourControls()
+			updateEverything()
+			syncPickerControls()
+		end
 
 		local function applyStep()
 			if token~=colourTweenToken then return end
@@ -544,9 +555,10 @@ function colors.new(app,page)
 			setMainColour(mainValue.Value)
 			setGradientColour(gradientValue.Value)
 
-			syncColourControls()
-			updateEverything()
-			syncPickerControls()
+			if not applyQueued then
+				applyQueued=true
+				task.defer(flushStep)
+			end
 		end
 
 		local valueConnections={}
@@ -571,6 +583,7 @@ function colors.new(app,page)
 		local gradientColourTween=tweenService:Create(gradientValue,info,{Value=c1})
 
 		trackValueConnection(gradientColourTween.Completed:Connect(function()
+			tweenFinished=true
 			if token==colourTweenToken then
 				setMainColour(c1)
 				setGradientColour(c1)
@@ -650,7 +663,7 @@ function colors.new(app,page)
 			liquidToggle.set(false)
 		end
 
-		tweenStyleTo(c,c,false)
+		tweenStyleTo(c)
 		setPickerFromColor(getActiveColor())
 		syncPickerControls()
 	end

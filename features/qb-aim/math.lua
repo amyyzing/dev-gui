@@ -69,6 +69,78 @@ local function interceptValue(params,originPosition,receiverStart,wrVel,qbVel,ba
 	return neededDisplacement:Dot(neededDisplacement)-ballSpeed*ballSpeed*time*time
 end
 
+local function interceptPolynomial(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed)
+	local inheritance=params.qbInheritance or 0
+	local inheritedVelocity=flat(qbVel or Vector3.zero)*inheritance
+	local receiverDelay=leadDelay(params,0)
+	local a=receiverStart+flat(wrVel)*receiverDelay-originPosition
+	local b=flat(wrVel)-inheritedVelocity
+	local c=-0.5*gravityVector
+
+	return{
+		c0=a:Dot(a),
+		c1=2*a:Dot(b),
+		c2=b:Dot(b)+2*a:Dot(c)-ballSpeed*ballSpeed,
+		c3=2*b:Dot(c),
+		c4=c:Dot(c),
+	}
+end
+
+local function countEvaluation(stats,key)
+	if type(stats)=="table" then
+		stats[key]=(stats[key] or 0)+1
+	end
+end
+
+local function polynomialValue(polynomial,time,stats)
+	countEvaluation(stats,"scalarEvaluations")
+	return((((polynomial.c4*time+polynomial.c3)*time+polynomial.c2)*time+polynomial.c1)*time+polynomial.c0)
+end
+
+local function polynomialDerivative(polynomial,time,stats)
+	countEvaluation(stats,"derivativeEvaluations")
+	return((4*polynomial.c4*time+3*polynomial.c3)*time+2*polynomial.c2)*time+polynomial.c1
+end
+
+local function polynomialSecondDerivative(polynomial,time)
+	return(12*polynomial.c4*time+6*polynomial.c3)*time+2*polynomial.c2
+end
+
+local function oppositeSigns(a,b)
+	return(a<0 and b>0) or(a>0 and b<0)
+end
+
+local function realQuadraticRoots(a,b,c)
+	if math.abs(a)<=1e-12 then
+		if math.abs(b)<=1e-12 then return{} end
+		return{-c/b}
+	end
+
+	local discriminant=b*b-4*a*c
+	if discriminant<-1e-12 then return{} end
+	if math.abs(discriminant)<=1e-12 then return{-b/(2*a)} end
+
+	local root=math.sqrt(math.max(0,discriminant))
+	local q=-0.5*(b+(b>=0 and root or -root))
+	if math.abs(q)<=1e-12 then
+		return{(-b-root)/(2*a),(-b+root)/(2*a)}
+	end
+	return{q/a,c/q}
+end
+
+local function valueTolerance(polynomial,time,ballSpeed)
+	local scale=math.max(
+		1,
+		math.abs(polynomial.c0),
+		math.abs(polynomial.c1*time),
+		math.abs(polynomial.c2*time*time),
+		math.abs(polynomial.c3*time*time*time),
+		math.abs(polynomial.c4*time*time*time*time),
+		ballSpeed*ballSpeed*time*time
+	)
+	return scale*1e-10
+end
+
 local function interceptLeadInfo(params,originPosition,target,wrVel,time,predictorState)
 	local wrFlat=flat(wrVel)
 	local speed=math.max(wrFlat.Magnitude,1e-6)
@@ -145,8 +217,9 @@ local function interceptLeadInfo(params,originPosition,target,wrVel,time,predict
 	}
 end
 
-local function interceptCandidate(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,includeLeadInfo)
+local function interceptCandidate(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,shape,predictorState,includeLeadInfo,polynomial,stats)
 	if time<=0 then return nil end
+	countEvaluation(stats,"candidateEvaluations")
 
 	local inheritance=params.qbInheritance or 0
 	local inheritedVelocity=flat(qbVel or Vector3.zero)*inheritance
@@ -167,7 +240,7 @@ local function interceptCandidate(params,originPosition,receiverStart,wrVel,qbVe
 	local catchY=(params.catchY or receiverStart.Y)+(params.solveYBias or 0)
 	local yError=math.abs(catchPosition.Y-catchY)
 	local speedError=math.abs(requiredSpeed-ballSpeed)
-	local residual=math.abs(interceptValue(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time))
+	local residual=math.abs(polynomial and polynomialValue(polynomial,time,stats) or interceptValue(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time))
 	local verticalVelocityAtCatch=worldVelocity.Y+gravityVector.Y*time
 	local landingPosition,landingTime=landing(originPosition,worldVelocity)
 	local leadDistance=flat(wrVel).Magnitude*receiverLeadDelay
@@ -219,28 +292,98 @@ local function betterIntercept(candidate,current)
 	return candidate.time<current.time
 end
 
-local function refineInterceptTime(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,lo,hi,loValue)
+local function refineRoot(polynomial,lo,hi,loValue,hiValue,iterations,ballSpeed,stats)
 	local low=lo
 	local high=hi
-	local lowValue=loValue or interceptValue(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,low)
+	local lowValue=loValue or polynomialValue(polynomial,low,stats)
+	local highValue=hiValue or polynomialValue(polynomial,high,stats)
+	local current=(low+high)*0.5
 
-	for _=1,(params.bisectionSteps or 12) do
-		local mid=(low+high)*0.5
-		local midValue=interceptValue(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,mid)
-
-		if math.abs(midValue)<1e-5 then
-			return mid
+	for _=1,iterations do
+		local value=polynomialValue(polynomial,current,stats)
+		if math.abs(value)<=valueTolerance(polynomial,current,ballSpeed) then
+			return current
 		end
 
-		if (lowValue<0 and midValue>0) or (lowValue>0 and midValue<0) then
-			high=mid
+		if oppositeSigns(lowValue,value) then
+			high=current
+			highValue=value
 		else
-			low=mid
-			lowValue=midValue
+			low=current
+			lowValue=value
 		end
+
+		local derivative=polynomialDerivative(polynomial,current,stats)
+		local nextTime=nil
+		if math.abs(derivative)>1e-9 then
+			nextTime=current-value/derivative
+		end
+		if not nextTime or nextTime<=low or nextTime>=high then
+			nextTime=(low+high)*0.5
+		end
+		current=nextTime
 	end
 
-	return(low+high)*0.5
+	local lowAbs=math.abs(lowValue)
+	local highAbs=math.abs(highValue)
+	if lowAbs<highAbs then
+		return low
+	end
+	return high
+end
+
+local function refineStationaryPoint(polynomial,lo,hi,loValue,hiValue,iterations,stats)
+	local low=lo
+	local high=hi
+	local lowValue=loValue or polynomialDerivative(polynomial,low,stats)
+	local highValue=hiValue or polynomialDerivative(polynomial,high,stats)
+	local current=(low+high)*0.5
+
+	for _=1,iterations do
+		local value=polynomialDerivative(polynomial,current,stats)
+		if math.abs(value)<=1e-8 then
+			return current
+		end
+
+		if oppositeSigns(lowValue,value) then
+			high=current
+			highValue=value
+		else
+			low=current
+			lowValue=value
+		end
+
+		local second=polynomialSecondDerivative(polynomial,current)
+		local nextTime=nil
+		if math.abs(second)>1e-9 then
+			nextTime=current-value/second
+		end
+		if not nextTime or nextTime<=low or nextTime>=high then
+			nextTime=(low+high)*0.5
+		end
+		current=nextTime
+	end
+
+	if math.abs(lowValue)<math.abs(highValue) then
+		return low
+	end
+	return high
+end
+
+local function refineNearSeed(polynomial,time,lo,hi,iterations,stats)
+	local current=time
+	for _=1,iterations do
+		local value=polynomialValue(polynomial,current,stats)
+		local derivative=polynomialDerivative(polynomial,current,stats)
+		if math.abs(derivative)<=1e-9 then break end
+
+		local nextTime=math.clamp(current-value/derivative,lo,hi)
+		if math.abs(nextTime-current)<=1e-7 then
+			return nextTime
+		end
+		current=nextTime
+	end
+	return current
 end
 
 function qbAimMath.ballAt(originPosition,velocity,time)
@@ -266,44 +409,118 @@ function qbAimMath.solve(params)
 
 	local receiverReleasePosition=receiverBasePosition+wrVel*receiverReleaseOffset
 	local receiverStart=receiverMaxAt(receiverReleasePosition,params.catchY or receiverReleasePosition.Y)
+	local polynomial=interceptPolynomial(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed)
 	local bestRoot=nil
 	local bestNear=nil
 	local minT=params.minTime or 0.35
 	local maxT=params.maxTime or 6
-	local dt=params.dt or 0.01
-	local previousTime=minT
-	local previousValue=interceptValue(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,previousTime)
+	local probeCount=math.max(8,math.floor(params.coarseProbes or 32))
+	local refinementSteps=math.max(12,math.floor(params.refinementSteps or params.bisectionSteps or 18))
+	local stats=params.stats
+	local samples={}
+	local roots={}
+	local nearSeeds={}
+
+	local function addRoot(time)
+		if not time or time<minT-1e-6 or time>maxT+1e-6 then return end
+		time=math.clamp(time,minT,maxT)
+		for _,existing in ipairs(roots) do
+			if math.abs(existing-time)<=1e-4 then return end
+		end
+		roots[#roots+1]=time
+	end
 
 	local function considerNear(time)
-		local candidate=interceptCandidate(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,params.shape,params.predictorState,false)
+		local candidate=interceptCandidate(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,params.shape,params.predictorState,false,polynomial,stats)
 		if candidate and candidate.targetMiss<=(params.nearTargetMissTolerance or 0.05) and candidate.yError<=(params.catchYTolerance or 0.35) and betterIntercept(candidate,bestNear) then
 			bestNear=candidate
 		end
 	end
 
 	local function considerRoot(time)
-		local candidate=interceptCandidate(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,params.shape,params.predictorState,false)
+		local candidate=interceptCandidate(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time,params.shape,params.predictorState,false,polynomial,stats)
 		if candidate and candidate.targetMiss<=(params.targetMissTolerance or 0.35) and candidate.yError<=(params.catchYTolerance or 0.35) and betterIntercept(candidate,bestRoot) then
 			bestRoot=candidate
 		end
 	end
 
-	considerNear(previousTime)
-
-	for time=minT+dt,maxT,dt do
-		local value=interceptValue(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time)
-		considerNear(time)
-
-		if math.abs(value)<1e-8 then
-			considerRoot(time)
-		elseif math.abs(previousValue)<1e-8 then
-			considerRoot(previousTime)
-		elseif (previousValue<0 and value>0) or (previousValue>0 and value<0) then
-			considerRoot(refineInterceptTime(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,previousTime,time,previousValue))
+	for index=0,probeCount do
+		local alpha=index/probeCount
+		local time=minT+(maxT-minT)*alpha
+		local value=polynomialValue(polynomial,time,stats)
+		samples[#samples+1]={time=time,value=value}
+		nearSeeds[#nearSeeds+1]={time=time,value=math.abs(value),index=#samples}
+		if math.abs(value)<=valueTolerance(polynomial,time,ballSpeed) then
+			addRoot(time)
 		end
+	end
 
-		previousTime=time
-		previousValue=value
+	local derivativePartitions={minT,maxT}
+	for _,time in ipairs(realQuadraticRoots(12*polynomial.c4,6*polynomial.c3,2*polynomial.c2)) do
+		if time>minT+1e-7 and time<maxT-1e-7 then
+			derivativePartitions[#derivativePartitions+1]=time
+		end
+	end
+	table.sort(derivativePartitions)
+
+	local stationaryPoints={}
+	local function addStationary(time)
+		if time<minT-1e-6 or time>maxT+1e-6 then return end
+		for _,existing in ipairs(stationaryPoints) do
+			if math.abs(existing-time)<=1e-5 then return end
+		end
+		stationaryPoints[#stationaryPoints+1]=math.clamp(time,minT,maxT)
+	end
+
+	for index=1,#derivativePartitions-1 do
+		local lo=derivativePartitions[index]
+		local hi=derivativePartitions[index+1]
+		local loValue=polynomialDerivative(polynomial,lo,stats)
+		local hiValue=polynomialDerivative(polynomial,hi,stats)
+		if math.abs(loValue)<=1e-8 then addStationary(lo) end
+		if math.abs(hiValue)<=1e-8 then addStationary(hi) end
+		if oppositeSigns(loValue,hiValue) then
+			addStationary(refineStationaryPoint(polynomial,lo,hi,loValue,hiValue,refinementSteps,stats))
+		end
+	end
+	table.sort(stationaryPoints)
+
+	local monotonicPartitions={minT}
+	for _,time in ipairs(stationaryPoints) do
+		if time>minT+1e-6 and time<maxT-1e-6 then
+			monotonicPartitions[#monotonicPartitions+1]=time
+		end
+		local value=polynomialValue(polynomial,time,stats)
+		if math.abs(value)<=valueTolerance(polynomial,time,ballSpeed)*16 then addRoot(time) end
+	end
+	monotonicPartitions[#monotonicPartitions+1]=maxT
+
+	for index=1,#monotonicPartitions-1 do
+		local lo=monotonicPartitions[index]
+		local hi=monotonicPartitions[index+1]
+		local loValue=polynomialValue(polynomial,lo,stats)
+		local hiValue=polynomialValue(polynomial,hi,stats)
+		if oppositeSigns(loValue,hiValue) then
+			addRoot(refineRoot(polynomial,lo,hi,loValue,hiValue,refinementSteps,ballSpeed,stats))
+		end
+	end
+
+	table.sort(roots)
+	for _,time in ipairs(roots) do
+		considerRoot(time)
+	end
+
+	if not bestRoot then
+		table.sort(nearSeeds,function(a,b)
+			return a.value<b.value
+		end)
+		for index=1,math.min(4,#nearSeeds) do
+			local seed=nearSeeds[index]
+			local sampleIndex=seed.index
+			local lo=samples[math.max(1,sampleIndex-1)].time
+			local hi=samples[math.min(#samples,sampleIndex+1)].time
+			considerNear(refineNearSeed(polynomial,seed.time,lo,hi,refinementSteps,stats))
+		end
 	end
 
 	local best=bestRoot or bestNear

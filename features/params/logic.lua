@@ -2,13 +2,14 @@ local gameParams={}
 
 local players=game:GetService("Players")
 local replicatedStorage=game:GetService("ReplicatedStorage")
-local inputService=game:GetService("UserInputService")
 local runService=game:GetService("RunService")
 
 local me=players.LocalPlayer
 local defaultGravity=196.2
 local defaultSpeed=18
-local speedForceInterval=0.05
+local speedForceInterval=0.12
+local paramReapplyInterval=0.12
+local speedForceJobId="GameParamsSpeedForce"
 local defaultSelectedPage="speed"
 local paramRows={
 	JumpPower="jumpPowerValue",
@@ -87,18 +88,21 @@ end
 function gameParams.new(app)
 	app=app or {}
 	local safeDisconnect=app.safeDisconnect
-	local inputToBinding=app.inputToBinding
 	local state=app.State or {}
+	local scheduler=app.schedulerApi
 	local api={}
 	local speedConn=nil
+	local speedScheduled=false
 	local speedElapsed=0
-	local inputConn=nil
 	local rootConns={}
 	local folderConns=setmetatable({}, {__mode="k"})
 	local valueConns=setmetatable({}, {__mode="k"})
+	local pendingValueApplies=setmetatable({}, {__mode="k"})
+	local lastValueApply=setmetatable({}, {__mode="k"})
 	local applying=false
 	local destroyed=false
 	local stateListener=nil
+	local applyParamsQueued=false
 
 	local function disconnect(connection)
 		if safeDisconnect then
@@ -220,6 +224,10 @@ function gameParams.new(app)
 	end
 
 	local function stopSpeedForcing(resetValue)
+		if speedScheduled and scheduler and type(scheduler.Unregister)=="function" then
+			pcall(scheduler.Unregister,"Heartbeat",speedForceJobId)
+		end
+		speedScheduled=false
 		disconnect(speedConn)
 		speedConn=nil
 		speedElapsed=0
@@ -243,8 +251,30 @@ function gameParams.new(app)
 		state.speedValue=clampSpeed(state.speedValue)
 		applySpeedValue()
 
-		if speedConn then
+		if speedConn or speedScheduled then
 			return
+		end
+
+		local function forceSpeed()
+			if not isSpeedActive() or not isAlive() then
+				stopSpeedForcing(false)
+				return
+			end
+
+			state.speedValue=clampSpeed(state.speedValue)
+			local hum=getMyHumanoid()
+
+			if hum and hum.WalkSpeed~=state.speedValue then
+				hum.WalkSpeed=state.speedValue
+			end
+		end
+
+		if scheduler and type(scheduler.Register)=="function" then
+			local ok,result=pcall(scheduler.Register,"Heartbeat",speedForceJobId,speedForceInterval,forceSpeed)
+			if ok and result then
+				speedScheduled=true
+				return
+			end
 		end
 
 		speedConn=runService.Heartbeat:Connect(function(dt)
@@ -260,12 +290,7 @@ function gameParams.new(app)
 			end
 			speedElapsed=0
 
-			state.speedValue=clampSpeed(state.speedValue)
-			local hum=getMyHumanoid()
-
-			if hum and hum.WalkSpeed~=state.speedValue then
-				hum.WalkSpeed=state.speedValue
-			end
+			forceSpeed()
 		end)
 	end
 
@@ -335,7 +360,7 @@ function gameParams.new(app)
 
 		valueConns[valueObject]={}
 
-		table.insert(valueConns[valueObject],valueObject:GetPropertyChangedSignal("Value"):Connect(function()
+		local function writeTarget()
 			if applying or not isAlive() or not isStateKeyActive(stateKey) or not valueObject.Parent then
 				return
 			end
@@ -345,13 +370,44 @@ function gameParams.new(app)
 				applying=true
 				valueObject.Value=target
 				applying=false
+				lastValueApply[valueObject]=os.clock()
 			end
-		end))
+		end
+
+		local function queueWriteTarget()
+			if pendingValueApplies[valueObject] then
+				return
+			end
+
+			pendingValueApplies[valueObject]=true
+
+			local function run()
+				pendingValueApplies[valueObject]=nil
+				if not(isAlive() and isStateKeyActive(stateKey) and valueObject.Parent) then
+					return
+				end
+
+				local elapsed=os.clock()-(lastValueApply[valueObject] or 0)
+				if elapsed<paramReapplyInterval then
+					pendingValueApplies[valueObject]=true
+					task.delay(paramReapplyInterval-elapsed,run)
+					return
+				end
+
+				writeTarget()
+			end
+
+			task.defer(run)
+		end
+
+		table.insert(valueConns[valueObject],valueObject:GetPropertyChangedSignal("Value"):Connect(queueWriteTarget))
 
 		table.insert(valueConns[valueObject],valueObject.AncestryChanged:Connect(function(_,parent)
 			if parent==nil then
 				safeDisconnectAll(valueConns[valueObject])
 				valueConns[valueObject]=nil
+				pendingValueApplies[valueObject]=nil
+				lastValueApply[valueObject]=nil
 			end
 		end))
 	end
@@ -374,6 +430,7 @@ function gameParams.new(app)
 			applying=true
 			valueObject.Value=target
 			applying=false
+			lastValueApply[valueObject]=os.clock()
 		end
 	end
 
@@ -421,17 +478,29 @@ function gameParams.new(app)
 		end
 	end
 
+	local function queueApplyGameParams()
+		if applyParamsQueued then
+			return
+		end
+
+		applyParamsQueued=true
+		task.defer(function()
+			applyParamsQueued=false
+			applyGameParams()
+		end)
+	end
+
 	local function watchRootFolder(root)
 		if not root then return end
 
 		table.insert(rootConns,root.ChildAdded:Connect(function()
-			task.defer(applyGameParams)
+			queueApplyGameParams()
 		end))
 
 		table.insert(rootConns,root.DescendantAdded:Connect(function(descendant)
 			local stateKey=paramRows[descendant.Name]
 			if descendant.Name=="GameParams" or (stateKey and isStateKeyActive(stateKey)) then
-				task.defer(applyGameParams)
+				queueApplyGameParams()
 			end
 		end))
 	end
@@ -458,7 +527,7 @@ function gameParams.new(app)
 		table.insert(rootConns,replicatedStorage.ChildAdded:Connect(function(child)
 			if child.Name=="Games" or child.Name=="MiniGames" then
 				watchRootFolder(child)
-				task.defer(applyGameParams)
+				queueApplyGameParams()
 			end
 		end))
 
@@ -755,9 +824,8 @@ function gameParams.new(app)
 		if destroyed then return end
 		destroyed=true
 		disconnectWatchers()
-		disconnect(inputConn)
-		inputConn=nil
 		stopSpeedForcing(false)
+		workspace.Gravity=defaultGravity
 		stateListener=nil
 	end
 

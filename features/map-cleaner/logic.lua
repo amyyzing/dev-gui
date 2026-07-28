@@ -32,6 +32,11 @@ local targetNames={
 	{key="Packs",name="Packs",parent=workspaceParent},
 }
 
+local targetNameSet={}
+for _,target in ipairs(targetNames) do
+	targetNameSet[target.name]=true
+end
+
 local function isTarget(inst)
 	if not inst then return false end
 
@@ -46,7 +51,6 @@ local function isTarget(inst)
 end
 
 function mapCleaner.new(app,page)
-	local make=app.New or app.make
 	local colors=app.colors
 	local safeDisconnect=app.safeDisconnect
 	local makeSection=app.makeSection
@@ -137,10 +141,10 @@ function mapCleaner.new(app,page)
 		if workspaceConn then return end
 
 		workspaceConn=workspace.DescendantAdded:Connect(function(inst)
-			if not enabled then return end
+			if not enabled or not targetNameSet[inst.Name] or not isTarget(inst) then return end
 
 			task.defer(function()
-				if enabled and isTarget(inst) then
+				if enabled then
 					removeCurrent()
 				end
 			end)

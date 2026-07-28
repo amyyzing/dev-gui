@@ -139,14 +139,19 @@ function trackRuntimeConnection(connection)
 	if connection then
 		if runtimeScope and runtimeScope.add then
 			runtimeScope:add(connection)
+		else
+			table.insert(runtimeConnections,connection)
 		end
-		table.insert(runtimeConnections,connection)
 	end
 
 	return connection
 end
 
 function untrackRuntimeConnection(connection)
+	if runtimeScope and runtimeScope.remove then
+		runtimeScope:remove(connection,false)
+	end
+
 	for index=#runtimeConnections,1,-1 do
 		if runtimeConnections[index]==connection then
 			table.remove(runtimeConnections,index)
@@ -161,6 +166,7 @@ function disconnectRuntimeConnections()
 			runtimeScope:destroy()
 		end)
 	end
+	runtimeScope=nil
 
 	for _,connection in ipairs(runtimeConnections) do
 		if typeof(connection)=="RBXScriptConnection" then
@@ -177,11 +183,6 @@ function disconnectRuntimeConnections()
 	table.clear(runtimeJobOrder)
 	table.clear(runtimeJobConnections)
 
-	if CoreScope and CoreScope.new then
-		runtimeScope=CoreScope.new("runtime",function(err,scopeName)
-			warn("cleanup failed:",scopeName,err)
-		end)
-	end
 end
 
 function registerThemeObject(instance)
@@ -558,7 +559,7 @@ function botApi.Post(path,body)
 	return decoded
 end
 
-manualReloadPath="loader.lua"
+manualReloadPath="main.lua"
 
 -- Keep the source split explicit:
 -- app layout, UI maps, pages, and descriptions live in /gui;
@@ -624,6 +625,7 @@ modulePaths={
 	ESPOffense="features/esp-offense/gui.lua",
 	ESPOffenseLogic="features/esp-offense/logic.lua",
 	QBAim="features/qb-aim/gui.lua",
+	QBInterception="features/qb-aim/interception.lua",
 	QBAimMath="features/qb-aim/math.lua",
 	QBAimLogic="features/qb-aim/logic.lua",
 	Testing="features/testing/gui.lua",
@@ -689,11 +691,7 @@ startupModuleNames={
 	"GuiFusion","GuiLogic","UILibraryMap","UIMap","MainFrame","Description","Announcement",
 	"HitboxLogic","Hitbox","ParamsLogic","Params","BoostLogic","Boost",
 	"ESPDefenseLogic","ESPDefense","ESPOffenseLogic","ESPOffense","ESPLogic","ESP",
-	"QBAimMath","QBAimLogic","QBAim","TestingLogic","Testing",
-	"MapEditorLogic","MapEditor","MaterialsLogic","Materials","MapCleanerLogic","MapCleaner","AdsLogic","Ads",
-	"ColorsLogic","Colors",
-	"HitboxPresetsLogic","HitboxPresets","KeybindsLogic","Keybinds","PresetEditorLogic","PresetEditor",
-	"PlayerDataLogic","PlayerData","ResetGuiLogic","ResetGui","DiscordLogic","Discord",
+	"QBInterception","QBAimMath","QBAimLogic","QBAim","TestingLogic","Testing",
 	"DataSave",
 }
 optionalModuleNames={"CorePlayerCache","CoreBallTracker"}
@@ -908,8 +906,19 @@ function loadRemoteModuleBatch(paths)
 
 	setLoaderProgress("loading files...",0.2,loaderStepTotal,false)
 
-	local apiPaths={}
+	local pendingPaths={}
 	for _,modulePath in ipairs(paths) do
+		if not moduleCache[modulePath] then
+			table.insert(pendingPaths,modulePath)
+		end
+	end
+
+	if #pendingPaths==0 then
+		return true,nil
+	end
+
+	local apiPaths={}
+	for _,modulePath in ipairs(pendingPaths) do
 		if not isExternalModulePath(modulePath) then
 			table.insert(apiPaths,modulePath)
 		end
@@ -923,10 +932,10 @@ function loadRemoteModuleBatch(paths)
 		end
 	end
 
-	local loaded=0
+	local loaded=#paths-#pendingPaths
 	local failed=0
 
-	for index,modulePath in ipairs(paths) do
+	for index,modulePath in ipairs(pendingPaths) do
 		local loadedModule=nil
 		local err=nil
 		local item=result.modules and result.modules[modulePath]
@@ -957,8 +966,9 @@ function loadRemoteModuleBatch(paths)
 			end
 		end
 
-		if index%8==0 or index==#paths then
-			setLoaderProgress("module batch loaded ("..tostring(loaded).."/"..tostring(#paths)..")",math.min(index,loaderStepTotal),loaderStepTotal,failed>0)
+		if index%8==0 or index==#pendingPaths then
+			local processed=(#paths-#pendingPaths)+index
+			setLoaderProgress("module batch loaded ("..tostring(loaded).."/"..tostring(#paths)..")",math.min(processed,loaderStepTotal),loaderStepTotal,failed>0)
 		end
 	end
 
@@ -1627,40 +1637,33 @@ function installRuntimeArchitecture()
 			jobRunner.Unregister(kind,id)
 
 			local key=schedulerKey(kind,id)
-			local state={enabled=true,elapsed=0}
-			local function run(dt)
-				if not state.enabled then
-					return
-				end
-
-				state.elapsed=state.elapsed+(dt or 0)
-				if state.elapsed<interval then
-					return
-				end
-
-				local elapsed=state.elapsed
-				state.elapsed=0
-				local ok,err=pcall(fn,elapsed,dt)
-				if not ok then
-					warn("scheduler job failed:",id,err)
-				end
+			local function run(elapsed,dt)
+				fn(elapsed,dt)
 			end
 
 			local handle
 			if kind=="RenderStepped" then
-				handle=scheduler:onRender(key,0,run,runtimeScope)
+				if interval>0 and scheduler.everyRender then
+					handle=scheduler:everyRender(key,interval,run)
+				else
+					handle=scheduler:onRender(key,0,run)
+				end
 			else
-				handle=scheduler:onHeartbeat(key,0,run,runtimeScope)
+				if interval>0 and scheduler.every then
+					handle=scheduler:every(key,interval,run)
+				else
+					handle=scheduler:onHeartbeat(key,0,run)
+				end
 			end
 
-			handles[key]={handle=handle,state=state}
+			handles[key]={handle=handle}
 			return true
 		end
 
 		function jobRunner.SetEnabled(kind,id,enabled)
 			local entry=handles[schedulerKey(kind,id)]
-			if entry then
-				entry.state.enabled=enabled and true or false
+			if entry and entry.handle and entry.handle.setEnabled then
+				entry.handle:setEnabled(enabled)
 			end
 		end
 
@@ -2086,8 +2089,18 @@ function destroyKnownGuiResidue()
 	end
 end
 
-function cleanupForManualReload()
+function cleanupForManualReload(skipResidueScan)
+	if DataSaveAPI and type(DataSaveAPI.SaveNow)=="function" then
+		pcall(DataSaveAPI.SaveNow)
+	end
+
 	toolAlive=false
+	if DataSaveAPI and type(DataSaveAPI.Destroy)=="function" then
+		pcall(function()
+			DataSaveAPI.Destroy()
+		end)
+	end
+	DataSaveAPI=nil
 
 	if mainPageApis then
 		for key,api in pairs(mainPageApis) do
@@ -2145,7 +2158,9 @@ function cleanupForManualReload()
 		pcall(disconnectRuntimeConnections)
 	end
 
-	destroyKnownGuiResidue()
+	if not skipResidueScan then
+		destroyKnownGuiResidue()
+	end
 end
 
 function refreshRemoteModulesNow()

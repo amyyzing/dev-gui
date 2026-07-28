@@ -581,9 +581,7 @@ end
 
 local function clearArray(t)
 	if type(t)~="table" then return end
-	for i=#t,1,-1 do
-		table.remove(t,i)
-	end
+	table.clear(t)
 end
 
 local function makeLocalCode(name)
@@ -599,8 +597,24 @@ function dataSave.new(app)
 	local root=normalizeRoot(app.playerSettingsRoot)
 	local loading=false
 	local autosaveQueued=false
-	local autosaveDelay=app.autosaveDelay or 0.8
+	local autosaveDelay=app.autosaveDelay or 1.25
 	local autosaveLastPayload=nil
+	local autosaveInFlightPayload=nil
+	local autosaveToken=0
+	local destroyed=false
+
+	local function isAlive()
+		if destroyed then
+			return false
+		end
+
+		if type(app.isToolAlive)=="function" then
+			local ok,result=pcall(app.isToolAlive)
+			return ok and result~=false
+		end
+
+		return app.toolAlive~=false
+	end
 
 	function api.IsLoading()
 		return loading
@@ -655,7 +669,6 @@ function dataSave.new(app)
 		local uiStyle=app.style or {}
 		local defaultUIStyle=getDefaultUIStyle(app)
 		local uiWindow=app.windowState or {}
-		local worldSettings=app.mapSettings or {}
 
 		return{
 			version=1,
@@ -974,7 +987,7 @@ function dataSave.new(app)
 
 	function api.SaveNow()
 		if loading or app.playerSettingsLoading then return false,"loading" end
-		if app.toolAlive==false then return false,"tool not alive" end
+		if not isAlive() then return false,"tool not alive" end
 		if not app.botApi or not app.botApi.Post then return false,"bot api missing" end
 
 		local currentSettings=api.Collect()
@@ -983,12 +996,13 @@ function dataSave.new(app)
 		local ok,encoded=pcall(function()
 			return httpService:JSONEncode(settingsRoot)
 		end)
+		local payloadKey=ok and encoded or nil
 
-		if ok and encoded==autosaveLastPayload then
+		if payloadKey and (payloadKey==autosaveLastPayload or payloadKey==autosaveInFlightPayload) then
 			return true,"unchanged"
 		end
 
-		autosaveLastPayload=ok and encoded or nil
+		autosaveInFlightPayload=payloadKey
 
 		task.spawn(function()
 			local response=app.botApi.Post("/player/save",{
@@ -998,6 +1012,12 @@ function dataSave.new(app)
 
 			if not response or not response.ok then
 				warn("settings save failed:",response and response.error or "unknown")
+			elseif payloadKey then
+				autosaveLastPayload=payloadKey
+			end
+
+			if autosaveInFlightPayload==payloadKey then
+				autosaveInFlightPayload=nil
 			end
 		end)
 
@@ -1006,15 +1026,27 @@ function dataSave.new(app)
 
 	function api.Schedule()
 		if loading or app.playerSettingsLoading then return end
-		if app.toolAlive==false then return end
+		if not isAlive() then return end
 		if autosaveQueued then return end
 
 		autosaveQueued=true
+		autosaveToken=autosaveToken+1
+		local token=autosaveToken
 
 		task.delay(autosaveDelay,function()
+			if destroyed or token~=autosaveToken then
+				return
+			end
 			autosaveQueued=false
 			api.SaveNow()
 		end)
+	end
+
+	function api.Destroy()
+		if destroyed then return end
+		destroyed=true
+		autosaveToken=autosaveToken+1
+		autosaveQueued=false
 	end
 
 	function api.SetPresetSize(index,x,y,z,skipSave)

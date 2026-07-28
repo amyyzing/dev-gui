@@ -7,8 +7,10 @@ local function ensureWorldSettings(app)
 		ws.SmoothPlastic=false
 	end
 
-	if type(ws.OriginalMaterials)~="table" or getmetatable(ws.OriginalMaterials)~=nil then
-		ws.OriginalMaterials={}
+	if type(ws.OriginalMaterials)~="table" then
+		ws.OriginalMaterials=setmetatable({}, {__mode="k"})
+	elseif getmetatable(ws.OriginalMaterials)==nil then
+		setmetatable(ws.OriginalMaterials,{__mode="k"})
 	end
 
 	app.mapSettings=ws
@@ -30,11 +32,12 @@ local function applySmoothPlasticToPart(worldSettings,part)
 		worldSettings.OriginalMaterials[part]=part.Material
 	end
 
-	part.Material=Enum.Material.SmoothPlastic
+	if part.Material~=Enum.Material.SmoothPlastic then
+		part.Material=Enum.Material.SmoothPlastic
+	end
 end
 
 function materials.new(app,page)
-	local colors=app.colors
 	local safeDisconnect=app.safeDisconnect
 	local makeSection=app.makeSection
 	local buildToggleRow=app.buildToggleRow
@@ -42,31 +45,40 @@ function materials.new(app,page)
 	local worldSettings=ensureWorldSettings(app)
 	local api={}
 	local materialToggle=nil
+	local active=false
 
 	function api.SetEnabled(state,fire)
 		worldSettings.SmoothPlastic=state and true or false
 
-		safeDisconnect(worldSettings.Conn)
-		worldSettings.Conn=nil
-
 		if worldSettings.SmoothPlastic then
-			for _,inst in ipairs(workspace:GetDescendants()) do
-				applySmoothPlasticToPart(worldSettings,inst)
-			end
-
-			worldSettings.Conn=workspace.DescendantAdded:Connect(function(inst)
-				if worldSettings.SmoothPlastic then
+			if not active then
+				for _,inst in ipairs(workspace:GetDescendants()) do
 					applySmoothPlasticToPart(worldSettings,inst)
 				end
-			end)
+			end
+
+			if not worldSettings.Conn then
+				worldSettings.Conn=workspace.DescendantAdded:Connect(function(inst)
+					if worldSettings.SmoothPlastic then
+						applySmoothPlasticToPart(worldSettings,inst)
+					end
+				end)
+			end
+			active=true
 		else
+			safeDisconnect(worldSettings.Conn)
+			worldSettings.Conn=nil
+
 			for part,material in pairs(worldSettings.OriginalMaterials) do
 				if part and part.Parent and part:IsA("BasePart") then
-					part.Material=material
+					if part.Material~=material then
+						part.Material=material
+					end
 				end
 			end
 
-			worldSettings.OriginalMaterials={}
+			worldSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
+			active=false
 		end
 
 		if materialToggle then
@@ -89,6 +101,8 @@ function materials.new(app,page)
 
 		if worldSettings.SmoothPlastic then
 			api.SetEnabled(true,false)
+		elseif active then
+			api.SetEnabled(false,false)
 		end
 	end
 

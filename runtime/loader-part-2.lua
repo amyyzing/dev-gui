@@ -426,6 +426,7 @@ function makeMainCtx()
 		ESPLogicModule=ESPLogicModule,
 		ESPDefenseLogicModule=ESPDefenseLogicModule,
 		ESPOffenseLogicModule=ESPOffenseLogicModule,
+		QBInterceptionModule=QBInterceptionModule,
 		QBAimMathModule=QBAimMathModule,
 		QBAimLogicModule=QBAimLogicModule,
 		TestingLogicModule=TestingLogicModule,
@@ -453,11 +454,11 @@ function makeMainCtx()
 			elseif modeSubtitle then
 				modeSubtitle.Text=getMainDescriptionText()
 			end
-			if mainPageApis.gameParams and type(mainPageApis.gameParams.Refresh)=="function" then
-				pcall(mainPageApis.gameParams.Refresh)
+			if mainPageApis.GameParams and type(mainPageApis.GameParams.Refresh)=="function" then
+				pcall(mainPageApis.GameParams.Refresh)
 			end
-			if mainPageApis.esp and type(mainPageApis.esp.Refresh)=="function" then
-				pcall(mainPageApis.esp.Refresh)
+			if mainPageApis.ESP and type(mainPageApis.ESP.Refresh)=="function" then
+				pcall(mainPageApis.ESP.Refresh)
 			end
 			if mainPageApis.QBAim and type(mainPageApis.QBAim.Refresh)=="function" then
 				pcall(mainPageApis.QBAim.Refresh)

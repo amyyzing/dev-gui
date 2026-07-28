@@ -98,7 +98,7 @@ function playerCacheApi.new(playersService, workspaceService, scope)
 	return self
 end
 
-function playerCacheApi:_connect(signal, callback)
+function playerCacheApi:_connect(signal, callback, trackGlobally)
 	if not signal or type(signal.Connect) ~= "function" then
 		return nil
 	end
@@ -108,7 +108,9 @@ function playerCacheApi:_connect(signal, callback)
 	end)
 
 	if ok and connection then
-		self._connections[#self._connections + 1] = connection
+		if trackGlobally ~= false then
+			self._connections[#self._connections + 1] = connection
+		end
 		return connection
 	end
 
@@ -121,13 +123,13 @@ function playerCacheApi:_bindPlayerSignals(player, entry)
 
 	entry.characterAddedConnection = self:_connect(player.CharacterAdded, function()
 		self:refreshPlayer(player)
-	end)
+	end, false)
 
 	entry.characterRemovingConnection = self:_connect(player.CharacterRemoving, function()
 		entry.character = nil
 		entry.root = nil
 		entry.humanoid = nil
-	end)
+	end, false)
 end
 
 function playerCacheApi:_addPlayer(player)
@@ -189,6 +191,11 @@ function playerCacheApi:getEntry(player)
 		self:_addPlayer(player)
 	end
 
+	local entry = self._entries[player]
+	if entry.character and entry.character.Parent and entry.root and entry.root.Parent then
+		return entry
+	end
+
 	return self:refreshPlayer(player)
 end
 
@@ -204,6 +211,9 @@ end
 
 function playerCacheApi:getHumanoid(player)
 	local entry = self:getEntry(player)
+	if entry and (not entry.humanoid or not entry.humanoid.Parent) and entry.character then
+		entry.humanoid = entry.character:FindFirstChildOfClass("Humanoid")
+	end
 	return entry and entry.humanoid or nil
 end
 

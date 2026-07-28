@@ -185,8 +185,7 @@ function esp.new(app,parent)
 
 	local function trackedFootball(player)
 		if ballTracker and type(ballTracker.getFootballPartFromPlayer)=="function" then
-			local football=ballTracker:getFootballPartFromPlayer(player,35)
-			if football then return football end
+			return ballTracker:getFootballPartFromPlayer(player,35)
 		end
 
 		return getFootballPartFromPlayer(player)
@@ -194,8 +193,7 @@ function esp.new(app,parent)
 
 	local function trackedTeamID(player)
 		if playerCache and type(playerCache.getTeamId)=="function" then
-			local teamID=playerCache:getTeamId(player)
-			if teamID then return teamID end
+			return playerCache:getTeamId(player)
 		end
 
 		return getPlayerTeamID(player)
@@ -285,7 +283,7 @@ function esp.new(app,parent)
 		refreshFooter(isGameplay())
 	end
 
-	local function syncControls()
+	local function syncControls(refreshActive)
 		local gameplay=isGameplay()
 		local mode=gameplay and getPossessionMode() or nil
 		local available=gameplay
@@ -302,7 +300,7 @@ function esp.new(app,parent)
 				stopBoth()
 				activeMode=nextMode
 				if nextApi and type(nextApi.Start)=="function" then pcall(nextApi.Start) end
-			elseif nextApi and type(nextApi.Refresh)=="function" then
+			elseif refreshActive and nextApi and type(nextApi.Refresh)=="function" then
 				pcall(nextApi.Refresh)
 			end
 			setStatus(nextMode=="defense" and "Defense active" or "Offense active",colors.green or colors.text)
@@ -326,7 +324,7 @@ function esp.new(app,parent)
 
 	function api.SetESPState(value,fire)
 		state.actionStatusOn=(value and isGameplay()) and true or false
-		syncControls()
+		syncControls(false)
 
 		if fire~=false then
 			changed()
@@ -334,7 +332,7 @@ function esp.new(app,parent)
 	end
 
 	function api.Refresh()
-		syncControls()
+		syncControls(true)
 	end
 
 	function api.Reset()
@@ -409,18 +407,18 @@ function esp.new(app,parent)
 
 	if scheduler and scheduler.Register then
 		scheduler.Register("Heartbeat","ESPControls",0.25,function()
-			syncControls()
+			syncControls(false)
 		end)
 	else
 		heartbeatConn=runService.Heartbeat:Connect(function(dt)
 			poll=poll+dt
 			if poll<0.25 then return end
 			poll=0
-			syncControls()
+			syncControls(false)
 		end)
 	end
 
-	syncControls()
+	syncControls(false)
 	return api
 end
 

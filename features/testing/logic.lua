@@ -6,24 +6,15 @@ local replicatedStorage=game:GetService("ReplicatedStorage")
 local workspace=game:GetService("Workspace")
 
 local localPlayer=players.LocalPlayer
+local qbInterception=rawget(getfenv(),"QBInterceptionModule")
 
 local ballGravity=28
 local testingCatchY=14.30
 local qbSafetyJobName="TestingQBCenterSafety"
-local qbSafetyInterval=0
+local qbSafetyInterval=0.06
 local USE_LEGACY_VISUAL_ARC_FALLBACK=false
 local SAFETY={
-	defenderSpeed=21,
-	reactionTime=0,
-	catchRadius=2.75,
-	bodyCatchMinYOffset=-2.5,
-	standingCatchMaxYOffset=6.5,
-	maxSegmentLength=1.25,
-	maxTimeStep=1/120,
-	maxSegments=700,
-	staleArcMaxAge=0.075,
-	forwardEpsilon=-0.05,
-	verticalSlack=0.25,
+	staleArcMaxAge=0.12,
 }
 local WHITE_ARC=ColorSequence.new(Color3.new(1,1,1))
 local RED_ARC=ColorSequence.new(Color3.fromRGB(255,70,70))
@@ -85,25 +76,6 @@ end
 
 local function flat(v)
 	return Vector3.new(v.X,0,v.Z)
-end
-
-local function horizontalDistance(a,b)
-	local dx=a.X-b.X
-	local dz=a.Z-b.Z
-	return math.sqrt(dx*dx+dz*dz)
-end
-
-local function closestAlphaXZ(point,a,b)
-	local pointXZ=flat(point)
-	local aXZ=flat(a)
-	local bXZ=flat(b)
-	local segment=bXZ-aXZ
-	local lengthSquared=segment:Dot(segment)
-	if lengthSquared<=1e-6 then
-		return 0
-	end
-
-	return math.clamp((pointXZ-aXZ):Dot(segment)/lengthSquared,0,1)
 end
 
 local function customTeamOf(player)
@@ -191,10 +163,6 @@ end
 
 local function legacyProjectileAt(origin,velocity,time)
 	return origin+velocity*time+Vector3.new(0,-0.5*ballGravity*time*time,0)
-end
-
-local function projectileAt(arc,time)
-	return arc.origin+arc.velocity*time+0.5*arc.gravity*time*time
 end
 
 local function c1FromPayload(payload)
@@ -378,12 +346,12 @@ local function findCenter()
 end
 
 function testing.new(app,parent,guiBuilder)
-	local make=app.New or app.make
 	local colors=app.colors
 	local safeDisconnect=app.safeDisconnect
 	local makeSection=app.makeSection
 	local buildToggleRow=app.buildToggleRow
 	local scheduler=app.schedulerApi
+	local interceptionCore=app.QBInterceptionModule or qbInterception
 	local state=app.State
 	local api={}
 	local section=nil
@@ -400,9 +368,14 @@ function testing.new(app,parent,guiBuilder)
 	local lifetimeConnections={}
 	local listeningEvents={}
 	local reconnectQueued=false
+	local destroyed=false
+	local captureToken=0
 	local lastThrower=nil
-	local lastThrowAt=0
 	local centerBeamDefaults={}
+
+	if not interceptionCore then
+		error("qb interception missing")
+	end
 
 	state.testingEnabled=state.testingEnabled and true or false
 	if state.testingWREnabled==nil then state.testingWREnabled=true end
@@ -469,7 +442,7 @@ function testing.new(app,parent,guiBuilder)
 		groundMarker=nil
 	end
 
-	local function setThrowingArcUnsafe(arc,unsafe)
+	local function setThrowingArcUnsafe(arc,unsafe,info)
 		local beam=arc and arc.beam
 		if not(beam and beam.Parent) then
 			return
@@ -479,7 +452,17 @@ function testing.new(app,parent,guiBuilder)
 			centerBeamDefaults[beam]=beam.Color
 		end
 
-		beam.Color=unsafe and RED_ARC or (centerBeamDefaults[beam] or WHITE_ARC)
+		if unsafe then
+			beam.Color=interceptionCore.BuildColorSequence(
+				centerBeamDefaults[beam] or WHITE_ARC,
+				RED_ARC,
+				info and info.windows or nil,
+				arc.flightTime,
+				false
+			)
+		else
+			beam.Color=centerBeamDefaults[beam] or WHITE_ARC
+		end
 	end
 
 	local function restoreCenterBeams()
@@ -534,122 +517,44 @@ function testing.new(app,parent,guiBuilder)
 		return humanoid.JumpHeight
 	end
 
-	local function maxJumpOffsetByTime(humanoid,time)
-		local peakHeight=math.max(0,getJumpPeakHeight(humanoid))
-		if peakHeight<=0 then
-			return 0
-		end
+	local function getTackleBox(player)
+		local replicated=player and player:FindFirstChild("Replicated")
+		local tackleBoxValue=replicated and replicated:FindFirstChild("TackleBox")
+		if not tackleBoxValue then return nil end
 
-		local g=workspace.Gravity
-		if g<=0 then
-			return peakHeight
-		end
-
-		local v0=math.sqrt(2*g*peakHeight)
-		local timeToPeak=v0/g
-		if time>=timeToPeak then
-			return peakHeight
-		end
-
-		return math.max(0,v0*time-0.5*g*time*time)
-	end
-
-	local function getCatchYRange(character,time)
-		local root=character and character:FindFirstChild("HumanoidRootPart")
-		if not root then
-			return nil
-		end
-
-		local humanoid=character:FindFirstChildOfClass("Humanoid")
-		local jumpOffset=maxJumpOffsetByTime(humanoid,time)
-		local minY=root.Position.Y+SAFETY.bodyCatchMinYOffset
-		local maxY=root.Position.Y+SAFETY.standingCatchMaxYOffset+jumpOffset
-		return minY,maxY,root,humanoid
-	end
-
-	local function estimateSegmentCount(arc)
-		local flightTime=math.max(0,arc and arc.flightTime or 0)
-		if flightTime<=0 then
-			return 0
-		end
-
-		local maxSpeedEstimate=arc.velocity.Magnitude+arc.gravity.Magnitude*flightTime
-		local approxPathLength=maxSpeedEstimate*flightTime
-		local byTime=math.ceil(flightTime/SAFETY.maxTimeStep)
-		local byLength=math.ceil(approxPathLength/SAFETY.maxSegmentLength)
-		return math.clamp(math.max(byTime,byLength,8),8,SAFETY.maxSegments)
-	end
-
-	local function isForwardFromC2(arc,point)
-		local offset=flat(point-arc.origin)
-		return offset:Dot(arc.forward)>=SAFETY.forwardEpsilon
-	end
-
-	local function canDefenderReachSegment(arc,player,t0,t1)
-		local character=player and player.Character
-		if not character then
-			return false
-		end
-
-		local humanoid=character:FindFirstChildOfClass("Humanoid")
-		local root=character:FindFirstChild("HumanoidRootPart")
-		if not(humanoid and root) or humanoid.Health<=0 then
-			return false
-		end
-
-		local p0=projectileAt(arc,t0)
-		local p1=projectileAt(arc,t1)
-		local alpha=closestAlphaXZ(root.Position,p0,p1)
-		local tBall=t0+(t1-t0)*alpha
-		local ballPoint=projectileAt(arc,tBall)
-		if not isForwardFromC2(arc,ballPoint) then
-			return false
-		end
-
-		local minY,maxY=getCatchYRange(character,tBall)
-		if not(minY and maxY) then
-			return false
-		end
-
-		if ballPoint.Y<minY-SAFETY.verticalSlack or ballPoint.Y>maxY+SAFETY.verticalSlack then
-			return false
-		end
-
-		local availableTime=math.max(0,tBall-SAFETY.reactionTime)
-		local reachableRadius=SAFETY.catchRadius+SAFETY.defenderSpeed*availableTime
-		local distance=horizontalDistance(root.Position,ballPoint)
-		if distance<=reachableRadius then
-			return true,{
-				player=player,
-				time=tBall,
-				point=ballPoint,
-				distance=distance,
-				reachableRadius=reachableRadius,
-				yMin=minY,
-				yMax=maxY,
-			}
-		end
-
-		return false
-	end
-
-	local function defenderCanInterceptArc(arc,player)
-		local segmentCount=estimateSegmentCount(arc)
-		if segmentCount<=0 then
-			return false
-		end
-
-		for i=0,segmentCount-1 do
-			local t0=arc.flightTime*(i/segmentCount)
-			local t1=arc.flightTime*((i+1)/segmentCount)
-			local hit,info=canDefenderReachSegment(arc,player,t0,t1)
-			if hit then
-				info.segmentCount=segmentCount
-				return true,info
+		local ok,value=pcall(function()
+			return tackleBoxValue.Value
+		end)
+		if ok and typeof(value)=="Instance" and value.Parent then
+			if value:IsA("BasePart") then return value end
+			for _,name in ipairs({"CatchBox","PlayerCollisionBox"}) do
+				local part=value:FindFirstChild(name,true)
+				if part and part:IsA("BasePart") then return part end
 			end
 		end
+		return nil
+	end
 
-		return false
+	local function defenderDescriptor(player)
+		local character=player and player.Character
+		local humanoid=character and character:FindFirstChildOfClass("Humanoid")
+		local root=character and character:FindFirstChild("HumanoidRootPart")
+		if not(root and humanoid) or humanoid.Health<=0 then return nil end
+
+		local tackleBox=getTackleBox(player)
+		local jumpHeight=getJumpPeakHeight(humanoid)
+		local gravity=math.max(workspace.Gravity,1e-3)
+		local jumpRiseTime=humanoid.UseJumpPower
+			and math.max(0,humanoid.JumpPower)/gravity
+			or math.sqrt(2*math.max(0,jumpHeight)/gravity)
+		return{
+			player=player,
+			position=(tackleBox and tackleBox.Position) or root.Position,
+			velocity=root.AssemblyLinearVelocity or Vector3.zero,
+			boxSize=(tackleBox and tackleBox.Size) or root.Size,
+			jumpHeight=jumpHeight,
+			jumpRiseTime=jumpRiseTime,
+		}
 	end
 
 	local function isArcStateFresh(arc)
@@ -695,6 +600,7 @@ function testing.new(app,parent,guiBuilder)
 			})
 		end
 
+		local defenders={}
 		for _,player in ipairs(players:GetPlayers()) do
 			if player~=thrower then
 				local teamResult=sameTeam(player,thrower)
@@ -708,15 +614,15 @@ function testing.new(app,parent,guiBuilder)
 				})
 
 				if opponent and db then
-					local hit,info=defenderCanInterceptArc(arc,player)
-					if hit then
-						return true,info
+					local defender=defenderDescriptor(player)
+					if defender then
+						defenders[#defenders+1]=defender
 					end
 				end
 			end
 		end
 
-		return false,{reason="no_interceptor"}
+		return interceptionCore.Evaluate(arc,defenders)
 	end
 
 	local function updateQBCenterSafety()
@@ -749,7 +655,7 @@ function testing.new(app,parent,guiBuilder)
 			return
 		end
 
-		setThrowingArcUnsafe(arc,unsafe)
+		setThrowingArcUnsafe(arc,unsafe,info)
 		debugQB("arc_decision",{
 			unsafe=unsafe,
 			reason=info and info.reason or "intercept",
@@ -771,12 +677,12 @@ function testing.new(app,parent,guiBuilder)
 			yMax=info and info.yMax or "nil",
 			distance=info and info.distance or "nil",
 			reachableRadius=info and info.reachableRadius or "nil",
-			segmentCount=info and info.segmentCount or estimateSegmentCount(arc),
+			windowCount=info and info.windows and #info.windows or 0,
 		})
 	end
 
 	local function syncQBSafety()
-		if not(state.testingEnabled and state.testingQBEnabled~=false) then
+		if destroyed or not(state.testingEnabled and state.testingQBEnabled~=false) then
 			disconnectQBSafety()
 			return
 		end
@@ -895,7 +801,7 @@ function testing.new(app,parent,guiBuilder)
 	end
 
 	local function captureC1(source,payload)
-		if not(state.testingEnabled and state.testingWREnabled~=false) then return end
+		if destroyed or not(state.testingEnabled and state.testingWREnabled~=false) then return end
 
 		local center,folder=findCenter()
 		local c1=center and center:FindFirstChild("C1",true)
@@ -925,11 +831,19 @@ function testing.new(app,parent,guiBuilder)
 	end
 
 	local function captureSoon(source,payload)
-		task.defer(captureC1,source,payload)
-		task.delay(0.016,captureC1,source,payload)
-		task.delay(0.033,captureC1,source,payload)
-		task.delay(0.08,captureC1,source,payload)
-		task.delay(0.15,captureC1,source,payload)
+		captureToken=captureToken+1
+		local token=captureToken
+		local function captureCurrent()
+			if not destroyed and token==captureToken then
+				captureC1(source,payload)
+			end
+		end
+
+		task.defer(captureCurrent)
+		task.delay(0.016,captureCurrent)
+		task.delay(0.033,captureCurrent)
+		task.delay(0.08,captureCurrent)
+		task.delay(0.15,captureCurrent)
 	end
 
 	local function updateFootballPayload(args,startIndex)
@@ -953,7 +867,6 @@ function testing.new(app,parent,guiBuilder)
 			local view=args[2].View
 			if not isLocalView(view) then
 				lastThrower=instanceName(view)
-				lastThrowAt=os.clock()
 				setStatus("throw: "..lastThrower,colors.muted)
 				captureSoon("throw")
 			end
@@ -970,7 +883,6 @@ function testing.new(app,parent,guiBuilder)
 
 		if topic=="UpdateFootball" then
 			local payload=updateFootballPayload(args,2)
-			lastThrowAt=os.clock()
 			setStatus("football"..(payload and (" "..fmtPower(payload.Power)) or ""),colors.muted)
 			captureSoon("update football",payload)
 		end
@@ -979,12 +891,12 @@ function testing.new(app,parent,guiBuilder)
 	local connectIncoming
 
 	local function scheduleReconnect()
-		if reconnectQueued or not(state.testingEnabled and state.testingWREnabled~=false) then return end
+		if destroyed or reconnectQueued or not(state.testingEnabled and state.testingWREnabled~=false) then return end
 		reconnectQueued=true
 
 		task.defer(function()
 			reconnectQueued=false
-			if state.testingEnabled and state.testingWREnabled~=false and connectIncoming then
+			if not destroyed and state.testingEnabled and state.testingWREnabled~=false and connectIncoming then
 				connectIncoming()
 			end
 		end)
@@ -1057,7 +969,7 @@ function testing.new(app,parent,guiBuilder)
 
 	connectIncoming=function()
 		disconnectRemoteConnections()
-		if not(state.testingEnabled and state.testingWREnabled~=false) then
+		if destroyed or not(state.testingEnabled and state.testingWREnabled~=false) then
 			return
 		end
 		watchRemoteTopology()
@@ -1083,7 +995,6 @@ function testing.new(app,parent,guiBuilder)
 			destroyMarker()
 			CurrentThrowArcState=nil
 			lastThrower=nil
-			lastThrowAt=0
 			setStatus("off",colors.muted)
 		end
 
@@ -1101,7 +1012,6 @@ function testing.new(app,parent,guiBuilder)
 			disconnectAll()
 			destroyMarker()
 			lastThrower=nil
-			lastThrowAt=0
 		end
 
 		syncControls()
@@ -1139,6 +1049,7 @@ function testing.new(app,parent,guiBuilder)
 	end
 
 	function api.Refresh()
+		if destroyed then return end
 		syncControls()
 		if state.testingEnabled then
 			connectIncoming()
@@ -1154,6 +1065,9 @@ function testing.new(app,parent,guiBuilder)
 	end
 
 	function api.Destroy()
+		if destroyed then return end
+		destroyed=true
+		captureToken=captureToken+1
 		disconnectAll()
 		disconnectQBSafety()
 		CurrentThrowArcState=nil

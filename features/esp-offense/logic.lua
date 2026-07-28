@@ -21,9 +21,9 @@ local maxThrowAngle=55
 local defenderSpeed=21
 local defenderReactionBuffer=0.05
 local catchHeightTolerance=0.25
-local passSampleStep=0.08
-local passSampleMax=28
-local espRefreshInterval=0.12
+local passSampleStep=0.12
+local passSampleMax=18
+local espRefreshInterval=0.20
 local espTeamCacheInterval=0.50
 local teamCache=setmetatable({}, {__mode="k"})
 
@@ -409,6 +409,7 @@ function espOffense.new(app)
 	local heartbeatConn=nil
 	local heartbeatElapsed=0
 	local running=false
+	local highlightsVisible=true
 	local schedulerJobId="ESPOffense"
 	local function currentPlayers()
 		if playerCache and type(playerCache.getPlayers)=="function" then
@@ -436,20 +437,25 @@ function espOffense.new(app)
 
 	local function trackedFootball(player)
 		if ballTracker and type(ballTracker.getFootballPartFromPlayer)=="function" then
-			local football=ballTracker:getFootballPartFromPlayer(player,35)
-			if football then return football end
+			return ballTracker:getFootballPartFromPlayer(player,35)
 		end
 
 		return getFootballPartFromPlayer(player)
 	end
 
-	local function clearHighlights()
+	local function clearHighlights(force)
+		if not force and not highlightsVisible then
+			return
+		end
+
 		for _,player in ipairs(currentPlayers()) do
 			local character=cachedCharacter(player)
 			if character then
 				destroyOwnedHighlight(character)
 			end
 		end
+
+		highlightsVisible=false
 	end
 
 	local function rebuild()
@@ -470,6 +476,7 @@ function espOffense.new(app)
 		local defenderRoots=collectDefenderRoots(players)
 		local red=colors.red or Color3.fromRGB(210,70,70)
 		local green=colors.green or Color3.fromRGB(90,200,90)
+		local nextHighlightsVisible=false
 
 		for _,player in ipairs(players) do
 			if player~=me then
@@ -480,8 +487,10 @@ function espOffense.new(app)
 							destroyOwnedHighlight(character)
 						elseif isReceiverClosed(player,origin,defenderRoots,catchY) then
 							forceHighlight(app,character,"closed",red)
+							nextHighlightsVisible=true
 						else
 							forceHighlight(app,character,"open",green)
+							nextHighlightsVisible=true
 						end
 					else
 						destroyOwnedHighlight(character)
@@ -489,6 +498,8 @@ function espOffense.new(app)
 				end
 			end
 		end
+
+		highlightsVisible=nextHighlightsVisible
 	end
 
 	function api.Start()
@@ -521,7 +532,7 @@ function espOffense.new(app)
 		end
 		safeDisconnect(heartbeatConn)
 		heartbeatConn=nil
-		clearHighlights()
+		clearHighlights(true)
 	end
 
 	function api.Refresh()

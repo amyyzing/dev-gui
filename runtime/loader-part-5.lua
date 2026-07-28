@@ -1,27 +1,15 @@
 function shutdownTool()
 	if not toolAlive then return end
 
-	sendPlayerSessionUpdate(true)
-	toolAlive=false
+	task.spawn(sendPlayerSessionUpdate,true)
 
-	if AnnouncementAPI and type(AnnouncementAPI.Destroy)=="function" then
-		pcall(function()
-			AnnouncementAPI.Destroy()
-		end)
-	end
-
-	if mainFrame and type(mainFrame.Destroy)=="function" then
-		pcall(function()
-			mainFrame.Destroy()
-		end)
-	end
-
-	if stopLiquidStrokeAnimation then
-		pcall(stopLiquidStrokeAnimation)
-	end
-
-	if disconnectRuntimeConnections then
-		disconnectRuntimeConnections()
+	if cleanupForManualReload then
+		cleanupForManualReload(true)
+	else
+		toolAlive=false
+		if disconnectRuntimeConnections then
+			disconnectRuntimeConnections()
+		end
 	end
 
 	if screenGui and screenGui.Parent then
@@ -40,13 +28,13 @@ function applyHitboxPreset(index)
 	mainPageState.sizeY=size.Y
 	mainPageState.sizeZ=size.Z
 
-	if mainPageApis.hitbox and type(mainPageApis.hitbox.SetHitboxSize)=="function" then
+	if mainPageApis.Hitbox and type(mainPageApis.Hitbox.SetHitboxSize)=="function" then
 		pcall(function()
-			mainPageApis.hitbox.SetHitboxSize(size.X,size.Y,size.Z,true)
+			mainPageApis.Hitbox.SetHitboxSize(size.X,size.Y,size.Z,true)
 		end)
-	elseif mainPageApis.hitbox and type(mainPageApis.hitbox.Refresh)=="function" then
+	elseif mainPageApis.Hitbox and type(mainPageApis.Hitbox.Refresh)=="function" then
 		syncMainState()
-		pcall(mainPageApis.hitbox.Refresh)
+		pcall(mainPageApis.Hitbox.Refresh)
 		requestPlayerAutosave()
 	else
 		syncMainState()
@@ -88,7 +76,7 @@ function handleGlobalInput(inp,processed)
 	end
 
 	if bind~=nil and bind==espToggleKey and espToggleKey~=Enum.KeyCode.Unknown then
-		if not(mainPageApis.esp and mainPageApis.esp.SetESPState) then
+		if not(mainPageApis.ESP and mainPageApis.ESP.SetESPState) then
 			if currentModeKey=="mode1" then
 				mainPageState.actionStatusOn=not mainPageState.actionStatusOn
 				syncMainState()
@@ -361,6 +349,9 @@ function buildDataSaveContext()
 		me=me,
 		playerId=tostring(me.UserId),
 		toolAlive=toolAlive,
+		isToolAlive=function()
+			return toolAlive
+		end,
 		Services=sharedRuntime,
 		schedulerApi=jobRunner,
 		StateStore=settingsStore,
@@ -401,6 +392,12 @@ function rebuildDataSaveFromModule(loadRemoteData)
 		end)
 
 		if ok then
+			if previous and previous~=result and type(previous.Destroy)=="function" then
+				if type(previous.SaveNow)=="function" then
+					pcall(previous.SaveNow)
+				end
+				pcall(previous.Destroy)
+			end
 			DataSaveAPI=result
 		else
 			DataSaveAPI=previous

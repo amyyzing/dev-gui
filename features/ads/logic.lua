@@ -138,8 +138,10 @@ function ads.new(app,page)
 				adsChildConn=ads.ChildAdded:Connect(function(child)
 					if enabled and child:IsA("Model") then
 						task.defer(function()
-							removeInstance(child,ads)
-							setStatus("removed "..tostring(#removed),colors.green)
+							if enabled then
+								removeInstance(child,ads)
+								setStatus("removed "..tostring(#removed),colors.green)
+							end
 						end)
 					end
 				end)
@@ -152,14 +154,10 @@ function ads.new(app,page)
 
 				if inst.Name=="Ads" then
 					task.defer(function()
-						watchAdsFolder()
-						removeCurrentAds()
-					end)
-				elseif inst:IsA("Model") and inst.Parent and inst.Parent.Name=="Ads" then
-					local parent=inst.Parent
-					task.defer(function()
-						removeInstance(inst,parent)
-						setStatus("removed "..tostring(#removed),colors.green)
+						if enabled then
+							watchAdsFolder()
+							removeCurrentAds()
+						end
 					end)
 				end
 			end)

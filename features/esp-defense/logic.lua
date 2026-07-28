@@ -20,9 +20,9 @@ local maxThrowAngle=55
 local defenderSpeed=21
 local defenderReactionBuffer=0.05
 local catchHeightTolerance=0.25
-local passSampleStep=0.08
-local passSampleMax=28
-local espRefreshInterval=0.12
+local passSampleStep=0.12
+local passSampleMax=18
+local espRefreshInterval=0.20
 local espTeamCacheInterval=0.50
 local teamCache=setmetatable({}, {__mode="k"})
 
@@ -436,6 +436,7 @@ function espDefense.new(app)
 	local heartbeatConn=nil
 	local heartbeatElapsed=0
 	local running=false
+	local highlightsVisible=true
 	local schedulerJobId="ESPDefense"
 	local function currentPlayers()
 		if playerCache and type(playerCache.getPlayers)=="function" then
@@ -459,18 +460,25 @@ function espDefense.new(app)
 			if carrier and shouldHighlightPlayer(carrier.player) then
 				return carrier
 			end
+			return nil
 		end
 
 		return findBallCarrierData(players)
 	end
 
-	local function clearHighlights()
+	local function clearHighlights(force)
+		if not force and not highlightsVisible then
+			return
+		end
+
 		for _,player in ipairs(currentPlayers()) do
 			local character=cachedCharacter(player)
 			if character then
 				destroyOwnedHighlight(character)
 			end
 		end
+
+		highlightsVisible=false
 	end
 
 	local function rebuild()
@@ -485,6 +493,7 @@ function espDefense.new(app)
 		local blue=colors.blue or Color3.fromRGB(70,140,255)
 		local red=colors.red or Color3.fromRGB(210,70,70)
 		local green=colors.green or Color3.fromRGB(90,200,90)
+		local nextHighlightsVisible=false
 
 		for _,player in ipairs(players) do
 			if player~=me then
@@ -493,11 +502,14 @@ function espDefense.new(app)
 					if shouldHighlightPlayer(player) then
 						if carrierData and player==carrierData.player then
 							forceHighlight(app,character,"holder",blue)
+							nextHighlightsVisible=true
 						elseif carrierData and isSameTeam(player,carrierData.player) then
 							if isReceiverClosed(player,carrierData,defenderRoots,app) then
 								forceHighlight(app,character,"closed",red)
+								nextHighlightsVisible=true
 							else
 								forceHighlight(app,character,"open",green)
+								nextHighlightsVisible=true
 							end
 						else
 							destroyOwnedHighlight(character)
@@ -508,6 +520,8 @@ function espDefense.new(app)
 				end
 			end
 		end
+
+		highlightsVisible=nextHighlightsVisible
 	end
 
 	function api.Start()
@@ -540,7 +554,7 @@ function espDefense.new(app)
 		end
 		safeDisconnect(heartbeatConn)
 		heartbeatConn=nil
-		clearHighlights()
+		clearHighlights(true)
 	end
 
 	function api.Refresh()

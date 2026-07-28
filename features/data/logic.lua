@@ -1,9 +1,7 @@
 local playerData={}
 
 local function clearArray(t)
-	for i=#t,1,-1 do
-		table.remove(t,i)
-	end
+	table.clear(t)
 end
 
 function playerData.new(app,page,deps)
@@ -261,7 +259,7 @@ function playerData.new(app,page,deps)
 		disconnectConnections(connections)
 	end
 
-	local dataSection,sectionControls=makeSection(page,2,"Player Data","",{
+	local _,sectionControls=makeSection(page,2,"Player Data","",{
 		headerOnly=true,
 		headerButton={
 			text="wipe",

@@ -11,8 +11,8 @@ local defaultBoostForce=32
 local defaultBoostCooldown=5
 local defaultBoostChance=100
 local defaultBoostRadius=10
-local footballCacheInterval=0.20
-local boostScanInterval=0.05
+local footballCacheInterval=0.35
+local boostScanInterval=0.12
 local boostContactRadius=4.5
 local boostScanJobId="AutoBoostContactScan"
 local boostToggleKey=Enum.KeyCode.Unknown
@@ -84,10 +84,9 @@ local function getFootball()
 					return kickoffFootball
 				end
 
-				for _,item in ipairs(replicatedFolder:GetChildren()) do
-					if item:IsA("BasePart") and item.Name=="Football" then
-						return item
-					end
+				local football=replicatedFolder:FindFirstChild("Football")
+				if football and football:IsA("BasePart") then
+					return football
 				end
 			end
 		end
@@ -104,6 +103,8 @@ function boost.new(app,parent)
 	local buildToggleRow=app.buildToggleRow
 	local state=app.State
 	local scheduler=app.schedulerApi
+	local services=app.Services or {}
+	local playerCache=services.playerCacheApi or app.playerCacheApi
 	local api={}
 	local jumpBoostToggle=nil
 	local jumpBoostModeToggle=nil
@@ -120,6 +121,7 @@ function boost.new(app,parent)
 	local section=nil
 	local footballCache=nil
 	local footballCacheExpires=0
+	local destroyed=false
 
 	local function changed()
 		if app.onChanged then pcall(app.onChanged,state) end
@@ -143,7 +145,7 @@ function boost.new(app,parent)
 	end
 
 	local function isAlive()
-		return section==nil or section.Parent~=nil
+		return not destroyed and (section==nil or section.Parent~=nil)
 	end
 
 	local function applyJumpBoost(rootPart)
@@ -202,12 +204,44 @@ function boost.new(app,parent)
 		return character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
 	end
 
+	local function currentPlayers()
+		if playerCache and type(playerCache.getPlayers)=="function" then
+			return playerCache:getPlayers()
+		end
+
+		return players:GetPlayers()
+	end
+
+	local function trackedCharacter(player)
+		if playerCache and type(playerCache.getCharacter)=="function" then
+			return playerCache:getCharacter(player)
+		end
+
+		return player and player.Character or nil
+	end
+
+	local function trackedRoot(player,character)
+		if playerCache and type(playerCache.getRoot)=="function" then
+			return playerCache:getRoot(player)
+		end
+
+		return characterRoot(character)
+	end
+
+	local function trackedHumanoid(player,character)
+		if playerCache and type(playerCache.getHumanoid)=="function" then
+			return playerCache:getHumanoid(player)
+		end
+
+		return character and character:FindFirstChildOfClass("Humanoid") or nil
+	end
+
 	local function hasNearbyBoostTarget(character,root)
-		for _,player in ipairs(players:GetPlayers()) do
-			local otherChar=player~=me and player.Character
+		for _,player in ipairs(currentPlayers()) do
+			local otherChar=player~=me and trackedCharacter(player)
 			if otherChar and otherChar~=character then
-				local humanoid=otherChar:FindFirstChildOfClass("Humanoid")
-				local otherRoot=characterRoot(otherChar)
+				local humanoid=trackedHumanoid(player,otherChar)
+				local otherRoot=trackedRoot(player,otherChar)
 				if humanoid and humanoid.Health>0 and otherRoot and (otherRoot.Position-root.Position).Magnitude<=boostContactRadius then
 					return true
 				end
@@ -246,8 +280,8 @@ function boost.new(app,parent)
 			return
 		end
 
-		local character=me.Character
-		local root=characterRoot(character)
+		local character=trackedCharacter(me)
+		local root=trackedRoot(me,character)
 		if not root or root.AssemblyLinearVelocity.Y>=-2 then
 			return
 		end
@@ -440,6 +474,8 @@ function boost.new(app,parent)
 	end
 
 	function api.Destroy()
+		if destroyed then return end
+		destroyed=true
 		safeDisconnect(inputConn)
 		inputConn=nil
 		safeDisconnect(characterAddedConn)
@@ -463,7 +499,9 @@ function boost.new(app,parent)
 
 		if state.jumpBoostOn then
 			task.defer(function()
-				setupJumpBoost(character)
+				if isAlive() and state.jumpBoostOn then
+					setupJumpBoost(character)
+				end
 			end)
 		end
 	end)

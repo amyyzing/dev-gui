@@ -102,6 +102,7 @@ function schedulerApi.new(runService, scope)
 		_renderConnection = nil,
 		_heartbeatConnection = nil,
 		_delayId = 0,
+		_runId = 0,
 	}, schedulerApi)
 
 	if scope then
@@ -115,13 +116,17 @@ function schedulerApi:setPaused(paused)
 	self._paused = paused == true
 end
 
-function schedulerApi:_removeJob(jobs, name)
+function schedulerApi:_removeJob(jobs, target)
 	for index = #jobs, 1, -1 do
-		if jobs[index].name == name then
+		local job = jobs[index]
+		if job == target or (type(target) == "string" and job.name == target) then
+			job.cancelled = true
 			table.remove(jobs, index)
-			return
+			return job
 		end
 	end
+
+	return nil
 end
 
 function schedulerApi:_runJobs(jobs, dt)
@@ -129,22 +134,37 @@ function schedulerApi:_runJobs(jobs, dt)
 		return
 	end
 
-	for _, job in ipairs(jobs) do
-		if not job.cancelled and job.enabled ~= false then
+	self._runId = self._runId + 1
+	local runId = self._runId
+	local index = 1
+	while index <= #jobs do
+		local job = jobs[index]
+		if job._lastRunId ~= runId and not job.cancelled and job.enabled ~= false then
+			job._lastRunId = runId
+			local callbackElapsed = dt
+			local shouldRun = true
+
 			if job.interval then
 				job.elapsed = job.elapsed + dt
-				if job.elapsed >= job.interval then
-					local elapsed = job.elapsed
-					job.elapsed = 0
-					local startedAt = os.clock()
-					job.callback(elapsed)
-					updateStats(job, startedAt)
+				shouldRun = job.elapsed >= job.interval
+				if shouldRun then
+					callbackElapsed = job.elapsed
+					job.elapsed = job.elapsed % job.interval
 				end
-			else
-				local startedAt = os.clock()
-				job.callback(dt)
-				updateStats(job, startedAt)
 			end
+
+			if shouldRun then
+				local startedAt = os.clock()
+				local ok, err = pcall(job.callback, callbackElapsed, dt)
+				updateStats(job, startedAt)
+				if not ok then
+					warn("Scheduler job failed:", job.name, err)
+				end
+			end
+		end
+
+		if jobs[index] == job then
+			index = index + 1
 		end
 	end
 end
@@ -195,7 +215,7 @@ function schedulerApi:_addJob(jobs, ensure, name, priority, callback, ownerScope
 
 	local handle = createHandle(job, function()
 		job.cancelled = true
-		self:_removeJob(jobs, name)
+		self:_removeJob(jobs, job)
 	end)
 
 	if ownerScope then
@@ -214,7 +234,13 @@ function schedulerApi:onHeartbeat(name, priority, callback, ownerScope)
 end
 
 function schedulerApi:every(name, interval, callback, ownerScope)
-	return self:_addJob(self._heartbeatJobs, self._ensureHeartbeat, name, 0, callback, ownerScope, interval)
+	interval = math.max(tonumber(interval) or 0, 0)
+	return self:_addJob(self._heartbeatJobs, self._ensureHeartbeat, name, 0, callback, ownerScope, interval > 0 and interval or nil)
+end
+
+function schedulerApi:everyRender(name, interval, callback, ownerScope)
+	interval = math.max(tonumber(interval) or 0, 0)
+	return self:_addJob(self._renderJobs, self._ensureRender, name, 0, callback, ownerScope, interval > 0 and interval or nil)
 end
 
 function schedulerApi:delay(nameOrSeconds, secondsOrCallback, callbackOrScope, maybeOwnerScope)
@@ -229,6 +255,8 @@ function schedulerApi:delay(nameOrSeconds, secondsOrCallback, callbackOrScope, m
 		callback = callbackOrScope
 		ownerScope = maybeOwnerScope
 	end
+
+	seconds = math.max(tonumber(seconds) or 0, 0)
 
 	local handle
 	local elapsed = 0

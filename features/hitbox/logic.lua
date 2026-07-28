@@ -10,6 +10,9 @@ local defaultSizeY=5.4
 local defaultSizeZ=1.41
 local defaultTransparency=0.7
 local hitboxToggleKey=Enum.KeyCode.Unknown
+local hitboxReapplyInterval=0.05
+local minHitboxSize=0.1
+local targetHitboxName="CatchBox"
 
 local function clampNumber(value,min,max,fallback)
 	local n=tonumber(value)
@@ -30,11 +33,6 @@ local function getDirectChildCount(folder)
 	return #folder:GetChildren()
 end
 
-local function folderHasAnyDescendants(folder)
-	if not folder then return false end
-	return #folder:GetDescendants()>0
-end
-
 function hitbox.new(app,parent)
 	local safeDisconnect=app.safeDisconnect
 	local inputToBinding=app.inputToBinding
@@ -52,13 +50,19 @@ function hitbox.new(app,parent)
 	local transparencySlider=nil
 	local inputConn=nil
 	local workspaceConn=nil
+	local workspaceRemovedConn=nil
 	local destroyConn=nil
 	local section=nil
 	local alive=true
+	local refreshQueued=false
+	local reapplyScheduled=false
 	local currentMode=1
 	local currentModeKey="mode1"
 	local currentModeLabel="Gameplay"
 	local watchers=setmetatable({}, {__mode="k"})
+	local modeRootConnections=setmetatable({}, {__mode="k"})
+	local dirtyParts=setmetatable({}, {__mode="k"})
+	local pendingWrites=setmetatable({}, {__mode="k"})
 	local originalParts=app.hitboxOriginals or {
 		Transparency=setmetatable({}, {__mode="k"}),
 		Size=setmetatable({}, {__mode="k"}),
@@ -84,9 +88,9 @@ function hitbox.new(app,parent)
 
 	local function normalizeState()
 		state.hitboxOn=state.hitboxOn and true or false
-		state.sizeX=clampNumber(state.sizeX,0.2,50,defaultSizeX)
-		state.sizeY=clampNumber(state.sizeY,0.2,50,defaultSizeY)
-		state.sizeZ=clampNumber(state.sizeZ,0.2,50,defaultSizeZ)
+		state.sizeX=clampNumber(state.sizeX,minHitboxSize,50,defaultSizeX)
+		state.sizeY=clampNumber(state.sizeY,minHitboxSize,50,defaultSizeY)
+		state.sizeZ=clampNumber(state.sizeZ,minHitboxSize,50,defaultSizeZ)
 		state.targetTransparency=clampNumber(state.targetTransparency,0,1,defaultTransparency)
 	end
 
@@ -111,7 +115,7 @@ function hitbox.new(app,parent)
 		end
 
 		local games=workspace:FindFirstChild("Games")
-		if getDirectChildCount(games)>0 or folderHasAnyDescendants(games) then
+		if getDirectChildCount(games)>0 then
 			return 1,"mode1","Gameplay"
 		end
 
@@ -146,6 +150,47 @@ function hitbox.new(app,parent)
 		return watchers[inst]
 	end
 
+	local function isTargetPart(part)
+		return part and part:IsA("BasePart") and part.Name==targetHitboxName
+	end
+
+	local function markPartWrite(part,property)
+		local counts=pendingWrites[part]
+		if not counts then
+			counts={}
+			pendingWrites[part]=counts
+		end
+		counts[property]=(counts[property] or 0)+1
+	end
+
+	local function consumePartWrite(part,property)
+		local counts=pendingWrites[part]
+		local count=counts and counts[property] or 0
+		if count<=0 then return false end
+
+		if count==1 then
+			counts[property]=nil
+			if next(counts)==nil then
+				pendingWrites[part]=nil
+			end
+		else
+			counts[property]=count-1
+		end
+		return true
+	end
+
+	local function setPartTransparency(part,value)
+		if part.Transparency==value then return end
+		markPartWrite(part,"Transparency")
+		part.Transparency=value
+	end
+
+	local function setPartSize(part,value)
+		if part.Size==value then return end
+		markPartWrite(part,"Size")
+		part.Size=value
+	end
+
 	local function applyVisuals(w,on)
 		if not w then return end
 
@@ -154,32 +199,95 @@ function hitbox.new(app,parent)
 
 			if not(part and part.Parent) then
 				table.remove(w.parts,i)
-			elseif part:IsA("BasePart") then
+				if part then
+					dirtyParts[part]=nil
+					pendingWrites[part]=nil
+				end
+			elseif isTargetPart(part) then
 				if on then
-					if part.Transparency~=state.targetTransparency then
-						part.Transparency=state.targetTransparency
-					end
+					setPartTransparency(part,state.targetTransparency)
 
 					local size=targetSize()
 					if size~=zeroVector and part.Size~=size then
-						part.Size=size
+						setPartSize(part,size)
 					end
 				else
+					dirtyParts[part]=nil
 					if w.origT[part]~=nil and part.Transparency~=w.origT[part] then
-						part.Transparency=w.origT[part]
+						setPartTransparency(part,w.origT[part])
 					end
 
 					if w.origS[part]~=nil and part.Size~=w.origS[part] then
-						part.Size=w.origS[part]
+						setPartSize(part,w.origS[part])
 					end
 				end
 			end
 		end
 	end
 
+	local function reapplyPartVisuals(w,part)
+		if not(w and part and part.Parent and isTargetPart(part)) then
+			return
+		end
+
+		if not state.hitboxOn then
+			return
+		end
+
+		setPartTransparency(part,state.targetTransparency)
+
+		local size=targetSize()
+		if size~=zeroVector and part.Size~=size then
+			setPartSize(part,size)
+		end
+	end
+
+	local function flushPartReapply()
+		reapplyScheduled=false
+		if not(isAlive() and state.hitboxOn) then
+			table.clear(dirtyParts)
+			return
+		end
+
+		for part,w in pairs(dirtyParts) do
+			dirtyParts[part]=nil
+			reapplyPartVisuals(w,part)
+		end
+	end
+
+	local function queuePartReapply(w,part)
+		if not(isAlive() and state.hitboxOn and w and part and part.Parent) then return end
+		dirtyParts[part]=w
+
+		if not reapplyScheduled then
+			reapplyScheduled=true
+			task.delay(hitboxReapplyInterval,flushPartReapply)
+		end
+	end
+
+	local function updateOriginalPartValue(w,part,property)
+		if property=="Size" then
+			originalParts.Size[part]=part.Size
+			w.origS[part]=part.Size
+		else
+			originalParts.Transparency[part]=part.Transparency
+			w.origT[part]=part.Transparency
+		end
+	end
+
+	local function onPartPropertyChanged(w,part,property)
+		if consumePartWrite(part,property) or not(part and part.Parent) then return end
+
+		if state.hitboxOn then
+			queuePartReapply(w,part)
+		else
+			updateOriginalPartValue(w,part,property)
+		end
+	end
+
 	local function trackPart(w,part)
 		if not isAlive() then return end
-		if not part:IsA("BasePart") then return end
+		if not isTargetPart(part) then return end
 
 		if not table.find(w.parts,part) then
 			table.insert(w.parts,part)
@@ -200,35 +308,29 @@ function hitbox.new(app,parent)
 			w.partConns[part]={}
 
 			table.insert(w.partConns[part],part:GetPropertyChangedSignal("Size"):Connect(function()
-				if isAlive() and state.hitboxOn then
-					local size=targetSize()
-
-					if size~=zeroVector and part.Size~=size then
-						part.Size=size
-					end
-				end
+				onPartPropertyChanged(w,part,"Size")
 			end))
 
 			table.insert(w.partConns[part],part:GetPropertyChangedSignal("Transparency"):Connect(function()
-				if isAlive() and state.hitboxOn and part.Transparency~=state.targetTransparency then
-					part.Transparency=state.targetTransparency
-				end
+				onPartPropertyChanged(w,part,"Transparency")
 			end))
 
 			table.insert(w.partConns[part],part.AncestryChanged:Connect(function(_,instParent)
 				if instParent==nil then
 					safeDisconnectAll(w.partConns[part])
 					w.partConns[part]=nil
+					dirtyParts[part]=nil
+					pendingWrites[part]=nil
 				end
 			end))
 		end
 
 		if state.hitboxOn then
-			part.Transparency=state.targetTransparency
+			setPartTransparency(part,state.targetTransparency)
 
 			local size=targetSize()
 			if size~=zeroVector then
-				part.Size=size
+				setPartSize(part,size)
 			end
 		end
 	end
@@ -245,17 +347,17 @@ function hitbox.new(app,parent)
 		w.attached=true
 
 		for _,descendant in ipairs(node:GetDescendants()) do
-			if descendant:IsA("BasePart") then
+			if isTargetPart(descendant) then
 				trackPart(w,descendant)
 			end
 		end
 
-		if node:IsA("BasePart") then
+		if isTargetPart(node) then
 			trackPart(w,node)
 		end
 
 		table.insert(w.cons,node.DescendantAdded:Connect(function(descendant)
-			if isAlive() and descendant:IsA("BasePart") then
+			if isAlive() and isTargetPart(descendant) then
 				trackPart(w,descendant)
 			end
 		end))
@@ -385,24 +487,6 @@ function hitbox.new(app,parent)
 		local games=workspace:FindFirstChild("Games")
 		if not games then return end
 
-		local w=ensureWatcher(games)
-		if not w.attached then
-			w.attached=true
-
-			table.insert(w.cons,games.ChildAdded:Connect(function(gameFolder)
-				if isAlive() then
-					attachGameFolder(gameFolder)
-				end
-			end))
-
-			table.insert(w.cons,games.AncestryChanged:Connect(function(_,instParent)
-				if instParent==nil then
-					safeDisconnectAll(w.cons)
-					watchers[games]=nil
-				end
-			end))
-		end
-
 		for _,gameFolder in ipairs(games:GetChildren()) do
 			attachGameFolder(gameFolder)
 		end
@@ -413,24 +497,6 @@ function hitbox.new(app,parent)
 
 		local miniGames=workspace:FindFirstChild("MiniGames")
 		if not miniGames then return end
-
-		local w=ensureWatcher(miniGames)
-		if not w.attached then
-			w.attached=true
-
-			table.insert(w.cons,miniGames.ChildAdded:Connect(function(miniGameFolder)
-				if isAlive() then
-					attachMiniGameFolder(miniGameFolder)
-				end
-			end))
-
-			table.insert(w.cons,miniGames.AncestryChanged:Connect(function(_,instParent)
-				if instParent==nil then
-					safeDisconnectAll(w.cons)
-					watchers[miniGames]=nil
-				end
-			end))
-		end
 
 		for _,miniGameFolder in ipairs(miniGames:GetChildren()) do
 			attachMiniGameFolder(miniGameFolder)
@@ -458,6 +524,13 @@ function hitbox.new(app,parent)
 					end
 				end
 
+				if w.parts then
+					for _,part in ipairs(w.parts) do
+						dirtyParts[part]=nil
+						pendingWrites[part]=nil
+					end
+				end
+
 				if w.cons then
 					safeDisconnectAll(w.cons)
 				end
@@ -465,6 +538,46 @@ function hitbox.new(app,parent)
 				watchers[inst]=nil
 			end
 		end
+	end
+
+	local function queueRefresh()
+		if refreshQueued or not isAlive() then return end
+		refreshQueued=true
+
+		task.defer(function()
+			refreshQueued=false
+			if isAlive() then
+				api.Refresh()
+			end
+		end)
+	end
+
+	local function unwatchModeRoot(root)
+		local connections=modeRootConnections[root]
+		if connections then
+			safeDisconnectAll(connections)
+			modeRootConnections[root]=nil
+		end
+	end
+
+	local function watchModeRoot(root)
+		if not root or modeRootConnections[root] then return end
+
+		local connections={}
+		modeRootConnections[root]=connections
+		table.insert(connections,root.ChildAdded:Connect(queueRefresh))
+		table.insert(connections,root.ChildRemoved:Connect(queueRefresh))
+		table.insert(connections,root.AncestryChanged:Connect(function(_,instParent)
+			if instParent==nil then
+				unwatchModeRoot(root)
+				queueRefresh()
+			end
+		end))
+	end
+
+	local function watchExistingModeRoots()
+		watchModeRoot(workspace:FindFirstChild("Games"))
+		watchModeRoot(workspace:FindFirstChild("MiniGames"))
 	end
 
 	local function scanCurrentModeFolders()
@@ -500,9 +613,9 @@ function hitbox.new(app,parent)
 	end
 
 	function api.SetHitboxSize(x,y,z,fire)
-		state.sizeX=clampNumber(x,0.2,50,defaultSizeX)
-		state.sizeY=clampNumber(y,0.2,50,defaultSizeY)
-		state.sizeZ=clampNumber(z,0.2,50,defaultSizeZ)
+		state.sizeX=clampNumber(x,minHitboxSize,50,defaultSizeX)
+		state.sizeY=clampNumber(y,minHitboxSize,50,defaultSizeY)
+		state.sizeZ=clampNumber(z,minHitboxSize,50,defaultSizeZ)
 
 		if state.hitboxOn then
 			forEachWatcherPartsApply(true)
@@ -531,6 +644,9 @@ function hitbox.new(app,parent)
 
 	function api.SetHitboxLock(value,fire)
 		state.hitboxOn=value and true or false
+		if not state.hitboxOn then
+			table.clear(dirtyParts)
+		end
 		forEachWatcherPartsApply(state.hitboxOn)
 		paintToggle()
 
@@ -541,6 +657,7 @@ function hitbox.new(app,parent)
 
 	function api.Refresh()
 		normalizeState()
+		watchExistingModeRoots()
 		scanCurrentModeFolders()
 		forEachWatcherPartsApply(state.hitboxOn)
 		syncReadouts()
@@ -564,11 +681,18 @@ function hitbox.new(app,parent)
 		inputConn=nil
 		safeDisconnect(workspaceConn)
 		workspaceConn=nil
+		safeDisconnect(workspaceRemovedConn)
+		workspaceRemovedConn=nil
 		safeDisconnect(destroyConn)
 		destroyConn=nil
+		for root in pairs(modeRootConnections) do
+			unwatchModeRoot(root)
+		end
+		table.clear(dirtyParts)
 		destroyControl(toggle)
 		destroyControl(transparencySlider)
 		clearAllWatchersAndRestore()
+		table.clear(pendingWrites)
 	end
 
 	normalizeState()
@@ -629,11 +753,15 @@ function hitbox.new(app,parent)
 
 	workspaceConn=workspace.ChildAdded:Connect(function(child)
 		if child.Name=="Games" or child.Name=="MiniGames" then
-			task.defer(function()
-				if isAlive() then
-					api.Refresh()
-				end
-			end)
+			watchModeRoot(child)
+			queueRefresh()
+		end
+	end)
+
+	workspaceRemovedConn=workspace.ChildRemoved:Connect(function(child)
+		if child.Name=="Games" or child.Name=="MiniGames" then
+			unwatchModeRoot(child)
+			queueRefresh()
 		end
 	end)
 

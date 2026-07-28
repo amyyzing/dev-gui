@@ -1,2 +1,6 @@
 .tools/
 .vs/
+game-source-code/
+game-source-code-*.txt
+__pycache__/
+*.pyc

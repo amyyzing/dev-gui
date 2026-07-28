@@ -1,7 +1,8 @@
 local ballTrackerApi = {}
 ballTrackerApi.__index = ballTrackerApi
 
-local ballCacheSeconds = 0.08
+local positiveBallCacheSeconds = 0.15
+local negativeBallCacheSeconds = 0.5
 local defaultHeldDistance = 35
 
 local function getRoot(character)
@@ -49,6 +50,31 @@ local function validPartNear(part, rootPart, maxDistance)
 	return part and part:IsA("BasePart") and part.Parent and rootPart and (part.Position - rootPart.Position).Magnitude <= maxDistance
 end
 
+local function candidateFootballPart(candidate, rootPart, maxDistance)
+	if validPartNear(candidate, rootPart, maxDistance) then
+		return candidate
+	end
+
+	if not candidate or not (candidate:IsA("Model") or candidate:IsA("Folder") or candidate:IsA("Tool")) then
+		return nil
+	end
+
+	for _, name in ipairs({ "FootballBox", "Part" }) do
+		local namedPart = candidate:FindFirstChild(name)
+		if validPartNear(namedPart, rootPart, maxDistance) then
+			return namedPart
+		end
+	end
+
+	for _, descendant in ipairs(candidate:GetDescendants()) do
+		if validPartNear(descendant, rootPart, maxDistance) then
+			return descendant
+		end
+	end
+
+	return nil
+end
+
 function ballTrackerApi.new(playersService, workspaceService, playerCache, scope)
 	local self = setmetatable({
 		_playersService = playersService or game:GetService("Players"),
@@ -66,25 +92,32 @@ function ballTrackerApi.new(playersService, workspaceService, playerCache, scope
 	return self
 end
 
+function ballTrackerApi:findDirectFootballPart(container, rootPart, maxDistance)
+	if not (container and rootPart) then
+		return nil
+	end
+
+	for _, child in ipairs(container:GetChildren()) do
+		if tostring(child.Name):lower():find("football", 1, true) then
+			local part = candidateFootballPart(child, rootPart, maxDistance)
+			if part then
+				return part
+			end
+		end
+	end
+
+	return nil
+end
+
 function ballTrackerApi:findFootballPart(container, rootPart, maxDistance)
 	maxDistance = tonumber(maxDistance) or defaultHeldDistance
 	if not (container and rootPart) then
 		return nil
 	end
 
-	local direct = container:FindFirstChild("Football")
+	local direct = self:findDirectFootballPart(container, rootPart, maxDistance)
 	if direct then
-		if validPartNear(direct, rootPart, maxDistance) then
-			return direct
-		end
-
-		if direct:IsA("Model") or direct:IsA("Folder") or direct:IsA("Tool") then
-			for _, descendant in ipairs(direct:GetDescendants()) do
-				if validPartNear(descendant, rootPart, maxDistance) then
-					return descendant
-				end
-			end
-		end
+		return direct
 	end
 
 	for _, descendant in ipairs(container:GetDescendants()) do
@@ -127,16 +160,39 @@ function ballTrackerApi:getFootballPartFromPlayer(player, maxDistance)
 
 	local cached = self._ballCache[player]
 	local now = os.clock()
-	if cached and now - cached.t <= ballCacheSeconds and validPartNear(cached.part, rootPart, maxDistance) then
-		return cached.part
+	if cached and cached.character == character then
+		if cached.part and now - cached.t <= positiveBallCacheSeconds and validPartNear(cached.part, rootPart, maxDistance) then
+			return cached.part
+		end
+
+		if cached.part == false
+			and now - cached.t <= negativeBallCacheSeconds
+			and (cached.maxDistance or 0) >= maxDistance then
+			local gameObjects = character:FindFirstChild("GAMEOBJECTS")
+			local direct = self:findDirectFootballPart(character, rootPart, maxDistance)
+				or self:findDirectFootballPart(gameObjects, rootPart, maxDistance)
+			if direct then
+				self._ballCache[player] = {
+					part = direct,
+					t = now,
+					character = character,
+					maxDistance = maxDistance,
+				}
+				return direct
+			end
+
+			return nil
+		end
 	end
 
 	local football = self:findFootballPart(character, rootPart, maxDistance)
-	if not football then
-		football = self:findFootballPart(character:FindFirstChild("GAMEOBJECTS"), rootPart, maxDistance)
-	end
 
-	self._ballCache[player] = football and { part = football, t = now } or nil
+	self._ballCache[player] = {
+		part = football or false,
+		t = now,
+		character = character,
+		maxDistance = maxDistance,
+	}
 	return football
 end
 

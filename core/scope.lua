@@ -72,6 +72,25 @@ function scopeApi:add(task, cleanup)
 	return task
 end
 
+function scopeApi:remove(task, cleanupTask)
+	if task == nil then
+		return false
+	end
+
+	for index = #self._tasks, 1, -1 do
+		local entry = self._tasks[index]
+		if entry.task == task then
+			table.remove(self._tasks, index)
+			if cleanupTask ~= false then
+				self:_cleanup(entry.task, entry.cleanup)
+			end
+			return true
+		end
+	end
+
+	return false
+end
+
 function scopeApi:task(cleanup)
 	if type(cleanup) ~= "function" then
 		return nil

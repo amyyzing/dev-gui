@@ -8,6 +8,7 @@ local replicatedStorage=game:GetService("ReplicatedStorage")
 
 local localPlayer=players.LocalPlayer
 local qbAimMath=rawget(getfenv(),"QBAimMathModule")
+local qbInterception=rawget(getfenv(),"QBInterceptionModule")
 
 local ballGravity=28
 local gravityVector=Vector3.new(0,-ballGravity,0)
@@ -46,7 +47,7 @@ local useHorizontalReleasePrediction=true
 local useVerticalReleasePrediction=true
 local qbHorizontalDeadzone=0.75
 local qbHorizontalSpeedMax=24
-local minTime,maxTime,timeStep=0.35,6,0.01
+local minTime,maxTime=0.35,6
 local qbInheritance=0
 local interceptBisectionSteps=12
 local globalMinAngle=-5
@@ -57,11 +58,7 @@ local arcSettings={
 	UpdateInterval=1/60,
 	AttachmentRoll=math.rad(90),
 	UnsafeColor=Color3.fromRGB(254,94,86),
-}
-local defenderSettings={
-	Speed=21,
-	ReactionBuffer=0,
-	CatchHeightTolerance=0.25,
+	WholeBeamWarning=false,
 }
 local trackSettings={
 	ReceiverInterval=1/60,
@@ -102,8 +99,6 @@ local releaseTimingPingScale=0.25
 local receiverUncertaintyMax=3
 local releaseTargetSpreadMax=3
 local releaseAngleSpreadMax=2.0
-local safeArcSampleStep=0.04
-local safeArcCatchYMargin=0.25
 local centerMaxReleaseDistance=12.00
 -- QB Drift
 local qbDriftTime=0
@@ -353,6 +348,24 @@ local function getPlayerTackleBox(player)
 		return value
 	end
 
+	return nil
+end
+
+local function getPlayerCatchVolume(player)
+	local direct=getPlayerTackleBox(player)
+	if direct then return direct end
+
+	local replicated=player and player:FindFirstChild("Replicated")
+	local tackleBoxValue=replicated and replicated:FindFirstChild("TackleBox")
+	local ok,value=pcall(function()
+		return tackleBoxValue and tackleBoxValue.Value
+	end)
+	if not(ok and typeof(value)=="Instance" and value.Parent) then return nil end
+
+	for _,name in ipairs({"CatchBox","PlayerCollisionBox"}) do
+		local part=value:FindFirstChild(name,true)
+		if part and part:IsA("BasePart") then return part end
+	end
 	return nil
 end
 
@@ -701,6 +714,7 @@ function qbAim.new(app,parent)
 	local buildSlider=app.buildSlider
 	local state=app.State or {}
 	local mathCore=app.QBAimMathModule or qbAimMath
+	local interceptionCore=app.QBInterceptionModule or qbInterception
 	local services=app.Services or {}
 	local playerCache=services.playerCacheApi or app.playerCacheApi
 	local ballTracker=services.ballTrackerApi or app.ballTrackerApi
@@ -755,6 +769,9 @@ function qbAim.new(app,parent)
 
 	if not mathCore then
 		error("qb aim math missing")
+	end
+	if not interceptionCore then
+		error("qb interception missing")
 	end
 
 	if state.qbAimTeamFilter==nil then
@@ -1854,8 +1871,21 @@ function qbAim.new(app,parent)
 		hideC1AndC3Info()
 	end
 
-	local function collectArcDefenderRoots(receiver)
-		local roots={}
+	local function jumpProfile(humanoid)
+		if not humanoid then return 7.2,0.27 end
+
+		local gravity=math.max(workspace.Gravity,1e-3)
+		if humanoid.UseJumpPower then
+			local jumpPower=math.max(0,humanoid.JumpPower)
+			return jumpPower*jumpPower/(2*gravity),jumpPower/gravity
+		end
+
+		local jumpHeight=math.max(0,humanoid.JumpHeight)
+		return jumpHeight,math.sqrt(2*jumpHeight/gravity)
+	end
+
+	local function collectArcDefenders(receiver)
+		local defenders={}
 		local localTeam=teamOf(localPlayer)
 
 		for _,player in ipairs(currentPlayers()) do
@@ -1863,65 +1893,65 @@ function qbAim.new(app,parent)
 			if player~=receiver and player~=localPlayer and isValidGameTeamID(playerTeam) and isValidGameTeamID(localTeam) and playerTeam~=localTeam then
 				local defenderRoot=rootOfPlayer(player)
 				if defenderRoot then
-					roots[#roots+1]=defenderRoot
+					local character=characterOf(player)
+					local humanoid=character and character:FindFirstChildOfClass("Humanoid")
+					if not humanoid or humanoid.Health>0 then
+						local tackleBox=getPlayerCatchVolume(player)
+						local jumpHeight,jumpRiseTime=jumpProfile(humanoid)
+						defenders[#defenders+1]={
+							player=player,
+							position=(tackleBox and tackleBox.Position) or defenderRoot.Position,
+							velocity=defenderRoot.AssemblyLinearVelocity or Vector3.zero,
+							boxSize=(tackleBox and tackleBox.Size) or defenderRoot.Size,
+							jumpHeight=jumpHeight,
+							jumpRiseTime=jumpRiseTime,
+						}
+					end
 				end
 			end
 		end
 
-		return roots
-	end
-
-	local function defenderCanReachBall(defenderRoot,ballPosition,elapsed,catchY)
-		if not defenderRoot or not ballPosition or elapsed<=0 then
-			return false
-		end
-
-		if ballPosition.Y>catchY+safeArcCatchYMargin then
-			return false
-		end
-
-		local reachRadius=defenderSettings.Speed*elapsed
-		return (flat(defenderRoot.Position)-flat(ballPosition)).Magnitude<=reachRadius
+		return defenders
 	end
 
 	local function trajectoryCanBeDefended(plan,receiver)
 		if state.qbAimSafeArc==false or not plan then
-			return false
+			return false,{reason="disabled"}
 		end
 
-		local defenderRoots=collectArcDefenderRoots(receiver)
-		if #defenderRoots==0 then
-			return false
+		local defenders=collectArcDefenders(receiver)
+		if #defenders==0 then
+			return false,{reason="no_defenders",windows={}}
 		end
 
-		local catchPoint=plan.target or plan.c1Point
-		local catchY=catchPoint and catchPoint.Y or nil
 		local maxTime=plan.time or plan.landingTime
-		if not(plan.origin and plan.velocity and catchY and maxTime and maxTime>0) then
-			return true
+		if not(plan.origin and plan.velocity and maxTime and maxTime>0) then
+			return true,{reason="invalid_arc",windows={}}
 		end
 
-		for time=safeArcSampleStep,maxTime,safeArcSampleStep do
-			local ballPosition=mathCore.ballAt(plan.origin,plan.velocity,time)
-			for _,defenderRoot in ipairs(defenderRoots) do
-				if defenderCanReachBall(defenderRoot,ballPosition,time,catchY) then
-					return true
-				end
-			end
-		end
-
-		return false
+		return interceptionCore.Evaluate({
+			origin=plan.origin,
+			velocity=plan.velocity,
+			gravity=gravityVector,
+			flightTime=maxTime,
+		},defenders)
 	end
 
 	local function planCanBeDefended(plan,receiver)
 		return trajectoryCanBeDefended(plan,receiver)
 	end
 
-	local function updateArcSafetyColor(beam,unsafe)
+	local function updateArcSafetyColor(beam,unsafe,info,flightTime)
 		if not beam then return end
 
 		if unsafe then
-			beam.Color=ColorSequence.new(arcSettings.UnsafeColor)
+			beam.Color=interceptionCore.BuildColorSequence(
+				preview.beamDefaultColor or beam.Color,
+				arcSettings.UnsafeColor,
+				info and info.windows or nil,
+				flightTime,
+				arcSettings.WholeBeamWarning
+			)
 		elseif preview.beamDefaultColor then
 			beam.Color=preview.beamDefaultColor
 		end
@@ -1984,7 +2014,8 @@ function qbAim.new(app,parent)
 		beam.Attachment1=c3
 		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-arcMaxCurve,arcMaxCurve)
 		beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-arcMaxCurve,arcMaxCurve)
-		updateArcSafetyColor(beam,planCanBeDefended(plan,trackedReceiver))
+		local unsafe,interceptInfo=planCanBeDefended(plan,trackedReceiver)
+		updateArcSafetyColor(beam,unsafe,interceptInfo,catchTime)
 		setPreviewCenterVisible(true)
 		beam.Enabled=true
 	end
@@ -2131,7 +2162,6 @@ function qbAim.new(app,parent)
 			maxRunSpeed=maxRunSpeed,
 			minTime=minTime,
 			maxTime=maxTime,
-			dt=timeStep,
 			qbInheritance=qbInheritance,
 			bisectionSteps=interceptBisectionSteps,
 			minAngle=globalMinAngle,

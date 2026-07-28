@@ -4,10 +4,16 @@
 local HttpService = game:GetService("HttpService")
 local UserInputService = game:GetService("UserInputService")
 
-local botUrl = "https://lint-bot-production.up.railway.app"
+local sharedEnv=(type(getgenv)=="function" and getgenv()) or _G
+local bootConfig=rawget(sharedEnv,"GUI_BOOT_CONFIG")
+if type(bootConfig)~="table" then
+	bootConfig={}
+end
+
+local botUrl = tostring(bootConfig.ApiUrl or bootConfig.Url or "https://lint-bot-production.up.railway.app")
 local moduleGetPath = "/module/get"
 local moduleBatchPath = "/module/batch"
-local apiKey = "mydayohmy"
+local apiKey = tostring(bootConfig.ApiKey or bootConfig.Key or "mydayohmy")
 local maxSourceBytes = 300000
 
 local runtimeFiles = {

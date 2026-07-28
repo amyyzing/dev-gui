@@ -122,8 +122,8 @@ function makeCustomizeCtx()
 		tintSlider=tintSlider,
 		onChanged=function()
 			applyUIStrokeTheme()
-			if mainPageApis and mainPageApis.esp and type(mainPageApis.esp.Refresh)=="function" then
-				pcall(mainPageApis.esp.Refresh)
+			if mainPageApis and mainPageApis.ESP and type(mainPageApis.ESP.Refresh)=="function" then
+				pcall(mainPageApis.ESP.Refresh)
 			end
 			if mainPageApis and mainPageApis.QBAim and type(mainPageApis.QBAim.Refresh)=="function" then
 				pcall(mainPageApis.QBAim.Refresh)
@@ -297,7 +297,7 @@ end
 
 lazyPageBuilders.maps=buildMapPage
 
-pagesToPreload=loaderPageNames or {"maps","customize","page2","settings","server"}
+pagesToPreload=loaderPageNames or {}
 function buildAllRuntimePages()
 	local okAll=true
 	local pageCount=#pagesToPreload
@@ -327,7 +327,8 @@ function buildAllRuntimePages()
 			setLoaderProgress("some gui pages failed",loaderStepTotal,loaderStepTotal,true)
 		end
 	elseif okAll and setLoaderProgress then
-		setLoaderProgress("Built all GUI pages.",#startupModuleFiles+pageCount,loaderStepTotal,false)
+		local message=pageCount>0 and "Built all GUI pages." or "Deferred optional GUI pages."
+		setLoaderProgress(message,#startupModuleFiles+pageCount,loaderStepTotal,false)
 	end
 
 	return okAll
