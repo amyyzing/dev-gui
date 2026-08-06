@@ -2,10 +2,10 @@
 
 ## Bootstrap
 
-`main.lua` is now the direct entry point. It fetches the five runtime files with one
-`/module/batch` request, then uses concurrent `/module/get` requests only for files
-missing from that response. Every source is size-checked and compiled before runtime
-part 1 is executed.
+`loader.lua` is the user-facing entry point. It fetches `main.lua` through Railway,
+validates it, and executes it. `main.lua` owns runtime caching, batch loading, source
+validation, and startup so those behaviors have one implementation. Users and runtime
+refreshes always start from `loader.lua`.
 
 The default API key is embedded for direct personal use. `GUI_BOOT_CONFIG` remains
 optional and can override the key or cache settings:
@@ -17,16 +17,15 @@ getgenv().GUI_BOOT_CONFIG={
 	Cache={Enabled=true,Folder="gui-runtime-cache"},
 }
 
--- Run the contents of main.lua after setting the config.
+-- Run the contents of loader.lua after setting the config.
 ```
 
 Changing `Version` selects a fresh cache directory. A cached source that fails source
 validation or compilation is ignored and fetched again. `Fresh=true` is available for
 explicit cache bypasses; normal startup does not add unconditional cache-busting data.
 
-`loader.lua` remains only as a temporary compatibility entry point. Runtime refreshes
-now request `main.lua`, so the legacy file can be removed after a live executor smoke
-test confirms direct startup and refresh behavior.
+Runtime refreshes request `loader.lua`, preserving the same entry point for initial
+execution and updates.
 
 The key is present in both source and the client process. It must not be treated as a
 secret or as an authorization boundary.

@@ -186,12 +186,22 @@ class BallisticRootTests(unittest.TestCase):
 
 
 class IntegrationContractTests(unittest.TestCase):
-    def test_fused_bootstrap_has_default_credential(self):
+    def test_main_bootstrap_has_default_credential(self):
         source = (ROOT / "main.lua").read_text(encoding="utf-8")
         self.assertIn("GUI_BOOT_CONFIG", source)
         self.assertNotIn('local loaderPath="loader.lua"', source)
         self.assertIn('config.ApiKey or config.Key or "mydayohmy"', source)
         self.assertLess(source.index("local chunks={}"), source.index("for _,path in ipairs(runtimeFiles) do\n\tlocal chunk=chunks[path]"))
+
+    def test_loader_is_the_user_and_refresh_entry_point(self):
+        loader = (ROOT / "loader.lua").read_text(encoding="utf-8")
+        runtime = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
+        self.assertIn("GUI_BOOT_CONFIG", loader)
+        self.assertIn('config.ApiKey or config.Key or "mydayohmy"', loader)
+        self.assertIn('path="main.lua"', loader)
+        self.assertIn('apiUrl.."/module/get"', loader)
+        self.assertIn('manualReloadPath="loader.lua"', runtime)
+        self.assertNotIn('manualReloadPath="main.lua"', runtime)
 
     def test_shared_interception_module_is_registered_and_consumed(self):
         loader = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")

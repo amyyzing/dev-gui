@@ -559,7 +559,7 @@ function botApi.Post(path,body)
 	return decoded
 end
 
-manualReloadPath="main.lua"
+manualReloadPath="loader.lua"
 
 -- Keep the source split explicit:
 -- app layout, UI maps, pages, and descriptions live in /gui;
