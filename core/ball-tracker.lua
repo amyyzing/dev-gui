@@ -93,7 +93,7 @@ function ballTrackerApi.new(playersService, workspaceService, playerCache, scope
 end
 
 function ballTrackerApi:findDirectFootballPart(container, rootPart, maxDistance)
-	if not (container and rootPart) then
+	if self._destroyed or not (container and rootPart) then
 		return nil
 	end
 
@@ -111,7 +111,7 @@ end
 
 function ballTrackerApi:findFootballPart(container, rootPart, maxDistance)
 	maxDistance = tonumber(maxDistance) or defaultHeldDistance
-	if not (container and rootPart) then
+	if self._destroyed or not (container and rootPart) then
 		return nil
 	end
 
@@ -146,7 +146,7 @@ function ballTrackerApi:getRoot(player)
 end
 
 function ballTrackerApi:getFootballPartFromPlayer(player, maxDistance)
-	if not player then
+	if self._destroyed or not player then
 		return nil
 	end
 
@@ -201,6 +201,10 @@ function ballTrackerApi:getHeldBall(player, maxDistance)
 end
 
 function ballTrackerApi:getCarrier(players)
+	if self._destroyed then
+		return nil
+	end
+
 	local list = players
 	if not list then
 		if self._playerCache and type(self._playerCache.getPlayers) == "function" then

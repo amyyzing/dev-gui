@@ -547,11 +547,11 @@ local function normalizePreset(preset)
 	if code=="" then return nil end
 
 	local name=tostring(preset.Name or preset.name or "Unnamed")
-	local editor=preset.presetEditor or preset.presetEditor
+	local editor=preset.presetEditor or preset.PresetEditor
 
 	if not editor then
 		local data=preset.Data or preset.data or {}
-		editor=data.presetEditor or data.presetEditor or {}
+		editor=data.presetEditor or data.PresetEditor or {}
 	end
 
 	local normalizedEditor={}
@@ -896,7 +896,7 @@ function dataSave.new(app)
 			setValue(app,"espToggleKey",decodeBinding(keybinds.toggleActionStatus))
 		end
 
-		applyPresetEditor(app,settings.presetEditor or settings.presetEditor)
+		applyPresetEditor(app,settings.presetEditor or settings.PresetEditor)
 
 		local uiStyle=type(settings.uiStyle)=="table" and settings.uiStyle or {}
 		local hasSavedUIStyle=hasAnyKey(uiStyle)

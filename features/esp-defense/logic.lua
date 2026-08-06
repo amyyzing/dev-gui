@@ -206,8 +206,8 @@ local function getFootballPartFromPlayer(player)
 	return findFootballPart(character:FindFirstChild("GAMEOBJECTS"),rootPart,35)
 end
 
-local function findBallCarrierData(players)
-	for _,player in ipairs(players or players:GetPlayers()) do
+local function findBallCarrierData(playerList)
+	for _,player in ipairs(playerList or players:GetPlayers()) do
 		if shouldHighlightPlayer(player) then
 			local footballPart=getFootballPartFromPlayer(player)
 			if footballPart then
@@ -297,9 +297,9 @@ local function solveStationaryThrow(origin,target)
 	return best
 end
 
-local function collectDefenderRoots(players)
+local function collectDefenderRoots(playerList)
 	local roots={}
-	for _,player in ipairs(players or players:GetPlayers()) do
+	for _,player in ipairs(playerList or players:GetPlayers()) do
 		if isSameTeam(player,me) then
 			local friendlyRoot=getPlayerRoot(player)
 			if friendlyRoot then
@@ -454,16 +454,16 @@ function espDefense.new(app)
 		return getLiveCharacter(player)
 	end
 
-	local function trackedCarrierData(players)
+	local function trackedCarrierData(playerList)
 		if ballTracker and type(ballTracker.getCarrier)=="function" then
-			local carrier=ballTracker:getCarrier(players)
+			local carrier=ballTracker:getCarrier(playerList)
 			if carrier and shouldHighlightPlayer(carrier.player) then
 				return carrier
 			end
 			return nil
 		end
 
-		return findBallCarrierData(players)
+		return findBallCarrierData(playerList)
 	end
 
 	local function clearHighlights(force)
@@ -487,15 +487,15 @@ function espDefense.new(app)
 			return
 		end
 
-		local players=currentPlayers()
-		local carrierData=trackedCarrierData(players)
-		local defenderRoots=collectDefenderRoots(players)
+		local playerList=currentPlayers()
+		local carrierData=trackedCarrierData(playerList)
+		local defenderRoots=collectDefenderRoots(playerList)
 		local blue=colors.blue or Color3.fromRGB(70,140,255)
 		local red=colors.red or Color3.fromRGB(210,70,70)
 		local green=colors.green or Color3.fromRGB(90,200,90)
 		local nextHighlightsVisible=false
 
-		for _,player in ipairs(players) do
+		for _,player in ipairs(playerList) do
 			if player~=me then
 				local character=cachedCharacter(player)
 				if character then

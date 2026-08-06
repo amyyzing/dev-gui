@@ -918,8 +918,11 @@ function loadRemoteModuleBatch(paths)
 	end
 
 	local apiPaths={}
+	local externalPaths={}
 	for _,modulePath in ipairs(pendingPaths) do
-		if not isExternalModulePath(modulePath) then
+		if isExternalModulePath(modulePath) then
+			table.insert(externalPaths,modulePath)
+		else
 			table.insert(apiPaths,modulePath)
 		end
 	end
@@ -932,25 +935,30 @@ function loadRemoteModuleBatch(paths)
 		end
 	end
 
+	local externalResult={ok=true,modules={},errors={}}
+	if #externalPaths>0 then
+		externalResult=botApi.Post("/module/batch",{
+			paths=externalPaths,
+			source=uiLibrarySource.id or "ui-library",
+		})
+		if not(externalResult and externalResult.ok and type(externalResult.modules)=="table") then
+			return false,externalResult and externalResult.error or "external module batch missing"
+		end
+	end
+
 	local loaded=#paths-#pendingPaths
 	local failed=0
 
 	for index,modulePath in ipairs(pendingPaths) do
 		local loadedModule=nil
 		local err=nil
-		local item=result.modules and result.modules[modulePath]
+		local batchResult=isExternalModulePath(modulePath) and externalResult or result
+		local item=batchResult.modules and batchResult.modules[modulePath]
 
-		if isExternalModulePath(modulePath) then
-			local source,sourceErr=fetchExternalModule(modulePath)
-			if source then
-				loadedModule,err=loadModuleFromSource(modulePath,source)
-			else
-				err=sourceErr
-			end
-		elseif item and type(item.source)=="string" then
+		if item and type(item.source)=="string" then
 			loadedModule,err=loadModuleFromSource(modulePath,item.source)
 		else
-			err=result.errors and result.errors[modulePath] or "batch module missing"
+			err=batchResult.errors and batchResult.errors[modulePath] or "batch module missing"
 		end
 
 		if loadedModule then
@@ -1904,19 +1912,19 @@ function getDefaultUIWindow()
 	return result
 end
 
-function applyDefaultUIStyleFields(style,force)
-	style=style or style
+function applyDefaultUIStyleFields(targetStyle,force)
+	targetStyle=targetStyle or style
 	local defaults=getDefaultUIStyle()
 
 	for k,v in pairs(defaults) do
-		if force or style[k]==nil then
-			style[k]=v
+		if force or targetStyle[k]==nil then
+			targetStyle[k]=v
 		end
 	end
 
-	style.UILib=getDefaultUILibId()
+	targetStyle.UILib=getDefaultUILibId()
 
-	return style
+	return targetStyle
 end
 
 function applyDefaultUIWindowFields(window,force)

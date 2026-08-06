@@ -3,7 +3,8 @@ local presetEditor={}
 function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 	local make=app.New or app.make
 	local colors=app.colors
-	local hitboxPresets=app.hitboxPresets
+	local presetData=app.hitboxPresets
+	local hitboxPresetsApi=hitboxPresets
 	local defaultHitboxPresets=app.defaultHitboxPresets
 	local fmtNumber=app.fmtNumber
 	local bindingToLabel=app.bindingToLabel
@@ -46,7 +47,7 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 			end
 		end
 
-		local p=hitboxPresets[index]
+		local p=presetData[index]
 		if not p then return end
 
 		p.size=Vector3.new(
@@ -74,8 +75,8 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 			end
 		end
 
-		if hitboxPresets[index] then
-			hitboxPresets[index].key=binding or Enum.KeyCode.Unknown
+		if presetData[index] then
+			presetData[index].key=binding or Enum.KeyCode.Unknown
 		end
 
 		if app.requestPlayerAutosave then
@@ -97,9 +98,9 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 			end
 		end
 
-		if hitboxPresets[index] and defaultHitboxPresets[index] then
-			hitboxPresets[index].key=defaultHitboxPresets[index].key
-			hitboxPresets[index].size=defaultHitboxPresets[index].size
+		if presetData[index] and defaultHitboxPresets[index] then
+			presetData[index].key=defaultHitboxPresets[index].key
+			presetData[index].size=defaultHitboxPresets[index].size
 		end
 
 		if app.requestPlayerAutosave then
@@ -134,7 +135,7 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 		local savedPresets={}
 
 		for i=1,4 do
-			local p=hitboxPresets[i]
+			local p=presetData[i]
 			table.insert(savedPresets,{
 				x=p.size.X,
 				y=p.size.Y,
@@ -152,10 +153,10 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 	saveBtn.Text="save"
 
 	connect(saveBtn.Activated,function()
-		if hitboxPresets and hitboxPresets.ShowSaveConfirm then
-			hitboxPresets.ShowSaveConfirm(api.Collect)
-		elseif hitboxPresets and hitboxPresets.AddPreset then
-			hitboxPresets.AddPreset("custom",api.Collect)
+		if hitboxPresetsApi and hitboxPresetsApi.ShowSaveConfirm then
+			hitboxPresetsApi.ShowSaveConfirm(api.Collect)
+		elseif hitboxPresetsApi and hitboxPresetsApi.AddPreset then
+			hitboxPresetsApi.AddPreset("custom",api.Collect)
 		else
 			warn("preset editor missing save helper")
 		end
@@ -182,11 +183,11 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 		resetBtn.Text="reset"
 
 		local function applyPresetSize()
-			local p=hitboxPresets[i]
+			local p=presetData[i]
 			if not p then return end
 
 			setPresetSize(i,xBox.Text,yBox.Text,zBox.Text)
-			p=hitboxPresets[i]
+			p=presetData[i]
 
 			xBox.Text=fmtNumber(p.size.X,2)
 			yBox.Text=fmtNumber(p.size.Y,2)
@@ -213,7 +214,7 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 			end
 
 			keybinds.StartCapture(keyBtn,function()
-				return hitboxPresets[i].key
+				return presetData[i].key
 			end,function(v)
 				setPresetKey(i,v)
 			end)
@@ -247,7 +248,7 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 
 	function api.Refresh()
 		for i,item in ipairs(presetRows) do
-			local p=hitboxPresets[i]
+			local p=presetData[i]
 			local active=keybinds.GetActiveCapture and keybinds.GetActiveCapture()
 
 			if not(active and active.button==item.keyBtn) then

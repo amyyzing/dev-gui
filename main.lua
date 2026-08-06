@@ -217,7 +217,7 @@ local runtimeSources={}
 local fetchedSources={}
 local missingPaths={}
 for _,path in ipairs(runtimeFiles) do
-	local source=readCachedSource(path)
+	local source=not fresh and readCachedSource(path) or nil
 	if source then
 		runtimeSources[path]=source
 	else

@@ -99,7 +99,7 @@ function playerCacheApi.new(playersService, workspaceService, scope)
 end
 
 function playerCacheApi:_connect(signal, callback, trackGlobally)
-	if not signal or type(signal.Connect) ~= "function" then
+	if self._destroyed or not signal or type(signal.Connect) ~= "function" then
 		return nil
 	end
 
@@ -133,7 +133,7 @@ function playerCacheApi:_bindPlayerSignals(player, entry)
 end
 
 function playerCacheApi:_addPlayer(player)
-	if not player or self._entries[player] then
+	if self._destroyed or not player or self._entries[player] then
 		return
 	end
 
@@ -166,6 +166,10 @@ function playerCacheApi:_removePlayer(player)
 end
 
 function playerCacheApi:refreshPlayer(player)
+	if self._destroyed then
+		return nil
+	end
+
 	local entry = self._entries[player]
 	if not entry then
 		return nil
@@ -183,7 +187,7 @@ function playerCacheApi:getPlayers()
 end
 
 function playerCacheApi:getEntry(player)
-	if not player then
+	if self._destroyed or not player then
 		return nil
 	end
 

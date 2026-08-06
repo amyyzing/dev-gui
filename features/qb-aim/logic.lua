@@ -1294,8 +1294,6 @@ function qbAim.new(app,parent)
 
 		if not isAvailable() then
 			setStatus(currentModeText().." unsupported")
-		elseif enabled then
-			setStatus("")
 		else
 			setStatus("")
 		end

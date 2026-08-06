@@ -846,12 +846,14 @@ function colors.new(app,page)
 		},body)
 
 		local bodyTween=nil
+		local bodyTransitionToken=0
 		local lastHeight=0
 
 		local function cancelTween()
-			if bodyTween then
-				bodyTween:Cancel()
-				bodyTween=nil
+			local tween=bodyTween
+			bodyTween=nil
+			if tween then
+				tween:Cancel()
 			end
 		end
 
@@ -869,6 +871,8 @@ function colors.new(app,page)
 			style[stateKey]=expanded
 			paint()
 			cancelTween()
+			bodyTransitionToken=bodyTransitionToken+1
+			local transitionToken=bodyTransitionToken
 
 			if expanded then
 				body.Visible=true
@@ -876,20 +880,23 @@ function colors.new(app,page)
 				body.Size=UDim2.new(1,0,0,0)
 
 				task.defer(function()
-					if not expanded or not body.Parent then return end
+					if transitionToken~=bodyTransitionToken or not expanded or not body.Parent then return end
 
 					local height=targetHeight()
 					lastHeight=height
 
 					if animate then
-						bodyTween=tweenService:Create(body,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(1,0,0,height)})
-						bodyTween:Play()
-						bodyTween.Completed:Connect(function()
-							if expanded and body.Parent then
+						local tween=tweenService:Create(body,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(1,0,0,height)})
+						bodyTween=tween
+						tween.Completed:Connect(function(playbackState)
+							if bodyTween~=tween or playbackState~=Enum.PlaybackState.Completed then return end
+							bodyTween=nil
+							if transitionToken==bodyTransitionToken and expanded and body.Parent then
 								body.AutomaticSize=Enum.AutomaticSize.Y
 								body.Size=UDim2.new(1,0,0,0)
 							end
 						end)
+						tween:Play()
 					else
 						body.AutomaticSize=Enum.AutomaticSize.Y
 						body.Size=UDim2.new(1,0,0,0)
@@ -902,13 +909,16 @@ function colors.new(app,page)
 				body.Size=UDim2.new(1,0,0,lastHeight)
 
 				if animate then
-					bodyTween=tweenService:Create(body,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Size=UDim2.new(1,0,0,0)})
-					bodyTween:Play()
-					bodyTween.Completed:Connect(function()
-						if not expanded and body.Parent then
+					local tween=tweenService:Create(body,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Size=UDim2.new(1,0,0,0)})
+					bodyTween=tween
+					tween.Completed:Connect(function(playbackState)
+						if bodyTween~=tween or playbackState~=Enum.PlaybackState.Completed then return end
+						bodyTween=nil
+						if transitionToken==bodyTransitionToken and not expanded and body.Parent then
 							body.Visible=false
 						end
 					end)
+					tween:Play()
 				else
 					body.Visible=false
 					body.Size=UDim2.new(1,0,0,0)

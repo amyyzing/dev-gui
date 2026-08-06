@@ -99,6 +99,11 @@ function gameParams.new(app)
 	local valueConns=setmetatable({}, {__mode="k"})
 	local pendingValueApplies=setmetatable({}, {__mode="k"})
 	local lastValueApply=setmetatable({}, {__mode="k"})
+	local originalNumberValues=setmetatable({}, {__mode="k"})
+	local numberValueStateKeys=setmetatable({}, {__mode="k"})
+	local originalWalkSpeeds=setmetatable({}, {__mode="k"})
+	local originalGravity=workspace.Gravity
+	local gravityOverrideActive=false
 	local applying=false
 	local destroyed=false
 	local stateListener=nil
@@ -176,6 +181,13 @@ function gameParams.new(app)
 		return isSettingEnabled("gravitySettingEnabled")
 	end
 
+	local function restoreGravity()
+		if gravityOverrideActive then
+			workspace.Gravity=originalGravity
+			gravityOverrideActive=false
+		end
+	end
+
 	local function normalizeState()
 		state.gameParamsEnabled=true
 		state.paramsSelectedPage=normalizePageKey(state.paramsSelectedPage)
@@ -210,6 +222,10 @@ function gameParams.new(app)
 		local gravity=clampNumber(value,0,1000,defaultGravity)
 		state.gravityValue=gravity
 		if isGravityActive() then
+			if not gravityOverrideActive then
+				originalGravity=workspace.Gravity
+				gravityOverrideActive=true
+			end
 			workspace.Gravity=gravity
 		end
 		return gravity
@@ -219,6 +235,9 @@ function gameParams.new(app)
 		local hum=getMyHumanoid()
 
 		if hum then
+			if originalWalkSpeeds[hum]==nil then
+				originalWalkSpeeds[hum]=hum.WalkSpeed
+			end
 			hum.WalkSpeed=state.speedValue
 		end
 	end
@@ -237,8 +256,10 @@ function gameParams.new(app)
 		end
 
 		local hum=getMyHumanoid()
-		if hum then
-			hum.WalkSpeed=defaultSpeed
+		local original=hum and originalWalkSpeeds[hum]
+		if hum and original~=nil then
+			hum.WalkSpeed=original
+			originalWalkSpeeds[hum]=nil
 		end
 	end
 
@@ -264,8 +285,14 @@ function gameParams.new(app)
 			state.speedValue=clampSpeed(state.speedValue)
 			local hum=getMyHumanoid()
 
-			if hum and hum.WalkSpeed~=state.speedValue then
-				hum.WalkSpeed=state.speedValue
+			if hum then
+				if originalWalkSpeeds[hum]==nil then
+					originalWalkSpeeds[hum]=hum.WalkSpeed
+				end
+
+				if hum.WalkSpeed~=state.speedValue then
+					hum.WalkSpeed=state.speedValue
+				end
 			end
 		end
 
@@ -359,6 +386,8 @@ function gameParams.new(app)
 		end
 
 		valueConns[valueObject]={}
+		originalNumberValues[valueObject]=valueObject.Value
+		numberValueStateKeys[valueObject]=stateKey
 
 		local function writeTarget()
 			if applying or not isAlive() or not isStateKeyActive(stateKey) or not valueObject.Parent then
@@ -400,7 +429,18 @@ function gameParams.new(app)
 			task.defer(run)
 		end
 
-		table.insert(valueConns[valueObject],valueObject:GetPropertyChangedSignal("Value"):Connect(queueWriteTarget))
+		table.insert(valueConns[valueObject],valueObject:GetPropertyChangedSignal("Value"):Connect(function()
+			if applying then
+				return
+			end
+
+			if not isStateKeyActive(stateKey) then
+				originalNumberValues[valueObject]=valueObject.Value
+				return
+			end
+
+			queueWriteTarget()
+		end))
 
 		table.insert(valueConns[valueObject],valueObject.AncestryChanged:Connect(function(_,parent)
 			if parent==nil then
@@ -408,8 +448,39 @@ function gameParams.new(app)
 				valueConns[valueObject]=nil
 				pendingValueApplies[valueObject]=nil
 				lastValueApply[valueObject]=nil
+				originalNumberValues[valueObject]=nil
+				numberValueStateKeys[valueObject]=nil
 			end
 		end))
+	end
+
+	local function restoreNumberValue(valueObject)
+		local original=originalNumberValues[valueObject]
+		if original==nil or not(valueObject and valueObject.Parent) then
+			return
+		end
+
+		pendingValueApplies[valueObject]=nil
+		lastValueApply[valueObject]=nil
+		if valueObject.Value~=original then
+			applying=true
+			valueObject.Value=original
+			applying=false
+		end
+	end
+
+	local function restoreInactiveNumberValues()
+		for valueObject,stateKey in pairs(numberValueStateKeys) do
+			if not isStateKeyActive(stateKey) then
+				restoreNumberValue(valueObject)
+			end
+		end
+	end
+
+	local function restoreAllNumberValues()
+		for valueObject in pairs(numberValueStateKeys) do
+			restoreNumberValue(valueObject)
+		end
 	end
 
 	local function applyNumberValue(gameParams,paramName,stateKey)
@@ -566,7 +637,7 @@ function gameParams.new(app)
 		end
 		applyGameParams()
 		if not isGravityActive() then
-			workspace.Gravity=defaultGravity
+			restoreGravity()
 		end
 
 		syncControls()
@@ -657,11 +728,12 @@ function gameParams.new(app)
 				applyGravity(state.gravityValue)
 				applyGameParams()
 			else
-				workspace.Gravity=defaultGravity
+				restoreGravity()
 			end
 		elseif pageKey=="stamina" then
 			applyGameParams()
 		end
+		restoreInactiveNumberValues()
 
 		syncControls("page-toggle")
 
@@ -702,12 +774,13 @@ function gameParams.new(app)
 			if isGravityActive() then
 				applyGravity(state.gravityValue)
 			else
-				workspace.Gravity=defaultGravity
+				restoreGravity()
 			end
 			applyGameParams()
 		else
 			applyGameParams()
 		end
+		restoreInactiveNumberValues()
 
 		syncControls("setting-toggle")
 
@@ -720,10 +793,11 @@ function gameParams.new(app)
 		state.gameParamsEnabled=true
 		startWatching()
 		applyGameParams()
+		restoreInactiveNumberValues()
 		if isGravityActive() then
 			applyGravity(state.gravityValue)
 		else
-			workspace.Gravity=defaultGravity
+			restoreGravity()
 		end
 		if isSpeedActive() then
 			ensureSpeedForcing()
@@ -783,10 +857,11 @@ function gameParams.new(app)
 		normalizeState()
 		startWatching()
 		applyGameParams()
+		restoreInactiveNumberValues()
 		if isGravityActive() then
 			applyGravity(state.gravityValue)
 		else
-			workspace.Gravity=defaultGravity
+			restoreGravity()
 		end
 		if isSpeedActive() then
 			ensureSpeedForcing()
@@ -816,6 +891,7 @@ function gameParams.new(app)
 		state.staminaDepleteValue=10
 		state.jumpPowerValue=53.5
 		state.divePowerValue=1.9
+		restoreInactiveNumberValues()
 		api.Refresh()
 		changed()
 	end
@@ -823,9 +899,10 @@ function gameParams.new(app)
 	function api.Destroy()
 		if destroyed then return end
 		destroyed=true
+		restoreAllNumberValues()
 		disconnectWatchers()
 		stopSpeedForcing(false)
-		workspace.Gravity=defaultGravity
+		restoreGravity()
 		stateListener=nil
 	end
 

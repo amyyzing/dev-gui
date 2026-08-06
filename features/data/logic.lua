@@ -17,6 +17,8 @@ function playerData.new(app,page,deps)
 	local wipeButton=nil
 	local busy=false
 	local connections={}
+	local activeModal=nil
+	local activeModalConnections={}
 
 	local function trackConnection(connection,bucket)
 		if connection then
@@ -34,6 +36,18 @@ function playerData.new(app,page,deps)
 		end
 
 		table.clear(bucket)
+	end
+
+	local function closeActiveModal()
+		local modal=activeModal
+		local modalConnections=activeModalConnections
+		activeModal=nil
+		activeModalConnections={}
+		disconnectConnections(modalConnections)
+
+		if modal and modal.Parent then
+			modal:Destroy()
+		end
 	end
 
 	local function canWipe()
@@ -109,6 +123,7 @@ function playerData.new(app,page,deps)
 			return
 		end
 
+		closeActiveModal()
 		local modal=make("Frame",{
 			BackgroundColor3=Color3.fromRGB(0,0,0),
 			BackgroundTransparency=0.25,
@@ -117,11 +132,14 @@ function playerData.new(app,page,deps)
 			ZIndex=100,
 		},screenGui)
 		local modalConnections={}
+		activeModal=modal
+		activeModalConnections=modalConnections
 		local function closeModal()
-			disconnectConnections(modalConnections)
-			if modal and modal.Parent then
-				modal:Destroy()
+			if activeModal~=modal then
+				return
 			end
+
+			closeActiveModal()
 		end
 
 		local box=make("Frame",{
@@ -256,6 +274,7 @@ function playerData.new(app,page,deps)
 	end
 
 	function api.Destroy()
+		closeActiveModal()
 		disconnectConnections(connections)
 	end
 

@@ -267,9 +267,9 @@ function equipOwnedPresetFromDataSave(preset)
 	end
 
 	local data=preset and (preset.Data or preset.data) or {}
-	local editor=data.presetEditor or data.presetEditor
+	local editor=data.presetEditor or data.PresetEditor
 	if not editor and preset then
-		editor=preset.presetEditor or preset.presetEditor
+		editor=preset.presetEditor or preset.PresetEditor
 	end
 
 	return applyPresetEditorFromDataSave(editor or {})

@@ -286,9 +286,9 @@ local function solveStationaryThrow(origin,target)
 	return best
 end
 
-local function collectDefenderRoots(players)
+local function collectDefenderRoots(playerList)
 	local roots={}
-	for _,player in ipairs(players or players:GetPlayers()) do
+	for _,player in ipairs(playerList or players:GetPlayers()) do
 		if shouldUseAsDefender(player) then
 			local defenderRoot=getPlayerRoot(player)
 			if defenderRoot then
@@ -470,15 +470,15 @@ function espOffense.new(app)
 			return
 		end
 
-		local players=currentPlayers()
+		local playerList=currentPlayers()
 		local catchY=getConfiguredThrowY(app)
 		local origin=getThrowOrigin(qbRoot,nil,catchY)
-		local defenderRoots=collectDefenderRoots(players)
+		local defenderRoots=collectDefenderRoots(playerList)
 		local red=colors.red or Color3.fromRGB(210,70,70)
 		local green=colors.green or Color3.fromRGB(90,200,90)
 		local nextHighlightsVisible=false
 
-		for _,player in ipairs(players) do
+		for _,player in ipairs(playerList) do
 			if player~=me then
 				local character=cachedCharacter(player)
 				if character then

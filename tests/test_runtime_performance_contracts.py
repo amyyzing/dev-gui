@@ -38,6 +38,15 @@ class HitboxContracts(unittest.TestCase):
 
 
 class RuntimePerformanceContracts(unittest.TestCase):
+    def test_ui_library_modules_are_batched(self):
+        runtime = source("runtime/loader-part-1.lua")
+        self.assertIn("local externalPaths={}", runtime)
+        self.assertIn("paths=externalPaths", runtime)
+        self.assertIn(
+            'source=uiLibrarySource.id or "ui-library"',
+            runtime,
+        )
+
     def test_esp_control_poll_does_not_force_rebuild(self):
         esp = source("features/esp/logic.lua")
         self.assertIn(

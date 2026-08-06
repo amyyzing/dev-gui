@@ -237,7 +237,7 @@ function hitboxPresets.new(app,ownedSection)
 			local code=tostring(preset.Code or preset.code or presetIndex)
 			local name=tostring(preset.Name or preset.name or "Unnamed")
 			local data=preset.Data or preset.data or {}
-			local editor=data.presetEditor or data.presetEditor or preset.presetEditor or {}
+			local editor=data.presetEditor or data.PresetEditor or preset.presetEditor or preset.PresetEditor or {}
 
 			local row=make("Frame",{BackgroundColor3=colors.bg,BorderSizePixel=0,Size=UDim2.new(1,-6,0,expandedOwned[code] and 178 or 32),ZIndex=6},ownedList)
 			make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=0},row)
