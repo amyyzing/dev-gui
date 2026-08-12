@@ -18,6 +18,11 @@ class BootstrapContracts(unittest.TestCase):
             bootstrap,
         )
 
+    def test_all_optional_pages_are_preloaded_on_every_platform(self):
+        expected = 'PreloadPages={"maps","server","customize","page2","settings"}'
+        self.assertIn(expected, source("gui/pc.luau"))
+        self.assertIn(expected, source("gui/mobile.luau"))
+
 
 class QBAimDefaultsContracts(unittest.TestCase):
     def test_safe_arc_defaults_off_across_runtime_and_persistence(self):

@@ -11,7 +11,7 @@ uiMap.LibraryProfileId="original"
 uiMap.DefaultProfileId=uiMap.LibraryProfileId
 
 uiMap.LoaderGui={
-	PreloadPages={},
+	PreloadPages={"maps","server","customize","page2","settings"},
 	Phases={"setup","modules","gui","ready"},
 
 	Text={
