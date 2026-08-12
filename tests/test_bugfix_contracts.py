@@ -19,6 +19,21 @@ class BootstrapContracts(unittest.TestCase):
         )
 
 
+class QBAimDefaultsContracts(unittest.TestCase):
+    def test_safe_arc_defaults_off_across_runtime_and_persistence(self):
+        self.assertIn('safeArc=getValue(app,"qbAimSafeArc",false)', source("data-save/data-save.lua"))
+        self.assertIn("qbAimSafeArc=false", source("runtime/loader-part-1.lua"))
+        self.assertIn("qbAimSafeArc=false,", source("runtime/loader-part-2.lua"))
+        self.assertIn(
+            'setQBAimSafeArc={"qbAimSafeArc",false,"QBAim","SetSafeArcState",true}',
+            source("runtime/loader-part-5.lua"),
+        )
+
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn("state.qbAimSafeArc=false", logic)
+        self.assertIn('buildToggleRow(sectionBody,"Safe Arc",state.qbAimSafeArc==true', logic)
+
+
 class PresetContracts(unittest.TestCase):
     def test_editor_keeps_data_and_api_separate(self):
         editor = source("features/preset-editor/logic.lua")

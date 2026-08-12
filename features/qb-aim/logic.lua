@@ -783,7 +783,7 @@ function qbAim.new(app,parent)
 	end
 
 	if state.qbAimSafeArc==nil then
-		state.qbAimSafeArc=true
+		state.qbAimSafeArc=false
 	end
 
 	if state.qbAimTargetHighlight==nil then
@@ -1280,7 +1280,7 @@ function qbAim.new(app,parent)
 		end
 
 		if safeArcToggle then
-			safeArcToggle.set(state.qbAimSafeArc~=false)
+			safeArcToggle.set(state.qbAimSafeArc==true)
 		end
 
 		if highlightToggle then
@@ -2587,7 +2587,7 @@ function qbAim.new(app,parent)
 		api.SetShowArcState(value,true)
 	end)
 
-	safeArcToggle=buildToggleRow(sectionBody,"Safe Arc",state.qbAimSafeArc~=false,function(value)
+	safeArcToggle=buildToggleRow(sectionBody,"Safe Arc",state.qbAimSafeArc==true,function(value)
 		api.SetSafeArcState(value,true)
 	end)
 
