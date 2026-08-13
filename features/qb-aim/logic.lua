@@ -44,9 +44,7 @@ local centerGroundFallbackMargin=2.50
 local centerMaxAboveBall=8.00
 local centerMaxYDelta=10.00
 local useHorizontalReleasePrediction=true
--- Signed drift is useful for X/Z calibration, but applying a negative drift to
--- jump velocity back-projects C2 toward the ground before it rises with the QB.
-local useVerticalReleasePrediction=false
+local useVerticalReleasePrediction=true
 local qbHorizontalDeadzone=0.75
 local qbHorizontalSpeedMax=24
 local minTime,maxTime=0.35,6

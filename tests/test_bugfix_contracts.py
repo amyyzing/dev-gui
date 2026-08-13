@@ -65,11 +65,11 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("if ok and played==true then", logic)
         self.assertIn('return true,"pumpfake"', logic)
 
-    def test_qb_c2_origin_is_not_tweened_or_back_projected_on_jump(self):
+    def test_qb_c2_origin_is_not_visually_lerped_but_keeps_jump_prediction(self):
         logic = source("features/qb-aim/logic.lua")
         self.assertIn('buildSlider(sectionBody,"XYZ Drift"', logic)
         self.assertIn("local useHorizontalReleasePrediction=true", logic)
-        self.assertIn("local useVerticalReleasePrediction=false", logic)
+        self.assertIn("local useVerticalReleasePrediction=true", logic)
         self.assertIn("local smoothedStartPoint=startPoint", logic)
         self.assertNotIn(
             "preview.lastStartPoint:Lerp(smoothedStartPoint,previewSmoothAmount)",
