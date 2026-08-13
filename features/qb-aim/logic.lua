@@ -1952,11 +1952,15 @@ function qbAim.new(app,parent)
 					if not humanoid or humanoid.Health>0 then
 						local tackleBox=getPlayerCatchVolume(player)
 						local jumpHeight,jumpRiseTime=jumpProfile(humanoid)
+						local speed=humanoid and math.max(maxRunSpeed,humanoid.WalkSpeed) or maxRunSpeed
+						local velocity=flat(defenderRoot.AssemblyLinearVelocity or Vector3.zero)
+						velocity=clampMagnitude(velocity,speed)
 						defenders[#defenders+1]={
 							player=player,
 							position=(tackleBox and tackleBox.Position) or defenderRoot.Position,
-							velocity=defenderRoot.AssemblyLinearVelocity or Vector3.zero,
+							velocity=velocity,
 							boxSize=(tackleBox and tackleBox.Size) or defenderRoot.Size,
+							speed=speed,
 							jumpHeight=jumpHeight,
 							jumpRiseTime=jumpRiseTime,
 						}
@@ -2069,7 +2073,7 @@ function qbAim.new(app,parent)
 		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-arcMaxCurve,arcMaxCurve)
 		beam.CurveSize1=math.clamp(endVelocity.Magnitude*previewTime/3,-arcMaxCurve,arcMaxCurve)
 		local unsafe,interceptInfo=planCanBeDefended(plan,trackedReceiver)
-		updateArcSafetyColor(beam,unsafe,interceptInfo,catchTime)
+		updateArcSafetyColor(beam,unsafe,interceptInfo,previewTime)
 		setPreviewCenterVisible(true)
 		beam.Enabled=true
 	end

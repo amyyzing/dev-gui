@@ -8,10 +8,9 @@ local DEFAULTS={
 	defenderSpeed=21,
 	reactionTime=0.12,
 	catchRadius=2.75,
-	ballRadius=0.85,
 	lowerCatchOffset=-2.5,
 	standingReach=6.5,
-	verticalSlack=0.25,
+	verticalSlack=0,
 	jumpHeight=7.2,
 	jumpRiseTime=0.27,
 	forwardEpsilon=-0.05,
@@ -66,26 +65,15 @@ end
 
 local function defenderDimensions(defender,settings)
 	local size=defender.boxSize
-	local halfWidth=0
-	local halfHeight=0
 	if typeof(size)=="Vector3" then
-		halfWidth=math.max(size.X,size.Z)*0.5
-		halfHeight=size.Y*0.5
+		local halfWidth=math.max(size.X,size.Z)*0.5
+		local halfHeight=size.Y*0.5
+		return halfWidth,-halfHeight,halfHeight
 	end
 
-	local ballRadius=math.max(0,defender.ballRadius or setting(settings,"ballRadius"))
-	local horizontalRadius=math.max(
-		defender.catchRadius or setting(settings,"catchRadius"),
-		halfWidth+ballRadius
-	)
-	local lowerOffset=math.min(
-		defender.lowerCatchOffset or setting(settings,"lowerCatchOffset"),
-		-halfHeight
-	)-ballRadius
-	local upperOffset=math.max(
-		defender.standingReach or setting(settings,"standingReach"),
-		halfHeight
-	)+ballRadius
+	local horizontalRadius=math.max(0,defender.catchRadius or setting(settings,"catchRadius"))
+	local lowerOffset=defender.lowerCatchOffset or setting(settings,"lowerCatchOffset")
+	local upperOffset=defender.standingReach or setting(settings,"standingReach")
 
 	return horizontalRadius,lowerOffset,upperOffset
 end
@@ -179,10 +167,9 @@ local function broadPhaseAllows(arc,defender,maxTime,horizontalRadius,lowerOffse
 		end
 	end
 
-	local defenderMinY=defender.position.Y+lowerOffset-setting(settings,"verticalSlack")
+	local defenderMinY=defender.position.Y+lowerOffset
 	local defenderMaxY=defender.position.Y+upperOffset
 		+math.max(0,defender.jumpHeight or setting(settings,"jumpHeight"))
-		+setting(settings,"verticalSlack")
 	return not(maxBallY<defenderMinY or minBallY>defenderMaxY)
 end
 
@@ -226,9 +213,9 @@ local function defenderWindows(arc,defender,settings)
 	local function verticallyCatchable(time)
 		local ballPosition=projectileAt(arc,time)
 		local position=defenderPositionAt(defender,time,settings)
-		local slack=math.max(0,defender.verticalSlack or setting(settings,"verticalSlack"))
-		local minY=position.Y+lowerOffset-slack
-		local maxY=position.Y+upperOffset+jumpOffsetAt(defender,time,settings)+slack
+		local jumpOffset=jumpOffsetAt(defender,time,settings)
+		local minY=position.Y+jumpOffset+lowerOffset
+		local maxY=position.Y+jumpOffset+upperOffset
 		return ballPosition.Y>=minY and ballPosition.Y<=maxY
 	end
 
@@ -244,14 +231,15 @@ local function defenderWindows(arc,defender,settings)
 		local position=defenderPositionAt(defender,time,settings)
 		local reactionTime=math.max(0,defender.reactionTime or setting(settings,"reactionTime"))
 		local runTime=math.max(0,time-reactionTime)
+		local jumpOffset=jumpOffsetAt(defender,time,settings)
 		window.player=defender.player
 		window.defender=defender
 		window.time=time
 		window.point=point
 		window.distance=horizontalDistance(position,point)
 		window.reachableRadius=horizontalRadius+math.max(0,defender.speed or setting(settings,"defenderSpeed"))*runTime
-		window.yMin=position.Y+lowerOffset-setting(settings,"verticalSlack")
-		window.yMax=position.Y+upperOffset+jumpOffsetAt(defender,time,settings)+setting(settings,"verticalSlack")
+		window.yMin=position.Y+jumpOffset+lowerOffset
+		window.yMax=position.Y+jumpOffset+upperOffset
 	end
 	return windows
 end

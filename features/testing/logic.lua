@@ -93,6 +93,21 @@ local function customTeamOf(player)
 	return nil
 end
 
+local function gameIDOf(player)
+	local replicated=player and player:FindFirstChild("Replicated")
+	local value=replicated and replicated:FindFirstChild("GameID")
+	local ok,result=pcall(function()
+		return value and value.Value
+	end)
+	if not ok or result==nil or tostring(result)=="" then return nil end
+	return tostring(result)
+end
+
+local function isCurrentSessionPlayer(player)
+	local gameID=gameIDOf(localPlayer)
+	return gameID~=nil and gameIDOf(player)==gameID
+end
+
 local function sameTeam(a,b)
 	if not(a and b) then
 		return nil
@@ -130,35 +145,6 @@ local function isOpponentOfThrower(player,thrower)
 	end
 
 	return result==false
-end
-
-local function hasAnyRoleData(player)
-	local character=player and player.Character
-	return player and (
-		player:GetAttribute("Position")~=nil
-			or player:GetAttribute("Role")~=nil
-			or (character and character:GetAttribute("Position")~=nil)
-			or (character and character:GetAttribute("Role")~=nil)
-	)
-end
-
-local function isDB(player)
-	local character=player and player.Character
-	if not character then
-		return false
-	end
-
-	if not hasAnyRoleData(player) then
-		return true
-	end
-
-	local role=player:GetAttribute("Position")
-		or player:GetAttribute("Role")
-		or character:GetAttribute("Position")
-		or character:GetAttribute("Role")
-
-	role=string.upper(tostring(role))
-	return role=="DB" or role=="CB" or role=="FS" or role=="SS" or role=="S"
 end
 
 local function legacyProjectileAt(origin,velocity,time)
@@ -284,18 +270,20 @@ local function collectGameReEvents()
 	local events={}
 
 	addEvent(events,replicatedStorage:FindFirstChild("ReEvent"))
+	local gameID=gameIDOf(localPlayer)
 
-	for _,entry in ipairs({
-		{container=replicatedStorage:FindFirstChild("Games"),requireLocalPlayer=false},
-		{container=replicatedStorage:FindFirstChild("MiniGames"),requireLocalPlayer=false},
-		{container=workspace:FindFirstChild("Games"),requireLocalPlayer=true},
-		{container=workspace:FindFirstChild("MiniGames"),requireLocalPlayer=false},
+	for _,container in ipairs({
+		replicatedStorage:FindFirstChild("Games"),
+		replicatedStorage:FindFirstChild("MiniGames"),
+		workspace:FindFirstChild("Games"),
+		workspace:FindFirstChild("MiniGames"),
 	}) do
-		local container=entry.container
 		if container then
-			for _,gameFolder in ipairs(container:GetChildren()) do
-				addGameFolderEvents(events,gameFolder,entry.requireLocalPlayer)
+			local gameFolder=gameID and container:FindFirstChild(gameID) or nil
+			if not gameFolder and #container:GetChildren()==1 then
+				gameFolder=container:GetChildren()[1]
 			end
+			addGameFolderEvents(events,gameFolder,false)
 		end
 	end
 
@@ -332,17 +320,63 @@ local function findLocalFolderIn(container,requireArc)
 end
 
 local function findLocalFolder()
+	local gameID=gameIDOf(localPlayer)
 	local games=workspace:FindFirstChild("Games")
 	local miniGames=workspace:FindFirstChild("MiniGames")
+	if gameID then
+		local gameFolder=(games and games:FindFirstChild(gameID)) or (miniGames and miniGames:FindFirstChild(gameID))
+		local localFolder=gameFolder and gameFolder:FindFirstChild("Local")
+		if localFolder then return localFolder end
+	end
+
 	return findLocalFolderIn(games,true)
 		or findLocalFolderIn(miniGames,true)
-		or findLocalFolderIn(games,false)
-		or findLocalFolderIn(miniGames,false)
+		or (games and #games:GetChildren()==1 and findLocalFolderIn(games,false))
+		or (miniGames and #miniGames:GetChildren()==1 and findLocalFolderIn(miniGames,false))
 end
 
 local function findCenter()
 	local localFolder=findLocalFolder()
 	return localFolder and localFolder:FindFirstChild("Center"),localFolder
+end
+
+local function readVisualThrowArcState()
+	local center=findCenter()
+	local beam=center and center:FindFirstChild("ThrowingArc",true)
+	if not(beam and beam:IsA("Beam") and beam.Enabled) then return nil end
+
+	local attachment0=beam.Attachment0 or center:FindFirstChild("C2",true)
+	local attachment1=beam.Attachment1 or center:FindFirstChild("C3",true)
+	local cframe0=attachmentCFrame(attachment0)
+	local cframe1=attachmentCFrame(attachment1)
+	if not(cframe0 and cframe1) then return nil end
+
+	local p0=cframe0.Position
+	local p1=p0+cframe0.RightVector*beam.CurveSize0
+	local p3=cframe1.Position
+	local p2=p3-cframe1.RightVector*beam.CurveSize1
+	local gravity=Vector3.new(0,-ballGravity,0)
+	local acceleration=3*((p3-p2)-(p1-p0))
+	local timeSquared=acceleration.Y/gravity.Y
+	if timeSquared<=1e-6 then return nil end
+
+	local flightTime=math.sqrt(timeSquared)
+	local velocity=3*(p1-p0)/flightTime
+	local calculatedEnd=p0+velocity*flightTime+0.5*gravity*flightTime*flightTime
+	if (calculatedEnd-p3).Magnitude>0.2 then return nil end
+	local c1Attachment=center:FindFirstChild("C1",true)
+	local c1CFrame=attachmentCFrame(c1Attachment)
+
+	return publishThrowArcState(
+		beam,
+		p0,
+		c1CFrame and c1CFrame.Position or nil,
+		p3,
+		velocity,
+		gravity,
+		flightTime,
+		velocity.Magnitude
+	)
 end
 
 function testing.new(app,parent,guiBuilder)
@@ -547,11 +581,17 @@ function testing.new(app,parent,guiBuilder)
 		local jumpRiseTime=humanoid.UseJumpPower
 			and math.max(0,humanoid.JumpPower)/gravity
 			or math.sqrt(2*math.max(0,jumpHeight)/gravity)
+		local speed=math.max(21,humanoid.WalkSpeed)
+		local velocity=flat(root.AssemblyLinearVelocity or Vector3.zero)
+		if velocity.Magnitude>speed then
+			velocity=velocity.Unit*speed
+		end
 		return{
 			player=player,
 			position=(tackleBox and tackleBox.Position) or root.Position,
-			velocity=root.AssemblyLinearVelocity or Vector3.zero,
+			velocity=velocity,
 			boxSize=(tackleBox and tackleBox.Size) or root.Size,
+			speed=speed,
 			jumpHeight=jumpHeight,
 			jumpRiseTime=jumpRiseTime,
 		}
@@ -602,18 +642,16 @@ function testing.new(app,parent,guiBuilder)
 
 		local defenders={}
 		for _,player in ipairs(players:GetPlayers()) do
-			if player~=thrower then
+			if player~=thrower and isCurrentSessionPlayer(player) then
 				local teamResult=sameTeam(player,thrower)
 				local opponent=isOpponentOfThrower(player,thrower)
-				local db=opponent and isDB(player) or false
 				debugQB("consider_player",{
 					player=player.Name,
 					team=tostring(teamResult),
 					opponent=opponent,
-					db=db,
 				})
 
-				if opponent and db then
+				if opponent then
 					local defender=defenderDescriptor(player)
 					if defender then
 						defenders[#defenders+1]=defender
@@ -631,7 +669,7 @@ function testing.new(app,parent,guiBuilder)
 			return
 		end
 
-		local arc=CurrentThrowArcState
+		local arc=readVisualThrowArcState() or CurrentThrowArcState
 		local unsafe,info=isArcUnsafe(arc,localPlayer)
 		if not isArcStateFresh(arc) then
 			if USE_LEGACY_VISUAL_ARC_FALLBACK then
@@ -819,7 +857,6 @@ function testing.new(app,parent,guiBuilder)
 			return
 		end
 
-		pos=Vector3.new(pos.X,testingCatchY,pos.Z)
 		ensureMarker(folder).CFrame=CFrame.new(pos)
 		ensureGroundMarker(folder).CFrame=CFrame.new(pos.X,groundYAt(pos),pos.Z)*CFrame.Angles(0,0,math.rad(90))
 		local powerText=payload and (" "..fmtPower(payload.Power)) or ""
