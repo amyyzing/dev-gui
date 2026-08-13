@@ -492,7 +492,7 @@ function testing.new(app,parent,guiBuilder)
 				RED_ARC,
 				info and info.windows or nil,
 				arc.flightTime,
-				false
+				true
 			)
 		else
 			beam.Color=centerBeamDefaults[beam] or WHITE_ARC

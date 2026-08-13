@@ -63,6 +63,15 @@ class SafeArcContracts(unittest.TestCase):
             logic,
         )
 
+    def test_unsafe_arc_recolors_the_whole_beam(self):
+        production = source("features/qb-aim/logic.lua")
+        testing = source("features/testing/logic.lua")
+        self.assertIn("WholeBeamWarning=true,", production)
+        self.assertIn(
+            "info and info.windows or nil,\n\t\t\t\tarc.flightTime,\n\t\t\t\ttrue",
+            testing,
+        )
+
 
 class VisualBeamReconstructionTests(unittest.TestCase):
     def test_game_beam_control_points_recover_flight_time_and_velocity(self):

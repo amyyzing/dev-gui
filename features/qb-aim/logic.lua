@@ -58,7 +58,7 @@ local arcSettings={
 	UpdateInterval=1/60,
 	AttachmentRoll=math.rad(90),
 	UnsafeColor=Color3.fromRGB(254,94,86),
-	WholeBeamWarning=false,
+	WholeBeamWarning=true,
 }
 local trackSettings={
 	ReceiverInterval=1/60,
