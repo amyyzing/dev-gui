@@ -257,6 +257,36 @@ function paramsGui.new(app,parent)
 		return themeColor(colors,"TEXT",Color3.fromRGB(225,225,225))
 	end
 
+	local function styleSettingToggle(toggle)
+		local label=toggle and toggle.label
+		if not(label and label:IsA("TextLabel")) then return toggle end
+
+		local originalSet=toggle.set
+
+		local function applyTextStyle()
+			if not label.Parent then return end
+
+			local surface=themeColor(colors,"PANEL",themeColor(colors,"BG",Color3.fromRGB(12,12,12)))
+			local enabled=toggle.get and toggle.get()==true
+			if colorLuminance(surface)>0.70 then
+				label.TextColor3=enabled and Color3.fromRGB(8,8,10) or Color3.fromRGB(112,112,124)
+				label.TextTransparency=0
+			else
+				label.TextColor3=enabled and themeColor(colors,"STROKE",textColor()) or textColor()
+				label.TextTransparency=enabled and 0 or 0.08
+			end
+		end
+
+		if originalSet then
+			toggle.set=function(value,animate)
+				originalSet(value,animate)
+				applyTextStyle()
+			end
+		end
+		applyTextStyle()
+		return toggle
+	end
+
 	local function normalizeState()
 		if runtime.Refresh then runtime.Refresh() end
 	end
@@ -697,9 +727,9 @@ function paramsGui.new(app,parent)
 
 		local function buildSettingSlider(page,settingKey,label,min,max,start,decimals,onChange)
 			if buildToggleLabel then
-				settingToggles[settingKey]=buildToggleLabel(page,label,state[settingKey]==true,function(value)
+				settingToggles[settingKey]=styleSettingToggle(buildToggleLabel(page,label,state[settingKey]==true,function(value)
 					api.SetParamSettingEnabled(settingKey,value,true)
-				end)
+				end))
 			elseif buildToggleRow then
 				settingToggles[settingKey]=buildToggleRow(page,label,state[settingKey]==true,function(value)
 					api.SetParamSettingEnabled(settingKey,value,true)

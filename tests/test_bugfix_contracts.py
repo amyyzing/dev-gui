@@ -77,6 +77,19 @@ class QBAimDefaultsContracts(unittest.TestCase):
         )
 
 
+class ParamsThemeContracts(unittest.TestCase):
+    def test_light_theme_text_toggles_have_distinct_dark_states(self):
+        params = source("features/params/gui.lua")
+        self.assertIn("local function styleSettingToggle(toggle)", params)
+        self.assertIn("Color3.fromRGB(8,8,10)", params)
+        self.assertIn("Color3.fromRGB(112,112,124)", params)
+        self.assertIn("label.TextTransparency=0", params)
+        self.assertIn(
+            "styleSettingToggle(buildToggleLabel(page,label",
+            params,
+        )
+
+
 class PresetContracts(unittest.TestCase):
     def test_editor_keeps_data_and_api_separate(self):
         editor = source("features/preset-editor/logic.lua")
