@@ -2051,10 +2051,6 @@ function qbAim.new(app,parent)
 		local smoothedCatchPoint=catchPoint
 		local smoothedLandingPoint=endPoint
 
-		if preview.lastStartPoint then
-			smoothedStartPoint=preview.lastStartPoint:Lerp(smoothedStartPoint,previewSmoothAmount)
-		end
-
 		if preview.lastCatchPoint and (smoothedCatchPoint-preview.lastCatchPoint).Magnitude<=28 then
 			smoothedCatchPoint=preview.lastCatchPoint:Lerp(smoothedCatchPoint,previewSmoothAmount)
 		end

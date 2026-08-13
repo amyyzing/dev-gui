@@ -65,6 +65,15 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("if ok and played==true then", logic)
         self.assertIn('return true,"pumpfake"', logic)
 
+    def test_qb_c2_origin_is_not_tweened_from_its_previous_height(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn('buildSlider(sectionBody,"XYZ Drift"', logic)
+        self.assertIn("local smoothedStartPoint=startPoint", logic)
+        self.assertNotIn(
+            "preview.lastStartPoint:Lerp(smoothedStartPoint,previewSmoothAmount)",
+            logic,
+        )
+
 
 class PresetContracts(unittest.TestCase):
     def test_editor_keeps_data_and_api_separate(self):
