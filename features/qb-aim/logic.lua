@@ -706,17 +706,35 @@ function qbAim._playLocalThrowAnimation()
 	return true
 end
 
+function qbAim._playPumpFakeAnimation(mechanics)
+	if not mechanics or type(mechanics.Pumpfake)~="function" then
+		return false
+	end
+
+	local ok=pcall(function()
+		task.spawn(function()
+			pcall(mechanics.Pumpfake,mechanics)
+		end)
+	end)
+
+	return ok
+end
+
 function qbAim._playThrowAnimation()
 	if not playThrowAnimation or not getHeldBall() then return false end
 
 	local mechanics=qbAim._getGlobalMechanics()
 	if mechanics and type(mechanics.PlayAnimation)=="function" then
-		local ok=pcall(function()
-			mechanics:PlayAnimation(throwAnimationName,throwAnimationSpeed)
+		local ok,played=pcall(function()
+			return mechanics:PlayAnimation(throwAnimationName,throwAnimationSpeed)
 		end)
-		if ok then
+		if ok and played==true then
 			return true,"mechanics"
 		end
+	end
+
+	if qbAim._playPumpFakeAnimation(mechanics) then
+		return true,"pumpfake"
 	end
 
 	if useLocalThrowFallback then

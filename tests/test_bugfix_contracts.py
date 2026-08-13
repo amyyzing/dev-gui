@@ -57,6 +57,14 @@ class QBAimDefaultsContracts(unittest.TestCase):
         for path in ("gui/pc.luau", "gui/mobile.luau"):
             self.assertIn("ResizeHandleVisible=true", source(path))
 
+    def test_throw_animation_falls_back_to_pump_fake_without_delaying_release(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn("function qbAim._playPumpFakeAnimation(mechanics)", logic)
+        self.assertIn("task.spawn(function()", logic)
+        self.assertIn("pcall(mechanics.Pumpfake,mechanics)", logic)
+        self.assertIn("if ok and played==true then", logic)
+        self.assertIn('return true,"pumpfake"', logic)
+
 
 class PresetContracts(unittest.TestCase):
     def test_editor_keeps_data_and_api_separate(self):
