@@ -59,6 +59,7 @@ uiMap.MainBackgroundGui={
 		TopButtonSize=28,
 		TopButtonGap=6,
 		TopButtonOuter=10,
+		ResizeHandleVisible=true,
 	},
 }
 

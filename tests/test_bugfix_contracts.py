@@ -38,6 +38,25 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("state.qbAimSafeArc=false", logic)
         self.assertIn('buildToggleRow(sectionBody,"Safe Arc",state.qbAimSafeArc==true', logic)
 
+    def test_park_uses_the_active_minigame_session(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn(
+            'return modeKey=="mode1" or modeKey=="mode2" or modeKey=="mode3"',
+            logic,
+        )
+        self.assertIn("local function getPlayerGameID(player)", logic)
+        self.assertIn("getPlayerGameID(player)==gameID", logic)
+        self.assertIn("if not allowSingleFallback then", logic)
+        self.assertIn(
+            'elseif modeKey=="mode2" or modeKey=="mode3" then',
+            logic,
+        )
+        self.assertNotIn('return false,"park unknown"', logic)
+
+    def test_window_resize_handle_is_visible(self):
+        for path in ("gui/pc.luau", "gui/mobile.luau"):
+            self.assertIn("ResizeHandleVisible=true", source(path))
+
 
 class PresetContracts(unittest.TestCase):
     def test_editor_keeps_data_and_api_separate(self):

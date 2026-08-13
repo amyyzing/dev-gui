@@ -114,6 +114,7 @@ local espHighlightName="MyESPHighlight"
 local validTeamIds={
 	HomeTeam=true,
 	AwayTeam=true,
+	SquadTeam=true,
 }
 
 local function flat(v)
@@ -384,8 +385,8 @@ local function isSameTeam(playerA,playerB)
 	return teamA==teamB
 end
 
-local function localGameID()
-	local replicated=localPlayer and localPlayer:FindFirstChild("Replicated")
+local function getPlayerGameID(player)
+	local replicated=player and player:FindFirstChild("Replicated")
 	local gameID=replicated and replicated:FindFirstChild("GameID")
 	if not gameID then return nil end
 
@@ -397,6 +398,10 @@ local function localGameID()
 	value=tostring(value)
 	if value=="" then return nil end
 	return value
+end
+
+local function localGameID()
+	return getPlayerGameID(localPlayer)
 end
 
 local function folderReEvent(folder)
@@ -472,8 +477,19 @@ local function getFirstMiniGame()
 end
 
 local function localFolder()
+	local gameID=localGameID()
 	local miniGames=workspace:FindFirstChild("MiniGames")
-	local gameFolder=(miniGames and #miniGames:GetChildren()==1) and getFirstMiniGame() or getFirstGame()
+	local games=workspace:FindFirstChild("Games")
+	local gameFolder=gameID and ((miniGames and miniGames:FindFirstChild(gameID)) or (games and games:FindFirstChild(gameID)))
+
+	if not gameFolder and miniGames and #miniGames:GetChildren()==1 then
+		gameFolder=getFirstMiniGame()
+	end
+
+	if not gameFolder then
+		gameFolder=getFirstGame()
+	end
+
 	return gameFolder and gameFolder:FindFirstChild("Local")
 end
 
@@ -544,19 +560,23 @@ local function prepPreviewObject(object)
 	end
 end
 
-local function getFirstMiniGameFolder(container)
+local function getOnlyMiniGameFolder(container)
 	if not container then return nil end
 
+	local found=nil
 	for _,child in ipairs(container:GetChildren()) do
 		if child:IsA("Folder") or child:IsA("Model") then
-			return child
+			if found then
+				return nil
+			end
+			found=child
 		end
 	end
 
-	return nil
+	return found
 end
 
-local function getSquadsReEvent()
+local function getMiniGameReEvent(allowSingleFallback)
 	local gameID=localGameID()
 	if gameID then
 		local replicatedMiniGames=replicatedStorage:FindFirstChild("MiniGames")
@@ -567,6 +587,10 @@ local function getSquadsReEvent()
 		if reEvent then
 			return reEvent,miniGame
 		end
+	end
+
+	if not allowSingleFallback then
+		return nil,nil
 	end
 
 	local containers={}
@@ -586,10 +610,10 @@ local function getSquadsReEvent()
 	addContainer(replicatedGames and replicatedGames:FindFirstChild("MiniGames"))
 
 	for _,container in ipairs(containers) do
-		local miniGame=getFirstMiniGameFolder(container)
-		local reEvent=miniGame and miniGame:FindFirstChild("ReEvent")
+		local miniGame=getOnlyMiniGameFolder(container)
+		local reEvent=folderReEvent(miniGame)
 
-		if reEvent and reEvent:IsA("RemoteEvent") then
+		if reEvent then
 			return reEvent,miniGame
 		end
 	end
@@ -909,7 +933,17 @@ function qbAim.new(app,parent)
 
 	local function isAvailable()
 		local modeKey=getModeKey(app)
-		return modeKey=="mode1" or modeKey=="mode3"
+		return modeKey=="mode1" or modeKey=="mode2" or modeKey=="mode3"
+	end
+
+	local function isCurrentSessionPlayer(player)
+		local modeKey=getModeKey(app)
+		if modeKey~="mode2" and modeKey~="mode3" then
+			return true
+		end
+
+		local gameID=localGameID()
+		return gameID~=nil and getPlayerGameID(player)==gameID
 	end
 
 	local function currentModeText()
@@ -1084,6 +1118,10 @@ function qbAim.new(app,parent)
 			return false
 		end
 
+		if not isCurrentSessionPlayer(player) then
+			return false
+		end
+
 		if state.qbAimTeamFilter==false then
 			return true
 		end
@@ -1198,7 +1236,7 @@ function qbAim.new(app,parent)
 	local function reseedReceiverTracking(now)
 		now=now or os.clock()
 		for _,player in ipairs(currentPlayers()) do
-			if player~=localPlayer then
+			if canTargetReceiver(player) then
 				local receiverRoot=rootOfPlayer(player)
 				if receiverRoot then
 					seedReceiverData(player,receiverRoot,now)
@@ -1888,7 +1926,7 @@ function qbAim.new(app,parent)
 
 		for _,player in ipairs(currentPlayers()) do
 			local playerTeam=teamOf(player)
-			if player~=receiver and player~=localPlayer and isValidGameTeamID(playerTeam) and isValidGameTeamID(localTeam) and playerTeam~=localTeam then
+			if player~=receiver and player~=localPlayer and isCurrentSessionPlayer(player) and isValidGameTeamID(playerTeam) and isValidGameTeamID(localTeam) and playerTeam~=localTeam then
 				local defenderRoot=rootOfPlayer(player)
 				if defenderRoot then
 					local character=characterOf(player)
@@ -2289,10 +2327,10 @@ function qbAim.new(app,parent)
 		return true,nil
 	end
 
-	local function fireSquadsThrow(plan)
-		local reEvent=getSquadsReEvent()
+	local function fireMiniGameThrow(plan,modeKey)
+		local reEvent=getMiniGameReEvent(modeKey=="mode3")
 		if not reEvent then
-			return false,"squads remote missing"
+			return false,"minigame remote missing"
 		end
 
 		reEvent:FireServer("Mechanics","ThrowBall",{
@@ -2379,11 +2417,11 @@ function qbAim.new(app,parent)
 		local fired,ok,err=pcall(function()
 			if modeKey=="mode1" then
 				return fireGameplayThrow(plan)
-			elseif modeKey=="mode3" then
-				return fireSquadsThrow(plan)
+			elseif modeKey=="mode2" or modeKey=="mode3" then
+				return fireMiniGameThrow(plan,modeKey)
 			end
 
-			return false,"park unknown"
+			return false,"mode unsupported"
 		end)
 
 		if not fired then
@@ -2634,7 +2672,7 @@ function qbAim.new(app,parent)
 
 		local now=os.clock()
 		for _,player in ipairs(currentPlayers()) do
-			if player~=localPlayer then
+			if canTargetReceiver(player) then
 				local receiverRoot=rootOfPlayer(player)
 				if receiverRoot then
 					local data=receiverData[player]
