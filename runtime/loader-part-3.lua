@@ -220,7 +220,7 @@ function resetMapRuntimeState()
 	end
 
 	for instance,properties in pairs(mapSettings.OriginalVisuals or{}) do
-		if instance then
+		if instance and instance.Parent then
 			for property,value in pairs(properties) do
 				pcall(function()
 					instance[property]=value
@@ -230,7 +230,7 @@ function resetMapRuntimeState()
 	end
 
 	for part,material in pairs(mapSettings.OriginalMaterials or {}) do
-		if part and part:IsA("BasePart") then
+		if part and part.Parent and part:IsA("BasePart") then
 			pcall(function()
 				part.Material=material
 			end)

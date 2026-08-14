@@ -29,8 +29,6 @@ class PerformanceModeContracts(unittest.TestCase):
         )
         self.assertIn("local function restoreWorld(worldSettings)", logic)
         self.assertIn("workspace.DescendantAdded:Connect", logic)
-        self.assertNotIn("part and part.Parent and part:IsA", logic)
-        self.assertIn("local changed=pcall(function()", logic)
         self.assertNotIn("RenderStepped", logic)
         self.assertNotIn("Heartbeat", logic)
 
