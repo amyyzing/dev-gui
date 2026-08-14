@@ -40,7 +40,7 @@ description.Categories={
 
 		Maps={
 			["Map Editor"]={Title="MAP EDITOR",description=blank},
-			["Performance Mode"]={Title="PERFORMANCE MODE",description=blank},
+			["Anti Material"]={Title="ANTI-MATERIAL",description=blank},
 			["Map Cleaner"]={Title="MAP CLEANER",description=blank},
 			["Remove Ads"]={Title="REMOVE BILLBOARD",description=blank},
 			["Workspace"]={Title="WORKSPACE",description=blank},
@@ -193,7 +193,7 @@ description.Categories={
 		},
 
 		Maps={
-			["Performance Mode"]="performance",
+			["SmoothPlastic"]="smooth",
 			["Map Cleaner"]="map cleaner",
 			["Remove Ads"]="remove ads",
 			["Gameplay only."]="game only",

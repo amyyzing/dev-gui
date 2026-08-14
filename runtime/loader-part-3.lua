@@ -181,7 +181,7 @@ AdsAPI=nil
 mapApiNames={"MapEditorAPI","MaterialsAPI","MapCleanerAPI","AdsAPI"}
 mapPageModules=(getUIMapPageModules and getUIMapPageModules("maps","MapPage")) or (UIMapModule and UIMapModule.MapPage and UIMapModule.MapPage.Modules) or {
 	{name="MapEditor",api="MapEditorAPI",order=0,title="Map Editor"},
-	{name="Materials",api="MaterialsAPI",order=1,title="Performance Mode"},
+	{name="Materials",api="MaterialsAPI",order=1,title="Anti Material"},
 	{name="MapCleaner",api="MapCleanerAPI",order=2,title="Map Cleaner"},
 	{name="Ads",api="AdsAPI",order=3,title="Remove Ads"},
 }
@@ -198,9 +198,6 @@ function ensureWorldSettings()
 	if type(mapSettings.OriginalMaterials)~="table" then
 		mapSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
 	end
-	if type(mapSettings.OriginalVisuals)~="table" then
-		mapSettings.OriginalVisuals=setmetatable({}, {__mode="k"})
-	end
 end
 
 function resetMapRuntimeState()
@@ -214,20 +211,6 @@ function resetMapRuntimeState()
 		safeDisconnect(mapSettings.Conn)
 		mapSettings.Conn=nil
 	end
-	if mapSettings.LightingConn then
-		safeDisconnect(mapSettings.LightingConn)
-		mapSettings.LightingConn=nil
-	end
-
-	for instance,properties in pairs(mapSettings.OriginalVisuals or{}) do
-		if instance and instance.Parent then
-			for property,value in pairs(properties) do
-				pcall(function()
-					instance[property]=value
-				end)
-			end
-		end
-	end
 
 	for part,material in pairs(mapSettings.OriginalMaterials or {}) do
 		if part and part.Parent and part:IsA("BasePart") then
@@ -239,7 +222,6 @@ function resetMapRuntimeState()
 
 	mapSettings.SmoothPlastic=false
 	mapSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
-	mapSettings.OriginalVisuals=setmetatable({}, {__mode="k"})
 	potatoMode=false
 end
 

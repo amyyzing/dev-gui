@@ -1,25 +1,7 @@
 local materials={}
 
-local lighting=game:GetService("Lighting")
-
-local effectClasses={
-	ParticleEmitter=true,
-	Trail=true,
-	Smoke=true,
-	Fire=true,
-	Sparkles=true,
-	PointLight=true,
-	SpotLight=true,
-	SurfaceLight=true,
-	BloomEffect=true,
-	BlurEffect=true,
-	ColorCorrectionEffect=true,
-	DepthOfFieldEffect=true,
-	SunRaysEffect=true,
-}
-
 local function ensureWorldSettings(app)
-	local ws=app.mapSettings or app.WorldSettings or{}
+	local ws=app.mapSettings or app.WorldSettings or {}
 
 	if ws.SmoothPlastic==nil then
 		ws.SmoothPlastic=false
@@ -29,12 +11,6 @@ local function ensureWorldSettings(app)
 		ws.OriginalMaterials=setmetatable({}, {__mode="k"})
 	elseif getmetatable(ws.OriginalMaterials)==nil then
 		setmetatable(ws.OriginalMaterials,{__mode="k"})
-	end
-
-	if type(ws.OriginalVisuals)~="table" then
-		ws.OriginalVisuals=setmetatable({}, {__mode="k"})
-	elseif getmetatable(ws.OriginalVisuals)==nil then
-		setmetatable(ws.OriginalVisuals,{__mode="k"})
 	end
 
 	app.mapSettings=ws
@@ -49,78 +25,16 @@ local function destroyControl(control)
 	end
 end
 
-local function setOptimizedProperty(worldSettings,instance,property,value)
-	local ok,current=pcall(function()
-		return instance[property]
-	end)
-	if not ok or current==value then return end
+local function applySmoothPlasticToPart(worldSettings,part)
+	if not part or not part:IsA("BasePart") then return end
 
-	local original=worldSettings.OriginalVisuals[instance]
-	if not original then
-		original={}
-		worldSettings.OriginalVisuals[instance]=original
-	end
-	if original[property]==nil then
-		original[property]=current
+	if worldSettings.OriginalMaterials[part]==nil then
+		worldSettings.OriginalMaterials[part]=part.Material
 	end
 
-	pcall(function()
-		instance[property]=value
-	end)
-end
-
-local function optimizeInstance(worldSettings,instance)
-	if instance:IsA("BasePart") then
-		if worldSettings.OriginalMaterials[instance]==nil then
-			worldSettings.OriginalMaterials[instance]=instance.Material
-		end
-		setOptimizedProperty(worldSettings,instance,"Material",Enum.Material.SmoothPlastic)
-		setOptimizedProperty(worldSettings,instance,"Reflectance",0)
-		setOptimizedProperty(worldSettings,instance,"CastShadow",false)
-		if instance:IsA("MeshPart") then
-			setOptimizedProperty(worldSettings,instance,"RenderFidelity",Enum.RenderFidelity.Performance)
-		end
-	elseif effectClasses[instance.ClassName] then
-		setOptimizedProperty(worldSettings,instance,"Enabled",false)
+	if part.Material~=Enum.Material.SmoothPlastic then
+		part.Material=Enum.Material.SmoothPlastic
 	end
-end
-
-local function optimizeWorld(worldSettings)
-	for _,instance in ipairs(workspace:GetDescendants()) do
-		optimizeInstance(worldSettings,instance)
-	end
-	for _,instance in ipairs(lighting:GetDescendants()) do
-		optimizeInstance(worldSettings,instance)
-	end
-
-	setOptimizedProperty(worldSettings,lighting,"GlobalShadows",false)
-	local terrain=workspace:FindFirstChildOfClass("Terrain")
-	if terrain then
-		setOptimizedProperty(worldSettings,terrain,"Decoration",false)
-	end
-end
-
-local function restoreWorld(worldSettings)
-	for instance,properties in pairs(worldSettings.OriginalVisuals) do
-		if instance and (instance.Parent or instance==lighting or instance==workspace.Terrain) then
-			for property,value in pairs(properties) do
-				pcall(function()
-					instance[property]=value
-				end)
-			end
-		end
-	end
-
-	for part,material in pairs(worldSettings.OriginalMaterials) do
-		if part and part.Parent and part:IsA("BasePart") then
-			pcall(function()
-				part.Material=material
-			end)
-		end
-	end
-
-	worldSettings.OriginalVisuals=setmetatable({}, {__mode="k"})
-	worldSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
 end
 
 function materials.new(app,page)
@@ -133,39 +47,37 @@ function materials.new(app,page)
 	local materialToggle=nil
 	local active=false
 
-	local function disconnectWatchers()
-		safeDisconnect(worldSettings.Conn)
-		safeDisconnect(worldSettings.LightingConn)
-		worldSettings.Conn=nil
-		worldSettings.LightingConn=nil
-	end
-
 	function api.SetEnabled(state,fire)
 		worldSettings.SmoothPlastic=state and true or false
 
 		if worldSettings.SmoothPlastic then
 			if not active then
-				optimizeWorld(worldSettings)
+				for _,inst in ipairs(workspace:GetDescendants()) do
+					applySmoothPlasticToPart(worldSettings,inst)
+				end
 			end
 
 			if not worldSettings.Conn then
-				worldSettings.Conn=workspace.DescendantAdded:Connect(function(instance)
+				worldSettings.Conn=workspace.DescendantAdded:Connect(function(inst)
 					if worldSettings.SmoothPlastic then
-						optimizeInstance(worldSettings,instance)
-					end
-				end)
-			end
-			if not worldSettings.LightingConn then
-				worldSettings.LightingConn=lighting.DescendantAdded:Connect(function(instance)
-					if worldSettings.SmoothPlastic then
-						optimizeInstance(worldSettings,instance)
+						applySmoothPlasticToPart(worldSettings,inst)
 					end
 				end)
 			end
 			active=true
 		else
-			disconnectWatchers()
-			restoreWorld(worldSettings)
+			safeDisconnect(worldSettings.Conn)
+			worldSettings.Conn=nil
+
+			for part,material in pairs(worldSettings.OriginalMaterials) do
+				if part and part.Parent and part:IsA("BasePart") then
+					if part.Material~=material then
+						part.Material=material
+					end
+				end
+			end
+
+			worldSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
 			active=false
 		end
 
@@ -200,7 +112,7 @@ function materials.new(app,page)
 		materialToggle=nil
 	end
 
-	local section,sectionControls=makeSection(page,1,"Performance Mode","",{
+	local section,sectionControls=makeSection(page,1,"Anti Material","",{
 		headerToggle={
 			startState=worldSettings.SmoothPlastic,
 			onChange=function(state)
@@ -212,7 +124,7 @@ function materials.new(app,page)
 
 	materialToggle=sectionControls and sectionControls.toggle
 	if not materialToggle then
-		materialToggle=buildToggleRow(section,"Performance Mode",worldSettings.SmoothPlastic,function(state)
+		materialToggle=buildToggleRow(section,"SmoothPlastic",worldSettings.SmoothPlastic,function(state)
 			api.SetEnabled(state)
 		end)
 	end
