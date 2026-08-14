@@ -20,7 +20,6 @@ local minThrowAngle=-5
 local maxThrowAngle=55
 local defenderSpeed=21
 local defenderReactionBuffer=0.05
-local catchHeightTolerance=0.25
 local passSampleStep=0.12
 local passSampleMax=18
 local espRefreshInterval=0.20
@@ -313,13 +312,9 @@ local function collectDefenderVolumes(playerList)
 	return defenders
 end
 
-local function defenderCanReachBall(defender,ballPosition,elapsed,catchY)
+local function defenderCanReachBall(defender,ballPosition,elapsed)
 	local defenderRoot=defender and defender.root
 	if not defenderRoot or not ballPosition or elapsed<=0 then
-		return false
-	end
-
-	if ballPosition.Y>catchY+catchHeightTolerance then
 		return false
 	end
 
@@ -333,13 +328,13 @@ local function defenderCanReachBall(defender,ballPosition,elapsed,catchY)
 	return reachTime<=elapsed+defenderReactionBuffer
 end
 
-local function passCanBeIntercepted(plan,defenders,catchY)
+local function passCanBeIntercepted(plan,defenders)
 	if not plan then
 		return true
 	end
 
 	for _,defender in ipairs(defenders) do
-		if defenderCanReachBall(defender,plan.target,plan.time,catchY) then
+		if defenderCanReachBall(defender,plan.target,plan.time) then
 			return true
 		end
 	end
@@ -350,7 +345,7 @@ local function passCanBeIntercepted(plan,defenders,catchY)
 		local ballPosition=ballAt(plan.origin,plan.velocity,time)
 
 		for _,defender in ipairs(defenders) do
-			if defenderCanReachBall(defender,ballPosition,time,catchY) then
+			if defenderCanReachBall(defender,ballPosition,time) then
 				return true
 			end
 		end
@@ -368,7 +363,7 @@ local function isReceiverClosed(receiverPlayer,origin,defenders,catchY)
 	local target=getReceiverTarget(receiverRoot,catchY)
 	local plan=origin and target and solveStationaryThrow(origin,target) or nil
 
-	return passCanBeIntercepted(plan,defenders,catchY)
+	return passCanBeIntercepted(plan,defenders)
 end
 
 local function getOurHighlight(character)

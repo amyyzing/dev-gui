@@ -96,7 +96,8 @@ class EspCatchBoxContracts(unittest.TestCase):
             self.assertIn("local function getPlayerCatchBox(player)", logic)
             self.assertIn("math.max(size.X,size.Z)*0.5", logic)
             self.assertIn("Magnitude-catchRadius", logic)
-            self.assertIn("ballPosition.Y>catchY+catchHeightTolerance", logic)
+            self.assertNotIn("catchHeightTolerance", logic)
+            self.assertNotIn("ballPosition.Y", logic)
             self.assertNotIn("interceptionCore.Evaluate", logic)
 
 
