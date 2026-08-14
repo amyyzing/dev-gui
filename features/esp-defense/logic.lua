@@ -92,6 +92,19 @@ local function getPlayerRoot(player)
 	return getCharacterRoot(getLiveCharacter(player))
 end
 
+local function getPlayerCatchBox(player)
+	local replicated=player and player:FindFirstChild("Replicated")
+	local tackleBoxValue=replicated and replicated:FindFirstChild("TackleBox")
+	local ok,value=pcall(function()
+		return tackleBoxValue and tackleBoxValue.Value
+	end)
+	if not(ok and typeof(value)=="Instance" and value.Parent) then return nil end
+	if value:IsA("BasePart") then return value end
+
+	local catchBox=value:FindFirstChild("CatchBox",true)
+	return catchBox and catchBox:IsA("BasePart") and catchBox or nil
+end
+
 local function flat(v)
 	return Vector3.new(v.X,0,v.Z)
 end
@@ -297,21 +310,22 @@ local function solveStationaryThrow(origin,target)
 	return best
 end
 
-local function collectDefenderRoots(playerList)
-	local roots={}
+local function collectDefenderVolumes(playerList)
+	local defenders={}
 	for _,player in ipairs(playerList or players:GetPlayers()) do
 		if isSameTeam(player,me) then
 			local friendlyRoot=getPlayerRoot(player)
 			if friendlyRoot then
-				table.insert(roots,friendlyRoot)
+				defenders[#defenders+1]={root=friendlyRoot,catchBox=getPlayerCatchBox(player)}
 			end
 		end
 	end
 
-	return roots
+	return defenders
 end
 
-local function defenderCanReachBall(defenderRoot,ballPosition,elapsed,catchY)
+local function defenderCanReachBall(defender,ballPosition,elapsed,catchY)
+	local defenderRoot=defender and defender.root
 	if not defenderRoot or not ballPosition or elapsed<=0 then
 		return false
 	end
@@ -320,19 +334,23 @@ local function defenderCanReachBall(defenderRoot,ballPosition,elapsed,catchY)
 		return false
 	end
 
-	local distanceXZ=(flat(defenderRoot.Position)-flat(ballPosition)).Magnitude
+	local catchBox=defender.catchBox
+	local center=(catchBox and catchBox.Position) or defenderRoot.Position
+	local size=catchBox and catchBox.Size
+	local catchRadius=size and math.max(size.X,size.Z)*0.5 or 0
+	local distanceXZ=math.max(0,(flat(center)-flat(ballPosition)).Magnitude-catchRadius)
 	local reachTime=distanceXZ/defenderSpeed
 
 	return reachTime<=elapsed+defenderReactionBuffer
 end
 
-local function passCanBeIntercepted(plan,defenderRoots,catchY)
+local function passCanBeIntercepted(plan,defenders,catchY)
 	if not plan then
 		return true
 	end
 
-	for _,defenderRoot in ipairs(defenderRoots) do
-		if defenderCanReachBall(defenderRoot,plan.target,plan.time,catchY) then
+	for _,defender in ipairs(defenders) do
+		if defenderCanReachBall(defender,plan.target,plan.time,catchY) then
 			return true
 		end
 	end
@@ -342,8 +360,8 @@ local function passCanBeIntercepted(plan,defenderRoots,catchY)
 		local time=plan.time*sampleIndex/sampleCount
 		local ballPosition=ballAt(plan.origin,plan.velocity,time)
 
-		for _,defenderRoot in ipairs(defenderRoots) do
-			if defenderCanReachBall(defenderRoot,ballPosition,time,catchY) then
+		for _,defender in ipairs(defenders) do
+			if defenderCanReachBall(defender,ballPosition,time,catchY) then
 				return true
 			end
 		end
@@ -352,7 +370,7 @@ local function passCanBeIntercepted(plan,defenderRoots,catchY)
 	return false
 end
 
-local function isReceiverClosed(receiverPlayer,carrierData,defenderRoots,app)
+local function isReceiverClosed(receiverPlayer,carrierData,defenders,app)
 	if not receiverPlayer or not carrierData then
 		return true
 	end
@@ -382,7 +400,7 @@ local function isReceiverClosed(receiverPlayer,carrierData,defenderRoots,app)
 	local target=getReceiverTarget(receiverRoot,catchY)
 	local plan=origin and target and solveStationaryThrow(origin,target) or nil
 
-	return passCanBeIntercepted(plan,defenderRoots,catchY)
+	return passCanBeIntercepted(plan,defenders,catchY)
 end
 
 local function getOurHighlight(character)
@@ -489,7 +507,7 @@ function espDefense.new(app)
 
 		local playerList=currentPlayers()
 		local carrierData=trackedCarrierData(playerList)
-		local defenderRoots=collectDefenderRoots(playerList)
+		local defenders=collectDefenderVolumes(playerList)
 		local blue=colors.blue or Color3.fromRGB(70,140,255)
 		local red=colors.red or Color3.fromRGB(210,70,70)
 		local green=colors.green or Color3.fromRGB(90,200,90)
@@ -504,7 +522,7 @@ function espDefense.new(app)
 							forceHighlight(app,character,"holder",blue)
 							nextHighlightsVisible=true
 						elseif carrierData and isSameTeam(player,carrierData.player) then
-							if isReceiverClosed(player,carrierData,defenderRoots,app) then
+							if isReceiverClosed(player,carrierData,defenders,app) then
 								forceHighlight(app,character,"closed",red)
 								nextHighlightsVisible=true
 							else
