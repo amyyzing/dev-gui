@@ -1935,6 +1935,29 @@ function qbAim.new(app,parent)
 		return jumpHeight,math.sqrt(2*jumpHeight/gravity)
 	end
 
+	local function arcParticipant(player)
+		local playerRoot=rootOfPlayer(player)
+		if not playerRoot then return nil end
+
+		local character=characterOf(player)
+		local humanoid=character and character:FindFirstChildOfClass("Humanoid")
+		if humanoid and humanoid.Health<=0 then return nil end
+
+		local catchBox=getPlayerCatchVolume(player)
+		local jumpHeight,jumpRiseTime=jumpProfile(humanoid)
+		local speed=humanoid and math.max(maxRunSpeed,humanoid.WalkSpeed) or maxRunSpeed
+		local velocity=flat(playerRoot.AssemblyLinearVelocity or Vector3.zero)
+		return{
+			player=player,
+			position=(catchBox and catchBox.Position) or playerRoot.Position,
+			velocity=clampMagnitude(velocity,speed),
+			boxSize=(catchBox and catchBox.Size) or playerRoot.Size,
+			speed=speed,
+			jumpHeight=jumpHeight,
+			jumpRiseTime=jumpRiseTime,
+		}
+	end
+
 	local function collectArcDefenders(receiver)
 		local defenders={}
 		local localTeam=teamOf(localPlayer)
@@ -1942,26 +1965,9 @@ function qbAim.new(app,parent)
 		for _,player in ipairs(currentPlayers()) do
 			local playerTeam=teamOf(player)
 			if player~=receiver and player~=localPlayer and isCurrentSessionPlayer(player) and isValidGameTeamID(playerTeam) and isValidGameTeamID(localTeam) and playerTeam~=localTeam then
-				local defenderRoot=rootOfPlayer(player)
-				if defenderRoot then
-					local character=characterOf(player)
-					local humanoid=character and character:FindFirstChildOfClass("Humanoid")
-					if not humanoid or humanoid.Health>0 then
-						local tackleBox=getPlayerCatchVolume(player)
-						local jumpHeight,jumpRiseTime=jumpProfile(humanoid)
-						local speed=humanoid and math.max(maxRunSpeed,humanoid.WalkSpeed) or maxRunSpeed
-						local velocity=flat(defenderRoot.AssemblyLinearVelocity or Vector3.zero)
-						velocity=clampMagnitude(velocity,speed)
-						defenders[#defenders+1]={
-							player=player,
-							position=(tackleBox and tackleBox.Position) or defenderRoot.Position,
-							velocity=velocity,
-							boxSize=(tackleBox and tackleBox.Size) or defenderRoot.Size,
-							speed=speed,
-							jumpHeight=jumpHeight,
-							jumpRiseTime=jumpRiseTime,
-						}
-					end
+				local participant=arcParticipant(player)
+				if participant then
+					defenders[#defenders+1]=participant
 				end
 			end
 		end
@@ -1984,12 +1990,44 @@ function qbAim.new(app,parent)
 			return true,{reason="invalid_arc",windows={}}
 		end
 
-		return interceptionCore.Evaluate({
+		local arc={
 			origin=plan.origin,
 			velocity=plan.velocity,
 			gravity=gravityVector,
 			flightTime=maxTime,
-		},defenders)
+		}
+		local unsafe,info=interceptionCore.Evaluate(arc,defenders)
+		if not unsafe then return false,info end
+
+		local receiverParticipant=arcParticipant(receiver)
+		local receiverWindows=receiverParticipant and interceptionCore.FindWindows(arc,{receiverParticipant}) or{}
+		local receiverWindow=receiverWindows[1]
+		if not receiverWindow then
+			info.reason="receiver_window_missing"
+			return true,info
+		end
+
+		local receiverStartTime=receiverWindow.startTime
+		local earlierDefenderWindows={}
+		for _,window in ipairs(info.windows or{}) do
+			if window.startTime<=receiverStartTime then
+				earlierDefenderWindows[#earlierDefenderWindows+1]=window
+			end
+		end
+
+		if #earlierDefenderWindows==0 then
+			return false,{
+				reason="receiver_first",
+				windows={},
+				receiverWindow=receiverWindow,
+				receiverStartTime=receiverStartTime,
+			}
+		end
+
+		info.windows=earlierDefenderWindows
+		info.receiverWindow=receiverWindow
+		info.receiverStartTime=receiverStartTime
+		return true,info
 	end
 
 	local function planCanBeDefended(plan,receiver)

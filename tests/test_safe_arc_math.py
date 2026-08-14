@@ -78,6 +78,16 @@ class SafeArcContracts(unittest.TestCase):
         self.assertNotIn('return nil,"timing unstable"', logic)
         self.assertIn("if trajectoryCanBeDefended(plan,receiver) then", logic)
 
+    def test_safe_arc_is_an_arrival_race_using_catchbox_dimensions(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn("local catchBox=getPlayerCatchVolume(player)", logic)
+        self.assertIn(
+            "interceptionCore.FindWindows(arc,{receiverParticipant})",
+            logic,
+        )
+        self.assertIn("if window.startTime<=receiverStartTime then", logic)
+        self.assertIn('reason="receiver_first"', logic)
+
 
 class VisualBeamReconstructionTests(unittest.TestCase):
     def test_game_beam_control_points_recover_flight_time_and_velocity(self):
