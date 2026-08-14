@@ -73,6 +73,16 @@ class BoostContracts(unittest.TestCase):
         self.assertNotIn("boostContactRadius", boost)
         self.assertNotIn("root.Touched:Connect(function(hit)", boost)
 
+    def test_always_bypasses_chance_and_contact_only_attempts_once(self):
+        boost = source("features/boost/logic.lua")
+        self.assertIn("local contactActive=false", boost)
+        self.assertIn("if contactActive then return false end", boost)
+        self.assertIn("contactActive=true", boost)
+        self.assertIn("contactActive=false", boost)
+        self.assertIn("tryJumpBoost(root,state.jumpBoostTradeMode)", boost)
+        self.assertIn("not ignoreChance and not rollBoostChance()", boost)
+        self.assertNotIn("AssemblyLinearVelocity", boost)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -119,6 +119,7 @@ function boost.new(app,parent)
 	local inputConn=nil
 	local destroyConn=nil
 	local boostReady=true
+	local contactActive=false
 	local section=nil
 	local footballCache=nil
 	local footballCacheExpires=0
@@ -173,8 +174,8 @@ function boost.new(app,parent)
 		return math.random(1,100)<=chance
 	end
 
-	local function tryJumpBoost(rootPart)
-		if not boostReady or not rollBoostChance() then
+	local function tryJumpBoost(rootPart,ignoreChance)
+		if not boostReady or (not ignoreChance and not rollBoostChance()) then
 			return false
 		end
 
@@ -301,11 +302,21 @@ function boost.new(app,parent)
 		return football and (football.Position-root.Position).Magnitude<=state.ballDetectionRadius
 	end
 
+	local function beginHeadContact(root)
+		if contactActive then return false end
+		contactActive=true
+
+		if not root then return false end
+		if not ballInBoostRange(root) then return false end
+		return tryJumpBoost(root,state.jumpBoostTradeMode)
+	end
+
 	local function clearJumpBoostTouchConnection()
 		for _,connection in ipairs(jumpBoostTouchConns) do
 			safeDisconnect(connection)
 		end
 		table.clear(jumpBoostTouchConns)
+		contactActive=false
 	end
 
 	local function clearJumpBoostScanConnection()
@@ -319,18 +330,18 @@ function boost.new(app,parent)
 	end
 
 	local function scanJumpBoostContact()
-		if not isAlive() or not state.jumpBoostOn or not boostReady then
+		if not isAlive() or not state.jumpBoostOn then
 			return
 		end
 
 		local character=trackedCharacter(me)
 		local root=trackedRoot(me,character)
-		if not root or root.AssemblyLinearVelocity.Y>=-2 then
-			return
-		end
+		if not root then return end
 
-		if hasFootOnOtherHead(character) and ballInBoostRange(root) then
-			tryJumpBoost(root)
+		if hasFootOnOtherHead(character) then
+			beginHeadContact(root)
+		else
+			contactActive=false
 		end
 	end
 
@@ -374,12 +385,9 @@ function boost.new(app,parent)
 
 		for _,foot in ipairs(characterFeet(character)) do
 			jumpBoostTouchConns[#jumpBoostTouchConns+1]=foot.Touched:Connect(function(hit)
-				if not isAlive() or not state.jumpBoostOn or not boostReady then return end
-				if root.AssemblyLinearVelocity.Y>=-2 then return end
+				if not isAlive() or not state.jumpBoostOn then return end
 				if not isOtherLivingPlayerHead(character,hit) or not isFootOnHeadTop(foot,hit) then return end
-				if ballInBoostRange(root) then
-					tryJumpBoost(root)
-				end
+				beginHeadContact(root)
 			end)
 		end
 
