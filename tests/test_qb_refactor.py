@@ -213,6 +213,8 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertIn("QBInterceptionModule=QBInterceptionModule", context)
         self.assertIn("interceptionCore.Evaluate", production)
         self.assertIn("interceptionCore.Evaluate", testing)
+        self.assertIn("interceptionCore.Evaluate", (ROOT / "features" / "esp-offense" / "logic.lua").read_text(encoding="utf-8"))
+        self.assertIn("interceptionCore.Evaluate", (ROOT / "features" / "esp-defense" / "logic.lua").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
