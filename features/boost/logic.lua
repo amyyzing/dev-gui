@@ -12,7 +12,7 @@ local defaultBoostCooldown=5
 local defaultBoostChance=100
 local defaultBoostRadius=10
 local footballCacheInterval=0.35
-local boostScanInterval=0.12
+local boostScanInterval=0.05
 local headTopTolerance=0.35
 local headEdgeTolerance=0.2
 local boostScanJobId="AutoBoostContactScan"
@@ -254,17 +254,33 @@ function boost.new(app,parent)
 		return feet
 	end
 
+	local function projectedHalfExtent(part,axis)
+		local half=part.Size*0.5
+		local frame=part.CFrame
+		return math.abs(axis:Dot(frame.RightVector))*half.X
+			+math.abs(axis:Dot(frame.UpVector))*half.Y
+			+math.abs(axis:Dot(frame.LookVector))*half.Z
+	end
+
 	local function isFootOnHeadTop(foot,head)
 		if not(foot and foot:IsA("BasePart") and head and head:IsA("BasePart") and head.Name=="Head") then
 			return false
 		end
 
-		local footBottom=foot.CFrame:PointToWorldSpace(Vector3.new(0,-foot.Size.Y*0.5,0))
-		local localBottom=head.CFrame:PointToObjectSpace(footBottom)
+		local headFrame=head.CFrame
+		local offset=foot.Position-head.Position
 		local halfHead=head.Size*0.5
-		return math.abs(localBottom.Y-halfHead.Y)<=headTopTolerance
-			and math.abs(localBottom.X)<=halfHead.X+headEdgeTolerance
-			and math.abs(localBottom.Z)<=halfHead.Z+headEdgeTolerance
+		local localX=offset:Dot(headFrame.RightVector)
+		local localY=offset:Dot(headFrame.UpVector)
+		local localZ=offset:Dot(headFrame.LookVector)
+		local footHalfX=projectedHalfExtent(foot,headFrame.RightVector)
+		local footHalfY=projectedHalfExtent(foot,headFrame.UpVector)
+		local footHalfZ=projectedHalfExtent(foot,headFrame.LookVector)
+		local footBottom=localY-footHalfY
+
+		return math.abs(footBottom-halfHead.Y)<=headTopTolerance
+			and math.abs(localX)<=halfHead.X+footHalfX+headEdgeTolerance
+			and math.abs(localZ)<=halfHead.Z+footHalfZ+headEdgeTolerance
 	end
 
 	local function isOtherLivingPlayerHead(character,head)
