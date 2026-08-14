@@ -19,6 +19,10 @@ local defaultThrowY=14
 local minThrowAngle=-5
 local maxThrowAngle=55
 local defenderSpeed=21
+local defenderReactionBuffer=0.05
+local catchHeightTolerance=0.25
+local passSampleStep=0.12
+local passSampleMax=18
 local espRefreshInterval=0.20
 local espTeamCacheInterval=0.50
 local teamCache=setmetatable({}, {__mode="k"})
@@ -89,58 +93,8 @@ local function getPlayerRoot(player)
 	return getCharacterRoot(getLiveCharacter(player))
 end
 
-local function getPlayerCatchVolume(player)
-	local replicated=player and player:FindFirstChild("Replicated")
-	local tackleBoxValue=replicated and replicated:FindFirstChild("TackleBox")
-	local ok,value=pcall(function()
-		return tackleBoxValue and tackleBoxValue.Value
-	end)
-	if not(ok and typeof(value)=="Instance" and value.Parent) then return nil end
-	if value:IsA("BasePart") then return value end
-
-	for _,name in ipairs({"CatchBox","PlayerCollisionBox"}) do
-		local part=value:FindFirstChild(name,true)
-		if part and part:IsA("BasePart") then return part end
-	end
-	return nil
-end
-
-local function interceptionDescriptor(player)
-	local root=getPlayerRoot(player)
-	if not root then return nil end
-
-	local character=getLiveCharacter(player)
-	local humanoid=character and character:FindFirstChildOfClass("Humanoid")
-	if humanoid and humanoid.Health<=0 then return nil end
-
-	local catchBox=getPlayerCatchVolume(player)
-	local speed=humanoid and math.max(defenderSpeed,humanoid.WalkSpeed) or defenderSpeed
-	local rootVelocity=root.AssemblyLinearVelocity or Vector3.zero
-	local velocity=Vector3.new(rootVelocity.X,0,rootVelocity.Z)
-	if velocity.Magnitude>speed then velocity=velocity.Unit*speed end
-
-	local gravity=math.max(workspace.Gravity,1e-3)
-	local jumpHeight=7.2
-	local jumpRiseTime=0.27
-	if humanoid then
-		if humanoid.UseJumpPower then
-			jumpHeight=(humanoid.JumpPower*humanoid.JumpPower)/(2*gravity)
-			jumpRiseTime=math.max(0,humanoid.JumpPower)/gravity
-		else
-			jumpHeight=math.max(0,humanoid.JumpHeight)
-			jumpRiseTime=math.sqrt(2*jumpHeight/gravity)
-		end
-	end
-
-	return{
-		player=player,
-		position=(catchBox and catchBox.Position) or root.Position,
-		velocity=velocity,
-		boxSize=(catchBox and catchBox.Size) or root.Size,
-		speed=speed,
-		jumpHeight=jumpHeight,
-		jumpRiseTime=jumpRiseTime,
-	}
+local function flat(v)
+	return Vector3.new(v.X,0,v.Z)
 end
 
 local function findFootballPart(container,rootPart,maxDistance)
@@ -274,13 +228,15 @@ local function getThrowOrigin(qbRoot,footballPart,throwY)
 	return Vector3.new(basePosition.X,throwY,basePosition.Z)
 end
 
-local function getReceiverTarget(receiverPlayer,catchY)
-	local receiverRoot=getPlayerRoot(receiverPlayer)
-	local catchBox=getPlayerCatchVolume(receiverPlayer)
-	local position=(catchBox and catchBox.Position) or (receiverRoot and receiverRoot.Position)
+local function getReceiverTarget(receiverRoot,catchY)
+	local position=receiverRoot and receiverRoot.Position
 	if not position then return nil end
 
 	return Vector3.new(position.X,catchY,position.Z)
+end
+
+local function ballAt(origin,velocity,time)
+	return origin+velocity*time+0.5*gravityVector*time*time
 end
 
 local function solveStationaryThrow(origin,target)
@@ -330,44 +286,71 @@ local function solveStationaryThrow(origin,target)
 	return best
 end
 
-local function collectDefenders(playerList)
-	local defenders={}
+local function collectDefenderRoots(playerList)
+	local roots={}
 	for _,player in ipairs(playerList or players:GetPlayers()) do
 		if shouldUseAsDefender(player) then
-			local defender=interceptionDescriptor(player)
-			if defender then
-				table.insert(defenders,defender)
+			local defenderRoot=getPlayerRoot(player)
+			if defenderRoot then
+				table.insert(roots,defenderRoot)
 			end
 		end
 	end
 
-	return defenders
+	return roots
 end
 
-local function passCanBeIntercepted(plan,defenders,interceptionCore)
+local function defenderCanReachBall(defenderRoot,ballPosition,elapsed,catchY)
+	if not defenderRoot or not ballPosition or elapsed<=0 then
+		return false
+	end
+
+	if ballPosition.Y>catchY+catchHeightTolerance then
+		return false
+	end
+
+	local distanceXZ=(flat(defenderRoot.Position)-flat(ballPosition)).Magnitude
+	local reachTime=distanceXZ/defenderSpeed
+
+	return reachTime<=elapsed+defenderReactionBuffer
+end
+
+local function passCanBeIntercepted(plan,defenderRoots,catchY)
 	if not plan then
 		return true
 	end
-	if not(interceptionCore and type(interceptionCore.Evaluate)=="function") then return true end
 
-	return interceptionCore.Evaluate({
-		origin=plan.origin,
-		velocity=plan.velocity,
-		gravity=gravityVector,
-		flightTime=plan.time,
-	},defenders)
+	for _,defenderRoot in ipairs(defenderRoots) do
+		if defenderCanReachBall(defenderRoot,plan.target,plan.time,catchY) then
+			return true
+		end
+	end
+
+	local sampleCount=math.clamp(math.ceil(plan.time/passSampleStep),4,passSampleMax)
+	for sampleIndex=1,sampleCount do
+		local time=plan.time*sampleIndex/sampleCount
+		local ballPosition=ballAt(plan.origin,plan.velocity,time)
+
+		for _,defenderRoot in ipairs(defenderRoots) do
+			if defenderCanReachBall(defenderRoot,ballPosition,time,catchY) then
+				return true
+			end
+		end
+	end
+
+	return false
 end
 
-local function isReceiverClosed(receiverPlayer,origin,defenders,catchY,interceptionCore)
+local function isReceiverClosed(receiverPlayer,origin,defenderRoots,catchY)
 	local receiverRoot=getPlayerRoot(receiverPlayer)
 	if not receiverRoot then
 		return true
 	end
 
-	local target=getReceiverTarget(receiverPlayer,catchY)
+	local target=getReceiverTarget(receiverRoot,catchY)
 	local plan=origin and target and solveStationaryThrow(origin,target) or nil
 
-	return passCanBeIntercepted(plan,defenders,interceptionCore)
+	return passCanBeIntercepted(plan,defenderRoots,catchY)
 end
 
 local function getOurHighlight(character)
@@ -422,7 +405,6 @@ function espOffense.new(app)
 	local services=app.Services or {}
 	local playerCache=services.playerCacheApi or app.playerCacheApi
 	local ballTracker=services.ballTrackerApi or app.ballTrackerApi
-	local interceptionCore=app.QBInterceptionModule
 	local api={}
 	local heartbeatConn=nil
 	local heartbeatElapsed=0
@@ -491,7 +473,7 @@ function espOffense.new(app)
 		local playerList=currentPlayers()
 		local catchY=getConfiguredThrowY(app)
 		local origin=getThrowOrigin(qbRoot,nil,catchY)
-		local defenders=collectDefenders(playerList)
+		local defenderRoots=collectDefenderRoots(playerList)
 		local red=colors.red or Color3.fromRGB(210,70,70)
 		local green=colors.green or Color3.fromRGB(90,200,90)
 		local nextHighlightsVisible=false
@@ -503,7 +485,7 @@ function espOffense.new(app)
 					if shouldHighlightReceiver(player) then
 						if hasActiveQBAimHighlight(character) then
 							destroyOwnedHighlight(character)
-						elseif isReceiverClosed(player,origin,defenders,catchY,interceptionCore) then
+						elseif isReceiverClosed(player,origin,defenderRoots,catchY) then
 							forceHighlight(app,character,"closed",red)
 							nextHighlightsVisible=true
 						else

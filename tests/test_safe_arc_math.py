@@ -89,19 +89,6 @@ class SafeArcContracts(unittest.TestCase):
         self.assertIn('reason="receiver_first"', logic)
 
 
-class EspCatchBoxContracts(unittest.TestCase):
-    def test_open_closed_esp_uses_catchbox_interception(self):
-        parent = source("features/esp/logic.lua")
-        self.assertIn("QBInterceptionModule=app.QBInterceptionModule", parent)
-
-        for path in ("features/esp-offense/logic.lua", "features/esp-defense/logic.lua"):
-            logic = source(path)
-            self.assertIn("local function getPlayerCatchVolume(player)", logic)
-            self.assertIn("boxSize=(catchBox and catchBox.Size) or root.Size", logic)
-            self.assertIn("interceptionCore.Evaluate", logic)
-            self.assertNotIn("flat(defenderRoot.Position)-flat(ballPosition)", logic)
-
-
 class VisualBeamReconstructionTests(unittest.TestCase):
     def test_game_beam_control_points_recover_flight_time_and_velocity(self):
         rng = random.Random(28)

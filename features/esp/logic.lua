@@ -201,7 +201,7 @@ function esp.new(app,parent)
 
 	if defenseModule and defenseModule.new then
 		local ok,result=pcall(function()
-			return defenseModule.new({colors=colors,style=style,State=state,safeDisconnect=safeDisconnect,schedulerApi=scheduler,Services=services,playerCacheApi=playerCache,ballTrackerApi=ballTracker,QBInterceptionModule=app.QBInterceptionModule})
+			return defenseModule.new({colors=colors,style=style,State=state,safeDisconnect=safeDisconnect,schedulerApi=scheduler,Services=services,playerCacheApi=playerCache,ballTrackerApi=ballTracker})
 		end)
 		defenseApi=ok and result or makeNoop()
 	else
@@ -210,7 +210,7 @@ function esp.new(app,parent)
 
 	if offenseModule and offenseModule.new then
 		local ok,result=pcall(function()
-			return offenseModule.new({colors=colors,style=style,State=state,safeDisconnect=safeDisconnect,schedulerApi=scheduler,Services=services,playerCacheApi=playerCache,ballTrackerApi=ballTracker,QBInterceptionModule=app.QBInterceptionModule})
+			return offenseModule.new({colors=colors,style=style,State=state,safeDisconnect=safeDisconnect,schedulerApi=scheduler,Services=services,playerCacheApi=playerCache,ballTrackerApi=ballTracker})
 		end)
 		offenseApi=ok and result or makeNoop()
 	else
