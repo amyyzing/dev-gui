@@ -86,6 +86,7 @@ jumpPowerValue=53.5
 divePowerValue=1.9
 jumpBoostOn=false
 jumpBoostTradeMode=false
+boostBypassCooldown=false
 boostForceY=32
 boostCooldown=5
 boostChance=100

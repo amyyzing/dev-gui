@@ -711,6 +711,7 @@ function dataSave.new(app)
 			boost={
 				enabled=getValue(app,"jumpBoostOn",false),
 				always=getValue(app,"jumpBoostTradeMode",false),
+				bypassCooldown=getValue(app,"boostBypassCooldown",false),
 				forceY=getValue(app,"boostForceY",32),
 				cooldown=getValue(app,"boostCooldown",5),
 				chance=getValue(app,"boostChance",100),
@@ -845,6 +846,7 @@ function dataSave.new(app)
 		local boost=settings.boost or {}
 		applyBoolean(app,"setJumpBoostState","jumpBoostOn",boost.enabled)
 		setBoolean(app,"jumpBoostTradeMode",boost.always)
+		applyBoolean(app,"setBoostBypassCooldown","boostBypassCooldown",boost.bypassCooldown)
 		setClamped(app,"boostForceY",boost.forceY,10,100,32)
 		setClamped(app,"boostCooldown",boost.cooldown,0,60,5)
 		setClamped(app,"boostChance",boost.chance,0,100,100)

@@ -193,6 +193,7 @@ local saveStateSetters={
 	setJumpPowerValue={"jumpPowerValue"},
 	setDivePowerValue={"divePowerValue"},
 	setJumpBoostState={"jumpBoostOn",true},
+	setBoostBypassCooldown={"boostBypassCooldown",true,"Boost","SetBypassCooldownState",true},
 	setGravityState={"gravityEnabled",true,"GameParams","SetGravityState",true},
 	setGameParamsState={"gameParamsEnabled",true,"GameParams","SetGameParamsState",true},
 	setESPState={"actionStatusOn",true,"ESP","SetESPState",true},

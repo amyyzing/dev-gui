@@ -83,6 +83,21 @@ class BoostContracts(unittest.TestCase):
         self.assertIn("not ignoreChance and not rollBoostChance()", boost)
         self.assertNotIn("AssemblyLinearVelocity", boost)
 
+    def test_bypass_cooldown_is_persisted_and_independent(self):
+        boost = source("features/boost/logic.lua")
+        self.assertIn('buildToggleRow(section,"Bypass Cooldown"', boost)
+        self.assertIn("function api.SetBypassCooldownState(value,fire)", boost)
+        self.assertIn("not state.boostBypassCooldown and not boostReady", boost)
+        self.assertIn("if not state.boostBypassCooldown then", boost)
+
+        data_save = source("data-save/data-save.lua")
+        self.assertIn('bypassCooldown=getValue(app,"boostBypassCooldown",false)', data_save)
+        self.assertIn('applyBoolean(app,"setBoostBypassCooldown","boostBypassCooldown",boost.bypassCooldown)', data_save)
+
+        self.assertIn("boostBypassCooldown=false", source("runtime/loader-part-1.lua"))
+        self.assertIn("boostBypassCooldown=false,", source("runtime/loader-part-2.lua"))
+        self.assertIn('setBoostBypassCooldown={"boostBypassCooldown",true,"Boost","SetBypassCooldownState",true}', source("runtime/loader-part-5.lua"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -109,6 +109,7 @@ function boost.new(app,parent)
 	local api={}
 	local jumpBoostToggle=nil
 	local jumpBoostModeToggle=nil
+	local bypassCooldownToggle=nil
 	local forceSlider=nil
 	local chanceSlider=nil
 	local radiusSlider=nil
@@ -132,6 +133,7 @@ function boost.new(app,parent)
 	local function normalizeState()
 		state.jumpBoostOn=state.jumpBoostOn and true or false
 		state.jumpBoostTradeMode=state.jumpBoostTradeMode and true or false
+		state.boostBypassCooldown=state.boostBypassCooldown and true or false
 		state.boostForceY=clampNumber(state.boostForceY,10,100,defaultBoostForce)
 		state.boostCooldown=clampNumber(state.boostCooldown,0,60,defaultBoostCooldown)
 		state.boostChance=clampNumber(state.boostChance,0,100,defaultBoostChance)
@@ -141,6 +143,7 @@ function boost.new(app,parent)
 	local function syncControls()
 		if jumpBoostToggle then jumpBoostToggle.set(state.jumpBoostOn) end
 		if jumpBoostModeToggle then jumpBoostModeToggle.set(state.jumpBoostTradeMode) end
+		if bypassCooldownToggle then bypassCooldownToggle.set(state.boostBypassCooldown) end
 		if forceSlider then forceSlider.set(state.boostForceY) end
 		if chanceSlider then chanceSlider.set(state.boostChance) end
 		if radiusSlider then radiusSlider.set(state.ballDetectionRadius) end
@@ -175,18 +178,20 @@ function boost.new(app,parent)
 	end
 
 	local function tryJumpBoost(rootPart,ignoreChance)
-		if not boostReady or (not ignoreChance and not rollBoostChance()) then
+		if (not state.boostBypassCooldown and not boostReady) or (not ignoreChance and not rollBoostChance()) then
 			return false
 		end
 
-		boostReady=false
 		applyJumpBoost(rootPart)
 
-		task.delay(state.boostCooldown,function()
-			if isAlive() then
-				boostReady=true
-			end
-		end)
+		if not state.boostBypassCooldown then
+			boostReady=false
+			task.delay(state.boostCooldown,function()
+				if isAlive() then
+					boostReady=true
+				end
+			end)
+		end
 
 		return true
 	end
@@ -426,6 +431,15 @@ function boost.new(app,parent)
 		end
 	end
 
+	function api.SetBypassCooldownState(value,fire)
+		state.boostBypassCooldown=value and true or false
+		syncControls()
+
+		if fire~=false then
+			changed()
+		end
+	end
+
 	function api.SetBoostForceY(value,fire)
 		state.boostForceY=clampNumber(value,10,100,defaultBoostForce)
 		syncControls()
@@ -475,6 +489,10 @@ function boost.new(app,parent)
 		api.SetAlwaysBoostState(value,true)
 	end)
 
+	bypassCooldownToggle=buildToggleRow(section,"Bypass Cooldown",state.boostBypassCooldown,function(value)
+		api.SetBypassCooldownState(value,true)
+	end)
+
 	forceSlider=buildSlider(section,"Force",10,100,state.boostForceY,1,function(v)
 		api.SetBoostForceY(v,true)
 	end)
@@ -496,6 +514,7 @@ function boost.new(app,parent)
 	function api.Reset()
 		state.jumpBoostOn=false
 		state.jumpBoostTradeMode=false
+		state.boostBypassCooldown=false
 		state.boostForceY=defaultBoostForce
 		state.boostCooldown=defaultBoostCooldown
 		state.boostChance=defaultBoostChance
@@ -520,6 +539,7 @@ function boost.new(app,parent)
 		footballCacheExpires=0
 		destroyControl(jumpBoostToggle)
 		destroyControl(jumpBoostModeToggle)
+		destroyControl(bypassCooldownToggle)
 		destroyControl(forceSlider)
 		destroyControl(chanceSlider)
 		destroyControl(radiusSlider)
