@@ -63,5 +63,16 @@ class RuntimePerformanceContracts(unittest.TestCase):
         self.assertIn("findDirectFootballPart", tracker)
 
 
+class BoostContracts(unittest.TestCase):
+    def test_auto_boost_requires_foot_contact_on_head_top(self):
+        boost = source("features/boost/logic.lua")
+        self.assertIn('for _,name in ipairs({"LeftFoot","RightFoot","Left Leg","Right Leg"})', boost)
+        self.assertIn("local function isFootOnHeadTop(foot,head)", boost)
+        self.assertIn("foot.Touched:Connect(function(hit)", boost)
+        self.assertIn("hasFootOnOtherHead(character)", boost)
+        self.assertNotIn("boostContactRadius", boost)
+        self.assertNotIn("root.Touched:Connect(function(hit)", boost)
+
+
 if __name__ == "__main__":
     unittest.main()

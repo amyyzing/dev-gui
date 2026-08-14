@@ -13,7 +13,8 @@ local defaultBoostChance=100
 local defaultBoostRadius=10
 local footballCacheInterval=0.35
 local boostScanInterval=0.12
-local boostContactRadius=4.5
+local headTopTolerance=0.35
+local headEdgeTolerance=0.2
 local boostScanJobId="AutoBoostContactScan"
 local boostToggleKey=Enum.KeyCode.Unknown
 local alwaysBoostToggleKey=Enum.KeyCode.Unknown
@@ -111,7 +112,7 @@ function boost.new(app,parent)
 	local forceSlider=nil
 	local chanceSlider=nil
 	local radiusSlider=nil
-	local jumpBoostTouchConn=nil
+	local jumpBoostTouchConns={}
 	local jumpBoostScanConn=nil
 	local jumpBoostScanScheduled=false
 	local characterAddedConn=nil
@@ -236,14 +237,54 @@ function boost.new(app,parent)
 		return character and character:FindFirstChildOfClass("Humanoid") or nil
 	end
 
-	local function hasNearbyBoostTarget(character,root)
+	local function characterFeet(character)
+		local feet={}
+		for _,name in ipairs({"LeftFoot","RightFoot","Left Leg","Right Leg"}) do
+			local foot=character and character:FindFirstChild(name)
+			if foot and foot:IsA("BasePart") then
+				feet[#feet+1]=foot
+			end
+		end
+		return feet
+	end
+
+	local function isFootOnHeadTop(foot,head)
+		if not(foot and foot:IsA("BasePart") and head and head:IsA("BasePart") and head.Name=="Head") then
+			return false
+		end
+
+		local footBottom=foot.CFrame:PointToWorldSpace(Vector3.new(0,-foot.Size.Y*0.5,0))
+		local localBottom=head.CFrame:PointToObjectSpace(footBottom)
+		local halfHead=head.Size*0.5
+		return math.abs(localBottom.Y-halfHead.Y)<=headTopTolerance
+			and math.abs(localBottom.X)<=halfHead.X+headEdgeTolerance
+			and math.abs(localBottom.Z)<=halfHead.Z+headEdgeTolerance
+	end
+
+	local function isOtherLivingPlayerHead(character,head)
+		if not(head and head.Name=="Head") then return false end
+
+		local otherCharacter=head:FindFirstAncestorWhichIsA("Model")
+		local otherPlayer=otherCharacter and players:GetPlayerFromCharacter(otherCharacter)
+		local humanoid=otherPlayer and otherPlayer~=me and trackedHumanoid(otherPlayer,otherCharacter)
+		return otherCharacter~=character and humanoid~=nil and humanoid.Health>0
+	end
+
+	local function hasFootOnOtherHead(character)
+		local feet=characterFeet(character)
+		if #feet==0 then return false end
+
 		for _,player in ipairs(currentPlayers()) do
 			local otherChar=player~=me and trackedCharacter(player)
 			if otherChar and otherChar~=character then
 				local humanoid=trackedHumanoid(player,otherChar)
-				local otherRoot=trackedRoot(player,otherChar)
-				if humanoid and humanoid.Health>0 and otherRoot and (otherRoot.Position-root.Position).Magnitude<=boostContactRadius then
-					return true
+				local head=otherChar:FindFirstChild("Head")
+				if humanoid and humanoid.Health>0 and head then
+					for _,foot in ipairs(feet) do
+						if isFootOnHeadTop(foot,head) then
+							return true
+						end
+					end
 				end
 			end
 		end
@@ -261,8 +302,10 @@ function boost.new(app,parent)
 	end
 
 	local function clearJumpBoostTouchConnection()
-		safeDisconnect(jumpBoostTouchConn)
-		jumpBoostTouchConn=nil
+		for _,connection in ipairs(jumpBoostTouchConns) do
+			safeDisconnect(connection)
+		end
+		table.clear(jumpBoostTouchConns)
 	end
 
 	local function clearJumpBoostScanConnection()
@@ -286,7 +329,7 @@ function boost.new(app,parent)
 			return
 		end
 
-		if hasNearbyBoostTarget(character,root) and ballInBoostRange(root) then
+		if hasFootOnOtherHead(character) and ballInBoostRange(root) then
 			tryJumpBoost(root)
 		end
 	end
@@ -329,35 +372,16 @@ function boost.new(app,parent)
 			return
 		end
 
-		jumpBoostTouchConn=root.Touched:Connect(function(hit)
-			if not isAlive() or not state.jumpBoostOn or not boostReady then
-				return
-			end
-
-			if root.AssemblyLinearVelocity.Y>=-2 then
-				return
-			end
-
-			local otherChar=hit:FindFirstAncestorWhichIsA("Model")
-			local otherHumanoid=otherChar and otherChar:FindFirstChildOfClass("Humanoid")
-
-			if not otherChar or otherChar==character or not otherHumanoid then
-				return
-			end
-
-			if state.jumpBoostTradeMode then
-				tryJumpBoost(root)
-				return
-			end
-
-			local football=getCachedFootball()
-			if football then
-				local distance=(football.Position-root.Position).Magnitude
-				if distance<=state.ballDetectionRadius then
+		for _,foot in ipairs(characterFeet(character)) do
+			jumpBoostTouchConns[#jumpBoostTouchConns+1]=foot.Touched:Connect(function(hit)
+				if not isAlive() or not state.jumpBoostOn or not boostReady then return end
+				if root.AssemblyLinearVelocity.Y>=-2 then return end
+				if not isOtherLivingPlayerHead(character,hit) or not isFootOnHeadTop(foot,hit) then return end
+				if ballInBoostRange(root) then
 					tryJumpBoost(root)
 				end
-			end
-		end)
+			end)
+		end
 
 		syncJumpBoostScan()
 	end
