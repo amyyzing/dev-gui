@@ -72,6 +72,12 @@ class SafeArcContracts(unittest.TestCase):
             testing,
         )
 
+    def test_safe_arc_does_not_add_unrelated_release_stability_gates(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertNotIn('return nil,"receiver too uncertain"', logic)
+        self.assertNotIn('return nil,"timing unstable"', logic)
+        self.assertIn("if trajectoryCanBeDefended(plan,receiver) then", logic)
+
 
 class VisualBeamReconstructionTests(unittest.TestCase):
     def test_game_beam_control_points_recover_flight_time_and_velocity(self):

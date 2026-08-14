@@ -96,9 +96,6 @@ local releaseTimingMidMax=0.12
 local releaseTimingRadiusMin=1/60
 local releaseTimingRadiusMax=0.06
 local releaseTimingPingScale=0.25
-local receiverUncertaintyMax=3
-local releaseTargetSpreadMax=3
-local releaseAngleSpreadMax=2.0
 local centerMaxReleaseDistance=12.00
 -- QB Drift
 local qbDriftTime=0
@@ -2147,34 +2144,6 @@ function qbAim.new(app,parent)
 		return data and data.lastSeen and math.max(0,os.clock()-data.lastSeen) or receiverStaleAfter
 	end
 
-	local function receiverUncertainty(data,timing)
-		local sampleAge=receiverAge(data)
-		local timingWidth=timing and timing.width or 0
-		local accel=flat(data and data.accel or Vector3.zero).Magnitude
-		local accelFactor=math.clamp(accel/receiverAccelMax,0,1)
-
-		return sampleAge*maxRunSpeed+timingWidth*maxRunSpeed+accelFactor*2
-	end
-
-	local function stableAcrossWindow(early,mid,late)
-		if not(early and mid and late and early.target and mid.target and late.target and early.angleDeg and mid.angleDeg and late.angleDeg) then
-			return false
-		end
-
-		local targetSpread=math.max(
-			(early.target-mid.target).Magnitude,
-			(late.target-mid.target).Magnitude,
-			(early.target-late.target).Magnitude
-		)
-		local angleSpread=math.max(
-			math.abs(early.angleDeg-mid.angleDeg),
-			math.abs(late.angleDeg-mid.angleDeg),
-			math.abs(early.angleDeg-late.angleDeg)
-		)
-
-		return targetSpread<=releaseTargetSpreadMax and angleSpread<=releaseAngleSpreadMax,targetSpread,angleSpread
-	end
-
 	local function buildPlan(receiver,ballPower,releaseOffset,releaseBall,receiverReleaseOffset,yReleaseOffset,originOverride)
 		if not canTargetReceiver(receiver) then
 			return nil,nil
@@ -2267,32 +2236,9 @@ function qbAim.new(app,parent)
 			return nil,"no throw found"
 		end
 
-		if state.qbAimSafeArc==false then
-			return{
-				mid=mid,
-				timing=timing,
-				uncertainty=0,
-			}
-		end
-
-		local uncertainty=receiverUncertainty(data,timing)
-		if uncertainty>receiverUncertaintyMax then
-			return nil,"receiver too uncertain"
-		end
-
-		local early=buildTwoPassPlan(receiver,ballPower,releaseBall,age+timing.min)
-		local late=buildTwoPassPlan(receiver,ballPower,releaseBall,age+timing.max)
-		local stable=stableAcrossWindow(early,mid,late)
-		if not stable then
-			return nil,"timing unstable"
-		end
-
 		return{
-			early=early,
 			mid=mid,
-			late=late,
 			timing=timing,
-			uncertainty=uncertainty,
 		}
 	end
 
