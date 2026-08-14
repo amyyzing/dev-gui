@@ -55,6 +55,11 @@ local function setOptimizedProperty(worldSettings,instance,property,value)
 	end)
 	if not ok or current==value then return end
 
+	local changed=pcall(function()
+		instance[property]=value
+	end)
+	if not changed then return end
+
 	local original=worldSettings.OriginalVisuals[instance]
 	if not original then
 		original={}
@@ -63,10 +68,6 @@ local function setOptimizedProperty(worldSettings,instance,property,value)
 	if original[property]==nil then
 		original[property]=current
 	end
-
-	pcall(function()
-		instance[property]=value
-	end)
 end
 
 local function optimizeInstance(worldSettings,instance)
@@ -102,7 +103,7 @@ end
 
 local function restoreWorld(worldSettings)
 	for instance,properties in pairs(worldSettings.OriginalVisuals) do
-		if instance and (instance.Parent or instance==lighting or instance==workspace.Terrain) then
+		if instance then
 			for property,value in pairs(properties) do
 				pcall(function()
 					instance[property]=value
@@ -112,7 +113,7 @@ local function restoreWorld(worldSettings)
 	end
 
 	for part,material in pairs(worldSettings.OriginalMaterials) do
-		if part and part.Parent and part:IsA("BasePart") then
+		if part and part:IsA("BasePart") then
 			pcall(function()
 				part.Material=material
 			end)
