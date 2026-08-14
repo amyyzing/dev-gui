@@ -108,7 +108,7 @@ uiMap.PageStructure={
 			Host="mapPage",
 			Modules={
 				{name="MapEditor",api="MapEditorAPI",order=0,title="Map Editor"},
-				{name="Materials",api="MaterialsAPI",order=1,title="Anti Material"},
+				{name="Materials",api="MaterialsAPI",order=1,title="Performance Mode"},
 				{name="MapCleaner",api="MapCleanerAPI",order=2,title="Map Cleaner"},
 				{name="Ads",api="AdsAPI",order=3,title="Remove Ads"},
 			},
