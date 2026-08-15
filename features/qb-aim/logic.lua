@@ -773,8 +773,11 @@ function qbAim.new(app,parent)
 	local throwInProgress=false
 	local lastThrowAt=-math.huge
 	local controllerThrowActionName="QBAim_ControllerThrow"
+	local controllerToggleActionName="QBAim_ControllerToggle"
 	local controllerThrowBinding=nil
+	local controllerToggleBinding=nil
 	local controllerThrowInputActive=false
+	local controllerToggleInputActive=false
 	local refreshControllerThrowBinding=function() end
 	local highlightedCharacter=nil
 	local connections={}
@@ -2631,8 +2634,11 @@ function qbAim.new(app,parent)
 
 	function api.Destroy()
 		contextActionService:UnbindAction(controllerThrowActionName)
+		contextActionService:UnbindAction(controllerToggleActionName)
 		controllerThrowBinding=nil
+		controllerToggleBinding=nil
 		controllerThrowInputActive=false
+		controllerToggleInputActive=false
 
 		if scheduler and type(scheduler.Unregister)=="function" then
 			for _,job in ipairs(schedulerJobs) do
@@ -2874,8 +2880,9 @@ function qbAim.new(app,parent)
 			or name:sub(1,10)=="Thumbstick"
 	end
 
-	local function isControllerThrowInput(input)
+	local function isControllerQBAimInput(input)
 		return controllerThrowBinding~=nil and input.KeyCode==controllerThrowBinding
+			or controllerToggleBinding~=nil and input.KeyCode==controllerToggleBinding
 	end
 
 	local function suppressNativeControllerInput(binding)
@@ -2927,44 +2934,78 @@ function qbAim.new(app,parent)
 	end
 
 	refreshControllerThrowBinding=function()
-		local binding=configuredBinding("getQBAimThrowKey",Enum.KeyCode.T)
-		if binding==controllerThrowBinding then return end
+		local throwBinding=configuredBinding("getQBAimThrowKey",Enum.KeyCode.T)
+		if throwBinding~=controllerThrowBinding then
+			contextActionService:UnbindAction(controllerThrowActionName)
+			controllerThrowBinding=nil
+			controllerThrowInputActive=false
+			if isControllerKeyCode(throwBinding) then
+				controllerThrowBinding=throwBinding
+				contextActionService:BindActionAtPriority(controllerThrowActionName,function(_,inputState)
+					if not enabled then
+						controllerThrowInputActive=false
+						return Enum.ContextActionResult.Pass
+					end
 
-		contextActionService:UnbindAction(controllerThrowActionName)
-		controllerThrowBinding=nil
-		controllerThrowInputActive=false
-		if not isControllerKeyCode(binding) then return end
+					if inputState==Enum.UserInputState.Begin then
+						controllerThrowInputActive=false
+						if hasFocusedTextBox() or not isAvailable() or not currentHeldBall() or not trackedReceiver then
+							return Enum.ContextActionResult.Pass
+						end
 
-		controllerThrowBinding=binding
-		contextActionService:BindActionAtPriority(controllerThrowActionName,function(_,inputState)
-			if not enabled then
-				controllerThrowInputActive=false
-				return Enum.ContextActionResult.Pass
+						if not suppressNativeControllerInput(throwBinding) then
+							return Enum.ContextActionResult.Pass
+						end
+
+						controllerThrowInputActive=true
+						task.defer(requestThrow,false)
+						return Enum.ContextActionResult.Sink
+					end
+
+					if inputState==Enum.UserInputState.End or inputState==Enum.UserInputState.Cancel then
+						local wasActive=controllerThrowInputActive
+						controllerThrowInputActive=false
+						return wasActive and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
+					end
+
+					return controllerThrowInputActive and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
+				end,false,10000,throwBinding)
 			end
+		end
 
-			if inputState==Enum.UserInputState.Begin then
-				controllerThrowInputActive=false
-				if hasFocusedTextBox() or not isAvailable() or not currentHeldBall() or not trackedReceiver then
-					return Enum.ContextActionResult.Pass
-				end
+		local toggleBinding=configuredBinding("getQBAimToggleKey",Enum.KeyCode.P)
+		if toggleBinding~=controllerToggleBinding then
+			contextActionService:UnbindAction(controllerToggleActionName)
+			controllerToggleBinding=nil
+			controllerToggleInputActive=false
+			if isControllerKeyCode(toggleBinding) then
+				controllerToggleBinding=toggleBinding
+				contextActionService:BindActionAtPriority(controllerToggleActionName,function(_,inputState)
+					if inputState==Enum.UserInputState.Begin then
+						controllerToggleInputActive=false
+						if hasFocusedTextBox() or not isAvailable() then
+							return Enum.ContextActionResult.Pass
+						end
 
-				if not suppressNativeControllerInput(binding) then
-					return Enum.ContextActionResult.Pass
-				end
+						if not suppressNativeControllerInput(toggleBinding) then
+							return Enum.ContextActionResult.Pass
+						end
 
-				controllerThrowInputActive=true
-				task.defer(requestThrow,false)
-				return Enum.ContextActionResult.Sink
+						controllerToggleInputActive=true
+						setEnabled(not enabled)
+						return Enum.ContextActionResult.Sink
+					end
+
+					if inputState==Enum.UserInputState.End or inputState==Enum.UserInputState.Cancel then
+						local wasActive=controllerToggleInputActive
+						controllerToggleInputActive=false
+						return wasActive and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
+					end
+
+					return controllerToggleInputActive and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
+				end,false,10000,toggleBinding)
 			end
-
-			if inputState==Enum.UserInputState.End or inputState==Enum.UserInputState.Cancel then
-				local wasActive=controllerThrowInputActive
-				controllerThrowInputActive=false
-				return wasActive and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
-			end
-
-			return controllerThrowInputActive and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
-		end,false,10000,binding)
+		end
 	end
 
 	local function shouldHandleProcessedQBAimInput(input)
@@ -3002,7 +3043,7 @@ function qbAim.new(app,parent)
 	end
 
 	addConnection(inputService.InputBegan:Connect(function(input,processed)
-		if isControllerThrowInput(input) then return end
+		if isControllerQBAimInput(input) then return end
 		if processed and not shouldHandleProcessedQBAimInput(input) then return end
 		handleQBAimInput(input,processed)
 	end))

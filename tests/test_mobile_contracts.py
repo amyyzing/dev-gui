@@ -60,12 +60,18 @@ class MobileFeatureContracts(unittest.TestCase):
         qb = source("features/qb-aim/logic.lua")
         self.assertIn("contextActionService:BindActionAtPriority", qb)
         self.assertIn("return Enum.ContextActionResult.Sink", qb)
-        self.assertIn("if isControllerThrowInput(input) then return end", qb)
+        self.assertIn("if isControllerQBAimInput(input) then return end", qb)
         self.assertIn("local function suppressNativeControllerInput(binding)", qb)
         self.assertIn("setting.Controller=blockedValue", qb)
         self.assertIn("runService.Heartbeat:Wait()", qb)
         self.assertIn("throwKeys[binding]=throwKeyState", qb)
         self.assertIn("task.defer(requestThrow,false)", qb)
+
+    def test_qb_toggle_supports_controller_bindings(self):
+        qb = source("features/qb-aim/logic.lua")
+        self.assertIn('controllerToggleActionName="QBAim_ControllerToggle"', qb)
+        self.assertIn('configuredBinding("getQBAimToggleKey",Enum.KeyCode.P)', qb)
+        self.assertIn("setEnabled(not enabled)", qb)
 
     def test_mobile_preset_editor_can_apply_without_a_keybind(self):
         editor = source("features/preset-editor/logic.lua")
