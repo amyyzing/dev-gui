@@ -72,6 +72,14 @@ class MobileFeatureContracts(unittest.TestCase):
         page_context = runtime[runtime.index("function makePage2Ctx()") :]
         self.assertIn('isMobile=runtimePlatform=="mobile"', page_context)
 
+    def test_mobile_keybind_rows_have_aligned_touch_targets(self):
+        keybinds = source("features/keybinds/logic.lua")
+        self.assertIn('Name="BindTouchTarget"', keybinds)
+        self.assertIn("isMobile and index>#rows-2", keybinds)
+        self.assertIn('Name="KeybindBottomTouchPadding"', keybinds)
+        self.assertIn("connect(touchTarget.Activated", keybinds)
+        self.assertIn("api.CancelCapture()", keybinds)
+
     def test_color_draggers_accept_and_track_touch(self):
         colors = source("features/colors/logic.lua")
         self.assertIn("input==dragInput", colors)

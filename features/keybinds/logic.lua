@@ -46,6 +46,7 @@ function keybinds.new(app,bindSection)
 	local wrapTextButton=app.wrapTextButton
 	local placeWrappedButton=app.placeWrappedButton
 	local setWrappedButtonBg=app.setWrappedButtonBg
+	local isMobile=app.isMobile==true
 
 	local api={}
 	local bindRows={}
@@ -143,7 +144,7 @@ function keybinds.new(app,bindSection)
 		requestRefresh()
 	end
 
-	function api.AddBindRow(label,getter,setter)
+	function api.AddBindRow(label,getter,setter,useMobileTouchTarget)
 		local row=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),ZIndex=5},bindSection)
 
 		local labelButton=make("TextButton",{
@@ -222,13 +223,32 @@ function keybinds.new(app,bindSection)
 
 		local button=api.MakeBindButton(row,0,0,122)
 		placeWrappedButton(button,UDim2.new(1,-122,0.5,-14))
+		local touchTarget=button
+		if useMobileTouchTarget then
+			touchTarget=make("TextButton",{
+				Name="BindTouchTarget",
+				BackgroundTransparency=1,
+				BorderSizePixel=0,
+				Position=UDim2.new(1,-138,0,0),
+				Size=UDim2.new(0,138,1,0),
+				Text="",
+				AutoButtonColor=false,
+				Active=true,
+				ZIndex=20,
+			},row)
+		end
 
-		connect(button.Activated,function()
+		connect(touchTarget.Activated,function()
 			if os.clock()<suppressMouseButton1ClickUntil then
 				return
 			end
 
 			if activeCapture and activeCapture.button==button then
+				if useMobileTouchTarget then
+					api.CancelCapture()
+					return
+				end
+
 				finishCapture("MouseButton1")
 				return
 			end
@@ -267,12 +287,21 @@ function keybinds.new(app,bindSection)
 
 	function api.Build(rows)
 		rows=rows or app.Bindings or defaultBindingRows(app)
-		for _,item in ipairs(rows) do
+		for index,item in ipairs(rows) do
 			api.AddBindRow(item.label,function()
 				return getBinding(app,item)
 			end,function(v)
 				setBinding(app,item,v)
-			end)
+			end,isMobile and index>#rows-2)
+		end
+
+		if isMobile then
+			make("Frame",{
+				Name="KeybindBottomTouchPadding",
+				BackgroundTransparency=1,
+				Size=UDim2.new(1,0,0,16),
+				LayoutOrder=#rows+1,
+			},bindSection)
 		end
 		api.Refresh()
 	end
