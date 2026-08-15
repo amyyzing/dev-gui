@@ -56,6 +56,13 @@ class MobileFeatureContracts(unittest.TestCase):
         self.assertIn('Text="THROW"', qb)
         self.assertIn("return requestThrow(false)", qb)
 
+    def test_qb_controller_throw_consumes_the_native_game_action(self):
+        qb = source("features/qb-aim/logic.lua")
+        self.assertIn("contextActionService:BindActionAtPriority", qb)
+        self.assertIn("return Enum.ContextActionResult.Sink", qb)
+        self.assertIn("if isControllerThrowInput(input) then return end", qb)
+        self.assertIn("task.defer(requestThrow,false)", qb)
+
     def test_mobile_preset_editor_can_apply_without_a_keybind(self):
         editor = source("features/preset-editor/logic.lua")
         runtime = source("runtime/loader-part-4.lua")

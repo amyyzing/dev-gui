@@ -3,6 +3,7 @@ local qbAim={}
 local players=game:GetService("Players")
 local runService=game:GetService("RunService")
 local inputService=game:GetService("UserInputService")
+local contextActionService=game:GetService("ContextActionService")
 local workspace=game:GetService("Workspace")
 local replicatedStorage=game:GetService("ReplicatedStorage")
 
@@ -771,6 +772,9 @@ function qbAim.new(app,parent)
 	local possessionSettleUntil=0
 	local throwInProgress=false
 	local lastThrowAt=-math.huge
+	local controllerThrowActionName="QBAim_ControllerThrow"
+	local controllerThrowBinding=nil
+	local refreshControllerThrowBinding=function() end
 	local highlightedCharacter=nil
 	local connections={}
 	local sectionBody=nil
@@ -2616,6 +2620,7 @@ function qbAim.new(app,parent)
 	end
 
 	function api.Refresh()
+		refreshControllerThrowBinding()
 		syncControls()
 	end
 
@@ -2624,6 +2629,9 @@ function qbAim.new(app,parent)
 	end
 
 	function api.Destroy()
+		contextActionService:UnbindAction(controllerThrowActionName)
+		controllerThrowBinding=nil
+
 		if scheduler and type(scheduler.Unregister)=="function" then
 			for _,job in ipairs(schedulerJobs) do
 				scheduler.Unregister(job.kind,job.id)
@@ -2853,6 +2861,47 @@ function qbAim.new(app,parent)
 		return ok and focused~=nil
 	end
 
+	local function isControllerKeyCode(binding)
+		if typeof(binding)~="EnumItem" or binding.EnumType~=Enum.KeyCode then
+			return false
+		end
+
+		local name=binding.Name
+		return name:sub(1,6)=="Button"
+			or name:sub(1,4)=="DPad"
+			or name:sub(1,10)=="Thumbstick"
+	end
+
+	local function isControllerThrowInput(input)
+		return controllerThrowBinding~=nil and input.KeyCode==controllerThrowBinding
+	end
+
+	refreshControllerThrowBinding=function()
+		local binding=configuredBinding("getQBAimThrowKey",Enum.KeyCode.T)
+		if binding==controllerThrowBinding then return end
+
+		contextActionService:UnbindAction(controllerThrowActionName)
+		controllerThrowBinding=nil
+		if not isControllerKeyCode(binding) then return end
+
+		controllerThrowBinding=binding
+		contextActionService:BindActionAtPriority(controllerThrowActionName,function(_,inputState)
+			if not enabled then
+				return Enum.ContextActionResult.Pass
+			end
+
+			if inputState==Enum.UserInputState.Begin then
+				if hasFocusedTextBox() or not isAvailable() then
+					return Enum.ContextActionResult.Pass
+				end
+
+				task.defer(requestThrow,false)
+			end
+
+			return Enum.ContextActionResult.Sink
+		end,false,10000,binding)
+	end
+
 	local function shouldHandleProcessedQBAimInput(input)
 		if hasFocusedTextBox() then return false end
 		if not enabled then return false end
@@ -2888,12 +2937,14 @@ function qbAim.new(app,parent)
 	end
 
 	addConnection(inputService.InputBegan:Connect(function(input,processed)
+		if isControllerThrowInput(input) then return end
 		if processed and not shouldHandleProcessedQBAimInput(input) then return end
 		handleQBAimInput(input,processed)
 	end))
 
 	cleanupC3InfoGui()
 	clearTargetHighlights()
+	refreshControllerThrowBinding()
 	syncControls()
 	return api
 end
