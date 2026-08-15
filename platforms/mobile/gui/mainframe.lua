@@ -1064,8 +1064,9 @@ function mainFrame.new(app)
 			local maxH=math.min(windowState.MaxH,math.max(260,viewport.Y-16))
 			local minW=math.min(windowState.MinW,maxW)
 			local minH=math.min(windowState.MinH,maxH)
-			local denominator=(startW*startW)+(startH*startH)
-			local scaleDelta=denominator>0 and (((-dx)*startW)+(dy*startH))/denominator or 0
+			local widthDelta=startW>0 and (-dx/startW) or 0
+			local heightDelta=startH>0 and (dy/startH) or 0
+			local scaleDelta=math.abs(widthDelta)>=math.abs(heightDelta) and widthDelta or heightDelta
 			local minScale=math.max(minW/startW,minH/startH)
 			local maxScale=math.min(maxW/startW,maxH/startH)
 			if minScale>maxScale then

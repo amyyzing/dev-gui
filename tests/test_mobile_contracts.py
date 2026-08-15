@@ -30,6 +30,9 @@ class MobileShellContracts(unittest.TestCase):
     def test_mobile_resize_preserves_the_window_aspect_ratio(self):
         shell = source("platforms/mobile/gui/mainframe.lua")
         self.assertIn("local function proportionalResizeScale(dx,dy)", shell)
+        self.assertIn("local widthDelta=startW>0 and (-dx/startW) or 0", shell)
+        self.assertIn("local heightDelta=startH>0 and (dy/startH) or 0", shell)
+        self.assertIn("math.abs(widthDelta)>=math.abs(heightDelta)", shell)
         self.assertIn("local resizeScale=proportionalResizeScale(dx,dy)", shell)
         self.assertIn("windowState.W=math.floor((startW*resizeScale)+0.5)", shell)
         self.assertIn("windowState.H=math.floor((startH*resizeScale)+0.5)", shell)
