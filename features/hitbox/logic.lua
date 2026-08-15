@@ -12,7 +12,6 @@ local defaultTransparency=0.7
 local hitboxToggleKey=Enum.KeyCode.Unknown
 local hitboxReapplyInterval=0.05
 local minHitboxSize=0.1
-local targetHitboxName="CatchBox"
 
 local function clampNumber(value,min,max,fallback)
 	local n=tonumber(value)
@@ -155,7 +154,11 @@ function hitbox.new(app,parent)
 	end
 
 	local function isTargetPart(part)
-		return part and part:IsA("BasePart") and part.Name==targetHitboxName
+		if not(part and part:IsA("BasePart")) then return false end
+
+		local tackleBox=trackedTackleBoxValue and trackedTackleBoxValue.Value
+		return part==tackleBox
+			or part.Name==me.Name and part.Parent and part.Parent.Name=="Hitboxes"
 	end
 
 	local function markPartWrite(part,property)

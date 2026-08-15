@@ -10,13 +10,11 @@ def source(path):
 
 
 class HitboxContracts(unittest.TestCase):
-    def test_hitbox_targets_only_catchbox(self):
+    def test_hitbox_targets_player_body_hitbox_not_catchbox(self):
         hitbox = source("features/hitbox/logic.lua")
-        self.assertIn('local targetHitboxName="CatchBox"', hitbox)
-        self.assertIn(
-            'return part and part:IsA("BasePart") and part.Name==targetHitboxName',
-            hitbox,
-        )
+        self.assertIn("local tackleBox=trackedTackleBoxValue and trackedTackleBoxValue.Value", hitbox)
+        self.assertIn('part.Parent.Name=="Hitboxes"', hitbox)
+        self.assertNotIn('targetHitboxName="CatchBox"', hitbox)
 
     def test_hitbox_follows_player_tacklebox_pointer(self):
         hitbox = source("features/hitbox/logic.lua")
