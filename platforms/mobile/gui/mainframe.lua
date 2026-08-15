@@ -1058,6 +1058,23 @@ function mainFrame.new(app)
 			return inputService:GetMouseLocation()
 		end
 
+		local function proportionalResizeScale(dx,dy)
+			local viewport=getViewportSize()
+			local maxW=math.min(windowState.MaxW,math.max(280,viewport.X-16))
+			local maxH=math.min(windowState.MaxH,math.max(260,viewport.Y-16))
+			local minW=math.min(windowState.MinW,maxW)
+			local minH=math.min(windowState.MinH,maxH)
+			local denominator=(startW*startW)+(startH*startH)
+			local scaleDelta=denominator>0 and (((-dx)*startW)+(dy*startH))/denominator or 0
+			local minScale=math.max(minW/startW,minH/startH)
+			local maxScale=math.min(maxW/startW,maxH/startH)
+			if minScale>maxScale then
+				return math.max(0.1,maxScale)
+			end
+
+			return math.clamp(1+scaleDelta,minScale,maxScale)
+		end
+
 		local function stopResize()
 			resizing=false
 			paintResizeHandle(false)
@@ -1091,8 +1108,9 @@ function mainFrame.new(app)
 				local dx=(cur.X-startPointer.X)/scale
 				local dy=(cur.Y-startPointer.Y)/scale
 
-				windowState.W=math.clamp(startW-dx,windowState.MinW,windowState.MaxW)
-				windowState.H=math.clamp(startH+dy,windowState.MinH,windowState.MaxH)
+				local resizeScale=proportionalResizeScale(dx,dy)
+				windowState.W=math.floor((startW*resizeScale)+0.5)
+				windowState.H=math.floor((startH*resizeScale)+0.5)
 
 				local usedDx=startW-windowState.W
 				root.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+(usedDx*0.5),startPos.Y.Scale,startPos.Y.Offset)

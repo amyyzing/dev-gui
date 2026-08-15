@@ -27,6 +27,17 @@ class MobileShellContracts(unittest.TestCase):
         self.assertIn('Name="ResizeHandle"', shell)
         self.assertIn("Size=UDim2.fromOffset(32,32)", shell)
 
+    def test_mobile_resize_preserves_the_window_aspect_ratio(self):
+        shell = source("platforms/mobile/gui/mainframe.lua")
+        self.assertIn("local function proportionalResizeScale(dx,dy)", shell)
+        self.assertIn("local resizeScale=proportionalResizeScale(dx,dy)", shell)
+        self.assertIn("windowState.W=math.floor((startW*resizeScale)+0.5)", shell)
+        self.assertIn("windowState.H=math.floor((startH*resizeScale)+0.5)", shell)
+        self.assertNotIn(
+            "windowState.W=math.clamp(startW-dx",
+            shell,
+        )
+
     def test_mobile_shell_fits_viewport_without_downscaling_controls(self):
         shell = source("platforms/mobile/gui/mainframe.lua")
         self.assertIn("uiScale.Scale=1", shell)
