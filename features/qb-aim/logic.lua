@@ -2443,11 +2443,10 @@ function qbAim.new(app,parent)
 		releaseThrowLock()
 	end
 
-	local function lockReceiverUnderCursor()
+	local function lockReceiverNearScreenPoint(targetPoint)
 		if not(enabled and isAvailable()) then return end
 
 		local camera=workspace.CurrentCamera
-		local mouse=localPlayer:GetMouse()
 		local best=nil
 		local bestDistance=math.huge
 
@@ -2456,7 +2455,7 @@ function qbAim.new(app,parent)
 			if receiverRoot and camera and canTargetReceiver(player) then
 				local screenPoint,onScreen=camera:WorldToViewportPoint(receiverRoot.Position)
 				if onScreen then
-					local distance=(Vector2.new(mouse.X,mouse.Y)-Vector2.new(screenPoint.X,screenPoint.Y)).Magnitude
+					local distance=(targetPoint-Vector2.new(screenPoint.X,screenPoint.Y)).Magnitude
 					if distance<bestDistance then
 						best=player
 						bestDistance=distance
@@ -2477,6 +2476,53 @@ function qbAim.new(app,parent)
 		else
 			setStatus(state.qbAimTeamFilter~=false and "no teammate" or "no wr")
 		end
+	end
+
+	local function lockReceiverUnderCursor()
+		local mouse=localPlayer:GetMouse()
+		lockReceiverNearScreenPoint(Vector2.new(mouse.X,mouse.Y))
+	end
+
+	local function lockReceiverAtViewportCenter()
+		local camera=workspace.CurrentCamera
+		local viewport=camera and camera.ViewportSize or Vector2.new(0,0)
+		lockReceiverNearScreenPoint(viewport*0.5)
+	end
+
+	local function requestThrow(noAnimation)
+		if not(enabled and isAvailable()) then return false end
+
+		if throwBlocked() then
+			setStatus("already throwing")
+			return true
+		end
+
+		if not currentHeldBall() then
+			clearPreviewForMissingBall("no ball")
+			return true
+		end
+
+		if trackedReceiver then
+			throwTo(trackedReceiver,{
+				noAnimation=noAnimation==true,
+			})
+		else
+			setStatus("no wr")
+		end
+
+		return true
+	end
+
+	function api.LockTarget()
+		if app.isMobile then
+			lockReceiverAtViewportCenter()
+		else
+			lockReceiverUnderCursor()
+		end
+	end
+
+	function api.Throw()
+		return requestThrow(false)
 	end
 
 	local function setEnabled(value)
@@ -2634,6 +2680,15 @@ function qbAim.new(app,parent)
 	highlightToggle=buildToggleRow(sectionBody,"Target Highlight",state.qbAimTargetHighlight~=false,function(value)
 		api.SetTargetHighlightState(value,true)
 	end)
+
+	if app.isMobile then
+		local actionRow=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,40),ZIndex=6},sectionBody)
+		local lockButton=make("TextButton",{Size=UDim2.new(0.5,-4,0,36),Position=UDim2.fromOffset(0,2),BackgroundColor3=colors.button or colors.bg,BorderSizePixel=0,Text="LOCK TARGET",Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.text,AutoButtonColor=true,ZIndex=7,ThemeRole="BUTTON",CornerRole="Control"},actionRow)
+		local throwButton=make("TextButton",{Size=UDim2.new(0.5,-4,0,36),Position=UDim2.new(0.5,4,0,2),BackgroundColor3=colors.button or colors.bg,BorderSizePixel=0,Text="THROW",Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.text,AutoButtonColor=true,ZIndex=7,ThemeRole="BUTTON",CornerRole="Control"},actionRow)
+
+		addConnection(lockButton.Activated:Connect(api.LockTarget))
+		addConnection(throwButton.Activated:Connect(api.Throw))
+	end
 
 	if buildSlider then
 		leadDelaySliderControl=buildSlider(sectionBody,"Lead Adjust",leadDelayMin,leadDelayMax,leadDelay,2,function(value)
@@ -2825,24 +2880,8 @@ function qbAim.new(app,parent)
 			return true
 		end
 
-		if wantsThrow and throwBlocked() then
-			setStatus("already throwing")
-			return true
-		end
-
-		if not currentHeldBall() then
-			clearPreviewForMissingBall("no ball")
-			return true
-		end
-
 		if wantsThrow then
-			if trackedReceiver then
-				throwTo(trackedReceiver,{
-					noAnimation=inputWasProcessed,
-				})
-			else
-				setStatus("no wr")
-			end
+			return requestThrow(inputWasProcessed)
 		end
 
 		return true

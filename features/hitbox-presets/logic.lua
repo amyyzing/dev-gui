@@ -378,14 +378,17 @@ function hitboxPresets.new(app,ownedSection)
 
 		modalOverlay=make("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.35,BorderSizePixel=0,ZIndex=90},screenGui)
 
-		local box=make("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),Size=UDim2.fromOffset(380,166),BackgroundColor3=colors.bg,BorderSizePixel=0,ZIndex=100},modalOverlay)
+		local box=make("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),Size=UDim2.new(1,-24,0,166),BackgroundColor3=colors.bg,BorderSizePixel=0,ZIndex=100},modalOverlay)
+		make("UISizeConstraint",{MaxSize=Vector2.new(380,166)},box)
 		make("UIStroke",{Color=colors.stroke,Thickness=2,Transparency=0},box)
 
 		make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="import?",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
 		make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,44),Size=UDim2.new(1,-32,0,42),Text="add "..code.."?",Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.muted,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,ZIndex=101},box)
 
-		local no=modalButton(box,"NO",166)
-		local yes=modalButton(box,"YES",268)
+		local no=modalButton(box,"NO",0)
+		local yes=modalButton(box,"YES",0)
+		no.Parent.Position=UDim2.new(1,-208,0,118)
+		yes.Parent.Position=UDim2.new(1,-106,0,118)
 
 		trackConnection(no.Activated:Connect(closePresetModal),modalConnections)
 		trackConnection(yes.Activated:Connect(function()
@@ -418,18 +421,21 @@ function hitboxPresets.new(app,ownedSection)
 
 		modalOverlay=make("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.35,BorderSizePixel=0,ZIndex=90},screenGui)
 
-		local box=make("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),Size=UDim2.fromOffset(360,188),BackgroundColor3=colors.bg,BorderSizePixel=0,ZIndex=100},modalOverlay)
+		local box=make("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),Size=UDim2.new(1,-24,0,188),BackgroundColor3=colors.bg,BorderSizePixel=0,ZIndex=100},modalOverlay)
+		make("UISizeConstraint",{MaxSize=Vector2.new(360,188)},box)
 		make("UIStroke",{Color=colors.stroke,Thickness=2,Transparency=0},box)
 
 		make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="name it",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
 
-		local nameBox=make("TextBox",{Size=UDim2.fromOffset(328,30),Position=UDim2.fromOffset(16,52),BackgroundColor3=colors.bg,BorderSizePixel=0,ClearTextOnFocus=false,Text="",PlaceholderText="name",TextColor3=colors.text,PlaceholderColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,Font=Enum.Font.Gotham,TextSize=13,ZIndex=101},box)
+		local nameBox=make("TextBox",{Size=UDim2.new(1,-32,0,30),Position=UDim2.fromOffset(16,52),BackgroundColor3=colors.bg,BorderSizePixel=0,ClearTextOnFocus=false,Text="",PlaceholderText="name",TextColor3=colors.text,PlaceholderColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,Font=Enum.Font.Gotham,TextSize=13,ZIndex=101},box)
 		wrapTextBox(nameBox,colors.bg,2)
 
 		local warning=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,88),Size=UDim2.new(1,-32,0,18),Text="",Font=Enum.Font.Gotham,TextSize=11,TextColor3=colors.red,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
 
-		local cancel=modalButton(box,"CANCEL",146)
-		local save=modalButton(box,"SAVE",248)
+		local cancel=modalButton(box,"CANCEL",0)
+		local save=modalButton(box,"SAVE",0)
+		cancel.Parent.Position=UDim2.new(1,-208,0,118)
+		save.Parent.Position=UDim2.new(1,-106,0,118)
 
 		trackConnection(cancel.Activated:Connect(closePresetModal),modalConnections)
 
@@ -454,15 +460,18 @@ function hitboxPresets.new(app,ownedSection)
 
 		modalOverlay=make("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=Color3.fromRGB(0,0,0),BackgroundTransparency=0.35,BorderSizePixel=0,ZIndex=90},screenGui)
 
-		local box=make("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),Size=UDim2.fromOffset(360,166),BackgroundColor3=colors.bg,BorderSizePixel=0,ZIndex=100},modalOverlay)
+		local box=make("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(0.5,0,0.5,0),Size=UDim2.new(1,-24,0,166),BackgroundColor3=colors.bg,BorderSizePixel=0,ZIndex=100},modalOverlay)
+		make("UISizeConstraint",{MaxSize=Vector2.new(360,166)},box)
 		make("UIStroke",{Color=colors.stroke,Thickness=2,Transparency=0},box)
 
 		make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,14),Size=UDim2.new(1,-32,0,22),Text="save?",Font=Enum.Font.GothamMedium,TextSize=14,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=101},box)
 
 		make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(16,44),Size=UDim2.new(1,-32,0,42),Text="saves this preset",Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.muted,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,ZIndex=101},box)
 
-		local no=modalButton(box,"NO",146)
-		local yes=modalButton(box,"YES",248)
+		local no=modalButton(box,"NO",0)
+		local yes=modalButton(box,"YES",0)
+		no.Parent.Position=UDim2.new(1,-208,0,118)
+		yes.Parent.Position=UDim2.new(1,-106,0,118)
 
 		trackConnection(no.Activated:Connect(closePresetModal),modalConnections)
 		trackConnection(yes.Activated:Connect(function()

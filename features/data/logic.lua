@@ -145,11 +145,12 @@ function playerData.new(app,page,deps)
 		local box=make("Frame",{
 			AnchorPoint=Vector2.new(0.5,0.5),
 			Position=UDim2.new(0.5,0,0.5,0),
-			Size=UDim2.fromOffset(390,170),
+			Size=UDim2.new(1,-24,0,170),
 			BackgroundColor3=colors.bg,
 			BorderSizePixel=0,
 			ZIndex=101,
 		},modal)
+		make("UISizeConstraint",{MaxSize=Vector2.new(390,170)},box)
 
 		make("UIStroke",{Color=colors.stroke,Thickness=2,Transparency=0},box)
 
@@ -180,8 +181,10 @@ function playerData.new(app,page,deps)
 		},box)
 
 		local danger=options and options.danger==true
-		local no=modalButton(box,"CANCEL",160,false,modalConnections)
-		local yes=modalButton(box,yesText or"YES",274,danger,modalConnections)
+		local no=modalButton(box,"CANCEL",0,false,modalConnections)
+		local yes=modalButton(box,yesText or"YES",0,danger,modalConnections)
+		no.Parent.Position=UDim2.new(1,-230,0,120)
+		yes.Parent.Position=UDim2.new(1,-116,0,120)
 
 		trackConnection(no.Activated:Connect(closeModal),modalConnections)
 

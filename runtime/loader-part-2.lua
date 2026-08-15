@@ -411,6 +411,7 @@ function makeMainCtx()
 		Janitor=cleanupBags,
 		colors=colors,
 		style=style,
+		isMobile=runtimePlatform=="mobile",
 		State=mainPageState,
 		makeSection=makeSection,
 		buildSlider=buildSlider,

@@ -12,6 +12,7 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 	local placeWrappedBox=app.placeWrappedBox
 	local placeWrappedButton=app.placeWrappedButton
 	local setWrappedButtonBg=app.setWrappedButtonBg
+	local isMobile=app.isMobile==true
 
 	local api={}
 	local presetRows={}
@@ -163,7 +164,8 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 	end)
 
 	local function buildPresetRow(i)
-		local row=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,62),ZIndex=5},editorSection)
+		local rowHeight=isMobile and 92 or 62
+		local row=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5},editorSection)
 
 		make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text="preset "..i,Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
 
@@ -182,6 +184,25 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 		placeWrappedButton(resetBtn,UDim2.new(1,-70,0,18))
 		resetBtn.Text="reset"
 
+		if isMobile then
+			local function layoutWrapped(control,position,size)
+				local wrapper=control and control.Parent
+				if not(wrapper and wrapper:IsA("GuiObject")) then return end
+
+				wrapper.Position=position
+				wrapper.Size=size
+				control.Size=UDim2.fromScale(1,1)
+				control.Position=UDim2.fromOffset(0,0)
+			end
+
+			layoutWrapped(keyBtn,UDim2.fromOffset(0,18),UDim2.new(0.5,-4,0,30))
+			layoutWrapped(resetBtn,UDim2.new(0.5,4,0,18),UDim2.new(0.5,-4,0,30))
+			layoutWrapped(xBox,UDim2.fromOffset(0,54),UDim2.new(1/3,-4,0,30))
+			layoutWrapped(yBox,UDim2.new(1/3,2,0,54),UDim2.new(1/3,-4,0,30))
+			layoutWrapped(zBox,UDim2.new(2/3,4,0,54),UDim2.new(1/3,-4,0,30))
+			keyBtn.Text="apply"
+		end
+
 		local function applyPresetSize()
 			local p=presetData[i]
 			if not p then return end
@@ -199,6 +220,14 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 		connect(zBox.FocusLost,applyPresetSize)
 
 		connect(keyBtn.Activated,function()
+			if isMobile then
+				applyPresetSize()
+				if app.applyHitboxPreset then
+					app.applyHitboxPreset(i)
+				end
+				return
+			end
+
 			if os.clock()<suppressKeyButtonClickUntil then
 				return
 			end
@@ -221,6 +250,8 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 		end)
 
 		connect(keyBtn.InputBegan,function(input)
+			if isMobile then return end
+
 			local active=keybinds.GetActiveCapture and keybinds.GetActiveCapture()
 			if not(active and active.button==keyBtn) then return end
 
@@ -252,7 +283,7 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 			local active=keybinds.GetActiveCapture and keybinds.GetActiveCapture()
 
 			if not(active and active.button==item.keyBtn) then
-				item.keyBtn.Text=bindingToLabel(p.key)
+				item.keyBtn.Text=isMobile and "apply" or bindingToLabel(p.key)
 				setWrappedButtonBg(item.keyBtn,colors.button or colors.bg)
 				item.keyBtn.TextColor3=colors.text
 			end

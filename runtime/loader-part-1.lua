@@ -1191,7 +1191,13 @@ loaderBox=make("Frame",{
 	ZIndex=loaderLayer+1,
 },loaderOverlay)
 
-loaderBoxScale=make("UIScale",{Scale=0.92},loaderBox)
+local loaderScale=0.92
+if runtimePlatform=="mobile" then
+	local camera=workspace.CurrentCamera
+	local viewport=camera and camera.ViewportSize or Vector2.new(1920,1080)
+	loaderScale=math.min(1,(viewport.X-16)/loaderBoxW,(viewport.Y-16)/loaderBoxH)
+end
+loaderBoxScale=make("UIScale",{Scale=math.max(0.72,loaderScale)},loaderBox)
 loaderBoxStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=1},loaderBox)
 loaderBoxGradient=make("UIGradient",{
 	Color=ColorSequence.new({
@@ -1341,8 +1347,8 @@ loaderPhaseRow=make("Frame",{
 	ZIndex=loaderLayer+2,
 },loaderBox)
 
-local phaseWidth=104
 local phaseGap=8
+local phaseWidth=math.max(54,math.floor((loaderBoxW-36-(phaseGap*3))/4))
 for index,name in ipairs(loaderPhaseNames) do
 	local item=make("Frame",{
 		BackgroundColor3=colors.panel,

@@ -24,8 +24,8 @@ uiMap.LoaderGui={
 	},
 
 	Box={
-		W=480,
-		H=320,
+		W=336,
+		H=280,
 	},
 }
 
@@ -35,14 +35,14 @@ uiMap.MainBackgroundGui={
 	},
 
 	Window={
-		W=880,
-		H=540,
-		MinW=560,
-		MinH=360,
-		MaxW=1220,
-		MaxH=820,
-		StartY=80,
-		MinimizedH=68,
+		W=720,
+		H=480,
+		MinW=320,
+		MinH=300,
+		MaxW=1000,
+		MaxH=700,
+		StartY=12,
+		MinimizedH=58,
 	},
 
 	Layout={
@@ -51,12 +51,12 @@ uiMap.MainBackgroundGui={
 		PageGap=8,
 		ColumnGap=8,
 		FooterGap=8,
-		HeaderHeight=52,
-		PageBarHeight=30,
-		PageTabWidth=106,
-		PageTabHeight=28,
-		FooterHeight=34,
-		TopButtonSize=28,
+		HeaderHeight=56,
+		PageBarHeight=42,
+		PageTabWidth=100,
+		PageTabHeight=40,
+		FooterHeight=42,
+		TopButtonSize=36,
 		TopButtonGap=6,
 		TopButtonOuter=10,
 		ResizeHandleVisible=true,

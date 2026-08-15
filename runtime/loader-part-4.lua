@@ -84,7 +84,8 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 		end
 	end
 
-	local box=make("Frame", {AnchorPoint=Vector2.new(0.5, 0.5), Position=UDim2.new(0.5, 0, 0.5, 0), Size=UDim2.fromOffset(390, 170), BackgroundColor3=colors.section or colors.bg, BorderSizePixel=0, ZIndex=101, ThemeRole="SECTION", CornerRole="Section"}, modal)
+	local box=make("Frame", {AnchorPoint=Vector2.new(0.5, 0.5), Position=UDim2.new(0.5, 0, 0.5, 0), Size=UDim2.new(1,-24,0,170), BackgroundColor3=colors.section or colors.bg, BorderSizePixel=0, ZIndex=101, ThemeRole="SECTION", CornerRole="Section"}, modal)
+	make("UISizeConstraint",{MaxSize=Vector2.new(390,170)},box)
 	make("UICorner", {CornerRadius=UDim.new(0, 0)}, box)
 
 	make("UIStroke", {Color=colors.stroke, Thickness=2, Transparency=0}, box)
@@ -119,8 +120,10 @@ function showConfirmModal(titleText, bodyText, yesText, onYes, options)
 	end
 
 	local danger=options and options.danger==true
-	local no=modalButton("CANCEL", 160, false)
-	local yes=modalButton(yesText or"YES", 274, danger)
+	local no=modalButton("CANCEL", 0, false)
+	local yes=modalButton(yesText or"YES", 0, danger)
+	no.Parent.Position=UDim2.new(1,-230,0,120)
+	yes.Parent.Position=UDim2.new(1,-116,0,120)
 
 	connectModal(no.Activated,closeModal)
 
@@ -393,6 +396,7 @@ function makePage2Ctx()
 		ThemeStore=themeRuntime,
 		Janitor=cleanupBags,
 		colors=colors,
+		isMobile=runtimePlatform=="mobile",
 		screenGui=screenGui,
 		hitboxPresets=hitboxPresets,
 		defaultHitboxPresets=defaultHitboxPresets,
@@ -417,6 +421,13 @@ function makePage2Ctx()
 		setPresetSize=setPresetSizeFromDataSave,
 		setPresetKey=setPresetKeyFromDataSave,
 		resetPreset=resetPresetFromDataSave,
+		applyHitboxPreset=function(index)
+			if type(applyHitboxPreset)=="function" then
+				return applyHitboxPreset(index)
+			end
+
+			return false
+		end,
 		applyPresetEditor=applyPresetEditorFromDataSave,
 		createOwnedPreset=createOwnedPresetFromDataSave,
 		importOwnedPreset=importOwnedPresetFromDataSave,

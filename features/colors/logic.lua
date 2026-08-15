@@ -1067,6 +1067,7 @@ function colors.new(app,page)
 
 		local value=startVal
 		local dragging=false
+		local dragInput=nil
 
 		local function roundTo(v,d)
 			local m=10^d
@@ -1095,22 +1096,24 @@ function colors.new(app,page)
 		end
 
 		trackConnection(hit.InputBegan:Connect(function(input)
-			if input.UserInputType==Enum.UserInputType.MouseButton1 then
+			if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 				dragging=true
+				dragInput=input
 				valueBox:ReleaseFocus()
 				setValue(valueFromMouse(input),true)
 			end
 		end))
 
 		trackConnection(inputService.InputChanged:Connect(function(input)
-			if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then
+			if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input==dragInput) then
 				setValue(valueFromMouse(input),true)
 			end
 		end))
 
 		trackConnection(inputService.InputEnded:Connect(function(input)
-			if input.UserInputType==Enum.UserInputType.MouseButton1 then
+			if input==dragInput or (dragInput and dragInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1) then
 				dragging=false
+				dragInput=nil
 			end
 		end))
 
@@ -1651,29 +1654,33 @@ function colors.new(app,page)
 		end
 	end
 
+	local colorDragInput=nil
 	trackConnection(svSquare.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 then
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			colorDrag="SV"
+			colorDragInput=input
 			updateColorDrag(input)
 		end
 	end))
 
 	trackConnection(hueStrip.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 then
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			colorDrag="Hue"
+			colorDragInput=input
 			updateColorDrag(input)
 		end
 	end))
 
 	trackConnection(inputService.InputChanged:Connect(function(input)
-		if colorDrag and input.UserInputType==Enum.UserInputType.MouseMovement then
+		if colorDrag and (input.UserInputType==Enum.UserInputType.MouseMovement or input==colorDragInput) then
 			updateColorDrag(input)
 		end
 	end))
 
 	trackConnection(inputService.InputEnded:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 then
+		if input==colorDragInput or (colorDragInput and colorDragInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1) then
 			colorDrag=nil
+			colorDragInput=nil
 		end
 	end))
 
@@ -2351,29 +2358,33 @@ function colors.new(app,page)
 		ZIndex=6,
 	},highlightPickerBody)
 
+	local highlightColorDragInput=nil
 	trackConnection(highlightSvBase.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 then
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			highlightColorDrag="SV"
+			highlightColorDragInput=input
 			updateHighlightColorDrag(input)
 		end
 	end))
 
 	trackConnection(highlightHueStrip.InputBegan:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 then
+		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			highlightColorDrag="Hue"
+			highlightColorDragInput=input
 			updateHighlightColorDrag(input)
 		end
 	end))
 
 	trackConnection(inputService.InputChanged:Connect(function(input)
-		if highlightColorDrag and input.UserInputType==Enum.UserInputType.MouseMovement then
+		if highlightColorDrag and (input.UserInputType==Enum.UserInputType.MouseMovement or input==highlightColorDragInput) then
 			updateHighlightColorDrag(input)
 		end
 	end))
 
 	trackConnection(inputService.InputEnded:Connect(function(input)
-		if input.UserInputType==Enum.UserInputType.MouseButton1 then
+		if input==highlightColorDragInput or (highlightColorDragInput and highlightColorDragInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1) then
 			highlightColorDrag=nil
+			highlightColorDragInput=nil
 		end
 	end))
 

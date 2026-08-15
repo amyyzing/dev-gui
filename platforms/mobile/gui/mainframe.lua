@@ -290,6 +290,32 @@ function mainFrame.new(app)
 	local rootSizeTween=nil
 	local rootPositionTween=nil
 
+	local function getViewportSize()
+		local camera=workspace.CurrentCamera
+		return camera and camera.ViewportSize or Vector2.new(1920,1080)
+	end
+
+	local function clampRootPosition(position)
+		local viewport=getViewportSize()
+		local width=math.min(root.Size.X.Offset,viewport.X)
+		local height=math.min(root.Size.Y.Offset,viewport.Y)
+		local anchorX=(position.X.Scale*viewport.X)+position.X.Offset
+		local anchorY=(position.Y.Scale*viewport.Y)+position.Y.Offset
+		local margin=8
+		local minX=(width*0.5)+margin
+		local maxX=viewport.X-(width*0.5)-margin
+		local maxY=viewport.Y-height-margin
+
+		if maxX<minX then
+			anchorX=viewport.X*0.5
+		else
+			anchorX=math.clamp(anchorX,minX,maxX)
+		end
+
+		anchorY=math.clamp(anchorY,margin,math.max(margin,maxY))
+		return UDim2.fromOffset(math.floor(anchorX+0.5),math.floor(anchorY+0.5))
+	end
+
 	local function mouseInsideRoot()
 		if not root or not root.Parent or not root.Visible then
 			return false
@@ -321,7 +347,7 @@ function mainFrame.new(app)
 			rootPositionTween:Cancel()
 		end
 
-		rootPositionTween=tweenService:Create(root,TweenInfo.new(duration or 0.08,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Position=position})
+		rootPositionTween=tweenService:Create(root,TweenInfo.new(duration or 0.08,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Position=clampRootPosition(position)})
 		rootPositionTween:Play()
 	end
 
@@ -345,10 +371,7 @@ function mainFrame.new(app)
 	local updateResponsiveLayout
 
 	local function updateScale()
-		local cam=workspace.CurrentCamera
-		local vp=cam and cam.ViewportSize or Vector2.new(1920,1080)
-		local s=math.clamp(math.min(vp.X/1920,vp.Y/1080),0.78,1.08)
-		uiScale.Scale=s
+		uiScale.Scale=1
 
 		if updateResponsiveLayout then
 			updateResponsiveLayout()
@@ -503,7 +526,7 @@ function mainFrame.new(app)
 		pageBarSize=UDim2.fromOffset(navWidth,384)
 	end
 
-	local pageBar=make("Frame",{Size=pageBarSize,BackgroundTransparency=1,ClipsDescendants=true,ZIndex=4,LayoutOrder=pageBarLayoutOrder},pageParent)
+	local pageBar=make("ScrollingFrame",{Size=pageBarSize,CanvasSize=navIsLeft and UDim2.new(0,0,0,0) or UDim2.fromOffset(pageShellWidth,pageBarHeight),ScrollingDirection=navIsLeft and Enum.ScrollingDirection.Y or Enum.ScrollingDirection.X,ScrollBarThickness=navIsLeft and 0 or 2,ScrollBarImageColor3=colors.stroke,BackgroundTransparency=1,BorderSizePixel=0,ClipsDescendants=true,ZIndex=4,LayoutOrder=pageBarLayoutOrder},pageParent)
 	local pageShell=make("Frame",{Size=navIsLeft and UDim2.new(1,0,1,0) or UDim2.fromOffset(pageShellWidth,pageBarHeight),BackgroundColor3=colors.topbar or colors.bg,BackgroundTransparency=pageShellTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=5,ThemeRole="TOPBAR",CornerRole="Section"},pageBar)
 	local pageShellScale=make("UIScale",{Scale=1},pageShell)
 	make("UICorner",{CornerRadius=UDim.new(0,0)},pageShell)
@@ -756,6 +779,15 @@ function mainFrame.new(app)
 		local sliderSize=tabSize()
 
 		tweenService:Create(pageSlider,TweenInfo.new(0.12,Enum.EasingStyle.Linear,Enum.EasingDirection.Out),{Position=sliderPos,Size=sliderSize}):Play()
+		if not navIsLeft then
+			local index=getPageIndex(activePageName)
+			local viewportWidth=pageBar.AbsoluteSize.X
+			local targetX=((index-0.5)*pageTabWidth)-(viewportWidth*0.5)
+			local maxX=math.max(0,pageShellWidth-viewportWidth)
+			tweenService:Create(pageBar,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+				CanvasPosition=Vector2.new(math.clamp(targetX,0,maxX),0),
+			}):Play()
+		end
 		paintPageTabs()
 		refreshFooterResetButton()
 		if type(onPageActivated)=="function" then
@@ -786,12 +818,18 @@ function mainFrame.new(app)
 	make("UIListLayout",{Padding=UDim.new(0,pageGap),SortOrder=Enum.SortOrder.LayoutOrder},rightCol)
 
 	updateResponsiveLayout=function()
-		local cam=workspace.CurrentCamera
-		local vp=cam and cam.ViewportSize or Vector2.new(1920,1080)
+		local vp=getViewportSize()
+		local availableW=math.max(280,vp.X-16)
+		local availableH=math.max(260,vp.Y-16)
+		local maxW=math.min(windowState.MaxW,availableW)
+		local maxH=math.min(windowState.MaxH,availableH)
+		local minW=math.min(windowState.MinW,maxW)
+		local minH=math.min(windowState.MinH,maxH)
 
-		windowState.W=math.clamp(windowState.W,windowState.MinW,math.min(windowState.MaxW,math.max(560,vp.X-40)))
-		windowState.H=math.clamp(windowState.H,windowState.MinH,math.min(windowState.MaxH,math.max(360,vp.Y-120)))
+		windowState.W=math.clamp(windowState.W,minW,maxW)
+		windowState.H=math.clamp(windowState.H,minH,maxH)
 		root.Size=UDim2.fromOffset(windowState.W,uiMinimized and minimizedRootH or windowState.H)
+		root.Position=clampRootPosition(root.Position)
 
 		local contentHeight=math.max(0,windowState.H-(rootPadding*2))
 		local usedHeight=headerHeight+footerHeight+(mainGap*2)
@@ -808,10 +846,11 @@ function mainFrame.new(app)
 			pageShellScale.Scale=1
 		else
 			pageBar.Size=UDim2.new(1,0,0,pageBarHeight)
+			pageBar.CanvasSize=UDim2.fromOffset(pageShellWidth,pageBarHeight)
 			pageShell.Size=UDim2.fromOffset(pageShellWidth,pageBarHeight)
 			pageViewport.Size=UDim2.new(1,0,0,pageHeight)
 			pageHost.Size=UDim2.new(1,0,1,0)
-			pageShellScale.Scale=math.min(1,math.max(0.72,(windowState.W-16)/pageShellWidth))
+			pageShellScale.Scale=1
 		end
 
 		local compact=windowState.W<720 or vp.X<1100
@@ -878,12 +917,13 @@ function mainFrame.new(app)
 	local toastHost=make("Frame",{
 		Name="ToastHost",
 		AnchorPoint=Vector2.new(1,1),
-		Position=UDim2.new(1,-18,1,-18),
-		Size=UDim2.fromOffset(320,190),
+		Position=UDim2.new(1,-12,1,-12),
+		Size=UDim2.new(1,-24,0,190),
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		ZIndex=80,
 	},screenGui)
+	make("UISizeConstraint",{MaxSize=Vector2.new(320,190)},toastHost)
 	make("UIListLayout",{
 		FillDirection=Enum.FillDirection.Vertical,
 		Padding=UDim.new(0,8),
@@ -969,7 +1009,7 @@ function mainFrame.new(app)
 		end)
 	end
 
-	resizeHandle=make("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(14,14),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,7,1,-7),BackgroundColor3=getUIStrokeColor(),BackgroundTransparency=0.18,BorderSizePixel=0,Text="",Visible=resizeHandleVisible,ZIndex=30,SkipThemeRole=true},root)
+	resizeHandle=make("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(32,32),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,6,1,-6),BackgroundColor3=getUIStrokeColor(),BackgroundTransparency=0.18,BorderSizePixel=0,Text="",Visible=resizeHandleVisible,ZIndex=30,SkipThemeRole=true},root)
 	make("UICorner",{CornerRadius=UDim.new(0,0)},resizeHandle)
 	local resizeStroke=make("UIStroke",{Color=colors.bg,Thickness=1,Transparency=0.25},resizeHandle)
 
@@ -977,7 +1017,7 @@ function mainFrame.new(app)
 	local resizing=false
 
 	local function paintResizeHandle(held)
-		local targetSize=held and 18 or (resizeHovering and 16 or 14)
+		local targetSize=held and 38 or (resizeHovering and 35 or 32)
 		local targetTransparency=held and 0.02 or (resizeHovering and 0.08 or 0.18)
 
 		tweenService:Create(resizeHandle,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
@@ -1004,38 +1044,52 @@ function mainFrame.new(app)
 	end)
 
 	do
-		local startMouse=nil
+		local startPointer=nil
 		local startW,startH=0,0
 		local startPos=nil
 		local resizeMoveConn=nil
+		local activeResizeInput=nil
+
+		local function inputPosition(input)
+			if input and input.UserInputType==Enum.UserInputType.Touch then
+				return Vector2.new(input.Position.X,input.Position.Y)
+			end
+
+			return inputService:GetMouseLocation()
+		end
 
 		local function stopResize()
 			resizing=false
 			paintResizeHandle(false)
 			safeDisconnect(resizeMoveConn)
 			resizeMoveConn=nil
+			activeResizeInput=nil
 		end
 
 		connect(resizeHandle.InputBegan,function(input)
-			if input.UserInputType~=Enum.UserInputType.MouseButton1 then return end
+			local inputType=input.UserInputType
+			if inputType~=Enum.UserInputType.MouseButton1 and inputType~=Enum.UserInputType.Touch then return end
 
 			resizing=true
 			paintResizeHandle(true)
-			startMouse=inputService:GetMouseLocation()
+			activeResizeInput=input
+			startPointer=inputPosition(input)
 			startW,startH=windowState.W,windowState.H
 			startPos=root.Position
 			safeDisconnect(resizeMoveConn)
 
 			resizeMoveConn=connect(inputService.InputChanged,function(changed)
 				if not resizing or not isAlive() then return end
-				if changed.UserInputType~=Enum.UserInputType.MouseMovement then return end
+				local isMouseMove=activeResizeInput and activeResizeInput.UserInputType==Enum.UserInputType.MouseButton1 and changed.UserInputType==Enum.UserInputType.MouseMovement
+				local isTouchMove=changed==activeResizeInput
+				if not isMouseMove and not isTouchMove then return end
 
-				local cur=inputService:GetMouseLocation()
+				local cur=inputPosition(isTouchMove and changed or activeResizeInput)
 				local scale=uiScale.Scale
 				if scale<=0 then scale=1 end
 
-				local dx=(cur.X-startMouse.X)/scale
-				local dy=(cur.Y-startMouse.Y)/scale
+				local dx=(cur.X-startPointer.X)/scale
+				local dy=(cur.Y-startPointer.Y)/scale
 
 				windowState.W=math.clamp(startW-dx,windowState.MinW,windowState.MaxW)
 				windowState.H=math.clamp(startH+dy,windowState.MinH,windowState.MaxH)
@@ -1050,7 +1104,7 @@ function mainFrame.new(app)
 		end)
 
 		connect(inputService.InputEnded,function(input)
-			if input.UserInputType==Enum.UserInputType.MouseButton1 then
+			if input==activeResizeInput or (activeResizeInput and activeResizeInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1) then
 				stopResize()
 			end
 		end)
@@ -1109,7 +1163,8 @@ function mainFrame.new(app)
 
 	do
 		local dragging=false
-		local startMouse,startPos
+		local startPointer,startPos
+		local activeDragInput=nil
 		local lastDragTween=0
 		local lastDragTarget=nil
 
@@ -1117,6 +1172,7 @@ function mainFrame.new(app)
 			dragging=false
 			safeDisconnect(dragConn)
 			dragConn=nil
+			activeDragInput=nil
 		end
 
 		local function updateDrag()
@@ -1126,10 +1182,13 @@ function mainFrame.new(app)
 			end
 
 			local cur=inputService:GetMouseLocation()
+			if activeDragInput and activeDragInput.UserInputType==Enum.UserInputType.Touch then
+				cur=Vector2.new(activeDragInput.Position.X,activeDragInput.Position.Y)
+			end
 			local scale=uiScale.Scale
 			if scale<=0 then scale=1 end
 
-			local delta=(cur-startMouse)/scale
+			local delta=(cur-startPointer)/scale
 			local target=UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,startPos.Y.Scale,startPos.Y.Offset+delta.Y)
 			local now=os.clock()
 
@@ -1143,9 +1202,10 @@ function mainFrame.new(app)
 		end
 
 		connect(header.InputBegan,function(i)
-			if i.UserInputType==Enum.UserInputType.MouseButton1 then
+			if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
 				dragging=true
-				startMouse=inputService:GetMouseLocation()
+				activeDragInput=i
+				startPointer=i.UserInputType==Enum.UserInputType.Touch and Vector2.new(i.Position.X,i.Position.Y) or inputService:GetMouseLocation()
 				startPos=root.Position
 				lastDragTween=0
 				lastDragTarget=nil
@@ -1161,7 +1221,7 @@ function mainFrame.new(app)
 		end)
 
 		connect(inputService.InputEnded,function(i)
-			if i.UserInputType==Enum.UserInputType.MouseButton1 and dragging then
+			if dragging and (i==activeDragInput or (activeDragInput and activeDragInput.UserInputType==Enum.UserInputType.MouseButton1 and i.UserInputType==Enum.UserInputType.MouseButton1)) then
 				stopDrag()
 			end
 		end)
@@ -1185,7 +1245,7 @@ function mainFrame.new(app)
 
 	function api.resetGui(animate)
 		local rootHeight=(root and root.AbsoluteSize and root.AbsoluteSize.Y) or windowState.H or 540
-		local defaultPosition=UDim2.new(0.5,0,0.5,-math.floor(rootHeight/2))
+		local defaultPosition=clampRootPosition(UDim2.new(0.5,0,0.5,-math.floor(rootHeight/2)))
 		if animate==false then
 			if rootPositionTween then
 				rootPositionTween:Cancel()
