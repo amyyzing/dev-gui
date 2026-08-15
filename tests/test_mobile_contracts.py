@@ -54,7 +54,7 @@ class MobileFeatureContracts(unittest.TestCase):
         self.assertIn("local function requestThrow(noAnimation)", qb)
         self.assertIn('Text="LOCK TARGET"', qb)
         self.assertIn('Text="THROW"', qb)
-        self.assertIn("return requestThrow(inputWasProcessed)", qb)
+        self.assertIn("return requestThrow(false)", qb)
 
     def test_mobile_preset_editor_can_apply_without_a_keybind(self):
         editor = source("features/preset-editor/logic.lua")

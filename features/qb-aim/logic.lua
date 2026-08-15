@@ -2881,7 +2881,7 @@ function qbAim.new(app,parent)
 		end
 
 		if wantsThrow then
-			return requestThrow(inputWasProcessed)
+			return requestThrow(false)
 		end
 
 		return true
