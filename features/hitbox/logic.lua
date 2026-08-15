@@ -51,6 +51,10 @@ function hitbox.new(app,parent)
 	local inputConn=nil
 	local workspaceConn=nil
 	local workspaceRemovedConn=nil
+	local playerDescendantAddedConn=nil
+	local playerDescendantRemovingConn=nil
+	local tackleBoxValueConn=nil
+	local trackedTackleBoxValue=nil
 	local destroyConn=nil
 	local section=nil
 	local alive=true
@@ -379,6 +383,35 @@ function hitbox.new(app,parent)
 		applyVisuals(w,state.hitboxOn)
 	end
 
+	local function attachCurrentTackleBox()
+		local node=trackedTackleBoxValue and trackedTackleBoxValue.Value
+		if node then
+			attachNode(node)
+		end
+	end
+
+	local function watchTackleBoxValue(valueObject)
+		if trackedTackleBoxValue==valueObject then
+			attachCurrentTackleBox()
+			return
+		end
+
+		safeDisconnect(tackleBoxValueConn)
+		tackleBoxValueConn=nil
+		trackedTackleBoxValue=valueObject
+
+		if valueObject and valueObject:IsA("ObjectValue") then
+			tackleBoxValueConn=valueObject:GetPropertyChangedSignal("Value"):Connect(attachCurrentTackleBox)
+			attachCurrentTackleBox()
+		end
+	end
+
+	local function watchExistingTackleBoxValue()
+		local replicated=me:FindFirstChild("Replicated")
+		local valueObject=replicated and replicated:FindFirstChild("TackleBox")
+		watchTackleBoxValue(valueObject)
+	end
+
 	local function hookHitboxesFolder(hitboxes)
 		if not isAlive() or not hitboxes then return end
 
@@ -659,6 +692,7 @@ function hitbox.new(app,parent)
 		normalizeState()
 		watchExistingModeRoots()
 		scanCurrentModeFolders()
+		watchExistingTackleBoxValue()
 		forEachWatcherPartsApply(state.hitboxOn)
 		syncReadouts()
 	end
@@ -683,6 +717,13 @@ function hitbox.new(app,parent)
 		workspaceConn=nil
 		safeDisconnect(workspaceRemovedConn)
 		workspaceRemovedConn=nil
+		safeDisconnect(playerDescendantAddedConn)
+		playerDescendantAddedConn=nil
+		safeDisconnect(playerDescendantRemovingConn)
+		playerDescendantRemovingConn=nil
+		safeDisconnect(tackleBoxValueConn)
+		tackleBoxValueConn=nil
+		trackedTackleBoxValue=nil
 		safeDisconnect(destroyConn)
 		destroyConn=nil
 		for root in pairs(modeRootConnections) do
@@ -762,6 +803,21 @@ function hitbox.new(app,parent)
 		if child.Name=="Games" or child.Name=="MiniGames" then
 			unwatchModeRoot(child)
 			queueRefresh()
+		end
+	end)
+
+	playerDescendantAddedConn=me.DescendantAdded:Connect(function(descendant)
+		if descendant:IsA("ObjectValue")
+			and descendant.Name=="TackleBox"
+			and descendant.Parent
+			and descendant.Parent.Name=="Replicated" then
+			watchTackleBoxValue(descendant)
+		end
+	end)
+
+	playerDescendantRemovingConn=me.DescendantRemoving:Connect(function(descendant)
+		if descendant==trackedTackleBoxValue then
+			watchTackleBoxValue(nil)
 		end
 	end)
 

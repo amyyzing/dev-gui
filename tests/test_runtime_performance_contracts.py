@@ -18,6 +18,13 @@ class HitboxContracts(unittest.TestCase):
             hitbox,
         )
 
+    def test_hitbox_follows_player_tacklebox_pointer(self):
+        hitbox = source("features/hitbox/logic.lua")
+        self.assertIn('replicated:FindFirstChild("TackleBox")', hitbox)
+        self.assertIn('valueObject:GetPropertyChangedSignal("Value")', hitbox)
+        self.assertIn("attachNode(node)", hitbox)
+        self.assertIn("me.DescendantAdded:Connect", hitbox)
+
     def test_mode_roots_handle_additions_and_removals(self):
         hitbox = source("features/hitbox/logic.lua")
         self.assertIn("root.ChildAdded:Connect(queueRefresh)", hitbox)
