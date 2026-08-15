@@ -61,6 +61,10 @@ class MobileFeatureContracts(unittest.TestCase):
         self.assertIn("contextActionService:BindActionAtPriority", qb)
         self.assertIn("return Enum.ContextActionResult.Sink", qb)
         self.assertIn("if isControllerThrowInput(input) then return end", qb)
+        self.assertIn("local function suppressNativeControllerInput(binding)", qb)
+        self.assertIn("setting.Controller=blockedValue", qb)
+        self.assertIn("runService.Heartbeat:Wait()", qb)
+        self.assertIn("throwKeys[binding]=throwKeyState", qb)
         self.assertIn("task.defer(requestThrow,false)", qb)
 
     def test_mobile_preset_editor_can_apply_without_a_keybind(self):

@@ -774,6 +774,7 @@ function qbAim.new(app,parent)
 	local lastThrowAt=-math.huge
 	local controllerThrowActionName="QBAim_ControllerThrow"
 	local controllerThrowBinding=nil
+	local controllerThrowInputActive=false
 	local refreshControllerThrowBinding=function() end
 	local highlightedCharacter=nil
 	local connections={}
@@ -2631,6 +2632,7 @@ function qbAim.new(app,parent)
 	function api.Destroy()
 		contextActionService:UnbindAction(controllerThrowActionName)
 		controllerThrowBinding=nil
+		controllerThrowInputActive=false
 
 		if scheduler and type(scheduler.Unregister)=="function" then
 			for _,job in ipairs(schedulerJobs) do
@@ -2876,29 +2878,92 @@ function qbAim.new(app,parent)
 		return controllerThrowBinding~=nil and input.KeyCode==controllerThrowBinding
 	end
 
+	local function suppressNativeControllerInput(binding)
+		local mechanics=qbAim._getGlobalMechanics()
+		local variables=mechanics and mechanics.Variables
+		local playerData=variables and variables.PlayerData
+		local profile=playerData and playerData[localPlayer.Name]
+		profile=profile and profile.ProfileData
+		local controlSettings=profile and profile.ControlSettings
+		local throwKeys=mechanics and mechanics.ThrowKeysPressed
+		if type(controlSettings)~="table" and type(throwKeys)~="table" then
+			return false
+		end
+
+		local blockedValue="__QBAimControllerInput__"
+		local changedControls={}
+		if type(controlSettings)=="table" then
+			for _,setting in pairs(controlSettings) do
+				if type(setting)=="table" and setting.Controller==binding.Name then
+					table.insert(changedControls,{setting=setting,value=setting.Controller})
+					setting.Controller=blockedValue
+				end
+			end
+		end
+
+		local throwKeyState=type(throwKeys)=="table" and throwKeys[binding] or nil
+		if throwKeyState~=nil then
+			throwKeys[binding]=nil
+		end
+
+		if #changedControls==0 and throwKeyState==nil then
+			return true
+		end
+
+		task.spawn(function()
+			runService.Heartbeat:Wait()
+			for _,entry in ipairs(changedControls) do
+				if entry.setting.Controller==blockedValue then
+					entry.setting.Controller=entry.value
+				end
+			end
+
+			if throwKeyState~=nil and throwKeys[binding]==nil then
+				throwKeys[binding]=throwKeyState
+			end
+		end)
+
+		return true
+	end
+
 	refreshControllerThrowBinding=function()
 		local binding=configuredBinding("getQBAimThrowKey",Enum.KeyCode.T)
 		if binding==controllerThrowBinding then return end
 
 		contextActionService:UnbindAction(controllerThrowActionName)
 		controllerThrowBinding=nil
+		controllerThrowInputActive=false
 		if not isControllerKeyCode(binding) then return end
 
 		controllerThrowBinding=binding
 		contextActionService:BindActionAtPriority(controllerThrowActionName,function(_,inputState)
 			if not enabled then
+				controllerThrowInputActive=false
 				return Enum.ContextActionResult.Pass
 			end
 
 			if inputState==Enum.UserInputState.Begin then
-				if hasFocusedTextBox() or not isAvailable() then
+				controllerThrowInputActive=false
+				if hasFocusedTextBox() or not isAvailable() or not currentHeldBall() or not trackedReceiver then
 					return Enum.ContextActionResult.Pass
 				end
 
+				if not suppressNativeControllerInput(binding) then
+					return Enum.ContextActionResult.Pass
+				end
+
+				controllerThrowInputActive=true
 				task.defer(requestThrow,false)
+				return Enum.ContextActionResult.Sink
 			end
 
-			return Enum.ContextActionResult.Sink
+			if inputState==Enum.UserInputState.End or inputState==Enum.UserInputState.Cancel then
+				local wasActive=controllerThrowInputActive
+				controllerThrowInputActive=false
+				return wasActive and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
+			end
+
+			return controllerThrowInputActive and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
 		end,false,10000,binding)
 	end
 
