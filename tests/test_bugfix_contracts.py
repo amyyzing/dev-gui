@@ -30,6 +30,20 @@ class BootstrapContracts(unittest.TestCase):
 
 
 class QBAimDefaultsContracts(unittest.TestCase):
+    def test_new_user_qb_tuning_defaults_are_consistent(self):
+        self.assertIn("qbAimLeadDelay=0.38", source("runtime/loader-part-1.lua"))
+        self.assertIn("qbAimPeakHeight=14.2", source("runtime/loader-part-1.lua"))
+        self.assertIn("qbAimQBDrift=0", source("runtime/loader-part-1.lua"))
+        self.assertIn("qbAimQBYDrift=0", source("runtime/loader-part-1.lua"))
+        self.assertIn("qbAimPeakHeight=14.2,", source("runtime/loader-part-2.lua"))
+        self.assertIn("local defaultCatchHeight=14.2", source("features/qb-aim/logic.lua"))
+
+        persistence = source("data-save/data-save.lua")
+        self.assertIn('leadDelay=getValue(app,"qbAimLeadDelay",0.38)', persistence)
+        self.assertIn('peakHeight=getValue(app,"qbAimPeakHeight",14.2)', persistence)
+        self.assertIn('xyzDrift=getValue(app,"qbAimQBDrift",0)', persistence)
+        self.assertIn('qbAim.peakHeight,8,20,14.2)', persistence)
+
     def test_safe_arc_defaults_off_across_runtime_and_persistence(self):
         self.assertIn('safeArc=getValue(app,"qbAimSafeArc",false)', source("data-save/data-save.lua"))
         self.assertIn("qbAimSafeArc=false", source("runtime/loader-part-1.lua"))

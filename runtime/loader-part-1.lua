@@ -233,7 +233,7 @@ qbAimShowArc=true
 qbAimSafeArc=false
 qbAimTargetHighlight=true
 qbAimLeadDelay=0.38
-qbAimPeakHeight=14.00
+qbAimPeakHeight=14.2
 qbAimQBDrift=0
 qbAimQBYDrift=0
 

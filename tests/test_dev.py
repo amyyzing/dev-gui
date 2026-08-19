@@ -192,9 +192,13 @@ def test_square_header_avatar_spans_title_block_and_shifts_text_on_both_platform
         assert "titleXValue+avatarSize(titleY,subtitleY)+10" in mainframe
         assert 'CornerRole="Control"' in mainframe
         assert 'CornerRadius=UDim.new(0,999)' not in mainframe
-        assert 'local getUIStrokeGradientColor=app.getUIStrokeGradientColor or getUIStrokeColor' in mainframe
-        assert 'local avatarStroke=make("UIStroke",{Color=getUIStrokeGradientColor(),Thickness=1,Transparency=0.35,StrokeRole="Fixed"},api.avatar)' in mainframe
-        assert 'avatarStroke.Color=getUIStrokeGradientColor()' in mainframe
+        assert 'BackgroundTransparency=1' in mainframe
+        assert 'local avatarStroke=make("UIStroke",{Color=getUIStrokeColor(),Thickness=1,Transparency=0.35,StrokeRole="Fixed"},api.avatar)' in mainframe
+        assert 'avatarStroke.Color=getUIStrokeColor()' in mainframe
+        assert 'TextColor3=colors.text,TextRole="TEXT"' in mainframe
+        assert 'Name="ResizeHandle"' in mainframe
+        assert 'BackgroundTransparency=1,BorderSizePixel=0,Text="",Visible=resizeHandleVisible' in mainframe
+        assert "local resizeStroke=" not in mainframe
         assert "UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerTitleY)" in mainframe
         assert "UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerSubtitleY)" in mainframe
 
@@ -295,7 +299,7 @@ def test_header_art_is_center_cropped_for_every_theme():
         assert 'Name="HeaderArt"' in shell
         assert "ScaleType=Enum.ScaleType.Crop" in shell
         assert "pcall(app.getHeaderArt,id)" in shell
-        assert "avatarStroke.Color=getUIStrokeGradientColor()" in shell
+        assert "avatarStroke.Color=getUIStrokeColor()" in shell
 
 
 def test_rgb_labels_bypass_description_aliases():
@@ -312,8 +316,11 @@ def test_rgb_labels_bypass_description_aliases():
 
 def test_params_selector_stays_inside_its_ring_and_gaps_are_not_clickable():
     params = read("features/params/gui.lua")
+    assert "local wheelGapDegrees=12" in params
     assert "sector.start+wheelGapDegrees/2" in params
     assert "sector.finish-wheelGapDegrees/2" in params
+    assert "local start=startAngle+wheelGapDegrees" not in params
+    assert params.count("ClipsDescendants=true") >= 3
     assert "local selectorGlow=" not in params
     assert "local selectorGlows=" not in params
     assert "ZIndex=12" in params

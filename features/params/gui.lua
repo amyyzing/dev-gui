@@ -10,7 +10,7 @@ local wheelSideGap=14
 local wheelGlowPad=6
 local wheelInnerRadius=0.22
 local wheelOuterRadius=0.43
-local wheelGapDegrees=8
+local wheelGapDegrees=12
 local wheelGlowLayers={
 	{pad=2,z=5},
 	{pad=4,z=4},
@@ -92,14 +92,11 @@ local function atan2(y,x)
 end
 
 local function inAngleRange(angle,startAngle,finishAngle)
-	local start=startAngle+wheelGapDegrees
-	local finish=finishAngle-wheelGapDegrees
-
-	if finish>360 then
-		return angle>=start or angle<=(finish-360)
+	if finishAngle>360 then
+		return angle>=startAngle or angle<=(finishAngle-360)
 	end
 
-	return angle>=start and angle<=finish
+	return angle>=startAngle and angle<=finishAngle
 end
 
 local function decodeHex(hex)
@@ -579,7 +576,7 @@ function paramsGui.new(app,parent)
 			Position=UDim2.new(1,0,0,0),
 			Size=UDim2.fromOffset(wheelWidth+wheelGlowPad*2,wheelHeight+wheelGlowPad*2),
 			ZIndex=6,
-			ClipsDescendants=false,
+			ClipsDescendants=true,
 		},parentFrame)
 
 		local canvas=make("Frame",{
@@ -587,7 +584,7 @@ function paramsGui.new(app,parent)
 			Position=UDim2.fromOffset(wheelGlowPad,wheelGlowPad),
 			Size=UDim2.fromOffset(wheelWidth,wheelHeight),
 			BackgroundTransparency=1,
-			ClipsDescendants=false,
+			ClipsDescendants=true,
 			ZIndex=6,
 		},wheelWrap)
 

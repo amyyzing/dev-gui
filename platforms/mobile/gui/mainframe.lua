@@ -54,7 +54,6 @@ function mainFrame.new(app)
 	local isAlive=app.isAlive or function() return true end
 	local getModeLabel=app.getModeLabel or function() return "Gameplay" end
 	local getUIStrokeColor=app.getUIStrokeColor or function() return colors.stroke end
-	local getUIStrokeGradientColor=app.getUIStrokeGradientColor or getUIStrokeColor
 	local getCurrentUILibProfile=app.getCurrentUILibProfile
 	local onPageActivated=app.onPageActivated
 	local uiProfile=type(app.uiProfile)=="table" and app.uiProfile or {}
@@ -471,6 +470,7 @@ function mainFrame.new(app)
 	api.avatar=make("ImageLabel",{
 		Name="PlayerAvatar",
 		BackgroundColor3=colors.card or colors.panel,
+		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset(headerTitleX,headerTitleY),
 		Size=UDim2.fromOffset(avatarSize(headerTitleY,headerSubtitleY),avatarSize(headerTitleY,headerSubtitleY)),
@@ -482,11 +482,11 @@ function mainFrame.new(app)
 		CornerRole="Control",
 	},header)
 	make("UICorner",{CornerRadius=UDim.new(0,0)},api.avatar)
-	local avatarStroke=make("UIStroke",{Color=getUIStrokeGradientColor(),Thickness=1,Transparency=0.35,StrokeRole="Fixed"},api.avatar)
+	local avatarStroke=make("UIStroke",{Color=getUIStrokeColor(),Thickness=1,Transparency=0.35,StrokeRole="Fixed"},api.avatar)
 
 	local titleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerTitleY),Size=titleSize(headerTitleX,headerTitleY,headerSubtitleY,18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=headerTitleSize,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
 
-	local subtitleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerSubtitleY),Size=titleSize(headerTitleX,headerTitleY,headerSubtitleY,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
+	local subtitleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerSubtitleY),Size=titleSize(headerTitleX,headerTitleY,headerSubtitleY,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=colors.text,TextRole="TEXT",TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
 
 	local function makeTopButton(text,xOffset)
 		local b=make("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=colors.button or colors.bg,BorderSizePixel=0,Text=text,Font=controlFont,TextSize=17,TextColor3=colors.text,AutoButtonColor=false,Selectable=true,ZIndex=6,ThemeRole="BUTTON"},header)
@@ -828,7 +828,7 @@ function mainFrame.new(app)
 	end
 
 	local function applyChromeProfile()
-		avatarStroke.Color=getUIStrokeGradientColor()
+		avatarStroke.Color=getUIStrokeColor()
 		rootStroke:SetAttribute("BaseStrokeTransparency",rootStrokeTransparency)
 		rootStroke.Transparency=rootStrokeTransparency
 		headerStroke:SetAttribute("BaseStrokeTransparency",headerStrokeTransparency)
@@ -1120,27 +1120,18 @@ function mainFrame.new(app)
 		end)
 	end
 
-	resizeHandle=make("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(32,32),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,6,1,-6),BackgroundColor3=getUIStrokeColor(),BackgroundTransparency=0.18,BorderSizePixel=0,Text="",Visible=resizeHandleVisible,ZIndex=30,SkipThemeRole=true},root)
+	resizeHandle=make("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(32,32),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,6,1,-6),BackgroundColor3=getUIStrokeColor(),BackgroundTransparency=1,BorderSizePixel=0,Text="",Visible=resizeHandleVisible,ZIndex=30,SkipThemeRole=true},root)
 	make("UICorner",{CornerRadius=UDim.new(0,0)},resizeHandle)
-	local resizeStroke=make("UIStroke",{Color=colors.bg,Thickness=1,Transparency=0.25},resizeHandle)
 
 	local resizeHovering=false
 	local resizing=false
 
 	local function paintResizeHandle(held)
 		local targetSize=held and 38 or (resizeHovering and 35 or 32)
-		local targetTransparency=held and 0.02 or (resizeHovering and 0.08 or 0.18)
 
 		tweenService:Create(resizeHandle,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
 			Size=UDim2.fromOffset(targetSize,targetSize),
-			BackgroundColor3=getUIStrokeColor(),
-			BackgroundTransparency=targetTransparency,
-		}):Play()
-
-		tweenService:Create(resizeStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
-			Color=held and (colors.text or Color3.new(1,1,1)) or (colors.bg or Color3.new()),
-			Thickness=1,
-			Transparency=(held or resizeHovering) and 0.08 or 0.25,
+			BackgroundTransparency=1,
 		}):Play()
 	end
 
@@ -1394,7 +1385,7 @@ function mainFrame.new(app)
 		applyChromeProfile()
 		paintPageTabs()
 		paintResizeHandle(resizing)
-		avatarStroke.Color=getUIStrokeGradientColor()
+		avatarStroke.Color=getUIStrokeColor()
 		bumpFusionValue(profileVersionValue)
 	end
 

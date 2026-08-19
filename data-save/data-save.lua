@@ -776,7 +776,7 @@ function dataSave.new(app)
 				safeArc=getValue(app,"qbAimSafeArc",false),
 				targetHighlight=getValue(app,"qbAimTargetHighlight",true),
 				leadDelay=getValue(app,"qbAimLeadDelay",0.38),
-				peakHeight=getValue(app,"qbAimPeakHeight",14.00),
+				peakHeight=getValue(app,"qbAimPeakHeight",14.2),
 				xyzDrift=getValue(app,"qbAimQBDrift",0),
 			},
 
@@ -905,7 +905,7 @@ function dataSave.new(app)
 		applyBoolean(app,"setQBAimSafeArc","qbAimSafeArc",qbAim.safeArc)
 		applyBoolean(app,"setQBAimTargetHighlight","qbAimTargetHighlight",qbAim.targetHighlight)
 		applyClamped(app,"setQBAimLeadDelay","qbAimLeadDelay",qbAim.leadDelay,0,1.5,0.38)
-		applyClamped(app,"setQBAimPeakHeight","qbAimPeakHeight",qbAim.peakHeight,8,20,14.00)
+		applyClamped(app,"setQBAimPeakHeight","qbAimPeakHeight",qbAim.peakHeight,8,20,14.2)
 		local savedDrift=qbAim.xyzDrift
 		if savedDrift==nil then savedDrift=qbAim.qbDrift end
 		if savedDrift==nil then savedDrift=qbAim.serverXZLead end
