@@ -155,13 +155,20 @@ def test_header_avatar_spans_title_block_and_shifts_text_on_both_platforms():
 
     for platform in ("pc", "mobile"):
         mainframe = read(f"platforms/{platform}/gui/mainframe.lua")
+        module_scope, constructor = mainframe.split("function mainFrame.new(app)", 1)
+        assert "local function avatarSize" in module_scope
+        assert "local function titleX" in module_scope
+        assert "local function titleSize" in module_scope
+        assert "local function headerAvatarSize" not in constructor
+        assert "local playerAvatar" not in constructor
+        assert "api.avatar=make" in constructor
         assert 'Name="PlayerAvatar"' in mainframe
         assert '"rbxthumb://type=AvatarHeadShot&id="' in mainframe
-        assert "(headerSubtitleY+14)-headerTitleY" in mainframe
-        assert "headerTitleX+headerAvatarSize()+10" in mainframe
+        assert "(subtitleY+14)-titleY" in mainframe
+        assert "titleXValue+avatarSize(titleY,subtitleY)+10" in mainframe
         assert 'CornerRole="Avatar"' in mainframe
-        assert "UDim2.fromOffset(headerTextX(),headerTitleY)" in mainframe
-        assert "UDim2.fromOffset(headerTextX(),headerSubtitleY)" in mainframe
+        assert "UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerTitleY)" in mainframe
+        assert "UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerSubtitleY)" in mainframe
 
 
 def test_auto_boost_is_in_the_left_column():
