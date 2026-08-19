@@ -289,6 +289,13 @@ function buildMapPage()
 	applyUIStrokeTheme()
 end
 
+function resetMapPageDefaults()
+	resetMapRuntimeState()
+	clearMapPage()
+	lazyPageBuilt.maps=false
+	ensureRuntimePageBuilt("maps")
+end
+
 rebuildMapFromModules=function()
 	resetMapRuntimeState()
 

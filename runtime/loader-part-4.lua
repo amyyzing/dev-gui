@@ -558,6 +558,18 @@ resetKeybindPresetPageDefaults=function()
 	requestPlayerAutosave()
 end
 
+function resetSettingsPageDefaults()
+	if mainFrame and type(mainFrame.resetGui)=="function" then
+		pcall(mainFrame.resetGui,true)
+	end
+
+	if ResetGuiAPI and type(ResetGuiAPI.Refresh)=="function" then
+		pcall(ResetGuiAPI.Refresh)
+	end
+
+	refreshRuntimePageControls("settings",true)
+end
+
 trackRuntimeConnection(resetBtn.Activated:Connect(function()
 	local activePageName=getActivePageName()
 
@@ -567,6 +579,16 @@ trackRuntimeConnection(resetBtn.Activated:Connect(function()
 		resetKeybindPresetPageDefaults()
 	elseif activePageName=="customize" then
 		resetCustomizePageDefaults()
+	elseif activePageName=="maps" then
+		resetMapPageDefaults()
+	elseif activePageName=="settings" then
+		resetSettingsPageDefaults()
+	elseif activePageName=="server" then
+		refreshRuntimePageControls("server",true)
+	end
+
+	if pageHost and pageHost:IsA("ScrollingFrame") then
+		pageHost.CanvasPosition=Vector2.new(0,0)
 	end
 
 	refreshActionStatus()

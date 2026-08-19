@@ -136,6 +136,24 @@ class PresetContracts(unittest.TestCase):
 
 
 class LifecycleContracts(unittest.TestCase):
+    def test_footer_reset_targets_every_page_and_first_run_defaults(self):
+        pc_shell = source("platforms/pc/gui/mainframe.lua")
+        mobile_shell = source("platforms/mobile/gui/mainframe.lua")
+        runtime2 = source("runtime/loader-part-2.lua")
+        runtime3 = source("runtime/loader-part-3.lua")
+        runtime4 = source("runtime/loader-part-4.lua")
+
+        for shell in (pc_shell, mobile_shell):
+            self.assertIn("local resetVisibleValue=true", shell)
+            self.assertIn("resetBtn.Visible=true", shell)
+            self.assertNotIn('activePageName~="settings"', shell)
+
+        self.assertIn('type(api.Reset)=="function"', runtime2)
+        self.assertIn("function resetMapPageDefaults()", runtime3)
+        for page in ("main", "page2", "customize", "maps", "settings", "server"):
+            self.assertIn(f'activePageName=="{page}"', runtime4)
+        self.assertIn("pageHost.CanvasPosition=Vector2.new(0,0)", runtime4)
+
     def test_map_page_state_is_session_only_and_anti_material_starts_off(self):
         data_save = source("data-save/data-save.lua")
         self.assertNotIn("smoothPlastic=", data_save)

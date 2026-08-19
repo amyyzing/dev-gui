@@ -965,10 +965,7 @@ function mainFrame.new(app)
 	end
 
 	local resetBtn,resetWrap=makeFooterBtn("Reset",94)
-	local resetVisibleValue=makeFusionComputed(function(use)
-		local page=use(activePageValue)
-		return page~="settings" and page~="maps" and page~="server"
-	end)
+	local resetVisibleValue=true
 
 	hydrateFusion(resetBtn,{
 		Visible=resetVisibleValue,
@@ -980,10 +977,9 @@ function mainFrame.new(app)
 	hydrateFusion(resetWrap,{Visible=resetVisibleValue})
 
 	refreshFooterResetButton=function()
-		local showReset=activePageName~="settings" and activePageName~="maps" and activePageName~="server"
-		resetBtn.Visible=showReset
+		resetBtn.Visible=true
 		resetBtn.Text=text("RESET")
-		resetWrap.Visible=showReset
+		resetWrap.Visible=true
 	end
 
 	refreshFooterResetButton()

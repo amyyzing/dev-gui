@@ -558,13 +558,17 @@ function resetMainPageDefaults()
 	for key,value in pairs(mainPageDefaults) do
 		mainPageState[key]=value
 	end
+	syncMainState()
 
 	for _,api in pairs(mainPageApis) do
-		if api and type(api.Refresh)=="function" then
+		if api and type(api.Reset)=="function" then
+			pcall(api.Reset)
+		elseif api and type(api.Refresh)=="function" then
 			pcall(api.Refresh)
 		end
 	end
 
 	syncMainState()
+	refreshRuntimePageControls("main",true)
 	requestPlayerAutosave()
 end
