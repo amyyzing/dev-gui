@@ -420,9 +420,9 @@ function mainFrame.new(app)
 		ClipsDescendants=true,
 		ZIndex=6,
 		ThemeRole="CARD",
-		CornerRole="Avatar",
+		CornerRole="Control",
 	},header)
-	make("UICorner",{CornerRadius=UDim.new(0,999)},api.avatar)
+	make("UICorner",{CornerRadius=UDim.new(0,0)},api.avatar)
 	make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=0.35,StrokeRole="Accent"},api.avatar)
 
 	local titleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerTitleY),Size=titleSize(headerTitleX,headerTitleY,headerSubtitleY,18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=headerTitleSize,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)

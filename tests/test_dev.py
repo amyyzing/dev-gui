@@ -148,10 +148,10 @@ def test_reworked_theme_list_is_complete_and_raycast_is_default():
         assert f'Name="{old_label}"' not in colors
 
 
-def test_header_avatar_spans_title_block_and_shifts_text_on_both_platforms():
+def test_square_header_avatar_spans_title_block_and_shifts_text_on_both_platforms():
     runtime = read("runtime/loader-part-1.lua")
-    assert 'if role=="Avatar" then' in runtime
-    assert "return 999" in runtime
+    assert "WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0" in runtime
+    assert 'if role=="Avatar" then' not in runtime
 
     for platform in ("pc", "mobile"):
         mainframe = read(f"platforms/{platform}/gui/mainframe.lua")
@@ -166,7 +166,8 @@ def test_header_avatar_spans_title_block_and_shifts_text_on_both_platforms():
         assert '"rbxthumb://type=AvatarHeadShot&id="' in mainframe
         assert "(subtitleY+14)-titleY" in mainframe
         assert "titleXValue+avatarSize(titleY,subtitleY)+10" in mainframe
-        assert 'CornerRole="Avatar"' in mainframe
+        assert 'CornerRole="Control"' in mainframe
+        assert 'CornerRadius=UDim.new(0,999)' not in mainframe
         assert "UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerTitleY)" in mainframe
         assert "UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerSubtitleY)" in mainframe
 
@@ -177,17 +178,17 @@ def test_auto_boost_is_in_the_left_column():
         assert module_line in read(path)
 
 
-def test_rounded_controls_and_colour_picker_are_clipped():
+def test_square_controls_and_colour_picker_are_clipped():
     runtime = read("runtime/loader-part-1.lua")
     colors = read("features/colors/logic.lua")
 
     assert 'if class=="UICorner" and parent and parent:IsA("GuiObject") then' in runtime
     assert "parent.ClipsDescendants=true" in runtime
-    assert 'local activeMode="Circle"' in colors
-    assert '{"Circle","RGB","HSV","Hex"}' in colors
+    assert 'local activeMode="Square"' in colors
+    assert '{"Square","RGB","HSV","Hex"}' in colors
     assert colors.count("Size=UDim2.fromOffset(104,104)") == 2
-    assert colors.count('addCorner(svSquare,"Avatar")') == 1
-    assert colors.count('addCorner(highlightSvBase,"Avatar")') == 1
+    assert colors.count('addCorner(svSquare,"Section")') == 1
+    assert colors.count('addCorner(highlightSvBase,"Section")') == 1
     assert colors.count("Size=UDim2.new(1,-4,0,3)") == 2
     assert "hueCursor.Position=UDim2.new(0,2,pickerHue,-1)" in colors
     assert "highlightHueCursor.Position=UDim2.new(0,2,highlightPickerHue,-1)" in colors

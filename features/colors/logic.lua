@@ -704,7 +704,7 @@ function colors.new(app,page)
 	end
 
 	local activeTarget="Primary"
-	local activeMode="Circle"
+	local activeMode="Square"
 	local activeHighlightTarget="Fill"
 	local highlightHoverMode=nil
 	local pickerHue,pickerSat,pickerVal=0,0,1
@@ -1467,7 +1467,7 @@ function colors.new(app,page)
 		SortOrder=Enum.SortOrder.LayoutOrder,
 	},modeRow)
 
-	for i,mode in ipairs({"Circle","RGB","HSV","Hex"}) do
+	for i,mode in ipairs({"Square","RGB","HSV","Hex"}) do
 		local button,marker=makeFlatButton(modeRow,mode,i,0.25)
 		trackConnection(button.Activated:Connect(function()
 			setActiveMode(mode)
@@ -1539,7 +1539,7 @@ function colors.new(app,page)
 		LayoutOrder=4,
 	},colorPanel)
 
-	for _,mode in ipairs({"Circle","RGB","HSV","Hex"}) do
+	for _,mode in ipairs({"Square","RGB","HSV","Hex"}) do
 		modeBodies[mode]=make("Frame",{
 			BackgroundTransparency=1,
 			Size=UDim2.new(1,0,1,0),
@@ -1548,7 +1548,7 @@ function colors.new(app,page)
 		},pickerBody)
 	end
 
-	local squareBody=modeBodies.Circle
+	local squareBody=modeBodies.Square
 	local svSquare=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,0,0),
 		BorderSizePixel=0,
@@ -1556,11 +1556,11 @@ function colors.new(app,page)
 		Size=UDim2.fromOffset(104,104),
 		ClipsDescendants=true,
 		SkipThemeRole=true,
-		CornerRole="Avatar",
+		CornerRole="Section",
 		ZIndex=6,
 	},squareBody)
 	svBase=svSquare
-	addCorner(svSquare,"Avatar")
+	addCorner(svSquare,"Section")
 
 	local whiteOverlay=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
@@ -1570,7 +1570,7 @@ function colors.new(app,page)
 		SkipThemeRole=true,
 		ZIndex=7,
 	},svSquare)
-	addCorner(whiteOverlay,"Avatar")
+	addCorner(whiteOverlay,"Section")
 	make("UIGradient",{
 		Transparency=NumberSequence.new({
 			NumberSequenceKeypoint.new(0,0),
@@ -1586,7 +1586,7 @@ function colors.new(app,page)
 		SkipThemeRole=true,
 		ZIndex=8,
 	},svSquare)
-	addCorner(blackOverlay,"Avatar")
+	addCorner(blackOverlay,"Section")
 	make("UIGradient",{
 		Rotation=90,
 		Transparency=NumberSequence.new({
@@ -2280,10 +2280,10 @@ function colors.new(app,page)
 		Size=UDim2.fromOffset(104,104),
 		ClipsDescendants=true,
 		SkipThemeRole=true,
-		CornerRole="Avatar",
+		CornerRole="Section",
 		ZIndex=6,
 	},highlightPickerBody)
-	addCorner(highlightSvBase,"Avatar")
+	addCorner(highlightSvBase,"Section")
 
 	local highlightWhiteOverlay=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
@@ -2293,7 +2293,7 @@ function colors.new(app,page)
 		SkipThemeRole=true,
 		ZIndex=7,
 	},highlightSvBase)
-	addCorner(highlightWhiteOverlay,"Avatar")
+	addCorner(highlightWhiteOverlay,"Section")
 	make("UIGradient",{
 		Transparency=NumberSequence.new({
 			NumberSequenceKeypoint.new(0,0),
@@ -2309,7 +2309,7 @@ function colors.new(app,page)
 		SkipThemeRole=true,
 		ZIndex=8,
 	},highlightSvBase)
-	addCorner(highlightBlackOverlay,"Avatar")
+	addCorner(highlightBlackOverlay,"Section")
 	make("UIGradient",{
 		Rotation=90,
 		Transparency=NumberSequence.new({

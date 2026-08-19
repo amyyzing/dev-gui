@@ -33,16 +33,9 @@ local function makeTheme(id,name,primary,stroke,gradient,shape,tones)
 	}
 end
 
-local roundedShape={
-	WindowRadius=12,SectionRadius=10,ControlRadius=8,SliderRadius=10,
-	SliderHeight=24,SliderStyle="pill",WindowStrokeTransparency=0.62,
-	SectionStrokeTransparency=0.9,ControlStrokeTransparency=0.86,
-	SliderStrokeTransparency=0.86,AccentStrokeTransparency=0.56,
-}
-
-local compactShape={
-	WindowRadius=7,SectionRadius=6,ControlRadius=5,SliderRadius=5,
-	SliderHeight=24,SliderStyle="thin",WindowStrokeTransparency=0.66,
+local squareShape={
+	WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,
+	SliderHeight=24,SliderStyle="original",WindowStrokeTransparency=0.66,
 	SectionStrokeTransparency=0.92,ControlStrokeTransparency=0.9,
 	SliderStrokeTransparency=0.9,AccentStrokeTransparency=0.62,
 }
@@ -53,22 +46,12 @@ local softTones={
 }
 
 devThemes={
-	raycast=makeTheme("raycast","Raycast",{17,17,20},{255,90,163},{124,92,255},roundedShape,softTones),
-	catppuccin=makeTheme("catppuccin","Catppuccin",{30,30,46},{203,166,247},{137,180,250},roundedShape,softTones),
-	dracula=makeTheme("dracula","Dracula",{40,42,54},{189,147,249},{255,121,198},compactShape,softTones),
-	linear=makeTheme("linear","Linear",{16,16,20},{94,106,210},{138,143,152},compactShape,softTones),
-	material=makeTheme("material","Material",{18,18,18},{3,218,198},{187,134,252},{
-		WindowRadius=5,SectionRadius=4,ControlRadius=3,SliderRadius=3,
-		SliderHeight=24,SliderStyle="thin",WindowStrokeTransparency=0.68,
-		SectionStrokeTransparency=0.92,ControlStrokeTransparency=0.9,
-		SliderStrokeTransparency=0.9,AccentStrokeTransparency=0.62,
-	},softTones),
-	absolutely=makeTheme("absolutely","Absolutely",{9,9,12},{168,85,247},{236,72,153},{
-		WindowRadius=15,SectionRadius=12,ControlRadius=10,SliderRadius=12,
-		SliderHeight=25,SliderStyle="glow",WindowStrokeTransparency=0.58,
-		SectionStrokeTransparency=0.88,ControlStrokeTransparency=0.84,
-		SliderStrokeTransparency=0.84,AccentStrokeTransparency=0.5,
-	},softTones),
+	raycast=makeTheme("raycast","Raycast",{17,17,20},{255,90,163},{124,92,255},squareShape,softTones),
+	catppuccin=makeTheme("catppuccin","Catppuccin",{30,30,46},{203,166,247},{137,180,250},squareShape,softTones),
+	dracula=makeTheme("dracula","Dracula",{40,42,54},{189,147,249},{255,121,198},squareShape,softTones),
+	linear=makeTheme("linear","Linear",{16,16,20},{94,106,210},{138,143,152},squareShape,softTones),
+	material=makeTheme("material","Material",{18,18,18},{3,218,198},{187,134,252},squareShape,softTones),
+	absolutely=makeTheme("absolutely","Absolutely",{9,9,12},{168,85,247},{236,72,153},squareShape,softTones),
 }
 
 me=Players.LocalPlayer
@@ -2452,9 +2435,7 @@ local function resolveStrokeRole(stroke)
 end
 
 local function strokeRoleRadius(role,shape)
-	if role=="Avatar" then
-		return 999
-	elseif role=="Window" then
+	if role=="Window" then
 		return tonumber(shape.WindowRadius) or 0
 	elseif role=="Section" then
 		return tonumber(shape.SectionRadius) or 0
