@@ -364,6 +364,16 @@ local function encodePresetEditor(presetEditor)
 	return output
 end
 
+local function dropMapSettings(root)
+	for _,settings in pairs(root.modes or {}) do
+		if type(settings)=="table" then
+			settings.workspace=nil
+			settings.Workspace=nil
+		end
+	end
+	return root
+end
+
 local function normalizeRoot(raw)
 	if type(raw)~="table" then
 		return cloneRoot()
@@ -371,15 +381,15 @@ local function normalizeRoot(raw)
 
 	if type(raw.modes)=="table" then
 		raw.version=raw.version or 2
-		return raw
+		return dropMapSettings(raw)
 	end
 
-	return{
+	return dropMapSettings({
 		version=2,
 		modes={
 			mode1=raw,
 		},
-	}
+	})
 end
 
 local function getValue(app,name,default)
@@ -754,10 +764,6 @@ function dataSave.new(app)
 			presetEditor=collectPresetEditor(app),
 			uiStyle=collectUIStylePayload(uiStyle,defaultUIStyle),
 
-			workspace={
-				smoothPlastic=app.mapSettings and app.mapSettings.SmoothPlastic and true or false,
-			},
-
 			window={
 				w=uiWindow.W,
 				h=uiWindow.H,
@@ -956,11 +962,6 @@ function dataSave.new(app)
 				app.style.UILib=tostring(defaultUIStyle.UILib or "original")
 			end
 			app.style.CornerRadius=0
-		end
-
-		local workspaceSettings=settings.workspace or settings.Workspace or {}
-		if app.mapSettings then
-			app.mapSettings.SmoothPlastic=workspaceSettings.smoothPlastic and true or false
 		end
 
 		local window=settings.window or {}

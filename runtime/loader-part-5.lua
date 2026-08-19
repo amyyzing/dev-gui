@@ -370,7 +370,6 @@ function buildDataSaveContext()
 
 		style=style,
 		windowState=windowState,
-		mapSettings=mapSettings,
 		root=root,
 		getDefaultUIStyle=getDefaultUIStyle,
 
@@ -420,9 +419,6 @@ function rebuildDataSaveFromModule(loadRemoteData)
 			end
 		end)
 
-		if mapSettings and mapSettings.SmoothPlastic and ensureRuntimePageBuilt then
-			pcall(ensureRuntimePageBuilt,"maps")
-		end
 	end
 
 	refreshAllUI()

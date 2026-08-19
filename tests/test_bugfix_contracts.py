@@ -122,6 +122,24 @@ class PresetContracts(unittest.TestCase):
 
 
 class LifecycleContracts(unittest.TestCase):
+    def test_map_page_state_is_session_only_and_anti_material_starts_off(self):
+        data_save = source("data-save/data-save.lua")
+        self.assertNotIn("smoothPlastic=", data_save)
+        self.assertNotIn("workspaceSettings", data_save)
+        self.assertIn("settings.workspace=nil", data_save)
+        self.assertIn("settings.Workspace=nil", data_save)
+
+        runtime = source("runtime/loader-part-1.lua")
+        self.assertIn("mapSettings={SmoothPlastic=false", runtime)
+
+        maps = source("runtime/loader-part-3.lua")
+        context = maps[maps.index("function makeMapCtx") : maps.index("function buildMapPage")]
+        self.assertNotIn("requestPlayerAutosave()", context)
+
+        startup = source("runtime/loader-part-5.lua")
+        self.assertNotIn("mapSettings=mapSettings", startup)
+        self.assertNotIn("mapSettings.SmoothPlastic and ensureRuntimePageBuilt", startup)
+
     def test_fallback_player_data_modal_is_destroyed(self):
         player_data = source("features/data/logic.lua")
         self.assertIn("local function closeActiveModal()", player_data)

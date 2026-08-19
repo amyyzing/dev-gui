@@ -243,9 +243,6 @@ function makeMapCtx(name)
 		getCurrentModeKey=function()
 			return currentModeKey
 		end,
-		onChanged=function()
-			requestPlayerAutosave()
-		end,
 	}
 
 	if name=="MapEditor" then
@@ -258,7 +255,6 @@ function makeMapCtx(name)
 			if mapSettings then
 				mapSettings.SmoothPlastic=potatoMode
 			end
-			requestPlayerAutosave()
 		end
 	elseif name=="MapCleaner" then
 		app.MapCleanerLogicModule=MapCleanerLogicModule
