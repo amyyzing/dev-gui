@@ -19,7 +19,7 @@ getgenv().DEV_GUI_BOOT_CONFIG = {
 }
 ```
 
-The client API key is only a routing boundary; an executor can inspect it. The private GitHub token remains server-side in Railway.
+The client API key is only a routing boundary; an executor can inspect it. The testing repository is public, so this source does not reuse the main GUI's GitHub token.
 The deployed `DEV_GUI_KEY` must be `dev-gui`, matching the loader's clone-only routing key.
 
 ## Structure
@@ -40,7 +40,7 @@ The companion `lint-bot` revision uses a third source named `dev-gui` with:
 - `DEV_GUI_OWNER`
 - `DEV_GUI_REPO`
 - `DEV_GUI_BRANCH`
-- `DEV_GUI_TOKEN`
+- `DEV_GUI_TOKEN` (optional for a public repository)
 - `DEV_GUI_PLAYER_LOG_CHANNEL_ID`
 
 The source has its own module allowlist, cache keys, stored player/preset/settings data, in-memory sessions, and optional player-log channel. It does not reuse the main GUI or Genesis credentials.
