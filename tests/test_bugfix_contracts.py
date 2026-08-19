@@ -143,16 +143,19 @@ class LifecycleContracts(unittest.TestCase):
 
     def test_game_params_restore_values_they_override(self):
         params = source("features/params/logic.lua")
+        self.assertIn("local originalGravity=workspace.Gravity", params)
+        self.assertIn("local originalWalkSpeeds=setmetatable", params)
         self.assertIn("local originalNumberValues=setmetatable", params)
         self.assertIn("restoreInactiveNumberValues()", params)
         destroy = params[params.index("function api.Destroy()") :]
         self.assertIn("restoreAllNumberValues()", destroy)
+        self.assertIn("stopSpeedLock(false)", destroy)
+        self.assertIn("stopGravityLock()", destroy)
 
-    def test_all_params_target_game_params_number_values(self):
+    def test_folder_backed_params_target_game_params_number_values(self):
         params = source("features/params/logic.lua")
         expected = {
             'WalkSpeed="speedValue"',
-            'Gravity="gravityValue"',
             'JumpPower="jumpPowerValue"',
             'DivePower="divePowerValue"',
             'SprintStaminaRegenRate="staminaRegenValue"',
@@ -161,16 +164,26 @@ class LifecycleContracts(unittest.TestCase):
         for mapping in expected:
             self.assertIn(mapping, params)
         self.assertIn('gameFolder:FindFirstChild("GameParams")', params)
-        self.assertNotIn('workspace:GetPropertyChangedSignal("Gravity")', params)
-        self.assertNotIn('hum:GetPropertyChangedSignal("WalkSpeed")', params)
+        self.assertNotIn('Gravity="gravityValue"', params)
 
     def test_enabled_core_params_are_locked_immediately(self):
         params = source("features/params/logic.lua")
         self.assertIn("local immediateParamLocks={", params)
         self.assertIn("speedValue=true", params)
-        self.assertIn("gravityValue=true", params)
         self.assertIn("jumpPowerValue=true", params)
         self.assertIn("if immediateParamLocks[stateKey] then", params)
+        self.assertIn('workspace:GetPropertyChangedSignal("Gravity")', params)
+        self.assertIn('humanoid:GetPropertyChangedSignal("WalkSpeed")', params)
+
+    def test_anti_material_only_changes_basepart_materials(self):
+        materials = source("features/materials/logic.lua")
+        self.assertIn("workspace:GetDescendants()", materials)
+        self.assertIn("part.Material=Enum.Material.SmoothPlastic", materials)
+        self.assertIn("workspace.DescendantAdded:Connect", materials)
+        self.assertNotIn("OriginalVisuals", materials)
+        self.assertNotIn("RenderFidelity", materials)
+        self.assertNotIn("CastShadow", materials)
+        self.assertNotIn("Reflectance", materials)
 
 
 class RuntimeFallbackContracts(unittest.TestCase):

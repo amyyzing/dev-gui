@@ -45,40 +45,30 @@ function materials.new(app,page)
 	local worldSettings=ensureWorldSettings(app)
 	local api={}
 	local materialToggle=nil
-	local active=false
 
 	function api.SetEnabled(state,fire)
 		worldSettings.SmoothPlastic=state and true or false
+		safeDisconnect(worldSettings.Conn)
+		worldSettings.Conn=nil
 
 		if worldSettings.SmoothPlastic then
-			if not active then
-				for _,inst in ipairs(workspace:GetDescendants()) do
+			for _,inst in ipairs(workspace:GetDescendants()) do
+				applySmoothPlasticToPart(worldSettings,inst)
+			end
+
+			worldSettings.Conn=workspace.DescendantAdded:Connect(function(inst)
+				if worldSettings.SmoothPlastic then
 					applySmoothPlasticToPart(worldSettings,inst)
 				end
-			end
-
-			if not worldSettings.Conn then
-				worldSettings.Conn=workspace.DescendantAdded:Connect(function(inst)
-					if worldSettings.SmoothPlastic then
-						applySmoothPlasticToPart(worldSettings,inst)
-					end
-				end)
-			end
-			active=true
+			end)
 		else
-			safeDisconnect(worldSettings.Conn)
-			worldSettings.Conn=nil
-
 			for part,material in pairs(worldSettings.OriginalMaterials) do
 				if part and part.Parent and part:IsA("BasePart") then
-					if part.Material~=material then
-						part.Material=material
-					end
+					part.Material=material
 				end
 			end
 
 			worldSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
-			active=false
 		end
 
 		if materialToggle then
@@ -101,8 +91,6 @@ function materials.new(app,page)
 
 		if worldSettings.SmoothPlastic then
 			api.SetEnabled(true,false)
-		elseif active then
-			api.SetEnabled(false,false)
 		end
 	end
 
