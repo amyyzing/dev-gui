@@ -1,20 +1,24 @@
 local gameParams={}
 
-local players=game:GetService("Players")
 local replicatedStorage=game:GetService("ReplicatedStorage")
-local runService=game:GetService("RunService")
 
-local me=players.LocalPlayer
 local defaultGravity=196.2
 local defaultSpeed=18
 local paramReapplyInterval=0.12
-local speedForceJobId="GameParamsSpeedForce"
 local defaultSelectedPage="speed"
 local paramRows={
+	WalkSpeed="speedValue",
+	Gravity="gravityValue",
 	JumpPower="jumpPowerValue",
 	DivePower="divePowerValue",
 	SprintStaminaRegenRate="staminaRegenValue",
 	SprintStaminaDepleteRate="staminaDepleteValue",
+}
+
+local immediateParamLocks={
+	speedValue=true,
+	gravityValue=true,
+	jumpPowerValue=true,
 }
 
 local paramStatePage={
@@ -48,16 +52,6 @@ local function clampStaminaDeplete(value)
 	return math.clamp(math.floor(math.abs(n)+0.5),0,50)
 end
 
-local function getMyHumanoid()
-	local character=workspace:FindFirstChild(me.Name) or me.Character
-
-	if character then
-		return character:FindFirstChildOfClass("Humanoid")
-	end
-
-	return nil
-end
-
 local function clampSpeed(value)
 	return math.clamp(tonumber(value) or defaultSpeed,0,100)
 end
@@ -88,12 +82,7 @@ function gameParams.new(app)
 	app=app or {}
 	local safeDisconnect=app.safeDisconnect
 	local state=app.State or {}
-	local scheduler=app.schedulerApi
 	local api={}
-	local speedConn=nil
-	local speedValueConn=nil
-	local speedHumanoid=nil
-	local speedScheduled=false
 	local rootConns={}
 	local folderConns=setmetatable({}, {__mode="k"})
 	local valueConns=setmetatable({}, {__mode="k"})
@@ -101,12 +90,6 @@ function gameParams.new(app)
 	local lastValueApply=setmetatable({}, {__mode="k"})
 	local originalNumberValues=setmetatable({}, {__mode="k"})
 	local numberValueStateKeys=setmetatable({}, {__mode="k"})
-	local originalWalkSpeeds=setmetatable({}, {__mode="k"})
-	local originalGravity=workspace.Gravity
-	local gravityOverrideActive=false
-	local gravityConn=nil
-	local applyingGravity=false
-	local applyingSpeed=false
 	local applying=false
 	local destroyed=false
 	local stateListener=nil
@@ -176,26 +159,6 @@ function gameParams.new(app)
 		return not pageKey or isPageEnabled(pageKey)
 	end
 
-	local function isSpeedActive()
-		return isSettingEnabled("speedSettingEnabled")
-	end
-
-	local function isGravityActive()
-		return isSettingEnabled("gravitySettingEnabled")
-	end
-
-	local function restoreGravity()
-		disconnect(gravityConn)
-		gravityConn=nil
-
-		if gravityOverrideActive then
-			applyingGravity=true
-			workspace.Gravity=originalGravity
-			applyingGravity=false
-			gravityOverrideActive=false
-		end
-	end
-
 	local function normalizeState()
 		state.gameParamsEnabled=true
 		state.paramsSelectedPage=normalizePageKey(state.paramsSelectedPage)
@@ -224,152 +187,6 @@ function gameParams.new(app)
 
 	local function isAlive()
 		return not destroyed
-	end
-
-	local function writeGravityTarget()
-		if applyingGravity or not isAlive() or not isGravityActive() then
-			return
-		end
-
-		local gravity=clampNumber(state.gravityValue,0,1000,defaultGravity)
-		state.gravityValue=gravity
-		if workspace.Gravity~=gravity then
-			applyingGravity=true
-			workspace.Gravity=gravity
-			applyingGravity=false
-		end
-	end
-
-	local function applyGravity(value)
-		local gravity=clampNumber(value,0,1000,defaultGravity)
-		state.gravityValue=gravity
-		if isGravityActive() then
-			if not gravityOverrideActive then
-				originalGravity=workspace.Gravity
-				gravityOverrideActive=true
-			end
-
-			if not gravityConn then
-				gravityConn=workspace:GetPropertyChangedSignal("Gravity"):Connect(function()
-					writeGravityTarget()
-				end)
-			end
-
-			writeGravityTarget()
-		end
-		return gravity
-	end
-
-	local function writeSpeedTarget(hum)
-		if applyingSpeed or not hum or not hum.Parent or not isAlive() or not isSpeedActive() then
-			return
-		end
-
-		if originalWalkSpeeds[hum]==nil then
-			originalWalkSpeeds[hum]=hum.WalkSpeed
-		end
-
-		local target=clampSpeed(state.speedValue)
-		state.speedValue=target
-		if hum.WalkSpeed~=target then
-			applyingSpeed=true
-			hum.WalkSpeed=target
-			applyingSpeed=false
-		end
-	end
-
-	local function bindSpeedHumanoid(hum)
-		if speedHumanoid==hum and speedValueConn then
-			return
-		end
-
-		disconnect(speedValueConn)
-		speedValueConn=nil
-		speedHumanoid=hum
-
-		if not hum then
-			return
-		end
-
-		if originalWalkSpeeds[hum]==nil then
-			originalWalkSpeeds[hum]=hum.WalkSpeed
-		end
-
-		speedValueConn=hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
-			writeSpeedTarget(hum)
-		end)
-	end
-
-	local function applySpeedValue()
-		local hum=getMyHumanoid()
-		bindSpeedHumanoid(hum)
-		writeSpeedTarget(hum)
-	end
-
-	local function stopSpeedForcing(resetValue)
-		if speedScheduled and scheduler and type(scheduler.Unregister)=="function" then
-			pcall(scheduler.Unregister,"Heartbeat",speedForceJobId)
-		end
-		speedScheduled=false
-		disconnect(speedConn)
-		speedConn=nil
-		disconnect(speedValueConn)
-		speedValueConn=nil
-		speedHumanoid=nil
-
-		if resetValue then
-			state.speedValue=defaultSpeed
-		end
-
-		for hum,original in pairs(originalWalkSpeeds) do
-			if hum.Parent then
-				applyingSpeed=true
-				hum.WalkSpeed=original
-				applyingSpeed=false
-			end
-			originalWalkSpeeds[hum]=nil
-		end
-	end
-
-	local function ensureSpeedForcing()
-		if not isSpeedActive() then
-			stopSpeedForcing(false)
-			return
-		end
-
-		state.speedValue=clampSpeed(state.speedValue)
-		applySpeedValue()
-
-		if speedConn or speedScheduled then
-			return
-		end
-
-		local function forceSpeed()
-			if not isSpeedActive() or not isAlive() then
-				stopSpeedForcing(false)
-				return
-			end
-
-			applySpeedValue()
-		end
-
-		if scheduler and type(scheduler.Register)=="function" then
-			local ok,result=pcall(scheduler.Register,"Heartbeat",speedForceJobId,0,forceSpeed)
-			if ok and result then
-				speedScheduled=true
-				return
-			end
-		end
-
-		speedConn=runService.Heartbeat:Connect(function()
-			if not isSpeedActive() or not isAlive() then
-				disconnect(speedConn)
-				speedConn=nil
-				return
-			end
-
-			forceSpeed()
-		end)
 	end
 
 	local function getCurrentModeKey()
@@ -490,7 +307,7 @@ function gameParams.new(app)
 				return
 			end
 
-			if stateKey=="jumpPowerValue" then
+			if immediateParamLocks[stateKey] then
 				writeTarget()
 			else
 				queueWriteTarget()
@@ -687,13 +504,8 @@ function gameParams.new(app)
 		state.gravitySettingEnabled=value and true or false
 		state.gravityEnabled=state.gravitySettingEnabled
 		state.gravityJumpParamsEnabled=isPageEnabled("gravity")
-		if isGravityActive() then
-			applyGravity(state.gravityValue)
-		end
 		applyGameParams()
-		if not isGravityActive() then
-			restoreGravity()
-		end
+		restoreInactiveNumberValues()
 
 		syncControls()
 
@@ -704,7 +516,7 @@ function gameParams.new(app)
 
 	function api.SetGravityValue(value,fire)
 		state.gravityValue=clampNumber(value,0,1000,defaultGravity)
-		applyGravity(state.gravityValue)
+		applyGameParams()
 		syncControls()
 
 		if fire~=false then
@@ -718,13 +530,11 @@ function gameParams.new(app)
 		state.speedParamsEnabled=isPageEnabled("speed")
 		state.speedValue=clampSpeed(state.speedValue)
 
-		if isSpeedActive() then
-			ensureSpeedForcing()
+		if not state.speedSettingEnabled and resetValue==true then
+			state.speedValue=defaultSpeed
 		end
 		applyGameParams()
-		if not isSpeedActive() then
-			stopSpeedForcing(resetValue==true)
-		end
+		restoreInactiveNumberValues()
 
 		syncControls()
 
@@ -735,9 +545,7 @@ function gameParams.new(app)
 
 	function api.SetSpeedValue(value,fire)
 		state.speedValue=clampSpeed(value)
-		if isSpeedActive() then
-			ensureSpeedForcing()
-		end
+		applyGameParams()
 
 		syncControls()
 
@@ -768,26 +576,9 @@ function gameParams.new(app)
 			state[settingKey]=enabled
 		end
 
-		if pageKey=="speed" then
-			state.speedEnabled=state.speedSettingEnabled
-			if isSpeedActive() then
-				ensureSpeedForcing()
-			end
-			applyGameParams()
-			if not isSpeedActive() then
-				stopSpeedForcing(false)
-			end
-		elseif pageKey=="gravity" then
-			state.gravityEnabled=state.gravitySettingEnabled
-			if isGravityActive() then
-				applyGravity(state.gravityValue)
-				applyGameParams()
-			else
-				restoreGravity()
-			end
-		elseif pageKey=="stamina" then
-			applyGameParams()
-		end
+		state.speedEnabled=state.speedSettingEnabled
+		state.gravityEnabled=state.gravitySettingEnabled
+		applyGameParams()
 		restoreInactiveNumberValues()
 
 		syncControls("page-toggle")
@@ -818,23 +609,7 @@ function gameParams.new(app)
 		state.speedEnabled=state.speedSettingEnabled
 		state.gravityEnabled=state.gravitySettingEnabled
 
-		if settingKey=="speedSettingEnabled" then
-			if isSpeedActive() then
-				ensureSpeedForcing()
-			else
-				stopSpeedForcing(false)
-			end
-			applyGameParams()
-		elseif settingKey=="gravitySettingEnabled" then
-			if isGravityActive() then
-				applyGravity(state.gravityValue)
-			else
-				restoreGravity()
-			end
-			applyGameParams()
-		else
-			applyGameParams()
-		end
+		applyGameParams()
 		restoreInactiveNumberValues()
 
 		syncControls("setting-toggle")
@@ -849,16 +624,6 @@ function gameParams.new(app)
 		startWatching()
 		applyGameParams()
 		restoreInactiveNumberValues()
-		if isGravityActive() then
-			applyGravity(state.gravityValue)
-		else
-			restoreGravity()
-		end
-		if isSpeedActive() then
-			ensureSpeedForcing()
-		else
-			stopSpeedForcing(false)
-		end
 
 		syncControls()
 
@@ -913,16 +678,6 @@ function gameParams.new(app)
 		startWatching()
 		applyGameParams()
 		restoreInactiveNumberValues()
-		if isGravityActive() then
-			applyGravity(state.gravityValue)
-		else
-			restoreGravity()
-		end
-		if isSpeedActive() then
-			ensureSpeedForcing()
-		else
-			stopSpeedForcing(false)
-		end
 		syncControls()
 	end
 
@@ -956,8 +711,6 @@ function gameParams.new(app)
 		destroyed=true
 		restoreAllNumberValues()
 		disconnectWatchers()
-		stopSpeedForcing(false)
-		restoreGravity()
 		stateListener=nil
 	end
 

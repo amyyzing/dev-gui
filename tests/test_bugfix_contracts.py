@@ -143,29 +143,34 @@ class LifecycleContracts(unittest.TestCase):
 
     def test_game_params_restore_values_they_override(self):
         params = source("features/params/logic.lua")
-        self.assertIn("local originalGravity=workspace.Gravity", params)
-        self.assertIn("local originalWalkSpeeds=setmetatable", params)
         self.assertIn("local originalNumberValues=setmetatable", params)
         self.assertIn("restoreInactiveNumberValues()", params)
         destroy = params[params.index("function api.Destroy()") :]
         self.assertIn("restoreAllNumberValues()", destroy)
-        self.assertIn("restoreGravity()", destroy)
+
+    def test_all_params_target_game_params_number_values(self):
+        params = source("features/params/logic.lua")
+        expected = {
+            'WalkSpeed="speedValue"',
+            'Gravity="gravityValue"',
+            'JumpPower="jumpPowerValue"',
+            'DivePower="divePowerValue"',
+            'SprintStaminaRegenRate="staminaRegenValue"',
+            'SprintStaminaDepleteRate="staminaDepleteValue"',
+        }
+        for mapping in expected:
+            self.assertIn(mapping, params)
+        self.assertIn('gameFolder:FindFirstChild("GameParams")', params)
+        self.assertNotIn('workspace:GetPropertyChangedSignal("Gravity")', params)
+        self.assertNotIn('hum:GetPropertyChangedSignal("WalkSpeed")', params)
 
     def test_enabled_core_params_are_locked_immediately(self):
         params = source("features/params/logic.lua")
-        self.assertIn(
-            'workspace:GetPropertyChangedSignal("Gravity")',
-            params,
-        )
-        self.assertIn(
-            'hum:GetPropertyChangedSignal("WalkSpeed")',
-            params,
-        )
-        self.assertIn(
-            'pcall(scheduler.Register,"Heartbeat",speedForceJobId,0,forceSpeed)',
-            params,
-        )
-        self.assertIn('if stateKey=="jumpPowerValue" then', params)
+        self.assertIn("local immediateParamLocks={", params)
+        self.assertIn("speedValue=true", params)
+        self.assertIn("gravityValue=true", params)
+        self.assertIn("jumpPowerValue=true", params)
+        self.assertIn("if immediateParamLocks[stateKey] then", params)
 
 
 class RuntimeFallbackContracts(unittest.TestCase):
