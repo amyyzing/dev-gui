@@ -2199,27 +2199,22 @@ function applyUIPrimaryTheme()
 
 	if not screenGui then return end
 
-	for instance in pairs(themeObjects) do
-		if not instance.Parent then
-			themeObjects[instance]=nil
-		elseif instance:IsDescendantOf(screenGui) then
+	for _,instance in ipairs(screenGui:GetDescendants()) do
+		if instance:IsA("GuiObject") then
 			local role=instance:GetAttribute("ThemeRole")
 			if role and colors[role] then
 				instance.BackgroundColor3=colors[role]
 			end
 		end
-	end
 
-	for instance in pairs(themeTextObjects) do
-		if not instance.Parent then
-			themeTextObjects[instance]=nil
-		elseif instance:IsDescendantOf(screenGui) then
+		if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
+			local skipTextRole=instance:GetAttribute("SkipTextRole")
 			local textRole=instance:GetAttribute("ThemeTextRole")
-			if not textRole and not instance:GetAttribute("SkipTextRole") then
+			if not textRole and not skipTextRole then
 				textRole="TEXT"
 				instance:SetAttribute("ThemeTextRole",textRole)
 			end
-			if textRole and colors[textRole] and not instance:GetAttribute("SkipTextRole") then
+			if textRole and colors[textRole] and not skipTextRole then
 				instance.TextColor3=colors[textRole]
 			end
 		end

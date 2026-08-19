@@ -227,14 +227,18 @@ def test_requested_control_copy_and_spacing_contracts():
     hitbox = read("features/hitbox/logic.lua")
     testing = read("features/testing/gui.lua")
     colors = read("features/colors/logic.lua")
+    runtime = read("runtime/loader-part-1.lua")
 
     assert 'Text="size"' in hitbox
     assert 'buildSlider(section,"transparency"' in hitbox
     assert 'Text="TRANSPARENCY"' not in hitbox
     assert 'buildSlider(section,"Alpha"' not in hitbox
+    assert 'local sectionStroke=section:FindFirstChildOfClass("UIStroke")' in hitbox
+    assert "sectionStroke:Destroy()" in hitbox
     assert 'makeSection(parent,5,"Testing","",{' in testing
     assert 'label=target=="Stroke" and "Secondary" or target' in colors
     assert 'button.Size=UDim2.new(0.5,-4,1,0)' in colors
+    assert 'for _,instance in ipairs(screenGui:GetDescendants()) do' in runtime
 
 
 def test_params_selector_and_main_pages_tween():
