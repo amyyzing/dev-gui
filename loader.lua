@@ -1,16 +1,31 @@
--- User-facing entry point. The full bootstrap stays in main.lua so startup
--- behavior has one implementation while this file remains small and stable.
+-- DEV_GUI_CUSTOM_LOADER
+-- Stable, user-facing entry point for the isolated dev-gui runtime.
 local HttpService=game:GetService("HttpService")
 
-local sharedEnv=(type(getgenv)=="function" and getgenv()) or _G
-local config=rawget(sharedEnv,"GUI_BOOT_CONFIG")
+local API_URL="https://lint-bot-production.up.railway.app"
+local MODULE_SOURCE="dev-gui"
+local BOOTSTRAP_PATH="dump/runtime/bootstrap.lua"
+local DEFAULT_API_KEY="dev-gui"
+local MAX_BOOTSTRAP_BYTES=300000
+
+local parentEnv=(getfenv and getfenv(0)) or _G
+local sharedEnv=parentEnv
+if type(getgenv)=="function" then
+	local ok,result=pcall(getgenv)
+	if ok and type(result)=="table" then
+		sharedEnv=result
+	end
+end
+
+local config=rawget(sharedEnv,"DEV_GUI_BOOT_CONFIG") or rawget(parentEnv,"DEV_GUI_BOOT_CONFIG")
 if type(config)~="table" then
 	config={}
 end
 
-local apiUrl=tostring(config.ApiUrl or config.Url or "https://lint-bot-production.up.railway.app")
-local apiKey=tostring(config.ApiKey or config.Key or "mydayohmy")
-local maxSourceBytes=math.max(1000,tonumber(config.MaxSourceBytes) or 300000)
+local apiKey=tostring(config.ApiKey or config.Key or DEFAULT_API_KEY)
+if apiKey=="" then
+	error("dev-gui loader requires an API key")
+end
 
 local function valueType(value)
 	if type(typeof)=="function" then
@@ -30,12 +45,13 @@ end
 
 local requestFn=getRequestFunction()
 if not requestFn then
-	error("loader requires an executor HTTP request function")
+	error("dev-gui loader requires an executor HTTP request function")
 end
 
 local requestBody={
 	apiKey=apiKey,
-	path="main.lua",
+	source=MODULE_SOURCE,
+	path=BOOTSTRAP_PATH,
 }
 if config.Fresh==true then
 	requestBody.fresh=true
@@ -43,52 +59,66 @@ end
 
 local requestOk,response=pcall(function()
 	return requestFn({
-		Url=apiUrl.."/module/get",
+		Url=API_URL.."/module/get",
 		Method="POST",
-		Headers={["Content-Type"]="application/json"},
+		Headers={
+			["Content-Type"]="application/json",
+			["X-Dev-Gui-Client"]="loader",
+		},
 		Body=HttpService:JSONEncode(requestBody),
 	})
 end)
 if not requestOk then
-	error("loader request failed: "..tostring(response))
+	error("dev-gui bootstrap request failed: "..tostring(response))
 end
 
-local statusCode=tonumber(response and(response.StatusCode or response.Status))
-local responseBody=response and(response.Body or response.body)
-if not responseBody then
-	error("loader API returned no body")
+local raw=response and(response.Body or response.body)
+if type(raw)~="string" or raw=="" then
+	error("dev-gui bootstrap API returned no body")
 end
 
 local decodeOk,payload=pcall(function()
-	return HttpService:JSONDecode(responseBody)
+	return HttpService:JSONDecode(raw)
 end)
 if not decodeOk then
-	error("loader API returned invalid JSON")
+	error("dev-gui bootstrap API returned invalid JSON")
 end
 
+local statusCode=tonumber(response and(response.StatusCode or response.Status))
 if statusCode and statusCode>=400 then
-	error("loader API failed: "..tostring(payload and payload.error or statusCode))
+	error("dev-gui bootstrap API failed: "..tostring(payload and payload.error or statusCode))
 end
-if not(payload and payload.ok==true and type(payload.source)=="string") then
-	error("loader API missing main.lua: "..tostring(payload and payload.error or "unknown"))
+if not(payload and payload.ok==true and payload.moduleSource==MODULE_SOURCE and payload.path==BOOTSTRAP_PATH and type(payload.source)=="string") then
+	error("dev-gui bootstrap response was not for the requested source")
 end
 
 local source=payload.source
-if source=="" or #source>maxSourceBytes then
-	error("loader blocked invalid main.lua source")
+if source=="" or #source>MAX_BOOTSTRAP_BYTES then
+	error("dev-gui loader blocked invalid bootstrap source")
 end
-if not source:find("GUI_BOOT_CONFIG",1,true) or not source:find("runtimeFiles",1,true) then
-	error("loader blocked unexpected main.lua source")
+if not source:find("DEV_GUI_RUNTIME_BOOTSTRAP",1,true) then
+	error("dev-gui loader blocked unexpected bootstrap source")
 end
 
-local chunk,compileError=loadstring(source,"@main.lua")
+local chunk,compileError=loadstring(source,"@"..BOOTSTRAP_PATH)
 if not chunk then
-	error("loader compile failed: "..tostring(compileError))
+	error("dev-gui bootstrap compile failed: "..tostring(compileError))
 end
 
-local parentEnv=(getfenv and getfenv(0)) or _G
+local runtimeEnv=setmetatable({
+	DEV_GUI_RUNTIME_CONFIG={
+		ApiKey=apiKey,
+		ApiUrl=API_URL,
+		ModuleSource=MODULE_SOURCE,
+		Fresh=config.Fresh==true,
+		FetchTimeout=tonumber(config.FetchTimeout),
+		MaxSourceBytes=tonumber(config.MaxSourceBytes),
+	},
+},{__index=parentEnv})
+runtimeEnv._G=runtimeEnv
+
 if setfenv then
-	setfenv(chunk,parentEnv)
+	setfenv(chunk,runtimeEnv)
 end
 
 local runOk,runError=xpcall(chunk,function(err)
@@ -98,5 +128,5 @@ local runOk,runError=xpcall(chunk,function(err)
 	return tostring(err)
 end)
 if not runOk then
-	error("loader startup failed: "..tostring(runError))
+	error("dev-gui startup failed: "..tostring(runError))
 end

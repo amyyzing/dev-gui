@@ -458,6 +458,19 @@ function getApiKey()
 	return nil
 end
 
+function getModuleSource()
+	if type(bootModuleSource)=="table" then
+		local value=bootModuleSource.Id or bootModuleSource.id
+		if type(value)=="string" and value~="" then return value end
+	end
+	if type(bootApi)=="table" and type(bootApi.Source)=="string" and bootApi.Source~="" then
+		return bootApi.Source
+	end
+	return "dev-gui"
+end
+
+appModuleSource={id=getModuleSource()}
+
 trustedApiUrl="https://lint-bot-production.up.railway.app"
 
 allowedApiPaths={
@@ -482,6 +495,7 @@ allowedApiPaths={
 botApi={
 	Url=trustedApiUrl,
 	Key=getApiKey(),
+	Source=appModuleSource.id,
 }
 
 function botApi.GetRequestFunction()
@@ -525,6 +539,9 @@ function botApi.Post(path,body)
 
 	body=body or{}
 	body.apiKey=botApi.Key
+	if (path=="/module/get" or path=="/module/batch" or path=="/module/manifest") and body.source==nil then
+		body.source=botApi.Source
+	end
 	if (path=="/module/get" or path=="/module/batch" or path=="/module/manifest") and body.fresh==true and body.cacheBust==nil then
 		body.cacheBust=tostring(os.clock())..":"..tostring(path)
 	end
@@ -647,7 +664,19 @@ modulePaths={
 	ResetGuiLogic="features/reset-gui/logic.lua",
 	Discord="features/discord/gui.lua",
 	DiscordLogic="features/discord/logic.lua",
+	DiscordController="features/discord/controller.lua",
+	DiscordView="features/discord/view.lua",
 	DataSave="data-save/data-save.lua",
+	DumpConnections="dump/runtime/connections.lua",
+	DumpLifecycle="dump/runtime/lifecycle.lua",
+	DumpInput="dump/runtime/input.lua",
+	DumpApiService="dump/services/api.lua",
+	DumpModuleLoaderService="dump/services/module-loader.lua",
+	DumpPersistenceService="dump/services/persistence.lua",
+	DumpUIAdapter="dump/adapters/ui-library.lua",
+	DumpUICreate="dump/ui/create.lua",
+	DumpSyntax="dump/syntax/init.lua",
+	Dump="dump/init.lua",
 }
 
 local uiLibraryModulePaths={
@@ -684,12 +713,15 @@ moduleGlobalNames={
 	DesignThemeCrimson="DesignThemeCrimson",
 	DesignThemeEvergreen="DesignThemeEvergreen",
 	DesignThemeSakura="DesignThemeSakura",
-	GuiFusion="FusionModule"
+	GuiFusion="FusionModule",
+	Dump="Dump",
 }
 startupModuleNames={
 	"CoreScope","CoreSignal","CoreScheduler","CorePlayerCache","CoreBallTracker",
 	"StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura",
-	"GuiFusion","GuiLogic","UILibraryMap","UIMap","MainFrame","Description","Announcement",
+	"GuiFusion","GuiLogic","UILibraryMap",
+	"DumpConnections","DumpLifecycle","DumpInput","DumpApiService","DumpModuleLoaderService","DumpPersistenceService","DumpUIAdapter","DumpUICreate","DumpSyntax","Dump",
+	"UIMap","MainFrame","Description","Announcement",
 	"HitboxLogic","Hitbox","ParamsLogic","Params","BoostLogic","Boost",
 	"ESPDefenseLogic","ESPDefense","ESPOffenseLogic","ESPOffense","ESPLogic","ESP",
 	"QBInterception","QBAimMath","QBAimLogic","QBAim","TestingLogic","Testing",
@@ -699,7 +731,7 @@ optionalModuleNames={"CorePlayerCache","CoreBallTracker"}
 mapReloadNames={"MapEditorLogic","MapEditor","MaterialsLogic","Materials","MapCleanerLogic","MapCleaner","AdsLogic","Ads"}
 customizeReloadNames={"ColorsLogic","Colors"}
 pageTwoReloadNames={"HitboxPresetsLogic","HitboxPresets","KeybindsLogic","Keybinds","PresetEditorLogic","PresetEditor"}
-settingsReloadNames={"PlayerDataLogic","PlayerData","ResetGuiLogic","ResetGui","DiscordLogic","Discord"}
+settingsReloadNames={"PlayerDataLogic","PlayerData","ResetGuiLogic","ResetGui","DiscordController","DiscordView","DiscordLogic","Discord"}
 
 function moduleGlobalName(name)
 	return moduleGlobalNames[name] or (tostring(name).."Module")
@@ -1096,8 +1128,10 @@ do
 	end
 end
 
-screenGuiName="HitboxUI"
-for _,existingName in ipairs({"HitboxUI_DarkInfluenced_GUIOnly","1",screenGuiName}) do
+local runtimeBootConfig=rawget(getfenv(),"bootConfig")
+if type(runtimeBootConfig)~="table" then runtimeBootConfig={} end
+screenGuiName=tostring(runtimeBootConfig.ScreenGuiName or "DevGuiUI")
+for _,existingName in ipairs({screenGuiName}) do
 	old=guiParent:FindFirstChild(existingName)
 	if old then old:Destroy() end
 end
@@ -2065,7 +2099,7 @@ mainFrame=nil
 applyUIStrokeTheme=nil
 
 function destroyKnownGuiResidue()
-	local guiNames={"HitboxUI_DarkInfluenced_GUIOnly","1",screenGuiName or "HitboxUI"}
+	local guiNames={screenGuiName or "DevGuiUI"}
 	local parents={guiParent}
 
 	for _,parent in ipairs(parents) do
@@ -2082,13 +2116,13 @@ function destroyKnownGuiResidue()
 	end
 
 	local residueNames={
-		ClonedCenter=true,
-		PreviewC1Marker=true,
-		PreviewC3InfoAnchor=true,
-		TestingC1Marker=true,
-		TestingC1GroundMarker=true,
-		QBAimTargetHighlight=true,
-		MyESPHighlight=true,
+		DevGuiClonedCenter=true,
+		DevGuiPreviewC1Marker=true,
+		DevGuiPreviewC3InfoAnchor=true,
+		DevGuiTestingC1Marker=true,
+		DevGuiTestingC1GroundMarker=true,
+		DevGuiQBAimTargetHighlight=true,
+		DevGuiESPHighlight=true,
 	}
 
 	for _,container in ipairs({Workspace,guiParent}) do
@@ -2216,12 +2250,13 @@ function exposeManualModuleRefresh()
 	local refresh=function()
 		return refreshRemoteModulesNow()
 	end
-	_G.refreshModules=refresh
+	local globalName=tostring(runtimeBootConfig.RefreshGlobalName or "devGuiRefreshModules")
+	_G[globalName]=refresh
 
 	if type(getgenv)=="function" then
 		local ok,env=pcall(getgenv)
 		if ok and type(env)=="table" then
-			env.refreshModules=refresh
+			env[globalName]=refresh
 		end
 	end
 end

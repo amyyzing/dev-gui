@@ -305,7 +305,7 @@ function mainFrame.new(app)
 		return mouse.X>=pos.X and mouse.X<=pos.X+size.X and mouse.Y>=pos.Y and mouse.Y<=pos.Y+size.Y
 	end
 
-	contextActionService:BindActionAtPriority("HitboxUI_MouseInputSink",function(_,_,input)
+	contextActionService:BindActionAtPriority("DevGui_MouseInputSink",function(_,_,input)
 		if input and mouseInsideRoot() then
 			return Enum.ContextActionResult.Sink
 		end
@@ -313,7 +313,7 @@ function mainFrame.new(app)
 		return Enum.ContextActionResult.Pass
 	end,false,Enum.ContextActionPriority.High.Value+1000,Enum.UserInputType.MouseButton1,Enum.UserInputType.MouseButton2,Enum.UserInputType.MouseButton3)
 	trackCleanup(function()
-		contextActionService:UnbindAction("HitboxUI_MouseInputSink")
+		contextActionService:UnbindAction("DevGui_MouseInputSink")
 	end)
 
 	local function tweenRootPosition(position,duration)

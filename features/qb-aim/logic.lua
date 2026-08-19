@@ -107,8 +107,8 @@ local qbVerticalDriftMax=6.00
 --   2. wait
 --   3. send
 local useLocalThrowFallback=false
-local qbTargetHighlightName="QBAimTargetHighlight"
-local espHighlightName="MyESPHighlight"
+local qbTargetHighlightName="DevGuiQBAimTargetHighlight"
+local espHighlightName="DevGuiESPHighlight"
 local validTeamIds={
 	HomeTeam=true,
 	AwayTeam=true,
@@ -772,8 +772,8 @@ function qbAim.new(app,parent)
 	local possessionSettleUntil=0
 	local throwInProgress=false
 	local lastThrowAt=-math.huge
-	local controllerThrowActionName="QBAim_ControllerThrow"
-	local controllerToggleActionName="QBAim_ControllerToggle"
+	local controllerThrowActionName="DevGui_QBAim_ControllerThrow"
+	local controllerToggleActionName="DevGui_QBAim_ControllerToggle"
 	local controllerThrowBinding=nil
 	local controllerToggleBinding=nil
 	local controllerThrowInputActive=false
@@ -1444,7 +1444,7 @@ function qbAim.new(app,parent)
 		if original and folder and (not preview.center or preview.orig~=original or not preview.center.Parent) then
 			destroyPreviewCenter()
 			preview.center=original:Clone()
-			preview.center.Name="ClonedCenter"
+			preview.center.Name="DevGuiClonedCenter"
 			preview.center.Parent=folder
 			prepPreviewObject(preview.center)
 			preview.orig=original
@@ -1746,10 +1746,10 @@ function qbAim.new(app,parent)
 			return marker
 		end
 
-		marker=folder:FindFirstChild("PreviewC1Marker")
+		marker=folder:FindFirstChild("DevGuiPreviewC1Marker")
 		if not(marker and marker:IsA("BasePart")) then
 			marker=Instance.new("Part")
-			marker.Name="PreviewC1Marker"
+			marker.Name="DevGuiPreviewC1Marker"
 			marker.Shape=Enum.PartType.Ball
 			marker.Size=Vector3.new(catchMarkerSize,catchMarkerSize,catchMarkerSize)
 			marker.Anchored=true
@@ -1802,7 +1802,7 @@ function qbAim.new(app,parent)
 
 		local _,folder=originalCenter()
 		if folder then
-			local existing=folder:FindFirstChild("PreviewC3InfoAnchor")
+			local existing=folder:FindFirstChild("DevGuiPreviewC3InfoAnchor")
 			if existing then
 				existing:Destroy()
 			end
@@ -1817,10 +1817,10 @@ function qbAim.new(app,parent)
 
 		local anchor=preview.c3InfoAnchor
 		if not(anchor and anchor.Parent) then
-			anchor=folder:FindFirstChild("PreviewC3InfoAnchor")
+			anchor=folder:FindFirstChild("DevGuiPreviewC3InfoAnchor")
 			if not(anchor and anchor:IsA("BasePart")) then
 				anchor=Instance.new("Part")
-				anchor.Name="PreviewC3InfoAnchor"
+				anchor.Name="DevGuiPreviewC3InfoAnchor"
 				anchor.Size=Vector3.new(0.25,0.25,0.25)
 				anchor.Transparency=1
 				anchor.Anchored=true

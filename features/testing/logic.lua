@@ -788,9 +788,9 @@ function testing.new(app,parent,guiBuilder)
 		end
 
 		local parent=parentFolder or workspace
-		local existing=parent:FindFirstChild("TestingC1Marker")
+		local existing=parent:FindFirstChild("DevGuiTestingC1Marker")
 		marker=(existing and existing:IsA("BasePart")) and existing or Instance.new("Part")
-		marker.Name="TestingC1Marker"
+		marker.Name="DevGuiTestingC1Marker"
 		styleMarker(marker)
 		marker.Parent=parent
 
@@ -830,9 +830,9 @@ function testing.new(app,parent,guiBuilder)
 		end
 
 		local parent=parentFolder or workspace
-		local existing=parent:FindFirstChild("TestingC1GroundMarker")
+		local existing=parent:FindFirstChild("DevGuiTestingC1GroundMarker")
 		groundMarker=(existing and existing:IsA("BasePart")) and existing or Instance.new("Part")
-		groundMarker.Name="TestingC1GroundMarker"
+		groundMarker.Name="DevGuiTestingC1GroundMarker"
 		styleGroundMarker(groundMarker)
 		groundMarker.Parent=parent
 		return groundMarker

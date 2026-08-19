@@ -10,7 +10,7 @@ local validTeamIds={
 	AwayTeam=true,
 }
 
-local espHighlightName="MyESPHighlight"
+local espHighlightName="DevGuiESPHighlight"
 local ballGravity=28
 local gravityVector=Vector3.new(0,-ballGravity,0)
 local modelBallSpeed=95
