@@ -335,6 +335,13 @@ def test_params_selector_stays_inside_its_ring_and_gaps_are_not_clickable():
     assert "ZIndex=12" not in params
 
 
+def test_customizer_wheel_only_accents_active_or_hovered_modes():
+    colors = read("features/colors/logic.lua")
+    assert "local isSelected=key==selected" in colors
+    assert "local isHover=key==highlightHoverMode" in colors
+    assert "elseif isCustom then" not in colors
+
+
 def test_dev_controls_use_an_authorized_module_path():
     loader = read("runtime/loader-part-1.lua")
     assert 'GuiLogic="features/colors/gui.lua"' in loader

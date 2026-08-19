@@ -1967,13 +1967,6 @@ function colors.new(app,page)
 			local key=mode.key
 			local isSelected=key==selected
 			local isHover=key==highlightHoverMode
-			local isCustom=style[mode.prefix.."CustomColor"]==true
-			for _,state in ipairs(mode.states or {}) do
-				if style[mode.prefix..(state.suffix or "").."CustomColor"]==true then
-					isCustom=true
-					break
-				end
-			end
 			local color=muted
 			local transparency=0.74
 			local highlightTransparency=1
@@ -1988,11 +1981,6 @@ function colors.new(app,page)
 				nearGlowTransparency=isHover and 0.42 or 0.54
 				midGlowTransparency=isHover and 0.62 or 0.72
 				farGlowTransparency=isHover and 0.82 or 0.90
-			elseif isCustom then
-				color=core
-				transparency=isHover and 0.24 or 0.40
-				nearGlowTransparency=isHover and 0.72 or 0.92
-				midGlowTransparency=isHover and 0.86 or 0.98
 			elseif isHover then
 				color=brightenColor(muted,0.13)
 				transparency=0.60
