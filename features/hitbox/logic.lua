@@ -745,6 +745,7 @@ function hitbox.new(app,parent)
 
 	local sectionControls=nil
 	section,sectionControls=makeSection(parent,1,"Hitbox","",{
+		stroke=false,
 		headerToggle={
 			startState=state.hitboxOn,
 			onChange=function(value)
@@ -752,10 +753,6 @@ function hitbox.new(app,parent)
 			end,
 		},
 	})
-	local sectionStroke=section:FindFirstChildOfClass("UIStroke")
-	if sectionStroke then
-		sectionStroke:Destroy()
-	end
 	toggle=sectionControls and sectionControls.toggle
 
 	local sizeLabel=make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="size",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)

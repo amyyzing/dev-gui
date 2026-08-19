@@ -233,8 +233,8 @@ def test_requested_control_copy_and_spacing_contracts():
     assert 'buildSlider(section,"transparency"' in hitbox
     assert 'Text="TRANSPARENCY"' not in hitbox
     assert 'buildSlider(section,"Alpha"' not in hitbox
-    assert 'local sectionStroke=section:FindFirstChildOfClass("UIStroke")' in hitbox
-    assert "sectionStroke:Destroy()" in hitbox
+    assert "stroke=false" in hitbox
+    assert "if options.stroke~=false then" in read("features/colors/gui.lua")
     assert 'makeSection(parent,5,"Testing","",{' in testing
     assert 'label=target=="Stroke" and "Secondary" or target' in colors
     assert 'button.Size=UDim2.new(0.5,-4,1,0)' in colors

@@ -617,9 +617,11 @@ function guiLogic.new(app)
 		local sec=make("Frame",{BackgroundColor3=themeColor("SECTION",colors.card),BackgroundTransparency=componentNumber("SectionBackgroundTransparency",0),BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ClipsDescendants=true,ZIndex=4,LayoutOrder=order,ThemeRole="SECTION",CornerRole="Section"},parent)
 
 		addCorner(sec,"Section")
-		local sectionStrokeTransparency=componentNumber("SectionStrokeTransparency",0.84)
-		local sectionStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=sectionStrokeTransparency},sec)
-		sectionStroke:SetAttribute("BaseStrokeTransparency",sectionStrokeTransparency)
+		if options.stroke~=false then
+			local sectionStrokeTransparency=componentNumber("SectionStrokeTransparency",0.84)
+			local sectionStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=sectionStrokeTransparency},sec)
+			sectionStroke:SetAttribute("BaseStrokeTransparency",sectionStrokeTransparency)
+		end
 		make("UIPadding",{PaddingTop=UDim.new(0,componentNumber("SectionPaddingY",10)),PaddingLeft=UDim.new(0,componentNumber("SectionPaddingX",12)),PaddingRight=UDim.new(0,componentNumber("SectionPaddingX",12)),PaddingBottom=UDim.new(0,componentNumber("SectionPaddingY",10))},sec)
 		make("UIListLayout",{Padding=UDim.new(0,componentNumber("SectionGap",6)),SortOrder=Enum.SortOrder.LayoutOrder},sec)
 
