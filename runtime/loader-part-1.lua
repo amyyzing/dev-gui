@@ -45,10 +45,27 @@ local softTones={
 	input=0.055,sliderBg=0.075,strokeSoft=0.15,sliderAccent=true,sliderBlend=0.66,
 }
 
+local proofTheme=makeTheme("proof","Proof",{245,243,237},{61,117,93},{95,106,194},squareShape,nil)
+proofTheme.Theme={
+	bg=Color3.fromRGB(245,243,237),
+	topbar=Color3.fromRGB(239,237,230),
+	panel=Color3.fromRGB(239,237,230),
+	card=Color3.fromRGB(245,243,237),
+	section=Color3.fromRGB(239,237,230),
+	button=Color3.fromRGB(239,237,230),
+	input=Color3.fromRGB(245,243,237),
+	sliderBg=Color3.fromRGB(239,237,230),
+	sliderFill=Color3.fromRGB(61,117,93),
+	text=Color3.fromRGB(47,49,45),
+	muted=Color3.fromRGB(75,77,72),
+	stroke=Color3.fromRGB(61,117,93),
+	softStroke=Color3.fromRGB(122,118,109),
+}
+
 devThemes={
 	raycast=makeTheme("raycast","Raycast",{17,17,20},{255,90,163},{124,92,255},squareShape,softTones),
 	everforest=makeTheme("everforest","Everforest",{253,246,227},{141,161,1},{53,167,124},squareShape,softTones),
-	dracula=makeTheme("dracula","Dracula",{40,42,54},{189,147,249},{255,121,198},squareShape,softTones),
+	proof=proofTheme,
 	linear=makeTheme("linear","Linear",{16,16,20},{94,106,210},{138,143,152},squareShape,softTones),
 	material=makeTheme("material","Material",{18,18,18},{3,218,198},{187,134,252},squareShape,softTones),
 	absolutely=makeTheme("absolutely","Absolutely",{9,9,12},{168,85,247},{236,72,153},squareShape,softTones),

@@ -238,7 +238,8 @@ local function normalizedStyleValue(key,value,default)
 	elseif key=="UILib" then
 		local theme=tostring(value or default):lower()
 		if theme=="catppuccin" then theme="everforest" end
-		return ({raycast=true,everforest=true,dracula=true,linear=true,material=true,absolutely=true})[theme] and theme or styleDefaults.UILib
+		if theme=="dracula" then theme="proof" end
+		return ({raycast=true,everforest=true,proof=true,linear=true,material=true,absolutely=true})[theme] and theme or styleDefaults.UILib
 	elseif type(default)=="number" then
 		local n=numberOrDefault(value,default)
 		local limits=numberLimits[key]
@@ -1352,7 +1353,7 @@ function colors.new(app,page)
 	},themeGrid)
 
 	local themePresets={}
-	for _,id in ipairs({"raycast","everforest","dracula","linear","material","absolutely"}) do
+	for _,id in ipairs({"raycast","everforest","proof","linear","material","absolutely"}) do
 		local profile=app.themes and app.themes[id]
 		local defaults=profile and profile.Defaults
 		if defaults then

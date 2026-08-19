@@ -127,17 +127,25 @@ def test_reworked_theme_list_is_complete_and_raycast_is_default():
     expected = {
         "raycast": "Raycast",
         "everforest": "Everforest",
-        "dracula": "Dracula",
+        "proof": "Proof",
         "linear": "Linear",
         "material": "Material",
         "absolutely": "Absolutely",
     }
     for theme_id, label in expected.items():
-        assert f'{theme_id}=makeTheme("{theme_id}","{label}"' in runtime
+        assert (
+            f'{theme_id}=makeTheme("{theme_id}","{label}"' in runtime
+            or f'{theme_id}=proofTheme' in runtime
+        )
 
-    assert '{"raycast","everforest","dracula","linear","material","absolutely"}' in colors
+    assert '{"raycast","everforest","proof","linear","material","absolutely"}' in colors
     assert 'everforest=makeTheme("everforest","Everforest",{253,246,227},{141,161,1},{53,167,124},squareShape,softTones)' in runtime
+    assert 'local proofTheme=makeTheme("proof","Proof",{245,243,237},{61,117,93},{95,106,194},squareShape,nil)' in runtime
+    assert 'topbar=Color3.fromRGB(239,237,230)' in runtime
+    assert 'text=Color3.fromRGB(47,49,45)' in runtime
+    assert 'muted=Color3.fromRGB(75,77,72)' in runtime
     assert 'if id=="catppuccin" then id="everforest" end' in data_save
+    assert 'if id=="dracula" then id="proof" end' in data_save
     assert "themes=devThemes" in read("runtime/loader-part-3.lua")
 
     for path in ("gui/pc.luau", "gui/mobile.luau"):
