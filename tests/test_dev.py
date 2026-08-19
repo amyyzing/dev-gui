@@ -252,7 +252,7 @@ def test_params_selector_and_main_pages_tween():
 
 def test_theme_and_idle_controls_refresh_immediately():
     colors = read("features/colors/logic.lua")
-    gui_logic = read("gui/gui-logic.lua")
+    gui_logic = read("features/colors/gui.lua")
     theme_apply = colors[colors.index("local function applyThemePreset"):colors.index("for i,preset in ipairs")]
 
     assert "setPrimaryColour(preset.Primary)" in theme_apply
@@ -263,6 +263,14 @@ def test_theme_and_idle_controls_refresh_immediately():
     assert 'label:SetAttribute("ThemeTextRole",state and "STROKE" or "TEXT")' in gui_logic
     assert gui_logic.count('ThemeRole="STROKE_SOFT"') >= 1
     assert 'componentValue("SliderTrackRole","STROKE_SOFT")' in gui_logic
+
+
+def test_dev_controls_use_an_authorized_module_path():
+    loader = read("runtime/loader-part-1.lua")
+    assert 'GuiLogic="features/colors/gui.lua"' in loader
+    assert '"gui/gui-logic.lua"' not in loader
+    assert "setLoadedModule(name,loadedModule)" in loader
+    assert "return setLoadedModule(name,loadedModule)" not in loader
 
 
 def test_colour_modes_are_independent_and_complete():

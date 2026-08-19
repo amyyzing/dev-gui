@@ -1,3 +1,1481 @@
-return{new=function(app,...)
-	return app.ColorsLogicModule.new(app,...)
-end}
+local guiLogic={}
+
+function guiLogic.new(app)
+	local make=app.New or app.make
+	local fusion=app.Fusion or app.fusion
+	local colors=app.colors
+	local style=app.style or {}
+	local inputService=app.inputService
+	local guiService=app.GuiService or game:GetService("GuiService")
+	local tweenService=app.TweenService
+	local fmtNumber=app.fmtNumber
+	local boxWrappers=app.boxWrappers or setmetatable({}, {__mode="k"})
+	local buttonWrappers=app.buttonWrappers or setmetatable({}, {__mode="k"})
+	local markThemeRole=app.markThemeRole or function() end
+	local getUILibRuntimeStyle=app.getUILibRuntimeStyle
+
+	local api={}
+	local wrapInset=0
+	local emptyTable={}
+	local defaultShape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original"}
+	local toggleTickAlphas={0.25,0.5,0.75}
+	local toggleSoftTween=TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+	local toggleSnapTween=TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out)
+	local builtInProfiles={
+		windui={Shape={WindowRadius=12,SectionRadius=10,ControlRadius=8,SliderRadius=10,SliderHeight=24,SliderStyle="windui"}},
+		rayfield={Shape={WindowRadius=6,SectionRadius=5,ControlRadius=4,SliderRadius=4,SliderHeight=26,SliderStyle="rayfield"}},
+		linoria={Shape={WindowRadius=3,SectionRadius=2,ControlRadius=2,SliderRadius=2,SliderHeight=22,SliderStyle="thin"}},
+		obsidian={Shape={WindowRadius=9,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=24,SliderStyle="glow"}},
+		visual={Shape={WindowRadius=8,SectionRadius=7,ControlRadius=6,SliderRadius=6,SliderHeight=28,SliderStyle="pill"}},
+		original={Shape=defaultShape},
+	}
+
+	local function makeFusionValue(initial)
+		if type(fusion)=="table" and type(fusion.Value)=="function" then
+			return fusion.Value(initial)
+		end
+		return nil
+	end
+
+	local function destroyFusionValue(value)
+		if value and type(value.Destroy)=="function" then
+			pcall(function()
+				value:Destroy()
+			end)
+		elseif value and type(value.destroy)=="function" then
+			pcall(function()
+				value:destroy()
+			end)
+		end
+	end
+
+	local function currentLib()
+		return tostring(style.UILib or "original"):lower()
+	end
+
+	local function profile()
+		local lib=currentLib()
+
+		if type(getUILibRuntimeStyle)=="function" then
+			local ok,style=pcall(getUILibRuntimeStyle,lib)
+			if ok and type(style)=="table" then
+				return style
+			end
+		end
+
+		return builtInProfiles[lib] or builtInProfiles.original
+	end
+
+	local function shape()
+		local style=profile()
+		return type(style.Shape)=="table" and style.Shape or defaultShape
+	end
+
+	local function components()
+		local style=profile()
+		return type(style.Components)=="table" and style.Components or emptyTable
+	end
+
+	local function componentValue(key,fallback)
+		local c=components()
+		if c[key]==nil then
+			return fallback
+		end
+
+		return c[key]
+	end
+
+	local function componentNumber(key,fallback)
+		local value=tonumber(componentValue(key,fallback))
+		if value==nil then
+			return fallback
+		end
+
+		return value
+	end
+
+	local function componentFont(key,fallback)
+		return componentValue(key,fallback)
+	end
+
+	local function addCorner(instance,role)
+		if not instance then return nil end
+
+		instance:SetAttribute("CornerRole",role or "Control")
+		return make("UICorner",{CornerRadius=UDim.new(0,0)},instance)
+	end
+
+	local function themeColor(role,fallback)
+		return colors[role] or fallback
+	end
+
+	local function themeRoleColor(role,fallback)
+		if type(role)=="string" and colors[role] then
+			return colors[role]
+		end
+
+		return fallback
+	end
+
+	local function luminance(color)
+		if not color then
+			return 0
+		end
+
+		return (color.R*0.2126)+(color.G*0.7152)+(color.B*0.0722)
+	end
+
+	local function readableOn(color)
+		if luminance(color)<0.48 then
+			return Color3.fromRGB(245,245,245)
+		end
+
+		return Color3.fromRGB(22,22,22)
+	end
+
+	local function hoverColor(base,amount)
+		base=base or colors.button or colors.bg
+		amount=tonumber(amount) or 0.08
+		local toward=luminance(base)<0.55 and Color3.new(1,1,1) or Color3.new(0,0,0)
+		return base:Lerp(toward,amount)
+	end
+
+	local function pointerPosition(input)
+		local inputType=typeof(input)
+		if inputType=="Vector2" then
+			return input
+		elseif inputType=="Vector3" then
+			return Vector2.new(input.X,input.Y)
+		end
+
+		local position=input and input.Position
+		if typeof(position)=="Vector3" then
+			return Vector2.new(position.X,position.Y)
+		elseif typeof(position)=="Vector2" then
+			return position
+		end
+
+		return inputService:GetMouseLocation()
+	end
+
+	local function guiInset()
+		local ok,inset=pcall(function()
+			return guiService:GetGuiInset()
+		end)
+
+		if ok and typeof(inset)=="Vector2" then
+			return inset
+		end
+
+		return Vector2.new(0,0)
+	end
+
+	local function distanceToRect(point,pos,size)
+		local dx=0
+		local dy=0
+
+		if point.X<pos.X then
+			dx=pos.X-point.X
+		elseif point.X>pos.X+size.X then
+			dx=point.X-(pos.X+size.X)
+		end
+
+		if point.Y<pos.Y then
+			dy=pos.Y-point.Y
+		elseif point.Y>pos.Y+size.Y then
+			dy=point.Y-(pos.Y+size.Y)
+		end
+
+		return dx*dx+dy*dy
+	end
+
+	local function pointerOffset(object,input)
+		local point=pointerPosition(input)
+		local inset=guiInset()
+		local pos=object.AbsolutePosition
+		local size=object.AbsoluteSize
+		local bestOffset=Vector2.new(0,0)
+		local bestDistance=distanceToRect(point,pos,size)
+		local candidates={
+			-inset,
+			inset
+		}
+
+		for _,offset in ipairs(candidates) do
+			local candidate=point+offset
+			local candidateDistance=distanceToRect(candidate,pos,size)
+			if candidateDistance<bestDistance then
+				bestOffset=offset
+				bestDistance=candidateDistance
+			end
+		end
+		return bestOffset
+	end
+
+	local function objectLocalPointer(object,input,offset)
+		local point=pointerPosition(input)+(offset or pointerOffset(object,input))
+		local pos=object.AbsolutePosition
+		local size=object.AbsoluteSize
+		return math.clamp(point.X-pos.X,0,size.X),math.clamp(point.Y-pos.Y,0,size.Y),math.max(size.X,1),math.max(size.Y,1)
+	end
+
+	api.pointerPosition=pointerPosition
+	api.objectLocalPointer=objectLocalPointer
+
+	local function createSwitch(parent,startState,onChange,width,height,_knobSize,_pad,zIndex)
+		local c=components()
+		local checkbox=tostring(c.ToggleStyle or "switch"):lower()=="checkbox"
+		width=width or componentNumber("ToggleWidth",checkbox and 34 or 58)
+		height=height or componentNumber("ToggleHeight",checkbox and 22 or 22)
+		zIndex=zIndex or 6
+
+		local onRole=tostring(c.ToggleOnRole or "SLIDER_FILL")
+		local accent=themeRoleColor(onRole,themeColor("SLIDER_FILL",colors.green or Color3.fromRGB(32,202,106)))
+		local input=themeColor("STROKE_SOFT",colors.softStroke or themeColor("SLIDER_BG",themeColor("INPUT",colors.panel or Color3.fromRGB(18,18,24))))
+		local muted=themeColor("MUTED",colors.muted or Color3.fromRGB(145,145,155))
+		local tickHeight=math.max(6,height-10)
+		local state=startState and true or false
+		local stateValue=makeFusionValue(state)
+		local activeTweens={}
+		local connections={}
+
+		local function connect(signal,fn)
+			local connection=signal:Connect(fn)
+			table.insert(connections,connection)
+			return connection
+		end
+
+		local wrap=make("Frame",{
+			Size=UDim2.fromOffset(width,height),
+			BackgroundColor3=input,
+			BorderSizePixel=0,
+			ClipsDescendants=true,
+			ZIndex=zIndex,
+			ThemeRole="STROKE_SOFT",
+			CornerRole="Control",
+		},parent)
+		addCorner(wrap,"Control")
+
+		local fillClip=make("Frame",{
+			AnchorPoint=Vector2.new(0,0.5),
+			Position=UDim2.fromScale(0,0.5),
+			Size=UDim2.new(0,0,1,0),
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			ClipsDescendants=true,
+			ZIndex=zIndex+1,
+		},wrap)
+
+		local fill=make("Frame",{
+			AnchorPoint=Vector2.new(0,0.5),
+			Position=UDim2.fromScale(0,0.5),
+			Size=UDim2.new(1,0,1,0),
+			BackgroundColor3=accent,
+			BackgroundTransparency=0.18,
+			BorderSizePixel=0,
+			ZIndex=zIndex+1,
+			ThemeRole=onRole,
+		},fillClip)
+		addCorner(fill,"Control")
+
+		local tickHolder=make("Frame",{
+			AnchorPoint=Vector2.new(0.5,0.5),
+			Position=UDim2.fromScale(0.5,0.5),
+			Size=UDim2.new(1,-10,1,0),
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			ZIndex=zIndex+2,
+		},wrap)
+
+		local ticks={}
+		for _,alpha in ipairs(toggleTickAlphas) do
+			local tick=make("Frame",{
+				AnchorPoint=Vector2.new(0.5,0.5),
+				Position=UDim2.fromScale(alpha,0.5),
+				Size=UDim2.fromOffset(1,tickHeight),
+				BackgroundColor3=muted,
+				BackgroundTransparency=0.82,
+				BorderSizePixel=0,
+				Visible=false,
+				ZIndex=zIndex+2,
+				SkipThemeRole=true,
+			},tickHolder)
+			table.insert(ticks,tick)
+		end
+
+		local hit=make("TextButton",{
+			BackgroundTransparency=1,
+			Text="",
+			Size=UDim2.new(1,0,1,0),
+			BorderSizePixel=0,
+			AutoButtonColor=false,
+			Selectable=true,
+			ZIndex=zIndex+8,
+		},wrap)
+
+		local function cancelTweens()
+			for _,tw in ipairs(activeTweens) do
+				pcall(function()
+					tw:Cancel()
+				end)
+			end
+			table.clear(activeTweens)
+		end
+
+		local function tween(object,info,goal)
+			local tw=tweenService:Create(object,info,goal)
+			table.insert(activeTweens,tw)
+			tw:Play()
+			return tw
+		end
+
+		local function applyVisuals(animate)
+			cancelTweens()
+
+			local currentAccent=themeRoleColor(onRole,themeColor("SLIDER_FILL",colors.green or Color3.fromRGB(32,202,106)))
+			local currentBg=themeColor("STROKE_SOFT",colors.softStroke or themeColor("SLIDER_BG",themeColor("INPUT",colors.panel or Color3.fromRGB(18,18,24))))
+			local currentMuted=themeColor("MUTED",colors.muted or Color3.fromRGB(145,145,155))
+			local onTextColor=readableOn(currentAccent)
+			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
+			local fillTransparency=0
+			local bgColor=currentBg
+
+			wrap:SetAttribute("ThemeRole","STROKE_SOFT")
+
+			if not animate then
+				wrap.BackgroundColor3=bgColor
+				fillClip.Size=fillSize
+				fill.BackgroundColor3=currentAccent
+				fill.BackgroundTransparency=fillTransparency
+				for _,tick in ipairs(ticks) do
+					tick.BackgroundColor3=state and onTextColor or currentMuted
+					tick.BackgroundTransparency=state and 0.74 or 0.86
+				end
+				return
+			end
+
+			tween(wrap,toggleSoftTween,{BackgroundColor3=bgColor})
+			tween(fillClip,toggleSnapTween,{Size=fillSize})
+			tween(fill,toggleSoftTween,{BackgroundColor3=currentAccent,BackgroundTransparency=fillTransparency})
+
+			for _,tick in ipairs(ticks) do
+				tween(tick,toggleSoftTween,{BackgroundColor3=state and onTextColor or currentMuted,BackgroundTransparency=state and 0.74 or 0.86})
+			end
+		end
+
+		local function setState(v,fire,animate)
+			local nextState=v and true or false
+			local changed=nextState~=state
+			state=nextState
+			if stateValue then
+				stateValue:set(state)
+			end
+			applyVisuals(animate~=false)
+
+			if fire and changed and onChange then
+				onChange(state)
+			end
+		end
+
+		connect(hit.Activated,function()
+			setState(not state,true,true)
+		end)
+
+		local function destroySwitch()
+			cancelTweens()
+			destroyFusionValue(stateValue)
+			for _,connection in ipairs(connections) do
+				pcall(function()
+					connection:Disconnect()
+				end)
+			end
+			table.clear(connections)
+			if wrap then
+				wrap:Destroy()
+			end
+		end
+
+		setState(state,false,false)
+		return{set=function(v,animate) setState(v,false,animate~=false) end,get=function() return state end,Destroy=destroySwitch,destroy=destroySwitch,stateValue=stateValue,wrap=wrap,knob=fill,hit=hit,width=width,height=height}
+	end
+
+	local function createHeaderSwitch(parent,startState,onChange,zIndex)
+		local c=components()
+		local width=tonumber(c.HeaderToggleWidth) or 88
+		local height=tonumber(c.HeaderToggleHeight) or 30
+		local railHeight=tonumber(c.HeaderToggleRailHeight) or 22
+		local z=zIndex or 6
+		local expanded=true
+		local expandedValue=makeFusionValue(expanded)
+		local tweenInfo=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		local headerTween=nil
+		local destroyed=false
+
+		local holder=make("Frame",{
+			AnchorPoint=Vector2.new(1,0.5),
+			Size=UDim2.fromOffset(width,height),
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			ClipsDescendants=true,
+			ZIndex=z,
+		},parent)
+
+		local control=createSwitch(holder,startState,onChange,width,railHeight,nil,nil,z+1)
+		control.wrap.AnchorPoint=Vector2.new(0.5,0.5)
+		control.wrap.Position=UDim2.fromScale(0.5,0.5)
+
+		local function setExpanded(value,animate)
+			expanded=value and true or false
+			if expandedValue then
+				expandedValue:set(expanded)
+			end
+
+			if headerTween then
+				headerTween:Cancel()
+				headerTween=nil
+			end
+
+			local targetSize=UDim2.fromOffset(width,railHeight)
+			if animate~=false then
+				headerTween=tweenService:Create(control.wrap,tweenInfo,{Size=targetSize})
+				headerTween:Play()
+			else
+				control.wrap.Size=targetSize
+			end
+		end
+
+		local function destroyHeaderSwitch()
+			if destroyed then return end
+			destroyed=true
+			if headerTween then
+				headerTween:Cancel()
+				headerTween=nil
+			end
+			if control and control.destroy then
+				control.destroy()
+			end
+			destroyFusionValue(expandedValue)
+			if holder then
+				holder:Destroy()
+			end
+		end
+
+		setExpanded(expanded,false)
+
+		return{
+			set=control.set,
+			get=control.get,
+			stateValue=control.stateValue,
+			setExpanded=setExpanded,
+			expandedValue=expandedValue,
+			Destroy=destroyHeaderSwitch,
+			destroy=destroyHeaderSwitch,
+			wrap=holder,
+			width=width,
+			height=height,
+		}
+	end
+
+	local function insetSize(size)
+		return UDim2.new(size.X.Scale,size.X.Offset-(wrapInset*2),size.Y.Scale,size.Y.Offset-(wrapInset*2))
+	end
+
+	local function insetPosition(position)
+		return UDim2.new(position.X.Scale,position.X.Offset+wrapInset,position.Y.Scale,position.Y.Offset+wrapInset)
+	end
+
+	function api.attachHover(button,normalBg,hoverBg,normalText,hoverText)
+		local function resolve(value)
+			if type(value)=="function" then
+				return value()
+			end
+
+			return value
+		end
+
+		button.MouseEnter:Connect(function()
+			if button.BackgroundTransparency<1 then
+				button.BackgroundColor3=resolve(hoverBg)
+			end
+
+			if button:IsA("TextButton") or button:IsA("TextLabel") then
+				button.TextColor3=resolve(hoverText) or resolve(normalText) or colors.text
+			end
+		end)
+
+		button.MouseLeave:Connect(function()
+			if button.BackgroundTransparency<1 then
+				button.BackgroundColor3=resolve(normalBg)
+			end
+
+			if button:IsA("TextButton") or button:IsA("TextLabel") then
+				button.TextColor3=resolve(normalText) or colors.text
+			end
+		end)
+	end
+
+	function api.wrapTextBox(box,bgColor,strokeThickness)
+		local padX=componentNumber("TextBoxPaddingX",4)
+		local parent=box.Parent
+		local wrap=Instance.new("Frame")
+
+		wrap.Name=box.Name~="" and (box.Name.."_Wrap") or "TextBoxWrap"
+		wrap.BackgroundColor3=bgColor or colors.panel
+		wrap.BorderSizePixel=0
+		wrap.ClipsDescendants=false
+		wrap.Active=true
+		wrap.Size=insetSize(box.Size)
+		wrap.Position=insetPosition(box.Position)
+		wrap.AnchorPoint=box.AnchorPoint
+		wrap.Visible=box.Visible
+		wrap.ZIndex=math.max((box.ZIndex or 2)-1,1)
+		wrap.Parent=parent
+		markThemeRole(wrap,wrap.BackgroundColor3)
+		addCorner(wrap,"Control")
+
+		local strokeTransparency=componentNumber("ControlStrokeTransparency",0.78)
+		local stroke=make("UIStroke",{Color=colors.stroke,Thickness=math.min(strokeThickness or 1,1),Transparency=strokeTransparency},wrap)
+		stroke:SetAttribute("BaseStrokeTransparency",strokeTransparency)
+
+		box.Parent=wrap
+		box.BackgroundTransparency=1
+		box.BorderSizePixel=0
+		box.Position=UDim2.new(0,padX,0,0)
+		box.Size=UDim2.new(1,-(padX*2),1,0)
+		box.AnchorPoint=Vector2.new(0,0)
+		box.ZIndex=wrap.ZIndex+1
+
+		boxWrappers[box]={wrap=wrap,stroke=stroke}
+		return wrap,stroke
+	end
+
+	function api.placeWrappedBox(box,position,size)
+		local entry=boxWrappers[box]
+		if not entry then return end
+		if size then entry.wrap.Size=insetSize(size) end
+		if position then entry.wrap.Position=insetPosition(position) end
+	end
+
+	function api.wrapTextButton(button,bgColor,strokeThickness)
+		local parent=button.Parent
+		local wrap=Instance.new("Frame")
+
+		wrap.Name=button.Name~="" and (button.Name.."_Wrap") or "ButtonWrap"
+		wrap.BackgroundColor3=bgColor or colors.bg
+		wrap.BorderSizePixel=0
+		wrap.ClipsDescendants=false
+		wrap.Active=true
+		wrap.Size=insetSize(button.Size)
+		wrap.Position=insetPosition(button.Position)
+		wrap.AnchorPoint=button.AnchorPoint
+		wrap.Visible=button.Visible
+		wrap.ZIndex=math.max((button.ZIndex or 2)-1,1)
+		wrap.Parent=parent
+		markThemeRole(wrap,wrap.BackgroundColor3)
+		addCorner(wrap,"Control")
+
+		local strokeTransparency=componentNumber("ControlStrokeTransparency",0.78)
+		local stroke=make("UIStroke",{Color=colors.stroke,Thickness=math.min(strokeThickness or 1,1),Transparency=strokeTransparency},wrap)
+		stroke:SetAttribute("BaseStrokeTransparency",strokeTransparency)
+
+		button.Parent=wrap
+		button.BackgroundTransparency=1
+		button.BorderSizePixel=0
+		button.Position=UDim2.new(0,0,0,0)
+		button.Size=UDim2.new(1,0,1,0)
+		button.AnchorPoint=Vector2.new(0,0)
+		button.ZIndex=wrap.ZIndex+1
+
+		buttonWrappers[button]={wrap=wrap,stroke=stroke}
+		return wrap,stroke
+	end
+
+	function api.placeWrappedButton(button,position,size)
+		local entry=buttonWrappers[button]
+		if not entry then return end
+		if size then entry.wrap.Size=insetSize(size) end
+		if position then entry.wrap.Position=insetPosition(position) end
+	end
+
+	function api.setWrappedButtonBg(button,color)
+		local entry=buttonWrappers[button]
+		if entry then
+			entry.wrap.BackgroundColor3=color
+		else
+			button.BackgroundColor3=color
+		end
+	end
+
+	function api.makeSection(parent,order,titleText,subtitleText,options)
+		options=options or {}
+		local c=components()
+		local sectionMode=tostring(c.SectionMode or "card"):lower()
+		local descriptionOnly=options.compact==true or options.headerOnly==true
+		local hasBody=not descriptionOnly
+		local canCollapse=hasBody and options.collapsible~=false and options.Collapsible~=false
+		local sec=make("Frame",{BackgroundColor3=themeColor("SECTION",colors.card),BackgroundTransparency=componentNumber("SectionBackgroundTransparency",0),BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ClipsDescendants=true,ZIndex=4,LayoutOrder=order,ThemeRole="SECTION",CornerRole="Section"},parent)
+
+		addCorner(sec,"Section")
+		local sectionStrokeTransparency=componentNumber("SectionStrokeTransparency",0.84)
+		local sectionStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=sectionStrokeTransparency},sec)
+		sectionStroke:SetAttribute("BaseStrokeTransparency",sectionStrokeTransparency)
+		make("UIPadding",{PaddingTop=UDim.new(0,componentNumber("SectionPaddingY",10)),PaddingLeft=UDim.new(0,componentNumber("SectionPaddingX",12)),PaddingRight=UDim.new(0,componentNumber("SectionPaddingX",12)),PaddingBottom=UDim.new(0,componentNumber("SectionPaddingY",10))},sec)
+		make("UIListLayout",{Padding=UDim.new(0,componentNumber("SectionGap",6)),SortOrder=Enum.SortOrder.LayoutOrder},sec)
+
+		local collapsed=false
+		local headerToggleWidth=componentNumber("HeaderToggleWidth",88)
+		local headerToggleHeight=componentNumber("HeaderToggleHeight",30)
+		local headerCustomOptions=options.headerCustom or options.headerControl
+		local headerCustomWidth=headerCustomOptions and (headerCustomOptions.width or headerCustomOptions.Width or 40) or 0
+		local headerCustomHeight=headerCustomOptions and (headerCustomOptions.height or headerCustomOptions.Height or headerToggleHeight) or 0
+		local headerHeight=componentNumber("SectionHeaderHeight",22)
+		if options.headerToggle then
+			headerHeight=math.max(headerHeight,headerToggleHeight)
+		end
+		if headerCustomOptions then
+			headerHeight=math.max(headerHeight,headerCustomHeight)
+		end
+
+		local header=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,headerHeight),ClipsDescendants=true,ZIndex=5,LayoutOrder=1},sec)
+		local controls={section=sec}
+		local sectionConnections={}
+		local sectionDestroyed=false
+		local function connectSection(signal,fn)
+			local connection=signal:Connect(fn)
+			table.insert(sectionConnections,connection)
+			return connection
+		end
+		local function disconnectSectionConnections()
+			for _,connection in ipairs(sectionConnections) do
+				pcall(function()
+					connection:Disconnect()
+				end)
+			end
+			table.clear(sectionConnections)
+		end
+		local headerButtonOptions=options.headerButton or options.headerAction
+		local headerButtonWidth=headerButtonOptions and (headerButtonOptions.width or headerButtonOptions.Width or 104) or 0
+		local toggleReserve=options.headerToggle and (headerToggleWidth+8) or 0
+		local customReserve=headerCustomOptions and (headerCustomWidth+8) or 0
+		local titleReserve=toggleReserve+customReserve+(headerButtonOptions and (headerButtonWidth+8) or 0)
+		local usesPrefix=canCollapse and componentValue("SectionPrefix",true)~=false
+		local titleButton=make("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-titleReserve,1,0),Text=(usesPrefix and "[-] " or "")..titleText,Font=componentFont("TitleFont",Enum.Font.GothamBold),TextSize=componentNumber("SectionTitleSize",14),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,Selectable=canCollapse,ZIndex=5},header)
+		local headerRightOffset=0
+
+		if sectionMode=="groupbox" then
+			local titleWidth=componentNumber("SectionTitleBoxWidth",140)
+			local titleHeight=componentNumber("SectionTitleBoxHeight",componentNumber("SectionHeaderHeight",18))
+			titleButton.AnchorPoint=Vector2.new(0.5,0)
+			titleButton.Position=UDim2.new(0.5,0,0,componentNumber("SectionTitleOffsetY",-2))
+			titleButton.Size=UDim2.fromOffset(titleWidth,titleHeight)
+			titleButton.BackgroundColor3=themeColor("SECTION",colors.card)
+			titleButton.BackgroundTransparency=componentNumber("SectionTitleBackgroundTransparency",0)
+			titleButton.TextXAlignment=Enum.TextXAlignment.Center
+			titleButton:SetAttribute("ThemeRole","SECTION")
+		elseif sectionMode=="label" then
+			titleButton.TextXAlignment=Enum.TextXAlignment.Left
+		end
+
+		if options.headerToggle then
+			local toggleOptions=options.headerToggle
+			controls.toggle=createHeaderSwitch(header,toggleOptions.startState,toggleOptions.onChange,6)
+			controls.toggle.wrap.Position=UDim2.new(1,0,0.5,0)
+			headerRightOffset=controls.toggle.width+8
+		end
+
+		if headerCustomOptions then
+			local holder=make("Frame",{
+				Size=UDim2.fromOffset(headerCustomWidth,headerCustomHeight),
+				Position=UDim2.new(1,-headerRightOffset-headerCustomWidth,0.5,-headerCustomHeight/2),
+				BackgroundTransparency=1,
+				BorderSizePixel=0,
+				ClipsDescendants=false,
+				ZIndex=6,
+			},header)
+			controls.headerCustom=holder
+			headerRightOffset=headerRightOffset+headerCustomWidth+8
+
+			local build=headerCustomOptions.build or headerCustomOptions.Build
+			if type(build)=="function" then
+				build(holder,controls)
+			end
+		end
+
+		if headerButtonOptions then
+			local customBg=headerButtonOptions.backgroundColor or headerButtonOptions.BackgroundColor3
+			local explicitHoverBg=headerButtonOptions.hoverBackgroundColor or headerButtonOptions.HoverBackgroundColor3
+			local function headerButtonBg()
+				return customBg or (headerButtonOptions.danger and colors.red) or themeColor("BUTTON",colors.bg)
+			end
+			local function headerButtonHoverBg()
+				return explicitHoverBg or hoverColor(headerButtonBg(),headerButtonOptions.danger and 0.18 or 0.08)
+			end
+			local normalBg=headerButtonBg()
+			local textColor=headerButtonOptions.textColor or headerButtonOptions.TextColor3 or (headerButtonOptions.danger and Color3.fromRGB(0,0,0)) or colors.text
+			local headerButtonHeight=componentNumber("HeaderButtonHeight",22)
+			local button=make("TextButton",{Size=UDim2.fromOffset(headerButtonWidth,headerButtonHeight),Position=UDim2.new(1,-headerRightOffset-headerButtonWidth,0.5,-headerButtonHeight/2),BackgroundColor3=normalBg,BorderSizePixel=0,Text=headerButtonOptions.text or headerButtonOptions.Text or "ACTION",Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=11,TextColor3=textColor,SkipTextRole=headerButtonOptions.danger or headerButtonOptions.textColor~=nil or headerButtonOptions.TextColor3~=nil,AutoButtonColor=false,Selectable=true,ZIndex=6},header)
+			local buttonWrap=api.wrapTextButton(button,normalBg,2)
+			buttonWrap.BackgroundColor3=normalBg
+			if headerButtonOptions.themeRole or headerButtonOptions.ThemeRole then
+				buttonWrap:SetAttribute("ThemeRole",headerButtonOptions.themeRole or headerButtonOptions.ThemeRole)
+			elseif headerButtonOptions.danger then
+				buttonWrap:SetAttribute("ThemeRole","RED")
+			elseif not customBg then
+				buttonWrap:SetAttribute("ThemeRole","BUTTON")
+			end
+
+			connectSection(button.MouseEnter,function()
+				buttonWrap.BackgroundColor3=headerButtonHoverBg()
+			end)
+
+			connectSection(button.MouseLeave,function()
+				buttonWrap.BackgroundColor3=headerButtonBg()
+			end)
+
+			connectSection(button.Activated,function()
+				local fn=headerButtonOptions.onClick or headerButtonOptions.OnClick
+				if fn then
+					fn()
+				end
+			end)
+
+			controls.headerButton=button
+			controls.headerButtonWrap=buttonWrap
+		end
+
+		local subtitleLabel=nil
+		if subtitleText and subtitleText~="" then
+			subtitleLabel=make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,14),Text=subtitleText,Font=componentFont("TextFont",Enum.Font.Gotham),TextSize=componentNumber("SectionSubtitleSize",11),TextColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,LayoutOrder=2},sec)
+		end
+
+		local body=nil
+		local bodyLayout=nil
+		if hasBody then
+			body=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,Visible=true,ZIndex=5,LayoutOrder=3,ClipsDescendants=true},sec)
+			make("UIPadding",{PaddingTop=UDim.new(0,componentNumber("SectionBodyInset",2)),PaddingLeft=UDim.new(0,componentNumber("SectionBodyInset",2)),PaddingRight=UDim.new(0,componentNumber("SectionBodyInset",2)),PaddingBottom=UDim.new(0,componentNumber("SectionBodyInset",2))},body)
+			bodyLayout=make("UIListLayout",{Padding=UDim.new(0,componentNumber("SectionBodyGap",6)),SortOrder=Enum.SortOrder.LayoutOrder},body)
+		end
+		local bodyTween=nil
+		local lastBodyHeight=0
+
+		local function getBodyHeight()
+			if not body then return 0 end
+			local h=math.max(body.AbsoluteSize.Y,bodyLayout.AbsoluteContentSize.Y,lastBodyHeight)
+			return math.max(0,math.floor(h+0.5))
+		end
+
+		local function tweenTitle()
+			titleButton.TextTransparency=0.18
+			tweenService:Create(titleButton,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=0}):Play()
+			tweenService:Create(sec,TweenInfo.new(0.14,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{BackgroundColor3=themeColor("SECTION",colors.card)}):Play()
+		end
+
+		local function cancelBodyTween()
+			if bodyTween then
+				bodyTween:Cancel()
+				bodyTween=nil
+			end
+		end
+
+		local function destroySection()
+			if sectionDestroyed then return end
+			sectionDestroyed=true
+			cancelBodyTween()
+
+			if controls.toggle and type(controls.toggle.Destroy)=="function" then
+				pcall(controls.toggle.Destroy)
+			end
+
+			disconnectSectionConnections()
+		end
+
+		controls.Destroy=destroySection
+		controls.destroy=destroySection
+		connectSection(sec.Destroying,destroySection)
+
+		local function setSubtitleVisible(visible,animate)
+			if not subtitleLabel then return end
+
+			if visible then
+				subtitleLabel.Visible=true
+			end
+
+			if animate then
+				local tween=tweenService:Create(subtitleLabel,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{TextTransparency=visible and 0 or 1})
+				tween:Play()
+				tween.Completed:Connect(function()
+					if subtitleLabel and subtitleLabel.Parent and not visible then
+						subtitleLabel.Visible=false
+						subtitleLabel.TextTransparency=0
+					end
+				end)
+			else
+				subtitleLabel.Visible=visible
+				subtitleLabel.TextTransparency=0
+			end
+		end
+
+		local function collapseBody(animate)
+			cancelBodyTween()
+			lastBodyHeight=getBodyHeight()
+			if body then
+				body.Visible=true
+				body.AutomaticSize=Enum.AutomaticSize.None
+				body.Size=UDim2.new(1,0,0,lastBodyHeight)
+			end
+
+			if not animate then
+				if body then
+					body.Visible=false
+					body.Size=UDim2.new(1,0,0,0)
+				end
+				setSubtitleVisible(false,false)
+				return
+			end
+
+			setSubtitleVisible(false,true)
+			if not body then
+				return
+			end
+
+			bodyTween=tweenService:Create(body,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),{Size=UDim2.new(1,0,0,0)})
+			bodyTween:Play()
+			bodyTween.Completed:Connect(function()
+				if collapsed and body and body.Parent then
+					body.Visible=false
+					body.Size=UDim2.new(1,0,0,0)
+				end
+			end)
+		end
+
+		local function expandBody(animate)
+			cancelBodyTween()
+			setSubtitleVisible(true,animate)
+			if not body then
+				return
+			end
+
+			body.Visible=true
+			body.AutomaticSize=Enum.AutomaticSize.None
+			body.Size=UDim2.new(1,0,0,0)
+
+			local function playExpand()
+				local target=math.max(bodyLayout.AbsoluteContentSize.Y+4,lastBodyHeight)
+				target=math.max(0,math.floor(target+0.5))
+				lastBodyHeight=target
+
+				if not animate then
+					body.AutomaticSize=Enum.AutomaticSize.Y
+					body.Size=UDim2.new(1,0,0,0)
+					return
+				end
+
+				bodyTween=tweenService:Create(body,TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(1,0,0,target)})
+				bodyTween:Play()
+				bodyTween.Completed:Connect(function()
+					if not collapsed and body and body.Parent then
+						body.AutomaticSize=Enum.AutomaticSize.Y
+						body.Size=UDim2.new(1,0,0,0)
+					end
+				end)
+			end
+
+			task.defer(playExpand)
+		end
+
+		local function paint(animate)
+			titleButton.Text=(usesPrefix and ((collapsed and "[+] " or "[-] ")..titleText) or titleText)
+			if sectionMode=="groupbox" then
+				titleButton.Text=titleText
+			end
+
+			if controls.toggle and controls.toggle.setExpanded then
+				controls.toggle.setExpanded((not canCollapse) or not collapsed,animate)
+			end
+
+			tweenTitle()
+
+			if canCollapse then
+				if collapsed then
+					collapseBody(animate)
+				else
+					expandBody(animate)
+				end
+			end
+		end
+
+		if canCollapse then
+			connectSection(titleButton.Activated,function()
+				collapsed=not collapsed
+				paint(true)
+			end)
+		end
+
+		connectSection(sec:GetPropertyChangedSignal("AbsoluteSize"),function()
+			if body and not collapsed then
+				lastBodyHeight=getBodyHeight()
+			end
+		end)
+
+		paint(false)
+		return body or sec,controls
+	end
+
+	function api.makeBox(parent,w,textValue,placeholder)
+		local b=make("TextBox",{Size=UDim2.fromOffset(w,componentNumber("TextBoxHeight",28)),BackgroundColor3=themeColor("INPUT",colors.panel),BorderSizePixel=0,ClearTextOnFocus=false,Text=textValue,PlaceholderText=placeholder or "",Font=componentFont("TextFont",Enum.Font.Gotham),TextSize=componentNumber("InputTextSize",13),TextColor3=colors.text,PlaceholderColor3=colors.muted,ZIndex=6,ThemeRole="INPUT"},parent)
+		local wrap,stroke=api.wrapTextBox(b,themeColor("INPUT",colors.panel),2)
+		wrap:SetAttribute("ThemeRole","INPUT")
+		local boxConnections={}
+		local function connectBox(signal,fn)
+			local connection=signal:Connect(fn)
+			table.insert(boxConnections,connection)
+			return connection
+		end
+		local function cleanupBox()
+			for _,connection in ipairs(boxConnections) do
+				pcall(function()
+					connection:Disconnect()
+				end)
+			end
+			table.clear(boxConnections)
+		end
+
+		connectBox(b.Focused,function()
+			wrap.BackgroundColor3=themeColor("INPUT",colors.panel)
+			stroke.Thickness=1
+		end)
+
+		connectBox(b.FocusLost,function()
+			wrap.BackgroundColor3=themeColor("INPUT",colors.panel)
+			stroke.Thickness=1
+		end)
+
+		connectBox(b.Destroying,cleanupBox)
+
+		return b
+	end
+
+	function api.buildSlider(parent,labelText,minVal,maxVal,startVal,decimals,onChange)
+		labelText=tostring(labelText or "")
+		local hasLabel=labelText~=""
+		local s=shape()
+		local sliderHeight=s.SliderHeight or componentNumber("SliderHeight",26)
+		local rowHeight=math.max(componentNumber("SliderRowHeight",38),sliderHeight+10)
+		local valueBoxVisible=componentValue("SliderValueBoxVisible",true)~=false
+		local valueBoxWidth=valueBoxVisible and componentNumber("SliderValueBoxWidth",58) or 0
+		local valueBoxGap=valueBoxVisible and componentNumber("SliderValueBoxGap",8) or 0
+		local labelWidth=componentNumber("SliderLabelWidth",s.SliderStyle=="thin" and 116 or 128)
+		local trackGap=componentNumber("SliderTrackGap",8)
+		local rightPadding=componentNumber("SliderRightPadding",8)
+		local labelX=componentNumber("SliderLabelX",12)
+		local labelPlacement=tostring(componentValue("SliderLabelPlacement","above")):lower()
+		local labelHeight=componentNumber("SliderLabelHeight",s.SliderStyle=="thin" and 12 or 14)
+		local labelY=componentNumber("SliderLabelY",0)
+		local controlGap=componentNumber("SliderControlGap",4)
+		local bottomPadding=componentNumber("SliderBottomPadding",4)
+		if not hasLabel and labelPlacement=="above" then
+			labelHeight=0
+			controlGap=0
+		end
+		local trackLeft=labelX+labelWidth+trackGap
+		local trackRight=valueBoxWidth+valueBoxGap+rightPadding
+		local trackYScale=0.5
+		local trackYOffset=0
+		local labelPosition=UDim2.fromOffset(labelX,0)
+		local labelSize=UDim2.fromOffset(labelWidth,rowHeight)
+		local valueBoxYScale=0.5
+		local valueBoxYOffset=0
+
+		if labelPlacement=="above" then
+			rowHeight=math.max(rowHeight,labelY+labelHeight+controlGap+sliderHeight+bottomPadding)
+			trackLeft=labelX
+			trackYScale=0
+			trackYOffset=labelY+labelHeight+controlGap+(sliderHeight/2)
+			labelPosition=UDim2.fromOffset(labelX,labelY)
+			labelSize=UDim2.new(1,-(labelX+rightPadding),0,labelHeight)
+			valueBoxYScale=trackYScale
+			valueBoxYOffset=trackYOffset
+		end
+
+		local containerRole=tostring(componentValue("SliderContainerRole","SECTION"))
+		local containerCorner=tostring(componentValue("SliderContainerCornerRole",containerRole=="BUTTON" and "Control" or "Section"))
+		local trackRole=tostring(componentValue("SliderTrackRole","STROKE_SOFT"))
+		local valueRole=tostring(componentValue("SliderValueBoxRole","INPUT"))
+		local sliderTweenInfo=TweenInfo.new(componentNumber("SliderTweenTime",0.14),Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		local sliderGlowInfo=TweenInfo.new(componentNumber("SliderGlowTweenTime",0.16),Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+		local sliderGlowIdleTransparency=componentNumber("SliderGlowIdleTransparency",0.84)
+		local sliderGlowActiveTransparency=componentNumber("SliderGlowActiveTransparency",0.52)
+		local sliderGlowStrokeIdleTransparency=componentNumber("SliderGlowStrokeIdleTransparency",0.72)
+		local sliderGlowStrokeActiveTransparency=componentNumber("SliderGlowStrokeActiveTransparency",0.24)
+		local sliderFillTransparency=componentNumber("SliderFillTransparency",0)
+		local sliderTrackTransparency=componentNumber("SliderTrackTransparency",0.04)
+		local container=make("Frame",{BackgroundColor3=themeColor(containerRole,themeColor("SECTION",colors.card)),BackgroundTransparency=componentNumber("SliderContainerTransparency",1),BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole=containerRole,CornerRole=containerCorner},parent)
+		addCorner(container,containerCorner)
+		local containerStrokeTransparency=componentNumber("SliderContainerStrokeTransparency",1)
+		local containerStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=containerStrokeTransparency},container)
+		containerStroke:SetAttribute("BaseStrokeTransparency",containerStrokeTransparency)
+		make("TextLabel",{BackgroundTransparency=1,Position=labelPosition,Size=labelSize,Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false,Visible=hasLabel},container)
+
+		local track=make("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor(trackRole,colors.panel),BackgroundTransparency=sliderTrackTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=6,ThemeRole=trackRole,CornerRole="Slider"},container)
+		addCorner(track,"Slider")
+		local trackStrokeTransparency=componentNumber("SliderTrackStrokeTransparency",0.78)
+		local trackStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=trackStrokeTransparency},track)
+		trackStroke:SetAttribute("BaseStrokeTransparency",trackStrokeTransparency)
+
+		local fillGlow=make("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",colors.stroke),BackgroundTransparency=sliderGlowIdleTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=7,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
+		addCorner(fillGlow,"Slider")
+
+		local fill=make("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",colors.stroke),BackgroundTransparency=sliderFillTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=8,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
+		addCorner(fill,"Slider")
+		local fillStroke=make("UIStroke",{Color=themeColor("SLIDER_FILL",colors.stroke),Thickness=componentNumber("SliderGlowStrokeThickness",2),Transparency=sliderGlowStrokeIdleTransparency},fill)
+		fillStroke:SetAttribute("StrokeRole","Accent")
+		fillStroke:SetAttribute("BaseStrokeTransparency",sliderGlowStrokeIdleTransparency)
+
+		local knobVisible=componentValue("SliderKnobVisible",false)==true
+		local knobWidth=knobVisible and (s.SliderStyle=="windui" and 10 or (s.SliderStyle=="thin" and 2 or 3)) or 0
+		local knob=make("Frame",{AnchorPoint=Vector2.new(0.5,0.5),Size=UDim2.fromOffset(knobWidth,sliderHeight),Position=UDim2.new(0,0,0.5,0),BackgroundColor3=themeColor("SLIDER_FILL",colors.stroke),BackgroundTransparency=knobVisible and 0 or 1,BorderSizePixel=0,Visible=knobVisible,ZIndex=9,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
+		if knobVisible then
+			addCorner(knob,"Slider")
+		end
+
+		local hit=make("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=12,AutoButtonColor=false,Selectable=true},track)
+		local valueBoxHeight=componentNumber("SliderValueBoxHeight",math.max(componentNumber("TextBoxHeight",24),sliderHeight))
+		local valueBox=make("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor(valueRole,colors.panel),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole=valueRole,CornerRole="Control",Selectable=true},container)
+		valueBox.Visible=valueBoxVisible
+		addCorner(valueBox,"Control")
+		local valueStrokeTransparency=componentNumber("SliderValueBoxStrokeTransparency",componentNumber("ControlStrokeTransparency",0.78))
+		local valueStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=valueStrokeTransparency},valueBox)
+		valueStroke:SetAttribute("BaseStrokeTransparency",valueStrokeTransparency)
+		local value=startVal
+		local valueState=makeFusionValue(value)
+		local dragging=false
+		local dragInputType=nil
+		local dragOffset=nil
+		local sliderDestroyed=false
+		local fillTween=nil
+		local fillGlowTween=nil
+		local fillGlowFadeTween=nil
+		local fillStrokeTween=nil
+		local knobTween=nil
+		local glowSerial=0
+		local connections={}
+
+		local function connect(signal,fn)
+			local connection=signal:Connect(fn)
+			table.insert(connections,connection)
+			return connection
+		end
+
+		local function roundTo(v,d)
+			local m=10^d
+			return math.floor(v*m+0.5)/m
+		end
+
+		local function cancelSliderTweens()
+			if fillTween then
+				fillTween:Cancel()
+				fillTween=nil
+			end
+			if fillGlowTween then
+				fillGlowTween:Cancel()
+				fillGlowTween=nil
+			end
+			if fillGlowFadeTween then
+				fillGlowFadeTween:Cancel()
+				fillGlowFadeTween=nil
+			end
+			if fillStrokeTween then
+				fillStrokeTween:Cancel()
+				fillStrokeTween=nil
+			end
+			if knobTween then
+				knobTween:Cancel()
+				knobTween=nil
+			end
+		end
+
+		local function setVisual(v,animate)
+			local pct=math.clamp((v-minVal)/(maxVal-minVal),0,1)
+			local fillSize=UDim2.new(pct,0,1,0)
+			local knobPosition=UDim2.new(pct,0,0.5,0)
+
+			if animate then
+				cancelSliderTweens()
+				fillTween=tweenService:Create(fill,sliderTweenInfo,{Size=fillSize})
+				fillGlowTween=tweenService:Create(fillGlow,sliderTweenInfo,{Size=fillSize,BackgroundTransparency=sliderGlowActiveTransparency})
+				fillStrokeTween=tweenService:Create(fillStroke,sliderGlowInfo,{Transparency=sliderGlowStrokeActiveTransparency})
+				fillTween:Play()
+				fillGlowTween:Play()
+				fillStrokeTween:Play()
+
+				if knobVisible then
+					knobTween=tweenService:Create(knob,sliderTweenInfo,{Position=knobPosition})
+					knobTween:Play()
+				end
+
+				glowSerial=glowSerial+1
+				local thisGlow=glowSerial
+				task.delay(0.18,function()
+					if sliderDestroyed or thisGlow~=glowSerial or not fillGlow.Parent then
+						return
+					end
+					fillGlowFadeTween=tweenService:Create(fillGlow,sliderGlowInfo,{BackgroundTransparency=sliderGlowIdleTransparency})
+					fillGlowFadeTween:Play()
+					fillStrokeTween=tweenService:Create(fillStroke,sliderGlowInfo,{Transparency=sliderGlowStrokeIdleTransparency})
+					fillStrokeTween:Play()
+				end)
+			else
+				cancelSliderTweens()
+				fill.Size=fillSize
+				fillGlow.Size=fillSize
+				fillGlow.BackgroundTransparency=sliderGlowIdleTransparency
+				fillStroke.Transparency=sliderGlowStrokeIdleTransparency
+			end
+
+			if knobVisible then
+				knob.Position=knobPosition
+			end
+			valueBox.Text=fmtNumber(v,decimals)
+		end
+
+		local function valueFromPercent(percent)
+			local pct=math.clamp(percent,0,1)
+			return roundTo(minVal+(maxVal-minVal)*pct,decimals)
+		end
+
+		local function valueFromInput(input)
+			local x,_,w=objectLocalPointer(track,input,dragOffset)
+			return valueFromPercent(x/w)
+		end
+
+		local function setValue(v,fire)
+			v=roundTo(math.clamp(tonumber(v) or value,minVal,maxVal),decimals)
+			value=v
+			if valueState then
+				valueState:set(value)
+			end
+			setVisual(v,fire~=false)
+
+			if fire and onChange then
+				onChange(v)
+			end
+		end
+
+		local function keyboardStep()
+			local step=10^(-(tonumber(decimals) or 0))
+			if inputService:IsKeyDown(Enum.KeyCode.LeftShift) or inputService:IsKeyDown(Enum.KeyCode.RightShift) then
+				step=step*10
+			elseif inputService:IsKeyDown(Enum.KeyCode.LeftControl) or inputService:IsKeyDown(Enum.KeyCode.RightControl) then
+				step=step/10
+			end
+
+			return math.max(step,10^-4)
+		end
+
+		local function handleStep(input)
+			if input.KeyCode==Enum.KeyCode.Left or input.KeyCode==Enum.KeyCode.Down or input.KeyCode==Enum.KeyCode.DPadLeft or input.KeyCode==Enum.KeyCode.DPadDown then
+				setValue(value-keyboardStep(),true)
+				return true
+			elseif input.KeyCode==Enum.KeyCode.Right or input.KeyCode==Enum.KeyCode.Up or input.KeyCode==Enum.KeyCode.DPadRight or input.KeyCode==Enum.KeyCode.DPadUp then
+				setValue(value+keyboardStep(),true)
+				return true
+			end
+
+			return false
+		end
+
+		local function beginDrag(i)
+			if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+				dragging=true
+				dragInputType=i.UserInputType
+				dragOffset=pointerOffset(track,i)
+				valueBox:ReleaseFocus()
+				setValue(valueFromInput(i),true)
+			end
+		end
+
+		local function handleInputBegan(input)
+			if handleStep(input) then
+				return
+			end
+
+			beginDrag(input)
+		end
+
+		connect(hit.InputBegan,handleInputBegan)
+		connect(track.InputBegan,handleInputBegan)
+		connect(fill.InputBegan,handleInputBegan)
+
+		connect(inputService.InputChanged,function(i)
+			if not dragging then
+				return
+			end
+
+			if dragInputType==Enum.UserInputType.Touch then
+				if i.UserInputType==Enum.UserInputType.Touch then
+					setValue(valueFromInput(i),true)
+				end
+			elseif i.UserInputType==Enum.UserInputType.MouseMovement then
+				setValue(valueFromInput(i),true)
+			end
+		end)
+
+		connect(inputService.InputEnded,function(i)
+			if i.UserInputType==dragInputType or i.UserInputType==Enum.UserInputType.MouseButton1 then
+				dragging=false
+				dragInputType=nil
+				dragOffset=nil
+			end
+		end)
+
+		connect(valueBox.FocusLost,function()
+			setValue(valueBox.Text,true)
+		end)
+
+		local function destroySlider()
+			sliderDestroyed=true
+			dragging=false
+			dragInputType=nil
+			dragOffset=nil
+			cancelSliderTweens()
+			destroyFusionValue(valueState)
+			for _,connection in ipairs(connections) do
+				pcall(function()
+					connection:Disconnect()
+				end)
+			end
+			table.clear(connections)
+		end
+
+		setValue(startVal,false)
+		return{set=function(v) setValue(v,false) end,get=function() return value end,Destroy=destroySlider,destroy=destroySlider,valueState=valueState,box=valueBox,fill=fill,fillGlow=fillGlow,knob=knob,track=track}
+	end
+
+	function api.buildToggleLabel(parent,labelText,startState,onChange)
+		local height=componentNumber("ToggleLabelHeight",28)
+		local padX=componentNumber("ToggleLabelPaddingX",12)
+		local state=startState and true or false
+		local destroyed=false
+		local stateValue=makeFusionValue(state)
+		local connections={}
+		local textTween=nil
+
+		local tweenInfo=TweenInfo.new(
+			componentNumber("ToggleLabelTweenTime",0.56),
+			Enum.EasingStyle.Quart,
+			Enum.EasingDirection.Out
+		)
+
+		local textFont=componentFont("ToggleLabelFont",Enum.Font.GothamBold)
+		local textSize=componentNumber("ToggleLabelTextSize",14)
+
+		local row=make("TextButton",{
+			BackgroundTransparency=1,
+			BorderSizePixel=0,
+			ClipsDescendants=true,
+			Size=UDim2.new(1,0,0,height),
+			Text="",
+			AutoButtonColor=false,
+			Selectable=true,
+			ZIndex=5,
+			SkipThemeRole=true,
+		},parent)
+
+		local label=make("TextLabel",{
+			BackgroundTransparency=1,
+			Position=UDim2.fromOffset(padX,0),
+			Size=UDim2.new(1,-(padX*2),1,0),
+			Text=labelText,
+			Font=textFont,
+			TextSize=textSize,
+			TextColor3=themeColor("TEXT",colors.text or Color3.fromRGB(235,235,235)),
+			TextTransparency=0.08,
+			TextStrokeTransparency=1,
+			TextXAlignment=Enum.TextXAlignment.Left,
+			TextTruncate=Enum.TextTruncate.AtEnd,
+			ZIndex=6,
+			TextRole="TEXT",
+		},row)
+
+		local function connect(signal,fn)
+			local connection=signal:Connect(fn)
+			table.insert(connections,connection)
+			return connection
+		end
+
+		local function offColor()
+			return themeColor("TEXT",colors.text or Color3.fromRGB(235,235,235))
+		end
+
+		local function onColor()
+			local active=themeColor("STROKE",colors.stroke or themeColor("SLIDER_FILL",colors.accent or Color3.fromRGB(90,190,255)))
+			local inactive=offColor()
+
+			if math.abs(luminance(active)-luminance(inactive))<0.18 then
+				local target=luminance(inactive)<0.50 and Color3.new(1,1,1) or Color3.new(0,0,0)
+				active=active:Lerp(target,0.32)
+			end
+
+			return active
+		end
+
+		local function cancelTween()
+			if textTween then
+				pcall(function()
+					textTween:Cancel()
+				end)
+				textTween=nil
+			end
+		end
+
+		local function targetProps()
+			return{
+				TextColor3=state and onColor() or offColor(),
+				TextTransparency=state and 0 or 0.08,
+				TextStrokeTransparency=1,
+			}
+		end
+
+		local function applyVisuals(animate)
+			cancelTween()
+			local properties=targetProps()
+			label:SetAttribute("ThemeTextRole",state and "STROKE" or "TEXT")
+
+			if not animate then
+				for key,value in pairs(properties) do
+					label[key]=value
+				end
+				return
+			end
+
+			textTween=tweenService:Create(label,tweenInfo,properties)
+
+			local thisTween=textTween
+
+			textTween.Completed:Connect(function()
+				if textTween==thisTween then
+					textTween=nil
+					for key,value in pairs(properties) do
+						label[key]=value
+					end
+				end
+			end)
+
+			textTween:Play()
+		end
+
+		local function setState(value,fire,animate)
+			local nextState=value and true or false
+			local changed=nextState~=state
+
+			if not changed then
+				if animate==false then
+					applyVisuals(false)
+				end
+				return
+			end
+
+			state=nextState
+
+			if stateValue then
+				stateValue:set(state)
+			end
+
+			if animate~=false then
+				applyVisuals(true)
+			else
+				applyVisuals(false)
+			end
+
+			if fire and onChange then
+				onChange(state)
+			end
+		end
+
+		connect(row.Activated,function()
+			setState(not state,true,true)
+		end)
+
+		local function destroyToggleLabel()
+			if destroyed then return end
+			destroyed=true
+
+			cancelTween()
+			destroyFusionValue(stateValue)
+
+			for _,connection in ipairs(connections) do
+				pcall(function()
+					connection:Disconnect()
+				end)
+			end
+
+			table.clear(connections)
+
+			if row then
+				row:Destroy()
+			end
+		end
+
+		applyVisuals(false)
+
+		return{
+			set=function(v,animate)
+				if not destroyed then
+					setState(v,false,animate~=false)
+				end
+			end,
+
+			get=function()
+				return state
+			end,
+
+			Destroy=destroyToggleLabel,
+			destroy=destroyToggleLabel,
+			stateValue=stateValue,
+			wrap=row,
+			label=label,
+			activeLabel=label,
+			activeShadow=nil,
+			fill=nil,
+		}
+	end
+
+	function api.buildToggleRow(parent,labelText,startState,onChange)
+		local c=components()
+		local toggleStyle=tostring(c.ToggleStyle or "switch"):lower()
+		local toggleW=componentNumber("ToggleWidth",48)
+		local toggleH=componentNumber("ToggleHeight",20)
+		local rowHeight=componentNumber("ToggleRowHeight",math.max(30,toggleH+8))
+		local row=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5},parent)
+		local label=make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,-(toggleW+16),1,0),Text=labelText,Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("ToggleLabelSize",12),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},row)
+		if label.Text=="" then
+			label.Visible=false
+		end
+
+		local control=createSwitch(row,startState,onChange,nil,nil,nil,nil,6)
+		if toggleStyle=="checkbox" then
+			control.wrap.Position=UDim2.new(0,0,0.5,-control.height/2)
+			label.Position=UDim2.fromOffset(control.width+8,0)
+			label.Size=UDim2.new(1,-(control.width+8),1,0)
+		else
+			control.wrap.Position=UDim2.new(1,-control.width,0.5,-control.height/2)
+		end
+		return control
+	end
+
+	api.boxWrappers=boxWrappers
+	api.buttonWrappers=buttonWrappers
+
+	return api
+end
+
+local buildControls=guiLogic.new
+
+function guiLogic.new(app,page,...)
+	if page~=nil then
+		return app.ColorsLogicModule.new(app,page,...)
+	end
+	return buildControls(app)
+end
+
+return guiLogic

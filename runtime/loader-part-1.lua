@@ -703,7 +703,7 @@ modulePaths={
 	DesignThemeSakura="design/themes/sakura.lua",
 	Announcement="announcement.lua",
 	GuiFusion="gui/fusion.lua",
-	GuiLogic="gui/gui-logic.lua",
+	GuiLogic="features/colors/gui.lua",
 	UILibraryMap="gui/library-map.lua",
 	UIMap="gui/"..runtimePlatform..".luau",
 	MainFrame="platforms/"..runtimePlatform.."/gui/mainframe.lua",
@@ -773,7 +773,6 @@ local uiLibraryModulePaths={
 	"design/themes/sakura.lua",
 	"design/tokens.lua",
 	"gui/fusion.lua",
-	"gui/gui-logic.lua",
 	"gui/library-map.lua",
 }
 
@@ -829,7 +828,7 @@ end
 function setLoadedModuleByPath(path,loadedModule)
 	for name,modulePath in pairs(modulePaths) do
 		if modulePath==path then
-			return setLoadedModule(name,loadedModule)
+			setLoadedModule(name,loadedModule)
 		end
 	end
 
