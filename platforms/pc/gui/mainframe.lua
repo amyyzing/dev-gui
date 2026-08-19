@@ -1303,6 +1303,7 @@ function mainFrame.new(app)
 	end
 
 	function api.RefreshTheme()
+		api.RefreshHeaderArt()
 		pageShell.BackgroundTransparency=pageShellTransparency
 		pageSlider.BackgroundTransparency=pageSliderTransparency
 		applyChromeProfile()

@@ -303,6 +303,7 @@ def test_header_art_is_center_cropped_for_every_theme():
         assert "api.headerArt.Visible=false" in shell
         assert 'if style.UseThemePalette==false or type(app.getHeaderArt)~="function" then' in shell
         assert "pcall(app.getHeaderArt,id)" in shell
+        assert "function api.RefreshTheme()\n\t\tapi.RefreshHeaderArt()" in shell
         assert "avatarStroke.Color=getUIStrokeColor()" in shell
 
 
