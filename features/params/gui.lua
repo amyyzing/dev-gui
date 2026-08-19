@@ -212,7 +212,6 @@ function paramsGui.new(app,parent)
 	local selectorRoot=nil
 	local selectorImage=nil
 	local selectorHighlight=nil
-	local selectorGlows={}
 	local selectorFallback=nil
 	local currentPage=nil
 	local pageTweens={}
@@ -502,16 +501,6 @@ function paramsGui.new(app,parent)
 				end
 			end
 
-			for index,glow in ipairs(selectorGlows) do
-				local transparency=index==1 and 0.54 or 0.78
-				if animate then
-					tweenObject(glow,{ImageColor3=haloColor,ImageTransparency=transparency},glowTween)
-				else
-					glow.ImageColor3=haloColor
-					glow.ImageTransparency=transparency
-				end
-			end
-
 			if selectorFallback then
 				if animate then
 					tweenObject(selectorFallback,{BackgroundColor3=coreColor,BackgroundTransparency=0.10})
@@ -635,7 +624,7 @@ function paramsGui.new(app,parent)
 			end
 
 			for _,sector in ipairs(wheelSectors) do
-				if inAngleRange(angle,sector.start,sector.finish) then
+				if inAngleRange(angle,sector.start+wheelGapDegrees/2,sector.finish-wheelGapDegrees/2) then
 					return sector.key
 				end
 			end
@@ -718,23 +707,7 @@ function paramsGui.new(app,parent)
 
 		local selectorAssets=assets and assets.speed
 		local selectorPiece=selectorAssets and (selectorAssets.normalPiece or selectorAssets.piece)
-		local selectorGlow=selectorAssets and (selectorAssets.glowPiece or selectorAssets.glow)
-		if selectorPiece and selectorGlow then
-			for _,layer in ipairs(wheelGlowLayers) do
-				local pad=layer.pad
-				selectorGlows[#selectorGlows+1]=make("ImageLabel",{
-					BackgroundTransparency=1,
-					Position=UDim2.fromOffset(-pad,-pad),
-					Size=UDim2.new(1,pad*2,1,pad*2),
-					Image=selectorGlow,
-					ImageColor3=inputColor(),
-					ImageTransparency=1,
-					ResampleMode=Enum.ResamplerMode.Default,
-					ScaleType=Enum.ScaleType.Stretch,
-					ZIndex=7,
-				},selectorRoot)
-			end
-
+		if selectorPiece then
 			selectorImage=make("ImageLabel",{
 				BackgroundTransparency=1,
 				Size=UDim2.fromScale(1,1),
@@ -784,7 +757,7 @@ function paramsGui.new(app,parent)
 				ImageTransparency=0.03,
 				ResampleMode=Enum.ResamplerMode.Default,
 				ScaleType=Enum.ScaleType.Stretch,
-				ZIndex=8,
+				ZIndex=12,
 			},canvas)
 		end
 

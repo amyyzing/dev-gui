@@ -231,7 +231,7 @@ function guiLogic.new(app)
 
 		local onRole=tostring(c.ToggleOnRole or "SLIDER_FILL")
 		local accent=themeRoleColor(onRole,themeColor("SLIDER_FILL",colors.green or Color3.fromRGB(32,202,106)))
-		local input=themeColor("STROKE_SOFT",colors.softStroke or themeColor("SLIDER_BG",themeColor("INPUT",colors.panel or Color3.fromRGB(18,18,24))))
+		local input=themeColor("MUTED",colors.muted or Color3.fromRGB(145,145,155))
 		local muted=themeColor("MUTED",colors.muted or Color3.fromRGB(145,145,155))
 		local tickHeight=math.max(6,height-10)
 		local state=startState and true or false
@@ -248,10 +248,11 @@ function guiLogic.new(app)
 		local wrap=make("Frame",{
 			Size=UDim2.fromOffset(width,height),
 			BackgroundColor3=input,
+			BackgroundTransparency=0.70,
 			BorderSizePixel=0,
 			ClipsDescendants=true,
 			ZIndex=zIndex,
-			ThemeRole="STROKE_SOFT",
+			ThemeRole="MUTED",
 			CornerRole="Control",
 		},parent)
 		addCorner(wrap,"Control")
@@ -333,14 +334,14 @@ function guiLogic.new(app)
 			cancelTweens()
 
 			local currentAccent=themeRoleColor(onRole,themeColor("SLIDER_FILL",colors.green or Color3.fromRGB(32,202,106)))
-			local currentBg=themeColor("STROKE_SOFT",colors.softStroke or themeColor("SLIDER_BG",themeColor("INPUT",colors.panel or Color3.fromRGB(18,18,24))))
+			local currentBg=themeColor("MUTED",colors.muted or Color3.fromRGB(145,145,155))
 			local currentMuted=themeColor("MUTED",colors.muted or Color3.fromRGB(145,145,155))
 			local onTextColor=readableOn(currentAccent)
 			local fillSize=state and UDim2.new(1,0,1,0) or UDim2.new(0,0,1,0)
 			local fillTransparency=0
 			local bgColor=currentBg
 
-			wrap:SetAttribute("ThemeRole","STROKE_SOFT")
+			wrap:SetAttribute("ThemeRole","MUTED")
 
 			if not animate then
 				wrap.BackgroundColor3=bgColor
@@ -999,7 +1000,7 @@ function guiLogic.new(app)
 
 		local containerRole=tostring(componentValue("SliderContainerRole","SECTION"))
 		local containerCorner=tostring(componentValue("SliderContainerCornerRole",containerRole=="BUTTON" and "Control" or "Section"))
-		local trackRole=tostring(componentValue("SliderTrackRole","STROKE_SOFT"))
+		local trackRole="MUTED"
 		local valueRole=tostring(componentValue("SliderValueBoxRole","INPUT"))
 		local sliderTweenInfo=TweenInfo.new(componentNumber("SliderTweenTime",0.14),Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 		local sliderGlowInfo=TweenInfo.new(componentNumber("SliderGlowTweenTime",0.16),Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
@@ -1008,7 +1009,7 @@ function guiLogic.new(app)
 		local sliderGlowStrokeIdleTransparency=componentNumber("SliderGlowStrokeIdleTransparency",0.72)
 		local sliderGlowStrokeActiveTransparency=componentNumber("SliderGlowStrokeActiveTransparency",0.24)
 		local sliderFillTransparency=componentNumber("SliderFillTransparency",0)
-		local sliderTrackTransparency=componentNumber("SliderTrackTransparency",0.04)
+		local sliderTrackTransparency=0.70
 		local container=make("Frame",{BackgroundColor3=themeColor(containerRole,themeColor("SECTION",colors.card)),BackgroundTransparency=componentNumber("SliderContainerTransparency",1),BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole=containerRole,CornerRole=containerCorner},parent)
 		addCorner(container,containerCorner)
 		local containerStrokeTransparency=componentNumber("SliderContainerStrokeTransparency",1)

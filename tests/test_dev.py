@@ -261,8 +261,58 @@ def test_theme_and_idle_controls_refresh_immediately():
     assert "tweenStyleTo" not in theme_apply
     assert 'TextRole="TEXT"' in gui_logic
     assert 'label:SetAttribute("ThemeTextRole",state and "STROKE" or "TEXT")' in gui_logic
-    assert gui_logic.count('ThemeRole="STROKE_SOFT"') >= 1
-    assert 'componentValue("SliderTrackRole","STROKE_SOFT")' in gui_logic
+    assert gui_logic.count('ThemeRole="MUTED"') >= 1
+    assert 'local trackRole="MUTED"' in gui_logic
+    assert 'local sliderTrackTransparency=0.70' in gui_logic
+
+
+def test_theme_palette_can_be_unlocked_and_text_refreshes():
+    runtime = read("runtime/loader-part-1.lua")
+    colors = read("features/colors/logic.lua")
+
+    assert "if style.UseThemePalette~=false then" in runtime
+    assert "style.UseThemePalette=true" in colors
+    assert "style.UseThemePalette=false" in colors
+    assert 'style.UseThemePalette~=false' in colors
+    assert 'Font=Enum.Font.Gotham,' in colors
+    assert 'Font=Enum.Font.GothamBold,\n\t\t\tTextSize=11' not in colors
+
+
+def test_header_art_is_center_cropped_for_every_theme():
+    runtime = read("runtime/loader-part-1.lua")
+    names = {"raycast", "everforest", "proof", "linear", "material", "absolutely"}
+    for name in names:
+        image = ROOT / "assets" / "headers" / f"{name}.png"
+        assert image.is_file() and image.stat().st_size > 1000
+        assert f'{name}="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/{name}.png"' in runtime
+
+    for platform in ("pc", "mobile"):
+        shell = read(f"platforms/{platform}/gui/mainframe.lua")
+        assert 'Name="HeaderArt"' in shell
+        assert "ScaleType=Enum.ScaleType.Crop" in shell
+        assert "pcall(app.getHeaderArt,id)" in shell
+        assert "avatarStroke.Color=getUIStrokeGradientColor()" in shell
+
+
+def test_rgb_labels_bypass_description_aliases():
+    runtime = read("runtime/loader-part-1.lua")
+    colors = read("features/colors/logic.lua")
+    description = read("gui/description.lua")
+
+    assert '["R"]="radius"' in description
+    assert '["G"]="gravity"' in description
+    assert "local skipTranslation=properties.SkipTranslation" in runtime
+    assert "if not skipTranslation and properties.Text~=nil" in runtime
+    assert "SkipTranslation=true" in colors
+
+
+def test_params_selector_stays_inside_its_ring_and_gaps_are_not_clickable():
+    params = read("features/params/gui.lua")
+    assert "sector.start+wheelGapDegrees/2" in params
+    assert "sector.finish-wheelGapDegrees/2" in params
+    assert "local selectorGlow=" not in params
+    assert "local selectorGlows=" not in params
+    assert "ZIndex=12" in params
 
 
 def test_dev_controls_use_an_authorized_module_path():

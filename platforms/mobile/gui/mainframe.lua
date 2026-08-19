@@ -431,6 +431,43 @@ function mainFrame.new(app)
 	make("UICorner",{CornerRadius=UDim.new(0,0)},header)
 	local headerStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=headerStrokeTransparency},header)
 	headerStroke:SetAttribute("BaseStrokeTransparency",headerStrokeTransparency)
+	api.headerArt=make("ImageLabel",{
+		Name="HeaderArt",
+		BackgroundTransparency=1,
+		Size=UDim2.fromScale(1,1),
+		Image="",
+		ImageTransparency=0.08,
+		ScaleType=Enum.ScaleType.Crop,
+		ClipsDescendants=true,
+		ZIndex=4,
+		SkipThemeRole=true,
+	},header)
+	make("Frame",{
+		BackgroundColor3=colors.topbar or colors.bg,
+		BackgroundTransparency=0.42,
+		BorderSizePixel=0,
+		Size=UDim2.fromScale(1,1),
+		ZIndex=4,
+		ThemeRole="TOPBAR",
+	},header)
+	api.headerArtToken=0
+	function api.RefreshHeaderArt()
+		api.headerArtToken=api.headerArtToken+1
+		local token=api.headerArtToken
+		local profile=currentProfile()
+		local id=tostring(profile and profile.Id or "raycast"):lower()
+		if type(app.getHeaderArt)~="function" then
+			api.headerArt.Visible=false
+			return
+		end
+		task.spawn(function()
+			local ok,image=pcall(app.getHeaderArt,id)
+			if destroyed or token~=api.headerArtToken or not api.headerArt.Parent then return end
+			api.headerArt.Image=ok and image or ""
+			api.headerArt.Visible=ok and type(image)=="string" and image~=""
+		end)
+	end
+	api.RefreshHeaderArt()
 	api.avatar=make("ImageLabel",{
 		Name="PlayerAvatar",
 		BackgroundColor3=colors.card or colors.panel,
@@ -1357,11 +1394,13 @@ function mainFrame.new(app)
 		applyChromeProfile()
 		paintPageTabs()
 		paintResizeHandle(resizing)
+		avatarStroke.Color=getUIStrokeGradientColor()
 		bumpFusionValue(profileVersionValue)
 	end
 
 	function api.ApplyProfile(profile)
 		loadProfile(profile or currentProfile())
+		api.RefreshHeaderArt()
 		loadLayoutNumbers()
 
 		windowState.MinW=layoutNumber(windowProfile,"MinW",windowState.MinW or 560)
@@ -1413,6 +1452,7 @@ function mainFrame.new(app)
 	end
 
 	function api.Destroy()
+		api.headerArtToken=api.headerArtToken+1
 		safeDisconnect(dragConn)
 		dragConn=nil
 		cleanupAll()

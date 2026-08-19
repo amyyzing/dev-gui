@@ -128,6 +128,51 @@ colors=setmetatable({
 	end,
 })
 
+local headerArtUrls={
+	raycast="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/raycast.png",
+	everforest="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/everforest.png",
+	proof="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/proof.png",
+	linear="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/linear.png",
+	material="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/material.png",
+	absolutely="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/absolutely.png",
+}
+local headerArtCache={}
+
+function getHeaderArt(id)
+	id=tostring(id or "raycast"):lower()
+	if headerArtCache[id] then
+		return headerArtCache[id]
+	end
+
+	local url=headerArtUrls[id]
+	local assetFn=getcustomasset or getsynasset
+	if not url or type(writefile)~="function" or type(assetFn)~="function" then
+		return nil
+	end
+
+	local path="dev_gui_header_"..id.."_1.png"
+	local exists=type(isfile)=="function" and isfile(path)
+	if not exists then
+		local ok,data=pcall(function()
+			return game:HttpGet(url,true)
+		end)
+		if not ok or type(data)~="string" or #data<8 then
+			return nil
+		end
+		local wrote=pcall(writefile,path,data)
+		if not wrote then
+			return nil
+		end
+	end
+
+	local ok,asset=pcall(assetFn,path)
+	if ok and type(asset)=="string" then
+		headerArtCache[id]=asset
+		return asset
+	end
+	return nil
+end
+
 style={}
 
 windowState={}
@@ -336,6 +381,7 @@ function make(class, properties, parent)
 	properties=properties or {}
 	local skipThemeRole=properties.SkipThemeRole
 	local skipTextRole=properties.SkipTextRole
+	local skipTranslation=properties.SkipTranslation
 	local forcedThemeRole=properties.ThemeRole
 	local forcedTextRole=properties.TextRole
 	local forcedStrokeRole=properties.StrokeRole
@@ -344,6 +390,7 @@ function make(class, properties, parent)
 
 	properties.SkipThemeRole=nil
 	properties.SkipTextRole=nil
+	properties.SkipTranslation=nil
 	properties.ThemeRole=nil
 	properties.TextRole=nil
 	properties.StrokeRole=nil
@@ -363,8 +410,8 @@ function make(class, properties, parent)
 		properties.TextStrokeTransparency=1
 		properties.TextStrokeColor3=Color3.fromRGB(0, 0, 0)
 		if properties.TextYAlignment==nil then properties.TextYAlignment=Enum.TextYAlignment.Center end
-		if properties.Text~=nil then properties.Text=translateUIText(properties.Text) end
-		if properties.PlaceholderText~=nil then properties.PlaceholderText=translateUIText(properties.PlaceholderText) end
+		if not skipTranslation and properties.Text~=nil then properties.Text=translateUIText(properties.Text) end
+		if not skipTranslation and properties.PlaceholderText~=nil then properties.PlaceholderText=translateUIText(properties.PlaceholderText) end
 
 		if class=="TextBox" then
 			properties.TextSize=properties.TextSize or 13
@@ -2111,8 +2158,10 @@ function refreshThemePalette()
 	local libStyle=getUILibRuntimeStyle(libId)
 	local libTheme=libStyle and libStyle.Theme or {}
 
-	for role,color in pairs(libTheme) do
-		colors[role]=color
+	if style.UseThemePalette~=false then
+		for role,color in pairs(libTheme) do
+			colors[role]=color
+		end
 	end
 
 	local tones=libStyle and libStyle.Tones

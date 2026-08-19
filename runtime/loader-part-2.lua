@@ -91,6 +91,7 @@ mainFrame=MainFrameModule.new({
 	getUIPrimaryColor=getUIPrimaryColor,
 	getUIStrokeColor=getUIStrokeColor,
 	getUIStrokeGradientColor=getUIStrokeGradientColor,
+	getHeaderArt=getHeaderArt,
 	isAlive=function()
 		return toolAlive
 	end,

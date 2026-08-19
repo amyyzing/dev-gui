@@ -25,6 +25,7 @@ local styleDefaults={
 	StrokeTransparency=0.84,
 	CornerRadius=0,
 	UILib="raycast",
+	UseThemePalette=true,
 	ThemePanelExpanded=false,
 	ColoursPanelExpanded=false,
 	HighlightPanelExpanded=false,
@@ -132,6 +133,7 @@ local colorFields={
 local boolFields={
 	StrokeGradient=true,
 	LiquidStroke=true,
+	UseThemePalette=true,
 	ThemePanelExpanded=true,
 	ColoursPanelExpanded=true,
 	HighlightPanelExpanded=true,
@@ -1025,6 +1027,7 @@ function colors.new(app,page)
 			Position=UDim2.fromOffset(0,0),
 			Size=UDim2.fromOffset(labelWidth,28),
 			Text=labelText,
+			SkipTranslation=true,
 			Font=Enum.Font.GothamBold,
 			TextSize=12,
 			TextColor3=colors.text,
@@ -1050,13 +1053,14 @@ function colors.new(app,page)
 		addCorner(valueBox,"Control")
 
 		local track=make("Frame",{
-			BackgroundColor3=themeColor("SLIDER_BG",colors.bg),
+			BackgroundColor3=themeColor("MUTED",colors.muted),
+			BackgroundTransparency=0.70,
 			BorderSizePixel=0,
 			Position=UDim2.fromOffset(labelWidth+4,9),
 			Size=UDim2.new(1,-(labelWidth+64),0,10),
 			ClipsDescendants=true,
 			ZIndex=6,
-			ThemeRole="SLIDER_BG",
+			ThemeRole="MUTED",
 			CornerRole="Slider",
 		},row)
 		addCorner(track,"Slider")
@@ -1374,6 +1378,7 @@ function colors.new(app,page)
 
 	local function applyThemePreset(preset)
 		style.UILib=preset.Id
+		style.UseThemePalette=true
 		setPrimaryColour(preset.Primary)
 		setMainColour(preset.Stroke)
 		setGradientColour(preset.Gradient)
@@ -1421,7 +1426,7 @@ function colors.new(app,page)
 			Position=UDim2.fromOffset(6,0),
 			Size=UDim2.new(1,-12,1,0),
 			Text=preset.Name,
-			Font=Enum.Font.GothamBold,
+			Font=Enum.Font.Gotham,
 			TextSize=11,
 			TextColor3=textColor,
 			SkipTextRole=true,
@@ -1431,7 +1436,13 @@ function colors.new(app,page)
 		},card)
 
 		trackConnection(card.Activated:Connect(function()
-			applyThemePreset(preset)
+			if tostring(style.UILib or ""):lower()==preset.Id and style.UseThemePalette~=false then
+				style.UseThemePalette=false
+				updateEverything()
+				syncPickerControls()
+			else
+				applyThemePreset(preset)
+			end
 		end))
 
 		themeCards[#themeCards+1]={Preset=preset,Card=card,Marker=marker,label=label}
@@ -2449,13 +2460,12 @@ function colors.new(app,page)
 	end)
 
 	paintChoices=function()
-		local primary=getUIPrimaryColor()
 		local stroke=getUIStrokeColor()
 		local activeColor=getActiveColor()
 
 		for _,entry in ipairs(themeCards) do
 			local preset=entry.Preset
-			local selected=tostring(style.UILib or ""):lower()==preset.Id and colorsMatch(primary,preset.Primary) and colorsMatch(stroke,preset.Stroke)
+			local selected=tostring(style.UILib or ""):lower()==preset.Id and style.UseThemePalette~=false
 
 			entry.Card.BackgroundColor3=selected and preset.Primary:Lerp(readableTextColor(preset.Primary),0.06) or preset.Primary
 			entry.Marker.Visible=selected
