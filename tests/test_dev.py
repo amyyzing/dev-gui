@@ -8,10 +8,18 @@ def read(relative_path: str) -> str:
     return (ROOT / relative_path).read_text(encoding="utf-8")
 
 
+def test_dump_file_names_stay_short_and_flat():
+    assert {path.name for path in (ROOT / "dump").glob("*.lua")} == {
+        "api.lua", "conn.lua", "create.lua", "init.lua", "input.lua", "lib.lua",
+        "life.lua", "load.lua", "save.lua", "start.lua", "ui.lua",
+    }
+    assert not any(path.is_file() for path in (ROOT / "dump").glob("*/*.lua"))
+
+
 def test_loader_is_bound_to_dev_gui_source_and_dump_bootstrap():
     loader = read("loader.lua")
     assert 'MODULE_SOURCE="dev-gui"' in loader
-    assert 'BOOTSTRAP_PATH="dump/runtime/bootstrap.lua"' in loader
+    assert 'BOOTSTRAP_PATH="dump/start.lua"' in loader
     assert 'DEFAULT_API_KEY="dev-gui"' in loader
     assert "DEV_GUI_BOOT_CONFIG" in loader
     assert "GUI_BOOT_CONFIG" not in loader.replace("DEV_GUI_BOOT_CONFIG", "")
@@ -36,7 +44,7 @@ def test_dump_init_is_the_single_composition_boundary():
 
 
 def test_public_syntax_stays_small_and_options_based():
-    syntax = read("dump/syntax/init.lua")
+    syntax = read("dump/ui.lua")
     for name in (
         "Page", "Category", "Section", "Label", "Button", "Toggle", "Slider",
         "Input", "Dropdown", "Keybind", "Row", "Column", "Spacer", "Divider",
@@ -47,7 +55,7 @@ def test_public_syntax_stays_small_and_options_based():
 
 
 def test_dropdown_handle_is_declared_before_its_click_callback_closes_over_it():
-    adapter = read("dump/adapters/ui-library.lua")
+    adapter = read("dump/lib.lua")
     dropdown = adapter.split("function api.createDropdown", 1)[1].split(
         "function api.createKeybind", 1
     )[0]
@@ -57,7 +65,7 @@ def test_dropdown_handle_is_declared_before_its_click_callback_closes_over_it():
 
 
 def test_discord_controller_has_no_ui_constructor_dependencies():
-    controller = read("features/discord/controller.lua")
+    controller = read("features/discord/core.lua")
     for forbidden in ("makeSection", "wrapTextButton", 'make("', "app.UI", "colors"):
         assert forbidden not in controller
 
@@ -68,7 +76,7 @@ def test_discord_controller_has_no_ui_constructor_dependencies():
 
 
 def test_discord_refresh_clears_a_stale_invite_before_publishing():
-    controller = read("features/discord/controller.lua")
+    controller = read("features/discord/core.lua")
     assert controller.count("snapshot.inviteLink=nil") >= 2
     assert "snapshot.inviteLink=inviteLink" in controller
 
@@ -90,16 +98,16 @@ def test_new_modules_are_registered_for_remote_loading():
     runtime = read("runtime/loader-part-1.lua")
     for module_path in (
         "dump/init.lua",
-        "dump/runtime/connections.lua",
-        "dump/runtime/lifecycle.lua",
-        "dump/runtime/input.lua",
-        "dump/syntax/init.lua",
-        "dump/ui/create.lua",
-        "dump/adapters/ui-library.lua",
-        "dump/services/api.lua",
-        "dump/services/module-loader.lua",
-        "dump/services/persistence.lua",
-        "features/discord/controller.lua",
+        "dump/conn.lua",
+        "dump/life.lua",
+        "dump/input.lua",
+        "dump/ui.lua",
+        "dump/create.lua",
+        "dump/lib.lua",
+        "dump/api.lua",
+        "dump/load.lua",
+        "dump/save.lua",
+        "features/discord/core.lua",
         "features/discord/view.lua",
     ):
         assert module_path in runtime

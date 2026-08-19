@@ -199,7 +199,7 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertIn("DEV_GUI_BOOT_CONFIG", loader)
         self.assertIn('DEFAULT_API_KEY="dev-gui"', loader)
         self.assertIn('MODULE_SOURCE="dev-gui"', loader)
-        self.assertIn('BOOTSTRAP_PATH="dump/runtime/bootstrap.lua"', loader)
+        self.assertIn('BOOTSTRAP_PATH="dump/start.lua"', loader)
         self.assertIn('API_URL.."/module/get"', loader)
         self.assertIn('manualReloadPath="loader.lua"', runtime)
         self.assertNotIn('manualReloadPath="main.lua"', runtime)

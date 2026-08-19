@@ -4,7 +4,7 @@ local HttpService=game:GetService("HttpService")
 
 local API_URL="https://lint-bot-production.up.railway.app"
 local MODULE_SOURCE="dev-gui"
-local BOOTSTRAP_PATH="dump/runtime/bootstrap.lua"
+local BOOTSTRAP_PATH="dump/start.lua"
 local DEFAULT_API_KEY="dev-gui"
 local MAX_BOOTSTRAP_BYTES=300000
 

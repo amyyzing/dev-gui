@@ -12,7 +12,7 @@ def source(path):
 
 class BootstrapContracts(unittest.TestCase):
     def test_fresh_boot_is_forwarded_without_shared_disk_cache(self):
-        bootstrap = source("dump/runtime/bootstrap.lua")
+        bootstrap = source("dump/start.lua")
         self.assertIn("if fresh then body.fresh=true end", bootstrap)
         self.assertNotIn("readCachedSource", bootstrap)
         self.assertNotIn("gui-runtime-cache", bootstrap)

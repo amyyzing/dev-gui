@@ -24,10 +24,10 @@ The deployed `DEV_GUI_KEY` must be `dev-gui`, matching the loader's clone-only r
 
 ## Structure
 
-- `loader.lua` is the stable entry and loads `dump/runtime/bootstrap.lua` through Railway.
+- `loader.lua` is the stable entry and loads `dump/start.lua` through Railway.
 - `dump/init.lua` is the only public entry into implementation details.
-- `dump/syntax/` exposes the small `UI.createThing(parent, options)` API.
-- `dump/adapters/` is the only layer that knows the positional 495 UI-library helpers.
+- `dump/ui.lua` exposes the small `UI.createThing(parent, options)` API.
+- `dump/lib.lua` is the only file that knows the positional 495 UI-library helpers.
 - `features/*/controller.lua` owns behavior; `view.lua` owns composition.
 
 The Discord settings feature is the first migrated controller/view example. Existing features continue to run through the legacy runtime while they are migrated incrementally.
