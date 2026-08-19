@@ -3,15 +3,15 @@ local dataSave={}
 local httpService=game:GetService("HttpService")
 
 local defaultStyleValues={
-	PrimaryR=17,
-	PrimaryG=17,
-	PrimaryB=20,
+	PrimaryR=16,
+	PrimaryG=16,
+	PrimaryB=16,
 	StrokeR=255,
-	StrokeG=90,
-	StrokeB=163,
-	GradientR=124,
-	GradientG=92,
-	GradientB=255,
+	StrokeG=99,
+	StrokeB=99,
+	GradientR=207,
+	GradientG=47,
+	GradientB=152,
 	StrokeGradient=false,
 	LiquidStroke=false,
 	LiquidStrokeSpeed=1,
@@ -108,16 +108,44 @@ local function themeId(value)
 	return validThemes[id] and id or "raycast"
 end
 
+local themeColorFields={"PrimaryR","PrimaryG","PrimaryB","StrokeR","StrokeG","StrokeB","GradientR","GradientG","GradientB"}
+local oldThemeColors={
+	raycast={17,17,20,255,90,163,124,92,255},
+	catppuccin={30,30,46,203,166,247,137,180,250},
+	everforest={253,246,227,141,161,1,53,167,124},
+	dracula={40,42,54,189,147,249,255,121,198},
+	linear={16,16,20,94,106,210,138,143,152},
+	material={18,18,18,3,218,198,187,134,252},
+	absolutely={9,9,12,168,85,247,236,72,153},
+}
+
+local function migrateThemeColors(style,rawId,themes)
+	local raw=tostring(rawId or ""):lower()
+	local id=themeId(raw)
+	local old=oldThemeColors[raw] or oldThemeColors[id]
+	local defaults=themes and themes[id] and themes[id].Defaults
+	if not old or not defaults then return id end
+
+	for i,field in ipairs(themeColorFields) do
+		if tonumber(style[field])~=old[i] then return id end
+	end
+
+	for _,field in ipairs(themeColorFields) do
+		style[field]=defaults[field]
+	end
+	return id
+end
+
 local styleNumberFields={
-	{"primaryR","PrimaryR",0,255,17},
-	{"primaryG","PrimaryG",0,255,17},
-	{"primaryB","PrimaryB",0,255,20},
+	{"primaryR","PrimaryR",0,255,16},
+	{"primaryG","PrimaryG",0,255,16},
+	{"primaryB","PrimaryB",0,255,16},
 	{"strokeR","StrokeR",0,255,255},
-	{"strokeG","StrokeG",0,255,90},
-	{"strokeB","StrokeB",0,255,163},
-	{"gradientR","GradientR",0,255,124},
-	{"gradientG","GradientG",0,255,92},
-	{"gradientB","GradientB",0,255,255},
+	{"strokeG","StrokeG",0,255,99},
+	{"strokeB","StrokeB",0,255,99},
+	{"gradientR","GradientR",0,255,207},
+	{"gradientG","GradientG",0,255,47},
+	{"gradientB","GradientB",0,255,152},
 	{"liquidStrokeSpeed","LiquidStrokeSpeed",0,2,1},
 	{"strokeThickness","StrokeThickness",0,8,1},
 	{"strokeTransparency","StrokeTransparency",0,1,0.55},
@@ -965,7 +993,8 @@ function dataSave.new(app)
 				app.style.HighlightSelectedState=tostring(uiStyle.HighlightSelectedState)
 			end
 
-			app.style.UILib=themeId(uiStyle.uiLib or defaultUIStyle.UILib)
+			local savedTheme=uiStyle.uiLib or uiStyle.UILib or defaultUIStyle.UILib
+			app.style.UILib=migrateThemeColors(app.style,savedTheme,app.themes)
 			app.style.CornerRadius=0
 		end
 

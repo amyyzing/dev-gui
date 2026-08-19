@@ -40,35 +40,46 @@ local squareShape={
 	SliderStrokeTransparency=0.9,AccentStrokeTransparency=0.62,
 }
 
-local softTones={
-	topbar=0.035,panel=0.065,card=0.105,section=0.105,button=0.065,
-	input=0.055,sliderBg=0.075,strokeSoft=0.15,sliderAccent=true,sliderBlend=0.66,
-}
-
-local proofTheme=makeTheme("proof","Proof",{245,243,237},{61,117,93},{95,106,194},squareShape,nil)
-proofTheme.Theme={
-	bg=Color3.fromRGB(245,243,237),
-	topbar=Color3.fromRGB(239,237,230),
-	panel=Color3.fromRGB(239,237,230),
-	card=Color3.fromRGB(245,243,237),
-	section=Color3.fromRGB(239,237,230),
-	button=Color3.fromRGB(239,237,230),
-	input=Color3.fromRGB(245,243,237),
-	sliderBg=Color3.fromRGB(239,237,230),
-	sliderFill=Color3.fromRGB(61,117,93),
-	text=Color3.fromRGB(47,49,45),
-	muted=Color3.fromRGB(75,77,72),
-	stroke=Color3.fromRGB(61,117,93),
-	softStroke=Color3.fromRGB(122,118,109),
-}
+local function exactTheme(id,name,primary,accent,secondary,palette)
+	local theme=makeTheme(id,name,primary,accent,secondary,squareShape,nil)
+	theme.Theme={}
+	for role,value in pairs(palette) do
+		theme.Theme[role]=Color3.fromRGB(value[1],value[2],value[3])
+	end
+	return theme
+end
 
 devThemes={
-	raycast=makeTheme("raycast","Raycast",{17,17,20},{255,90,163},{124,92,255},squareShape,softTones),
-	everforest=makeTheme("everforest","Everforest",{253,246,227},{141,161,1},{53,167,124},squareShape,softTones),
-	proof=proofTheme,
-	linear=makeTheme("linear","Linear",{16,16,20},{94,106,210},{138,143,152},squareShape,softTones),
-	material=makeTheme("material","Material",{18,18,18},{3,218,198},{187,134,252},squareShape,softTones),
-	absolutely=makeTheme("absolutely","Absolutely",{9,9,12},{168,85,247},{236,72,153},squareShape,softTones),
+	raycast=exactTheme("raycast","Raycast",{16,16,16},{255,99,99},{207,47,152},{
+		bg={16,16,16},topbar={16,16,16},panel={20,20,20},card={21,21,21},section={20,20,20},
+		button={21,21,21},input={21,21,21},sliderBg={21,21,21},sliderFill={255,99,99},
+		text={254,254,254},muted={102,102,102},stroke={255,99,99},softStroke={40,40,40},
+	}),
+	everforest=exactTheme("everforest","Everforest",{253,246,227},{147,178,89},{223,105,186},{
+		bg={253,246,227},topbar={253,246,227},panel={253,246,227},card={239,235,212},section={239,235,212},
+		button={239,235,212},input={253,246,227},sliderBg={239,235,212},sliderFill={147,178,89},
+		text={92,106,114},muted={147,159,145},stroke={147,178,89},softStroke={224,220,199},
+	}),
+	proof=exactTheme("proof","Proof",{245,243,237},{61,117,93},{95,106,194},{
+		bg={245,243,237},topbar={239,237,230},panel={239,237,230},card={245,243,237},section={239,237,230},
+		button={239,237,230},input={245,243,237},sliderBg={239,237,230},sliderFill={61,117,93},
+		text={47,49,45},muted={75,77,72},stroke={61,117,93},softStroke={122,118,109},
+	}),
+	linear=exactTheme("linear","Linear",{15,15,17},{96,106,204},{194,161,255},{
+		bg={15,15,17},topbar={15,18,25},panel={10,12,17},card={23,24,29},section={23,24,29},
+		button={15,18,25},input={23,24,29},sliderBg={23,24,29},sliderFill={96,106,204},
+		text={227,228,230},muted={99,107,123},stroke={96,106,204},softStroke={99,107,123},
+	}),
+	material=exactTheme("material","Material",{33,33,33},{128,203,196},{199,146,234},{
+		bg={33,33,33},topbar={33,33,33},panel={33,33,33},card={43,43,43},section={43,43,43},
+		button={43,43,43},input={43,43,43},sliderBg={43,43,43},sliderFill={128,203,196},
+		text={238,255,255},muted={103,103,103},stroke={128,203,196},softStroke={97,97,97},
+	}),
+	absolutely=exactTheme("absolutely","Absolutely",{45,45,43},{204,125,94},{204,125,94},{
+		bg={45,45,43},topbar={55,55,53},panel={55,55,53},card={45,45,43},section={55,55,53},
+		button={55,55,53},input={45,45,43},sliderBg={55,55,53},sliderFill={204,125,94},
+		text={249,249,247},muted={178,178,176},stroke={204,125,94},softStroke={178,178,176},
+	}),
 }
 
 me=Players.LocalPlayer
@@ -95,13 +106,13 @@ colorNames={
 }
 
 colors=setmetatable({
-	bg=Color3.fromRGB(17,17,20),
-	panel=Color3.fromRGB(26,26,30),
-	card=Color3.fromRGB(34,34,39),
-	accent=Color3.fromRGB(255,90,163),
-	text=Color3.fromRGB(238,238,238),
-	muted=Color3.fromRGB(182,180,180),
-	stroke=Color3.fromRGB(255,90,163),
+	bg=Color3.fromRGB(16,16,16),
+	panel=Color3.fromRGB(20,20,20),
+	card=Color3.fromRGB(21,21,21),
+	accent=Color3.fromRGB(255,99,99),
+	text=Color3.fromRGB(254,254,254),
+	muted=Color3.fromRGB(102,102,102),
+	stroke=Color3.fromRGB(255,99,99),
 	red=Color3.fromRGB(254,94,86),
 	blue=Color3.fromRGB(21,103,251),
 	green=Color3.fromRGB(32,202,106),
@@ -1948,7 +1959,7 @@ local function styleByte(name,fallback)
 	return math.clamp(math.floor((tonumber(style[name]) or fallback)+0.5),0,255)
 end
 
-local styleColorDefaults={Stroke={255,90,163},Gradient={124,92,255},Primary={17,17,20}}
+local styleColorDefaults={Stroke={255,99,99},Gradient={207,47,152},Primary={16,16,16}}
 
 local function styleColor(prefix,defaults)
 	return Color3.fromRGB(

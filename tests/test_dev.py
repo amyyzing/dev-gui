@@ -125,27 +125,27 @@ def test_reworked_theme_list_is_complete_and_raycast_is_default():
     data_save = read("data-save/data-save.lua")
 
     expected = {
-        "raycast": "Raycast",
-        "everforest": "Everforest",
-        "proof": "Proof",
-        "linear": "Linear",
-        "material": "Material",
-        "absolutely": "Absolutely",
+        "raycast": ("Raycast", "{16,16,16}", "{255,99,99}", "{207,47,152}"),
+        "everforest": ("Everforest", "{253,246,227}", "{147,178,89}", "{223,105,186}"),
+        "proof": ("Proof", "{245,243,237}", "{61,117,93}", "{95,106,194}"),
+        "linear": ("Linear", "{15,15,17}", "{96,106,204}", "{194,161,255}"),
+        "material": ("Material", "{33,33,33}", "{128,203,196}", "{199,146,234}"),
+        "absolutely": ("Absolutely", "{45,45,43}", "{204,125,94}", "{204,125,94}"),
     }
-    for theme_id, label in expected.items():
-        assert (
-            f'{theme_id}=makeTheme("{theme_id}","{label}"' in runtime
-            or f'{theme_id}=proofTheme' in runtime
-        )
+    for theme_id, (label, primary, accent, secondary) in expected.items():
+        assert f'{theme_id}=exactTheme("{theme_id}","{label}",{primary},{accent},{secondary}' in runtime
 
     assert '{"raycast","everforest","proof","linear","material","absolutely"}' in colors
-    assert 'everforest=makeTheme("everforest","Everforest",{253,246,227},{141,161,1},{53,167,124},squareShape,softTones)' in runtime
-    assert 'local proofTheme=makeTheme("proof","Proof",{245,243,237},{61,117,93},{95,106,194},squareShape,nil)' in runtime
-    assert 'topbar=Color3.fromRGB(239,237,230)' in runtime
-    assert 'text=Color3.fromRGB(47,49,45)' in runtime
-    assert 'muted=Color3.fromRGB(75,77,72)' in runtime
+    assert "softTones" not in runtime
+    assert "theme.Theme[role]=Color3.fromRGB(value[1],value[2],value[3])" in runtime
+    assert "text={47,49,45},muted={75,77,72}" in runtime
+    assert "text={92,106,114},muted={147,159,145}" in runtime
+    assert "text={238,255,255},muted={103,103,103}" in runtime
     assert 'if id=="catppuccin" then id="everforest" end' in data_save
     assert 'if id=="dracula" then id="proof" end' in data_save
+    assert "local function migrateThemeColors" in data_save
+    assert "if tonumber(style[field])~=old[i] then return id end" in data_save
+    assert "themes=devThemes" in read("runtime/loader-part-5.lua")
     assert "themes=devThemes" in read("runtime/loader-part-3.lua")
 
     for path in ("gui/pc.luau", "gui/mobile.luau"):
@@ -153,6 +153,8 @@ def test_reworked_theme_list_is_complete_and_raycast_is_default():
 
     assert 'UILib="raycast"' in colors
     assert 'UILib="raycast"' in data_save
+    assert "PrimaryR=16" in colors and "GradientR=207" in colors
+    assert "PrimaryR=16" in data_save and "GradientR=207" in data_save
     assert 'return validThemes[id] and id or "raycast"' in data_save
     for old_label in ("Dark", "Light", "Midnight", "Crimson", "Evergreen", "Sakura"):
         assert f'Name="{old_label}"' not in colors

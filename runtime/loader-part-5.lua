@@ -369,6 +369,7 @@ function buildDataSaveContext()
 		expandedOwned=expandedOwnedPresets,
 
 		style=style,
+		themes=devThemes,
 		windowState=windowState,
 		root=root,
 		getDefaultUIStyle=getDefaultUIStyle,

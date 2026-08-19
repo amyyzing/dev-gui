@@ -3,17 +3,17 @@ local colors={}
 local tweenService=game:GetService("TweenService")
 
 local styleDefaults={
-	PrimaryR=17,
-	PrimaryG=17,
-	PrimaryB=20,
+	PrimaryR=16,
+	PrimaryG=16,
+	PrimaryB=16,
 
 	StrokeR=255,
-	StrokeG=90,
-	StrokeB=163,
+	StrokeG=99,
+	StrokeB=99,
 
-	GradientR=124,
-	GradientG=92,
-	GradientB=255,
+	GradientR=207,
+	GradientG=47,
+	GradientB=152,
 
 	StrokeGradient=false,
 	LiquidStroke=false,
