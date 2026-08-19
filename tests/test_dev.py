@@ -247,11 +247,11 @@ def test_requested_control_copy_and_spacing_contracts():
     assert 'for _,instance in ipairs(screenGui:GetDescendants()) do' in runtime
 
 
-def test_params_selector_and_main_pages_tween():
+def test_params_selector_uses_fixed_masked_segments_and_main_pages_tween():
     params = read("features/params/gui.lua")
-    assert 'local currentRotation=selectorRoot.Rotation' in params
-    assert 'tweenObject(selectorRoot,{Rotation=targetRotation}' in params
-    assert 'math.floor(((currentRotation-baseRotation)/360)+0.5)*360' in params
+    assert "local isSelected=pageKey==selected" in params
+    assert "selectorRoot" not in params
+    assert 'tweenObject(wheelImages[pageKey],{ImageColor3=targetColor,ImageTransparency=targetTransparency})' in params
 
     for platform in ("pc", "mobile"):
         shell = read(f"platforms/{platform}/gui/mainframe.lua")
@@ -323,19 +323,16 @@ def test_rgb_labels_bypass_description_aliases():
 
 def test_params_selector_stays_inside_its_ring_and_gaps_are_not_clickable():
     params = read("features/params/gui.lua")
-    assert 'local canvas=make("CanvasGroup",{' in params
+    assert 'local canvas=make("Frame",{' in params
     assert "local wheelGapDegrees=12" in params
     assert "sector.start+wheelGapDegrees/2" in params
     assert "sector.finish-wheelGapDegrees/2" in params
     assert "local start=startAngle+wheelGapDegrees" not in params
-    assert params.count("ClipsDescendants=true") >= 3
-    assert params.count("BorderSizePixel=0") >= 10
-    assert "local function selectorInsideClipBounds()" in params
-    assert "selectorRoot.Visible=selectorInsideClipBounds()" in params
-    assert 'GetPropertyChangedSignal("CanvasPosition")' in params
+    assert "selectorInsideClipBounds" not in params
+    assert params.count("BorderSizePixel=0") >= 8
     assert "local selectorGlow=" not in params
     assert "local selectorGlows=" not in params
-    assert "ZIndex=12" in params
+    assert "ZIndex=12" not in params
 
 
 def test_dev_controls_use_an_authorized_module_path():

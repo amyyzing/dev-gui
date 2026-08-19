@@ -206,10 +206,6 @@ function paramsGui.new(app,parent)
 	local wheelHighlightImages={}
 	local wheelCenterCap=nil
 	local fallbackPieces={}
-	local selectorRoot=nil
-	local selectorImage=nil
-	local selectorHighlight=nil
-	local selectorFallback=nil
 	local currentPage=nil
 	local pageTweens={}
 	local paintTweens=setmetatable({}, {__mode="k"})
@@ -422,7 +418,7 @@ function paramsGui.new(app,parent)
 		local highlightColor=lightTheme and Color3.new(0,0,0) or Color3.new(1,1,1)
 
 		for _,pageKey in ipairs(pageOrder) do
-			local isSelected=false
+			local isSelected=pageKey==selected
 			local targetColor=isSelected and coreColor or muted
 			local targetTransparency=isSelected and 0.10 or 0.70
 			local highlightTransparency=isSelected and (lightTheme and 0.88 or 0.84) or 1
@@ -466,44 +462,6 @@ function paramsGui.new(app,parent)
 				else
 					fallbackPieces[pageKey].BackgroundColor3=targetColor
 					fallbackPieces[pageKey].BackgroundTransparency=targetTransparency
-				end
-			end
-		end
-
-		if selectorRoot then
-			local baseRotation=(wheelMidAngles[selected] or wheelMidAngles.speed)-wheelMidAngles.speed
-			local currentRotation=selectorRoot.Rotation
-			local targetRotation=baseRotation+math.floor(((currentRotation-baseRotation)/360)+0.5)*360
-			if animate then
-				tweenObject(selectorRoot,{Rotation=targetRotation},TweenInfo.new(0.26,Enum.EasingStyle.Quart,Enum.EasingDirection.Out))
-			else
-				selectorRoot.Rotation=baseRotation
-			end
-
-			if selectorImage then
-				if animate then
-					tweenObject(selectorImage,{ImageColor3=coreColor,ImageTransparency=0.10})
-				else
-					selectorImage.ImageColor3=coreColor
-					selectorImage.ImageTransparency=0.10
-				end
-			end
-
-			if selectorHighlight then
-				if animate then
-					tweenObject(selectorHighlight,{ImageColor3=highlightColor,ImageTransparency=lightTheme and 0.88 or 0.84},glowTween)
-				else
-					selectorHighlight.ImageColor3=highlightColor
-					selectorHighlight.ImageTransparency=lightTheme and 0.88 or 0.84
-				end
-			end
-
-			if selectorFallback then
-				if animate then
-					tweenObject(selectorFallback,{BackgroundColor3=coreColor,BackgroundTransparency=0.10})
-				else
-					selectorFallback.BackgroundColor3=coreColor
-					selectorFallback.BackgroundTransparency=0.10
 				end
 			end
 		end
@@ -577,16 +535,16 @@ function paramsGui.new(app,parent)
 			Position=UDim2.new(1,0,0,0),
 			Size=UDim2.fromOffset(wheelWidth+wheelGlowPad*2,wheelHeight+wheelGlowPad*2),
 			ZIndex=6,
-			ClipsDescendants=true,
+			ClipsDescendants=false,
 		},parentFrame)
 
-		local canvas=make("CanvasGroup",{
+		local canvas=make("Frame",{
 			AnchorPoint=Vector2.new(0,0),
 			Position=UDim2.fromOffset(wheelGlowPad,wheelGlowPad),
 			Size=UDim2.fromOffset(wheelWidth,wheelHeight),
 			BackgroundTransparency=1,
 			BorderSizePixel=0,
-			ClipsDescendants=true,
+			ClipsDescendants=false,
 			ZIndex=6,
 		},wheelWrap)
 
@@ -699,57 +657,6 @@ function paramsGui.new(app,parent)
 			end
 		end
 
-		selectorRoot=make("Frame",{
-			BackgroundTransparency=1,
-			BorderSizePixel=0,
-			Position=UDim2.fromScale(0,0),
-			Size=UDim2.fromScale(1,1),
-			Rotation=(wheelMidAngles[normalizePageKey(state.paramsSelectedPage)] or wheelMidAngles.speed)-wheelMidAngles.speed,
-			ZIndex=7,
-		},canvas)
-
-		local selectorAssets=assets and assets.speed
-		local selectorPiece=selectorAssets and (selectorAssets.normalPiece or selectorAssets.piece)
-		if selectorPiece then
-			selectorImage=make("ImageLabel",{
-				BackgroundTransparency=1,
-				BorderSizePixel=0,
-				Size=UDim2.fromScale(1,1),
-				Image=selectorPiece,
-				ImageColor3=inputColor(),
-				ImageTransparency=0.10,
-				ResampleMode=Enum.ResamplerMode.Default,
-				ScaleType=Enum.ScaleType.Stretch,
-				ZIndex=8,
-			},selectorRoot)
-
-			selectorHighlight=make("ImageLabel",{
-				BackgroundTransparency=1,
-				BorderSizePixel=0,
-				Size=UDim2.fromScale(1,1),
-				Image=selectorPiece,
-				ImageColor3=Color3.new(1,1,1),
-				ImageTransparency=1,
-				ResampleMode=Enum.ResamplerMode.Default,
-				ScaleType=Enum.ScaleType.Stretch,
-				ZIndex=9,
-			},selectorRoot)
-		else
-			local radians=math.rad(wheelMidAngles.speed)
-			local midRadius=wheelWidth*(wheelInnerRadius+wheelOuterRadius)*0.5
-			selectorFallback=make("Frame",{
-				AnchorPoint=Vector2.new(0.5,0.5),
-				Position=UDim2.new(0.5,math.cos(radians)*midRadius,0.5,-math.sin(radians)*midRadius),
-				Size=UDim2.fromOffset(30,18),
-				Rotation=90-wheelMidAngles.speed,
-				BackgroundColor3=inputColor(),
-				BackgroundTransparency=0.10,
-				BorderSizePixel=0,
-				ZIndex=8,
-				ThemeRole="INPUT",
-			},selectorRoot)
-		end
-
 		if assets and assets._center then
 			local centerSize=math.floor(wheelWidth*wheelInnerRadius*2+8)
 			wheelCenterCap=make("ImageLabel",{
@@ -763,7 +670,7 @@ function paramsGui.new(app,parent)
 				ImageTransparency=0.03,
 				ResampleMode=Enum.ResamplerMode.Default,
 				ScaleType=Enum.ScaleType.Stretch,
-				ZIndex=12,
+				ZIndex=8,
 			},canvas)
 		end
 
@@ -777,50 +684,6 @@ function paramsGui.new(app,parent)
 			Selectable=false,
 			ZIndex=10,
 		},canvas)
-
-		local function selectorInsideClipBounds()
-			if not selectorRoot or not selectorRoot.Parent then return false end
-
-			local canvasMin=canvas.AbsolutePosition
-			local canvasMax=canvasMin+canvas.AbsoluteSize
-			local ancestor=canvas.Parent
-
-			while ancestor do
-				if ancestor:IsA("GuiObject") then
-					if not ancestor.Visible then return false end
-					if ancestor.ClipsDescendants then
-						local clipMin=ancestor.AbsolutePosition
-						local clipMax=clipMin+ancestor.AbsoluteSize
-						if canvasMin.X<clipMin.X or canvasMin.Y<clipMin.Y or canvasMax.X>clipMax.X or canvasMax.Y>clipMax.Y then
-							return false
-						end
-					end
-				end
-				ancestor=ancestor.Parent
-			end
-
-			return canvas.AbsoluteSize.X>0 and canvas.AbsoluteSize.Y>0
-		end
-
-		local function refreshSelectorVisibility()
-			if selectorRoot and selectorRoot.Parent then
-				selectorRoot.Visible=selectorInsideClipBounds()
-			end
-		end
-
-		local watched=canvas
-		while watched do
-			if watched:IsA("GuiObject") then
-				trackConnection(watched:GetPropertyChangedSignal("AbsolutePosition"):Connect(refreshSelectorVisibility))
-				trackConnection(watched:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshSelectorVisibility))
-				trackConnection(watched:GetPropertyChangedSignal("Visible"):Connect(refreshSelectorVisibility))
-				if watched:IsA("ScrollingFrame") then
-					trackConnection(watched:GetPropertyChangedSignal("CanvasPosition"):Connect(refreshSelectorVisibility))
-				end
-			end
-			watched=watched.Parent
-		end
-		task.defer(refreshSelectorVisibility)
 
 		trackConnection(hitLayer.InputBegan:Connect(function(input)
 			if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then
