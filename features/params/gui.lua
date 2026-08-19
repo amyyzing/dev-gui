@@ -209,6 +209,11 @@ function paramsGui.new(app,parent)
 	local wheelHighlightImages={}
 	local wheelCenterCap=nil
 	local fallbackPieces={}
+	local selectorRoot=nil
+	local selectorImage=nil
+	local selectorHighlight=nil
+	local selectorGlows={}
+	local selectorFallback=nil
 	local currentPage=nil
 	local pageTweens={}
 	local paintTweens=setmetatable({}, {__mode="k"})
@@ -417,9 +422,11 @@ function paramsGui.new(app,parent)
 		local active=lightTheme and darkenColor(activeBase,0.28) or activeBase
 		local coreColor=lightTheme and darkenColor(active,0.04) or brightenColor(active,0.04)
 		local muted=mutedColor()
+		local haloColor=lightTheme and darkenColor(coreColor,0.10) or brightenColor(coreColor,0.16)
+		local highlightColor=lightTheme and Color3.new(0,0,0) or Color3.new(1,1,1)
 
 		for _,pageKey in ipairs(pageOrder) do
-			local isSelected=pageKey==selected
+			local isSelected=false
 			local targetColor=isSelected and coreColor or muted
 			local targetTransparency=isSelected and 0.10 or 0.70
 			local highlightTransparency=isSelected and (lightTheme and 0.88 or 0.84) or 1
@@ -427,9 +434,6 @@ function paramsGui.new(app,parent)
 			local midGlowTransparency=isSelected and 0.78 or 1
 			local farGlowTransparency=1
 			local outerGlowTransparency=1
-			local haloColor=lightTheme and darkenColor(coreColor,0.10) or brightenColor(coreColor,0.16)
-			local highlightColor=lightTheme and Color3.new(0,0,0) or Color3.new(1,1,1)
-
 			if wheelImages[pageKey] then
 				if animate then
 					tweenObject(wheelImages[pageKey],{ImageColor3=targetColor,ImageTransparency=targetTransparency})
@@ -466,6 +470,54 @@ function paramsGui.new(app,parent)
 				else
 					fallbackPieces[pageKey].BackgroundColor3=targetColor
 					fallbackPieces[pageKey].BackgroundTransparency=targetTransparency
+				end
+			end
+		end
+
+		if selectorRoot then
+			local baseRotation=(wheelMidAngles[selected] or wheelMidAngles.speed)-wheelMidAngles.speed
+			local currentRotation=selectorRoot.Rotation
+			local targetRotation=baseRotation+math.floor(((currentRotation-baseRotation)/360)+0.5)*360
+			if animate then
+				tweenObject(selectorRoot,{Rotation=targetRotation},TweenInfo.new(0.26,Enum.EasingStyle.Quart,Enum.EasingDirection.Out))
+			else
+				selectorRoot.Rotation=baseRotation
+			end
+
+			if selectorImage then
+				if animate then
+					tweenObject(selectorImage,{ImageColor3=coreColor,ImageTransparency=0.10})
+				else
+					selectorImage.ImageColor3=coreColor
+					selectorImage.ImageTransparency=0.10
+				end
+			end
+
+			if selectorHighlight then
+				if animate then
+					tweenObject(selectorHighlight,{ImageColor3=highlightColor,ImageTransparency=lightTheme and 0.88 or 0.84},glowTween)
+				else
+					selectorHighlight.ImageColor3=highlightColor
+					selectorHighlight.ImageTransparency=lightTheme and 0.88 or 0.84
+				end
+			end
+
+			for index,glow in ipairs(selectorGlows) do
+				local transparency=index==1 and 0.54 or 0.78
+				if animate then
+					tweenObject(glow,{ImageColor3=haloColor,ImageTransparency=transparency},glowTween)
+				else
+					glow.ImageColor3=haloColor
+					glow.ImageTransparency=transparency
+				end
+			end
+
+			if selectorFallback then
+				if animate then
+					tweenObject(selectorFallback,{BackgroundColor3=coreColor,BackgroundTransparency=0.10})
+				else
+					selectorFallback.BackgroundColor3=coreColor
+					selectorFallback.BackgroundTransparency=0.10
 				end
 			end
 		end
@@ -654,6 +706,70 @@ function paramsGui.new(app,parent)
 				},canvas)
 				fallbackPieces[pageKey]=fallback
 			end
+		end
+
+		selectorRoot=make("Frame",{
+			BackgroundTransparency=1,
+			Position=UDim2.fromScale(0,0),
+			Size=UDim2.fromScale(1,1),
+			Rotation=(wheelMidAngles[normalizePageKey(state.paramsSelectedPage)] or wheelMidAngles.speed)-wheelMidAngles.speed,
+			ZIndex=7,
+		},canvas)
+
+		local selectorAssets=assets and assets.speed
+		local selectorPiece=selectorAssets and (selectorAssets.normalPiece or selectorAssets.piece)
+		local selectorGlow=selectorAssets and (selectorAssets.glowPiece or selectorAssets.glow)
+		if selectorPiece and selectorGlow then
+			for _,layer in ipairs(wheelGlowLayers) do
+				local pad=layer.pad
+				selectorGlows[#selectorGlows+1]=make("ImageLabel",{
+					BackgroundTransparency=1,
+					Position=UDim2.fromOffset(-pad,-pad),
+					Size=UDim2.new(1,pad*2,1,pad*2),
+					Image=selectorGlow,
+					ImageColor3=inputColor(),
+					ImageTransparency=1,
+					ResampleMode=Enum.ResamplerMode.Default,
+					ScaleType=Enum.ScaleType.Stretch,
+					ZIndex=7,
+				},selectorRoot)
+			end
+
+			selectorImage=make("ImageLabel",{
+				BackgroundTransparency=1,
+				Size=UDim2.fromScale(1,1),
+				Image=selectorPiece,
+				ImageColor3=inputColor(),
+				ImageTransparency=0.10,
+				ResampleMode=Enum.ResamplerMode.Default,
+				ScaleType=Enum.ScaleType.Stretch,
+				ZIndex=8,
+			},selectorRoot)
+
+			selectorHighlight=make("ImageLabel",{
+				BackgroundTransparency=1,
+				Size=UDim2.fromScale(1,1),
+				Image=selectorPiece,
+				ImageColor3=Color3.new(1,1,1),
+				ImageTransparency=1,
+				ResampleMode=Enum.ResamplerMode.Default,
+				ScaleType=Enum.ScaleType.Stretch,
+				ZIndex=9,
+			},selectorRoot)
+		else
+			local radians=math.rad(wheelMidAngles.speed)
+			local midRadius=wheelWidth*(wheelInnerRadius+wheelOuterRadius)*0.5
+			selectorFallback=make("Frame",{
+				AnchorPoint=Vector2.new(0.5,0.5),
+				Position=UDim2.new(0.5,math.cos(radians)*midRadius,0.5,-math.sin(radians)*midRadius),
+				Size=UDim2.fromOffset(30,18),
+				Rotation=90-wheelMidAngles.speed,
+				BackgroundColor3=inputColor(),
+				BackgroundTransparency=0.10,
+				BorderSizePixel=0,
+				ZIndex=8,
+				ThemeRole="INPUT",
+			},selectorRoot)
 		end
 
 		if assets and assets._center then

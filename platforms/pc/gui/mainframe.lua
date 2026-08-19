@@ -16,6 +16,27 @@ local function titleSize(titleXValue,titleY,subtitleY,height)
 	return UDim2.new(1,-(titleX(titleXValue,titleY,subtitleY)+164),0,height)
 end
 
+local function turnPage(tweenService,state,frame,direction)
+	if state._pageTurnTween then
+		state._pageTurnTween:Cancel()
+		state._pageTurnTween=nil
+	end
+	if state._pageTurnFrame and state._pageTurnFrame.Parent then
+		state._pageTurnFrame.Position=UDim2.fromScale(0,0)
+		state._pageTurnFrame.Rotation=0
+	end
+	if not frame or direction==0 then return end
+
+	frame.Position=UDim2.new(direction*0.05,0,0,0)
+	frame.Rotation=direction*3
+	state._pageTurnFrame=frame
+	state._pageTurnTween=tweenService:Create(frame,TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{
+		Position=UDim2.fromScale(0,0),
+		Rotation=0,
+	})
+	state._pageTurnTween:Play()
+end
+
 function mainFrame.new(app)
 	local make=app.New or app.make
 	local fusion=app.Fusion or app.fusion
@@ -782,9 +803,19 @@ function mainFrame.new(app)
 	end
 
 	local refreshFooterResetButton=function() end
+	api._pageFrames={
+		main=settingsPage,
+		maps=mapPage,
+		server=serverPage,
+		customize=uiSettingsPage,
+		page2=futurePage,
+		settings=actualSettingsPage,
+	}
 
 	local function setActivePage(name)
-		activePageName=name or "main"
+		name=name or "main"
+		turnPage(tweenService,api,api._pageFrames[name],name==activePageName and 0 or (getPageIndex(name)<getPageIndex(activePageName) and -1 or 1))
+		activePageName=name
 		if activePageValue then
 			activePageValue:set(activePageName)
 		end

@@ -4,7 +4,7 @@ function testingGui.build(app,parent,state,api)
 	local makeSection=app.makeSection
 	local buildToggleRow=app.buildToggleRow
 
-	local body,controls=makeSection(parent,5,"Testing","WR C1 and QB arc safety",{
+	local body,controls=makeSection(parent,5,"Testing","",{
 		headerToggle={
 			startState=state.testingEnabled,
 			onChange=function(value)

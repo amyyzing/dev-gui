@@ -754,7 +754,8 @@ function hitbox.new(app,parent)
 	})
 	toggle=sectionControls and sectionControls.toggle
 
-	make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="HITBOX SIZE",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	local sizeLabel=make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="size",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
+	make("UIPadding",{PaddingLeft=UDim.new(0,12)},sizeLabel)
 
 	local sizeReadout=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,24),ZIndex=5},section)
 	make("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder,HorizontalAlignment=Enum.HorizontalAlignment.Left},sizeReadout)
@@ -767,9 +768,7 @@ function hitbox.new(app,parent)
 	boxY=makeReadout("Y: "..fmtNumber(state.sizeY,2))
 	boxZ=makeReadout("Z: "..fmtNumber(state.sizeZ,2))
 
-	make("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,16),Text="TRANSPARENCY",Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},section)
-
-	transparencySlider=buildSlider(section,"Alpha",0,1,state.targetTransparency,2,function(value)
+	transparencySlider=buildSlider(section,"transparency",0,1,state.targetTransparency,2,function(value)
 		api.SetTransparency(value,true)
 	end)
 

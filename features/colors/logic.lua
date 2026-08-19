@@ -386,27 +386,34 @@ function colors.new(app,page)
 		return dx*dx+dy*dy
 	end
 
-	local function objectLocalPointer(object,input)
+	local function pointerOffset(object,input)
 		local point=pointerPosition(input)
 		local inset=guiInset()
 		local pos=object.AbsolutePosition
 		local size=object.AbsoluteSize
-		local best=point
+		local bestOffset=Vector2.new(0,0)
 		local bestDistance=distanceToRect(point,pos,size)
 		local candidates={
-			point-inset,
-			point+inset,
+			-inset,
+			inset,
 		}
 
-		for _,candidate in ipairs(candidates) do
+		for _,offset in ipairs(candidates) do
+			local candidate=point+offset
 			local candidateDistance=distanceToRect(candidate,pos,size)
 			if candidateDistance<bestDistance then
-				best=candidate
+				bestOffset=offset
 				bestDistance=candidateDistance
 			end
 		end
+		return bestOffset
+	end
 
-		return best.X-pos.X,best.Y-pos.Y,math.max(size.X,1),math.max(size.Y,1)
+	local function objectLocalPointer(object,input,offset)
+		local point=pointerPosition(input)+(offset or pointerOffset(object,input))
+		local pos=object.AbsolutePosition
+		local size=object.AbsoluteSize
+		return math.clamp(point.X-pos.X,0,size.X),math.clamp(point.Y-pos.Y,0,size.Y),math.max(size.X,1),math.max(size.Y,1)
 	end
 
 	local function trackConnection(connection)
@@ -711,8 +718,10 @@ function colors.new(app,page)
 	local highlightHoverMode=nil
 	local pickerHue,pickerSat,pickerVal=0,0,1
 	local colorDrag=nil
+	local colorDragOffset=nil
 	local highlightPickerHue,highlightPickerSat,highlightPickerVal=0,0,1
 	local highlightColorDrag=nil
+	local highlightColorDragOffset=nil
 
 	local targetButtons={}
 	local modeButtons={}
@@ -730,6 +739,8 @@ function colors.new(app,page)
 	local highlightWheelCanvas=nil
 	local highlightWheelCenterCap=nil
 	local modeBodies={}
+	local syncHighlightControls=function() end
+	local setHighlightPickerFromColor=function() end
 	local colorPreview,previewHex,hexBox
 	local svBase,svCursor,hueCursor
 	local highlightSvBase,highlightSvCursor,highlightHueCursor,highlightPreviewHex,highlightPickerPreview
@@ -1072,6 +1083,7 @@ function colors.new(app,page)
 		local value=startVal
 		local dragging=false
 		local dragInput=nil
+		local dragOffset=nil
 
 		local function roundTo(v,d)
 			local m=10^d
@@ -1085,7 +1097,7 @@ function colors.new(app,page)
 		end
 
 		local function valueFromMouse(input)
-			local x,_,w=objectLocalPointer(track,input)
+			local x,_,w=objectLocalPointer(track,input,dragOffset)
 			local pct=math.clamp(x/w,0,1)
 			return roundTo(minVal+(maxVal-minVal)*pct,decimals)
 		end
@@ -1103,6 +1115,7 @@ function colors.new(app,page)
 			if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 				dragging=true
 				dragInput=input
+				dragOffset=pointerOffset(track,input)
 				valueBox:ReleaseFocus()
 				setValue(valueFromMouse(input),true)
 			end
@@ -1118,6 +1131,7 @@ function colors.new(app,page)
 			if input==dragInput or (dragInput and dragInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1) then
 				dragging=false
 				dragInput=nil
+				dragOffset=nil
 			end
 		end))
 
@@ -1228,11 +1242,6 @@ function colors.new(app,page)
 	end
 
 	getActiveColor=function()
-		if activeTarget=="HighlightFill" or activeTarget=="HighlightOutline" then
-			activeHighlightTarget=activeTarget=="HighlightFill" and "Fill" or "Outline"
-			return getActiveHighlightColor()
-		end
-
 		if activeTarget=="Primary" then
 			return getUIPrimaryColor()
 		end
@@ -1245,12 +1254,6 @@ function colors.new(app,page)
 	end
 
 	local function writeActiveColor(color)
-		if activeTarget=="HighlightFill" or activeTarget=="HighlightOutline" then
-			activeHighlightTarget=activeTarget=="HighlightFill" and "Fill" or "Outline"
-			writeActiveHighlightColor(color)
-			return
-		end
-
 		if activeTarget=="Primary" then
 			setPrimaryColour(color)
 		else
@@ -1289,21 +1292,20 @@ function colors.new(app,page)
 	local function setHighlightMode(modeKey)
 		style.HighlightSelectedMode=normalizeHighlightMode(modeKey)
 		style.HighlightSelectedState=normalizeHighlightState(style.HighlightSelectedState,activeHighlightMode())
-		setPickerFromColor(getActiveColor())
-		syncPickerControls()
+		setHighlightPickerFromColor(getActiveHighlightColor())
+		syncHighlightControls()
 	end
 
 	local function setHighlightState(stateKey)
 		style.HighlightSelectedState=normalizeHighlightState(stateKey,activeHighlightMode())
-		setPickerFromColor(getActiveColor())
-		syncPickerControls()
+		setHighlightPickerFromColor(getActiveHighlightColor())
+		syncHighlightControls()
 	end
 
 	local function setHighlightTarget(target)
 		activeHighlightTarget=target=="Outline" and "Outline" or "Fill"
-		activeTarget=activeHighlightTarget=="Fill" and "HighlightFill" or "HighlightOutline"
-		setPickerFromColor(getActiveColor())
-		syncPickerControls()
+		setHighlightPickerFromColor(getActiveHighlightColor())
+		syncHighlightControls()
 	end
 
 	local introRow=make("Frame",{
@@ -1373,6 +1375,7 @@ function colors.new(app,page)
 	local function applyThemePreset(preset)
 		style.UILib=preset.Id
 		setPrimaryColour(preset.Primary)
+		setMainColour(preset.Stroke)
 		setGradientColour(preset.Gradient)
 		style.StrokeGradient=false
 		style.LiquidStroke=false
@@ -1383,7 +1386,6 @@ function colors.new(app,page)
 			app.applyUIProfile()
 		end
 		updateEverything()
-		tweenStyleTo(preset.Stroke)
 		setPickerFromColor(getActiveColor())
 		syncPickerControls()
 	end
@@ -1451,7 +1453,9 @@ function colors.new(app,page)
 	},targetRow)
 
 	for i,target in ipairs({"Primary","Stroke"}) do
-		local button,marker=makeFlatButton(targetRow,target,i)
+		local label=target=="Stroke" and "Secondary" or target
+		local button,marker=makeFlatButton(targetRow,label,i,0.5)
+		button.Size=UDim2.new(0.5,-4,1,0)
 		trackConnection(button.Activated:Connect(function()
 			setActiveTarget(target)
 		end))
@@ -1667,12 +1671,12 @@ function colors.new(app,page)
 
 	local function updateColorDrag(input)
 		if colorDrag=="SV" and svSquare.AbsoluteSize.X>0 then
-			local x,y,w,h=objectLocalPointer(svSquare,input)
+			local x,y,w,h=objectLocalPointer(svSquare,input,colorDragOffset)
 			pickerSat=math.clamp(x/w,0,1)
 			pickerVal=1-math.clamp(y/h,0,1)
 			applyActiveColor(Color3.fromHSV(pickerHue,pickerSat,pickerVal),true)
 		elseif colorDrag=="Hue" and hueStrip.AbsoluteSize.Y>0 then
-			local _,y,_,h=objectLocalPointer(hueStrip,input)
+			local _,y,_,h=objectLocalPointer(hueStrip,input,colorDragOffset)
 			pickerHue=math.clamp(y/h,0,1)
 			applyActiveColor(Color3.fromHSV(pickerHue,pickerSat,pickerVal),true)
 		end
@@ -1683,6 +1687,7 @@ function colors.new(app,page)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			colorDrag="SV"
 			colorDragInput=input
+			colorDragOffset=pointerOffset(svSquare,input)
 			updateColorDrag(input)
 		end
 	end))
@@ -1691,6 +1696,7 @@ function colors.new(app,page)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			colorDrag="Hue"
 			colorDragInput=input
+			colorDragOffset=pointerOffset(hueStrip,input)
 			updateColorDrag(input)
 		end
 	end))
@@ -1705,19 +1711,20 @@ function colors.new(app,page)
 		if input==colorDragInput or (colorDragInput and colorDragInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1) then
 			colorDrag=nil
 			colorDragInput=nil
+			colorDragOffset=nil
 		end
 	end))
 
 	local rgbBody=modeBodies.RGB
 	make("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},rgbBody)
-	rgbSliders.R=makeMiniSlider(rgbBody,"Red",0,255,0,0,Color3.fromRGB(255,0,0),function()
-		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.green.get(),rgbSliders.B.get()),false)
+	rgbSliders.R=makeMiniSlider(rgbBody,"R",0,255,0,0,Color3.fromRGB(255,0,0),function()
+		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.G.get(),rgbSliders.B.get()),false)
 	end)
-	rgbSliders.green=makeMiniSlider(rgbBody,"Green",0,255,0,0,Color3.fromRGB(0,255,0),function()
-		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.green.get(),rgbSliders.B.get()),false)
+	rgbSliders.G=makeMiniSlider(rgbBody,"G",0,255,0,0,Color3.fromRGB(0,255,0),function()
+		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.G.get(),rgbSliders.B.get()),false)
 	end)
-	rgbSliders.B=makeMiniSlider(rgbBody,"Blue",0,255,0,0,Color3.fromRGB(0,120,255),function()
-		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.green.get(),rgbSliders.B.get()),false)
+	rgbSliders.B=makeMiniSlider(rgbBody,"B",0,255,0,0,Color3.fromRGB(0,120,255),function()
+		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.G.get(),rgbSliders.B.get()),false)
 	end)
 
 	local hsvBody=modeBodies.HSV
@@ -1734,7 +1741,7 @@ function colors.new(app,page)
 		pickerVal=math.clamp(hsvSliders.V.get()/100,0,1)
 		applyActiveColor(Color3.fromHSV(pickerHue,pickerSat,pickerVal),true)
 	end)
-	hsvSliders.V=makeMiniSlider(hsvBody,"Value",0,100,0,0,getUIStrokeColor(),function()
+	hsvSliders.V=makeMiniSlider(hsvBody,"Val",0,100,0,0,getUIStrokeColor(),function()
 		pickerHue=math.clamp(hsvSliders.H.get()/360,0,1)
 		pickerSat=math.clamp(hsvSliders.S.get()/100,0,1)
 		pickerVal=math.clamp(hsvSliders.V.get()/100,0,1)
@@ -1791,9 +1798,7 @@ function colors.new(app,page)
 
 	trackConnection(applyHex.Activated:Connect(commitHex))
 
-	local syncHighlightControls
-
-	local function setHighlightPickerFromColor(color)
+	setHighlightPickerFromColor=function(color)
 		highlightPickerHue,highlightPickerSat,highlightPickerVal=toHSV(color)
 	end
 
@@ -1806,11 +1811,13 @@ function colors.new(app,page)
 		end
 
 		if highlightSvCursor then
-			highlightSvCursor.Position=UDim2.new(highlightPickerSat,-4,1-highlightPickerVal,-4)
+			local x=highlightPickerSat
+			local y=1-highlightPickerVal
+			highlightSvCursor.Position=UDim2.new(x,math.floor(-8*x+0.5),y,math.floor(-8*y+0.5))
 		end
 
 		if highlightHueCursor then
-			highlightHueCursor.Position=UDim2.new(0,2,highlightPickerHue,-1)
+			highlightHueCursor.Position=UDim2.new(0,2,highlightPickerHue,math.floor(-3*highlightPickerHue+0.5))
 		end
 
 		if highlightPickerPreview then
@@ -1832,13 +1839,13 @@ function colors.new(app,page)
 
 	local function updateHighlightColorDrag(input)
 		if highlightColorDrag=="SV" and highlightSvBase and highlightSvBase.AbsoluteSize.X>0 then
-			local x,y,w,h=objectLocalPointer(highlightSvBase,input)
+			local x,y,w,h=objectLocalPointer(highlightSvBase,input,highlightColorDragOffset)
 			highlightPickerSat=math.clamp(x/w,0,1)
 			highlightPickerVal=1-math.clamp(y/h,0,1)
 			applyHighlightPickerColor(Color3.fromHSV(highlightPickerHue,highlightPickerSat,highlightPickerVal))
 		elseif highlightColorDrag=="Hue" and highlightHueCursor and highlightHueCursor.Parent and highlightHueCursor.Parent.AbsoluteSize.Y>0 then
 			local hueStrip=highlightHueCursor.Parent
-			local _,y,_,h=objectLocalPointer(hueStrip,input)
+			local _,y,_,h=objectLocalPointer(hueStrip,input,highlightColorDragOffset)
 			highlightPickerHue=math.clamp(y/h,0,1)
 			applyHighlightPickerColor(Color3.fromHSV(highlightPickerHue,highlightPickerSat,highlightPickerVal))
 		end
@@ -2393,6 +2400,7 @@ function colors.new(app,page)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			highlightColorDrag="SV"
 			highlightColorDragInput=input
+			highlightColorDragOffset=pointerOffset(highlightSvBase,input)
 			updateHighlightColorDrag(input)
 		end
 	end))
@@ -2401,6 +2409,7 @@ function colors.new(app,page)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			highlightColorDrag="Hue"
 			highlightColorDragInput=input
+			highlightColorDragOffset=pointerOffset(highlightHueStrip,input)
 			updateHighlightColorDrag(input)
 		end
 	end))
@@ -2415,6 +2424,7 @@ function colors.new(app,page)
 		if input==highlightColorDragInput or (highlightColorDragInput and highlightColorDragInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1) then
 			highlightColorDrag=nil
 			highlightColorDragInput=nil
+			highlightColorDragOffset=nil
 		end
 	end))
 
@@ -2494,11 +2504,13 @@ function colors.new(app,page)
 		end
 
 		if svCursor then
-			svCursor.Position=UDim2.new(pickerSat,-4,1-pickerVal,-4)
+			local x=pickerSat
+			local y=1-pickerVal
+			svCursor.Position=UDim2.new(x,math.floor(-8*x+0.5),y,math.floor(-8*y+0.5))
 		end
 
 		if hueCursor then
-			hueCursor.Position=UDim2.new(0,2,pickerHue,-1)
+			hueCursor.Position=UDim2.new(0,2,pickerHue,math.floor(-3*pickerHue+0.5))
 		end
 
 		if colorPreview then
@@ -2519,7 +2531,7 @@ function colors.new(app,page)
 
 		if rgbSliders.R then
 			rgbSliders.R.set(clampByte(color.R*255),false)
-			rgbSliders.green.set(clampByte(color.G*255),false)
+			rgbSliders.G.set(clampByte(color.G*255),false)
 			rgbSliders.B.set(clampByte(color.B*255),false)
 		end
 

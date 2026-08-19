@@ -217,5 +217,66 @@ def test_square_controls_and_colour_picker_are_clipped():
     assert colors.count('addCorner(svSquare,"Section")') == 1
     assert colors.count('addCorner(highlightSvBase,"Section")') == 1
     assert colors.count("Size=UDim2.new(1,-4,0,3)") == 2
-    assert "hueCursor.Position=UDim2.new(0,2,pickerHue,-1)" in colors
-    assert "highlightHueCursor.Position=UDim2.new(0,2,highlightPickerHue,-1)" in colors
+    assert "math.floor(-3*pickerHue+0.5)" in colors
+    assert "math.floor(-3*highlightPickerHue+0.5)" in colors
+    assert "math.clamp(point.X-pos.X,0,size.X)" in colors
+    assert "math.clamp(point.Y-pos.Y,0,size.Y)" in colors
+
+
+def test_requested_control_copy_and_spacing_contracts():
+    hitbox = read("features/hitbox/logic.lua")
+    testing = read("features/testing/gui.lua")
+    colors = read("features/colors/logic.lua")
+
+    assert 'Text="size"' in hitbox
+    assert 'buildSlider(section,"transparency"' in hitbox
+    assert 'Text="TRANSPARENCY"' not in hitbox
+    assert 'buildSlider(section,"Alpha"' not in hitbox
+    assert 'makeSection(parent,5,"Testing","",{' in testing
+    assert 'label=target=="Stroke" and "Secondary" or target' in colors
+    assert 'button.Size=UDim2.new(0.5,-4,1,0)' in colors
+
+
+def test_params_selector_and_main_pages_tween():
+    params = read("features/params/gui.lua")
+    assert 'local currentRotation=selectorRoot.Rotation' in params
+    assert 'tweenObject(selectorRoot,{Rotation=targetRotation}' in params
+    assert 'math.floor(((currentRotation-baseRotation)/360)+0.5)*360' in params
+
+    for platform in ("pc", "mobile"):
+        shell = read(f"platforms/{platform}/gui/mainframe.lua")
+        assert "local function turnPage(" in shell
+        assert "frame.Rotation=direction*3" in shell
+        assert "Position=UDim2.fromScale(0,0)" in shell
+
+
+def test_theme_and_idle_controls_refresh_immediately():
+    colors = read("features/colors/logic.lua")
+    gui_logic = read("gui/gui-logic.lua")
+    theme_apply = colors[colors.index("local function applyThemePreset"):colors.index("for i,preset in ipairs")]
+
+    assert "setPrimaryColour(preset.Primary)" in theme_apply
+    assert "setMainColour(preset.Stroke)" in theme_apply
+    assert "updateEverything()" in theme_apply
+    assert "tweenStyleTo" not in theme_apply
+    assert 'TextRole="TEXT"' in gui_logic
+    assert 'label:SetAttribute("ThemeTextRole",state and "STROKE" or "TEXT")' in gui_logic
+    assert gui_logic.count('ThemeRole="STROKE_SOFT"') >= 1
+    assert 'componentValue("SliderTrackRole","STROKE_SOFT")' in gui_logic
+
+
+def test_colour_modes_are_independent_and_complete():
+    colors = read("features/colors/logic.lua")
+
+    assert 'rgbSliders.R=makeMiniSlider(rgbBody,"R"' in colors
+    assert 'rgbSliders.G=makeMiniSlider(rgbBody,"G"' in colors
+    assert 'rgbSliders.B=makeMiniSlider(rgbBody,"B"' in colors
+    assert 'hsvSliders.H=makeMiniSlider(hsvBody,"Hue"' in colors
+    assert 'hsvSliders.S=makeMiniSlider(hsvBody,"Sat"' in colors
+    assert 'hsvSliders.V=makeMiniSlider(hsvBody,"Val"' in colors
+    assert "local function commitHex()" in colors
+    assert "applyActiveColor(color,false)" in colors
+    assert 'activeTarget=activeHighlightTarget' not in colors
+    assert 'activeTarget=="HighlightFill"' not in colors
+    assert "highlightColorDragOffset=pointerOffset" in colors
+    assert "colorDragOffset=pointerOffset" in colors
