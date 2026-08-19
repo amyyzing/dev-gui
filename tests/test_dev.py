@@ -170,6 +170,9 @@ def test_square_header_avatar_spans_title_block_and_shifts_text_on_both_platform
         assert "titleXValue+avatarSize(titleY,subtitleY)+10" in mainframe
         assert 'CornerRole="Control"' in mainframe
         assert 'CornerRadius=UDim.new(0,999)' not in mainframe
+        assert 'local getUIStrokeGradientColor=app.getUIStrokeGradientColor or getUIStrokeColor' in mainframe
+        assert 'local avatarStroke=make("UIStroke",{Color=getUIStrokeGradientColor(),Thickness=1,Transparency=0.35,StrokeRole="Fixed"},api.avatar)' in mainframe
+        assert 'avatarStroke.Color=getUIStrokeGradientColor()' in mainframe
         assert "UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerTitleY)" in mainframe
         assert "UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerSubtitleY)" in mainframe
 
