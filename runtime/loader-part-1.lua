@@ -338,6 +338,10 @@ function make(class, properties, parent)
 	properties.StrokeRole=nil
 	properties.CornerRole=nil
 
+	if forcedCornerRole and class~="UICorner" and class~="UIStroke" and class~="UIGradient" then
+		properties.ClipsDescendants=true
+	end
+
 	if properties.Active==nil and (class=="Frame" or class=="ScrollingFrame" or class=="TextButton" or class=="TextBox") then
 		properties.Active=true
 	end
@@ -379,6 +383,9 @@ function make(class, properties, parent)
 	end
 	if parent~=nil then
 		instance.Parent=parent
+	end
+	if class=="UICorner" and parent and parent:IsA("GuiObject") then
+		parent.ClipsDescendants=true
 	end
 	registerThemeObject(instance)
 

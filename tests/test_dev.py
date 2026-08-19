@@ -175,3 +175,19 @@ def test_auto_boost_is_in_the_left_column():
     module_line = '{api="Boost",name="Boost",column="left",order=2,title="Boost"}'
     for path in ("gui/pc.luau", "gui/mobile.luau", "runtime/loader-part-2.lua"):
         assert module_line in read(path)
+
+
+def test_rounded_controls_and_colour_picker_are_clipped():
+    runtime = read("runtime/loader-part-1.lua")
+    colors = read("features/colors/logic.lua")
+
+    assert 'if class=="UICorner" and parent and parent:IsA("GuiObject") then' in runtime
+    assert "parent.ClipsDescendants=true" in runtime
+    assert 'local activeMode="Circle"' in colors
+    assert '{"Circle","RGB","HSV","Hex"}' in colors
+    assert colors.count("Size=UDim2.fromOffset(104,104)") == 2
+    assert colors.count('addCorner(svSquare,"Avatar")') == 1
+    assert colors.count('addCorner(highlightSvBase,"Avatar")') == 1
+    assert colors.count("Size=UDim2.new(1,-4,0,3)") == 2
+    assert "hueCursor.Position=UDim2.new(0,2,pickerHue,-1)" in colors
+    assert "highlightHueCursor.Position=UDim2.new(0,2,highlightPickerHue,-1)" in colors
