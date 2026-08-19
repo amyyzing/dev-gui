@@ -323,12 +323,16 @@ def test_rgb_labels_bypass_description_aliases():
 
 def test_params_selector_stays_inside_its_ring_and_gaps_are_not_clickable():
     params = read("features/params/gui.lua")
+    assert 'local canvas=make("CanvasGroup",{' in params
     assert "local wheelGapDegrees=12" in params
     assert "sector.start+wheelGapDegrees/2" in params
     assert "sector.finish-wheelGapDegrees/2" in params
     assert "local start=startAngle+wheelGapDegrees" not in params
     assert params.count("ClipsDescendants=true") >= 3
     assert params.count("BorderSizePixel=0") >= 10
+    assert "local function selectorInsideClipBounds()" in params
+    assert "selectorRoot.Visible=selectorInsideClipBounds()" in params
+    assert 'GetPropertyChangedSignal("CanvasPosition")' in params
     assert "local selectorGlow=" not in params
     assert "local selectorGlows=" not in params
     assert "ZIndex=12" in params

@@ -580,7 +580,7 @@ function paramsGui.new(app,parent)
 			ClipsDescendants=true,
 		},parentFrame)
 
-		local canvas=make("Frame",{
+		local canvas=make("CanvasGroup",{
 			AnchorPoint=Vector2.new(0,0),
 			Position=UDim2.fromOffset(wheelGlowPad,wheelGlowPad),
 			Size=UDim2.fromOffset(wheelWidth,wheelHeight),
@@ -777,6 +777,50 @@ function paramsGui.new(app,parent)
 			Selectable=false,
 			ZIndex=10,
 		},canvas)
+
+		local function selectorInsideClipBounds()
+			if not selectorRoot or not selectorRoot.Parent then return false end
+
+			local canvasMin=canvas.AbsolutePosition
+			local canvasMax=canvasMin+canvas.AbsoluteSize
+			local ancestor=canvas.Parent
+
+			while ancestor do
+				if ancestor:IsA("GuiObject") then
+					if not ancestor.Visible then return false end
+					if ancestor.ClipsDescendants then
+						local clipMin=ancestor.AbsolutePosition
+						local clipMax=clipMin+ancestor.AbsoluteSize
+						if canvasMin.X<clipMin.X or canvasMin.Y<clipMin.Y or canvasMax.X>clipMax.X or canvasMax.Y>clipMax.Y then
+							return false
+						end
+					end
+				end
+				ancestor=ancestor.Parent
+			end
+
+			return canvas.AbsoluteSize.X>0 and canvas.AbsoluteSize.Y>0
+		end
+
+		local function refreshSelectorVisibility()
+			if selectorRoot and selectorRoot.Parent then
+				selectorRoot.Visible=selectorInsideClipBounds()
+			end
+		end
+
+		local watched=canvas
+		while watched do
+			if watched:IsA("GuiObject") then
+				trackConnection(watched:GetPropertyChangedSignal("AbsolutePosition"):Connect(refreshSelectorVisibility))
+				trackConnection(watched:GetPropertyChangedSignal("AbsoluteSize"):Connect(refreshSelectorVisibility))
+				trackConnection(watched:GetPropertyChangedSignal("Visible"):Connect(refreshSelectorVisibility))
+				if watched:IsA("ScrollingFrame") then
+					trackConnection(watched:GetPropertyChangedSignal("CanvasPosition"):Connect(refreshSelectorVisibility))
+				end
+			end
+			watched=watched.Parent
+		end
+		task.defer(refreshSelectorVisibility)
 
 		trackConnection(hitLayer.InputBegan:Connect(function(input)
 			if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then
