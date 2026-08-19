@@ -980,7 +980,7 @@ function mainFrame.new(app)
 
 	updateResponsiveLayout()
 
-	local footer=make("Frame",{BackgroundColor3=colors.bg,BackgroundTransparency=0,Size=UDim2.new(1,0,0,footerHeight),ZIndex=8,LayoutOrder=4,ThemeRole="BG"},main)
+	local footer=make("Frame",{BackgroundColor3=colors.bg,BackgroundTransparency=0,BorderSizePixel=0,Size=UDim2.new(1,0,0,footerHeight),ZIndex=8,LayoutOrder=4,ThemeRole="BG"},main)
 	make("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,footerGap),SortOrder=Enum.SortOrder.LayoutOrder,HorizontalAlignment=Enum.HorizontalAlignment.Right,VerticalAlignment=Enum.VerticalAlignment.Center},footer)
 
 	function api.RefreshESPStatus() end
@@ -1122,18 +1122,27 @@ function mainFrame.new(app)
 		end)
 	end
 
-	resizeHandle=make("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(32,32),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,6,1,-6),BackgroundColor3=getUIStrokeColor(),BackgroundTransparency=1,BorderSizePixel=0,Text="",Visible=resizeHandleVisible,ZIndex=30,SkipThemeRole=true},root)
+	resizeHandle=make("TextButton",{Name="ResizeHandle",AutoButtonColor=false,Size=UDim2.fromOffset(32,32),AnchorPoint=Vector2.new(0,1),Position=UDim2.new(0,6,1,-6),BackgroundColor3=getUIStrokeColor(),BackgroundTransparency=0.18,BorderSizePixel=0,Text="",Visible=resizeHandleVisible,ZIndex=30,SkipThemeRole=true},root)
 	make("UICorner",{CornerRadius=UDim.new(0,0)},resizeHandle)
+	local resizeStroke=make("UIStroke",{Color=colors.bg,Thickness=1,Transparency=0.25},resizeHandle)
 
 	local resizeHovering=false
 	local resizing=false
 
 	local function paintResizeHandle(held)
 		local targetSize=held and 38 or (resizeHovering and 35 or 32)
+		local targetTransparency=held and 0.02 or (resizeHovering and 0.08 or 0.18)
 
 		tweenService:Create(resizeHandle,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
 			Size=UDim2.fromOffset(targetSize,targetSize),
-			BackgroundTransparency=1,
+			BackgroundColor3=getUIStrokeColor(),
+			BackgroundTransparency=targetTransparency,
+		}):Play()
+
+		tweenService:Create(resizeStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
+			Color=held and (colors.text or Color3.new(1,1,1)) or (colors.bg or Color3.new()),
+			Thickness=1,
+			Transparency=(held or resizeHovering) and 0.08 or 0.25,
 		}):Play()
 	end
 

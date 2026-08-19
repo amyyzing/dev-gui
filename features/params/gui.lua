@@ -573,6 +573,7 @@ function paramsGui.new(app,parent)
 		wheelWrap=make("Frame",{
 			AnchorPoint=Vector2.new(1,0),
 			BackgroundTransparency=1,
+			BorderSizePixel=0,
 			Position=UDim2.new(1,0,0,0),
 			Size=UDim2.fromOffset(wheelWidth+wheelGlowPad*2,wheelHeight+wheelGlowPad*2),
 			ZIndex=6,
@@ -584,6 +585,7 @@ function paramsGui.new(app,parent)
 			Position=UDim2.fromOffset(wheelGlowPad,wheelGlowPad),
 			Size=UDim2.fromOffset(wheelWidth,wheelHeight),
 			BackgroundTransparency=1,
+			BorderSizePixel=0,
 			ClipsDescendants=true,
 			ZIndex=6,
 		},wheelWrap)
@@ -640,6 +642,7 @@ function paramsGui.new(app,parent)
 					local pad=layer.pad
 					local glow=make("ImageLabel",{
 						BackgroundTransparency=1,
+						BorderSizePixel=0,
 						Position=UDim2.new(pieceData.x,-pad,pieceData.y,-pad),
 						Size=UDim2.new(pieceData.w,pad*2,pieceData.h,pad*2),
 						Image=glowPiece,
@@ -654,6 +657,7 @@ function paramsGui.new(app,parent)
 
 				wheelImages[pageKey]=make("ImageLabel",{
 					BackgroundTransparency=1,
+					BorderSizePixel=0,
 					Position=UDim2.fromScale(pieceData.x,pieceData.y),
 					Size=UDim2.fromScale(pieceData.w,pieceData.h),
 					Image=normalPiece,
@@ -666,6 +670,7 @@ function paramsGui.new(app,parent)
 
 				wheelHighlightImages[pageKey]=make("ImageLabel",{
 					BackgroundTransparency=1,
+					BorderSizePixel=0,
 					Position=UDim2.fromScale(pieceData.x,pieceData.y),
 					Size=UDim2.fromScale(pieceData.w,pieceData.h),
 					Image=normalPiece,
@@ -696,6 +701,7 @@ function paramsGui.new(app,parent)
 
 		selectorRoot=make("Frame",{
 			BackgroundTransparency=1,
+			BorderSizePixel=0,
 			Position=UDim2.fromScale(0,0),
 			Size=UDim2.fromScale(1,1),
 			Rotation=(wheelMidAngles[normalizePageKey(state.paramsSelectedPage)] or wheelMidAngles.speed)-wheelMidAngles.speed,
@@ -707,6 +713,7 @@ function paramsGui.new(app,parent)
 		if selectorPiece then
 			selectorImage=make("ImageLabel",{
 				BackgroundTransparency=1,
+				BorderSizePixel=0,
 				Size=UDim2.fromScale(1,1),
 				Image=selectorPiece,
 				ImageColor3=inputColor(),
@@ -718,6 +725,7 @@ function paramsGui.new(app,parent)
 
 			selectorHighlight=make("ImageLabel",{
 				BackgroundTransparency=1,
+				BorderSizePixel=0,
 				Size=UDim2.fromScale(1,1),
 				Image=selectorPiece,
 				ImageColor3=Color3.new(1,1,1),
@@ -749,6 +757,7 @@ function paramsGui.new(app,parent)
 				Position=UDim2.fromScale(0.5,0.5),
 				Size=UDim2.fromOffset(centerSize,centerSize),
 				BackgroundTransparency=1,
+				BorderSizePixel=0,
 				Image=assets._center,
 				ImageColor3=inputColor(),
 				ImageTransparency=0.03,

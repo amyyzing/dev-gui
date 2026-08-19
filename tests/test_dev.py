@@ -197,8 +197,10 @@ def test_square_header_avatar_spans_title_block_and_shifts_text_on_both_platform
         assert 'avatarStroke.Color=getUIStrokeColor()' in mainframe
         assert 'TextColor3=colors.text,TextRole="TEXT"' in mainframe
         assert 'Name="ResizeHandle"' in mainframe
-        assert 'BackgroundTransparency=1,BorderSizePixel=0,Text="",Visible=resizeHandleVisible' in mainframe
-        assert "local resizeStroke=" not in mainframe
+        assert 'BackgroundTransparency=0.18,BorderSizePixel=0,Text="",Visible=resizeHandleVisible' in mainframe
+        assert 'local resizeStroke=make("UIStroke"' in mainframe
+        assert "BackgroundTransparency=targetTransparency" in mainframe
+        assert 'BackgroundTransparency=0,BorderSizePixel=0,Size=UDim2.new(1,0,0,footerHeight)' in mainframe
         assert "UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerTitleY)" in mainframe
         assert "UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerSubtitleY)" in mainframe
 
@@ -326,6 +328,7 @@ def test_params_selector_stays_inside_its_ring_and_gaps_are_not_clickable():
     assert "sector.finish-wheelGapDegrees/2" in params
     assert "local start=startAngle+wheelGapDegrees" not in params
     assert params.count("ClipsDescendants=true") >= 3
+    assert params.count("BorderSizePixel=0") >= 10
     assert "local selectorGlow=" not in params
     assert "local selectorGlows=" not in params
     assert "ZIndex=12" in params
