@@ -298,6 +298,10 @@ def test_header_art_is_center_cropped_for_every_theme():
         shell = read(f"platforms/{platform}/gui/mainframe.lua")
         assert 'Name="HeaderArt"' in shell
         assert "ScaleType=Enum.ScaleType.Crop" in shell
+        assert 'local style=type(app.style)=="table" and app.style or {}' in shell
+        assert 'api.headerArt.Image=""' in shell
+        assert "api.headerArt.Visible=false" in shell
+        assert 'if style.UseThemePalette==false or type(app.getHeaderArt)~="function" then' in shell
         assert "pcall(app.getHeaderArt,id)" in shell
         assert "avatarStroke.Color=getUIStrokeColor()" in shell
 

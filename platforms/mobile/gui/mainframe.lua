@@ -41,6 +41,7 @@ function mainFrame.new(app)
 	local make=app.New or app.make
 	local fusion=app.Fusion or app.fusion
 	local colors=app.colors
+	local style=type(app.style)=="table" and app.style or {}
 	local description=app.Description or app.description or {}
 	local windowState=app.windowState
 	local screenGui=app.SG or app.screenGui
@@ -453,10 +454,11 @@ function mainFrame.new(app)
 	function api.RefreshHeaderArt()
 		api.headerArtToken=api.headerArtToken+1
 		local token=api.headerArtToken
+		api.headerArt.Image=""
+		api.headerArt.Visible=false
 		local profile=currentProfile()
 		local id=tostring(profile and profile.Id or "raycast"):lower()
-		if type(app.getHeaderArt)~="function" then
-			api.headerArt.Visible=false
+		if style.UseThemePalette==false or type(app.getHeaderArt)~="function" then
 			return
 		end
 		task.spawn(function()

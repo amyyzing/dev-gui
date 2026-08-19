@@ -76,6 +76,7 @@ mainFrame=MainFrameModule.new({
 	make=make,
 	fusion=FusionModule,
 	colors=colors,
+	style=style,
 	description=description,
 	windowState=windowState,
 	uiProfile=getCurrentUILibProfile and getCurrentUILibProfile() or nil,
