@@ -99,10 +99,11 @@ local defaultStyleValues={
 	QBAimHighlightOutlineTransparency=0,
 }
 
-local validThemes={raycast=true,catppuccin=true,dracula=true,linear=true,material=true,absolutely=true}
+local validThemes={raycast=true,everforest=true,dracula=true,linear=true,material=true,absolutely=true}
 
 local function themeId(value)
 	local id=tostring(value or ""):lower()
+	if id=="catppuccin" then id="everforest" end
 	return validThemes[id] and id or "raycast"
 end
 

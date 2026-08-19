@@ -126,7 +126,7 @@ def test_reworked_theme_list_is_complete_and_raycast_is_default():
 
     expected = {
         "raycast": "Raycast",
-        "catppuccin": "Catppuccin",
+        "everforest": "Everforest",
         "dracula": "Dracula",
         "linear": "Linear",
         "material": "Material",
@@ -135,7 +135,9 @@ def test_reworked_theme_list_is_complete_and_raycast_is_default():
     for theme_id, label in expected.items():
         assert f'{theme_id}=makeTheme("{theme_id}","{label}"' in runtime
 
-    assert '{"raycast","catppuccin","dracula","linear","material","absolutely"}' in colors
+    assert '{"raycast","everforest","dracula","linear","material","absolutely"}' in colors
+    assert 'everforest=makeTheme("everforest","Everforest",{253,246,227},{141,161,1},{53,167,124},squareShape,softTones)' in runtime
+    assert 'if id=="catppuccin" then id="everforest" end' in data_save
     assert "themes=devThemes" in read("runtime/loader-part-3.lua")
 
     for path in ("gui/pc.luau", "gui/mobile.luau"):

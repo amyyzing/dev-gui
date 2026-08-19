@@ -47,7 +47,7 @@ local softTones={
 
 devThemes={
 	raycast=makeTheme("raycast","Raycast",{17,17,20},{255,90,163},{124,92,255},squareShape,softTones),
-	catppuccin=makeTheme("catppuccin","Catppuccin",{30,30,46},{203,166,247},{137,180,250},squareShape,softTones),
+	everforest=makeTheme("everforest","Everforest",{253,246,227},{141,161,1},{53,167,124},squareShape,softTones),
 	dracula=makeTheme("dracula","Dracula",{40,42,54},{189,147,249},{255,121,198},squareShape,softTones),
 	linear=makeTheme("linear","Linear",{16,16,20},{94,106,210},{138,143,152},squareShape,softTones),
 	material=makeTheme("material","Material",{18,18,18},{3,218,198},{187,134,252},squareShape,softTones),
