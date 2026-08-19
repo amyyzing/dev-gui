@@ -33,7 +33,26 @@ local function applySmoothPlasticToPart(worldSettings,part)
 	end
 
 	if part.Material~=Enum.Material.SmoothPlastic then
-		part.Material=Enum.Material.SmoothPlastic
+		pcall(function()
+			part.Material=Enum.Material.SmoothPlastic
+		end)
+	end
+end
+
+local function restorePart(worldSettings,part)
+	local material=worldSettings.OriginalMaterials[part]
+	if material==nil then return end
+
+	local restored=false
+	pcall(function()
+		if part:IsA("BasePart") then
+			part.Material=material
+			restored=true
+		end
+	end)
+
+	if restored then
+		worldSettings.OriginalMaterials[part]=nil
 	end
 end
 
@@ -49,26 +68,27 @@ function materials.new(app,page)
 	function api.SetEnabled(state,fire)
 		worldSettings.SmoothPlastic=state and true or false
 		safeDisconnect(worldSettings.Conn)
+		safeDisconnect(worldSettings.RemoveConn)
 		worldSettings.Conn=nil
+		worldSettings.RemoveConn=nil
 
 		if worldSettings.SmoothPlastic then
-			for _,inst in ipairs(workspace:GetDescendants()) do
-				applySmoothPlasticToPart(worldSettings,inst)
-			end
-
 			worldSettings.Conn=workspace.DescendantAdded:Connect(function(inst)
 				if worldSettings.SmoothPlastic then
 					applySmoothPlasticToPart(worldSettings,inst)
 				end
 			end)
-		else
-			for part,material in pairs(worldSettings.OriginalMaterials) do
-				if part and part.Parent and part:IsA("BasePart") then
-					part.Material=material
-				end
-			end
+			worldSettings.RemoveConn=workspace.DescendantRemoving:Connect(function(inst)
+				restorePart(worldSettings,inst)
+			end)
 
-			worldSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
+			for _,inst in ipairs(workspace:GetDescendants()) do
+				applySmoothPlasticToPart(worldSettings,inst)
+			end
+		else
+			for part in pairs(worldSettings.OriginalMaterials) do
+				restorePart(worldSettings,part)
+			end
 		end
 
 		if materialToggle then

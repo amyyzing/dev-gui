@@ -185,6 +185,14 @@ class LifecycleContracts(unittest.TestCase):
         self.assertIn("workspace:GetDescendants()", materials)
         self.assertIn("part.Material=Enum.Material.SmoothPlastic", materials)
         self.assertIn("workspace.DescendantAdded:Connect", materials)
+        self.assertIn("workspace.DescendantRemoving:Connect", materials)
+        self.assertIn("restorePart(worldSettings,inst)", materials)
+        self.assertIn("for part in pairs(worldSettings.OriginalMaterials)", materials)
+        self.assertNotIn("part and part.Parent", materials)
+        self.assertEqual(
+            materials.count('OriginalMaterials=setmetatable({}, {__mode="k"})'),
+            1,
+        )
         self.assertNotIn("OriginalVisuals", materials)
         self.assertNotIn("RenderFidelity", materials)
         self.assertNotIn("CastShadow", materials)
