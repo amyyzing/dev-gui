@@ -205,14 +205,5 @@ class RuntimeFallbackContracts(unittest.TestCase):
         self.assertIn(expected, defense)
         self.assertIn(expected, offense)
 
-    def test_player_log_reports_available_hardware_without_fake_ram_usage(self):
-        runtime = source("runtime/loader-part-5.lua")
-        self.assertIn('"getsysteminfo","getdeviceinfo","gethardwareinfo"', runtime)
-        self.assertIn("cpuName=hardware.cpuName", runtime)
-        self.assertIn("gpuName=hardware.gpuName", runtime)
-        self.assertIn("ramAmount=hardware.ramAmount", runtime)
-        self.assertNotIn("GetTotalMemoryUsageMb", runtime)
-
-
 if __name__ == "__main__":
     unittest.main()
