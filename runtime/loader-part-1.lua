@@ -55,7 +55,7 @@ style={}
 
 windowState={}
 
-mapSettings={SmoothPlastic=false, OriginalMaterials=setmetatable({}, {__mode="k"})}
+mapSettings={SmoothPlastic=false, OriginalMaterials={}}
 
 currentModeLabel="Gameplay"
 currentModeKey="mode1"

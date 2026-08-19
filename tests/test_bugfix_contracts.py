@@ -207,10 +207,9 @@ class LifecycleContracts(unittest.TestCase):
         self.assertIn("restorePart(worldSettings,inst)", materials)
         self.assertIn("for part in pairs(worldSettings.OriginalMaterials)", materials)
         self.assertNotIn("part and part.Parent", materials)
-        self.assertEqual(
-            materials.count('OriginalMaterials=setmetatable({}, {__mode="k"})'),
-            1,
-        )
+        self.assertIn("ws.OriginalMaterials={}", materials)
+        self.assertNotIn('OriginalMaterials=setmetatable({}, {__mode="k"})', materials)
+        self.assertIn("mapSettings={SmoothPlastic=false, OriginalMaterials={}}", source("runtime/loader-part-1.lua"))
         self.assertNotIn("OriginalVisuals", materials)
         self.assertNotIn("RenderFidelity", materials)
         self.assertNotIn("CastShadow", materials)

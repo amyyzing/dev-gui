@@ -196,7 +196,9 @@ function ensureWorldSettings()
 	end
 
 	if type(mapSettings.OriginalMaterials)~="table" then
-		mapSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
+		mapSettings.OriginalMaterials={}
+	elseif getmetatable(mapSettings.OriginalMaterials)~=nil then
+		setmetatable(mapSettings.OriginalMaterials,nil)
 	end
 end
 
@@ -211,7 +213,10 @@ function resetMapRuntimeState()
 		safeDisconnect(mapSettings.Conn)
 		mapSettings.Conn=nil
 	end
-
+	if mapSettings.RemoveConn then
+		safeDisconnect(mapSettings.RemoveConn)
+		mapSettings.RemoveConn=nil
+	end
 	for part,material in pairs(mapSettings.OriginalMaterials or {}) do
 		if part and part.Parent and part:IsA("BasePart") then
 			pcall(function()
@@ -221,7 +226,7 @@ function resetMapRuntimeState()
 	end
 
 	mapSettings.SmoothPlastic=false
-	mapSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
+	mapSettings.OriginalMaterials={}
 	potatoMode=false
 end
 

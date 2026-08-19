@@ -8,9 +8,9 @@ local function ensureWorldSettings(app)
 	end
 
 	if type(ws.OriginalMaterials)~="table" then
-		ws.OriginalMaterials=setmetatable({}, {__mode="k"})
-	elseif getmetatable(ws.OriginalMaterials)==nil then
-		setmetatable(ws.OriginalMaterials,{__mode="k"})
+		ws.OriginalMaterials={}
+	elseif getmetatable(ws.OriginalMaterials)~=nil then
+		setmetatable(ws.OriginalMaterials,nil)
 	end
 
 	app.mapSettings=ws
@@ -31,7 +31,6 @@ local function applySmoothPlasticToPart(worldSettings,part)
 	if worldSettings.OriginalMaterials[part]==nil then
 		worldSettings.OriginalMaterials[part]=part.Material
 	end
-
 	if part.Material~=Enum.Material.SmoothPlastic then
 		pcall(function()
 			part.Material=Enum.Material.SmoothPlastic
