@@ -135,12 +135,24 @@ def test_reworked_theme_list_is_complete_and_raycast_is_default():
     for theme_id, (label, primary, accent, secondary) in expected.items():
         assert f'{theme_id}=exactTheme("{theme_id}","{label}",{primary},{accent},{secondary}' in runtime
 
+    expected_text = {
+        "raycast": ("{254,254,254}", "{102,102,102}"),
+        "everforest": ("{92,106,114}", "{147,159,145}"),
+        "proof": ("{47,49,45}", "{75,77,72}"),
+        "linear": ("{227,228,230}", "{99,107,123}"),
+        "material": ("{238,255,255}", "{103,103,103}"),
+        "absolutely": ("{249,249,247}", "{178,178,176}"),
+    }
+    for text, muted in expected_text.values():
+        assert f"text={text},muted={muted}" in runtime
+
     assert '{"raycast","everforest","proof","linear","material","absolutely"}' in colors
     assert "softTones" not in runtime
     assert "theme.Theme[role]=Color3.fromRGB(value[1],value[2],value[3])" in runtime
-    assert "text={47,49,45},muted={75,77,72}" in runtime
-    assert "text={92,106,114},muted={147,159,145}" in runtime
-    assert "text={238,255,255},muted={103,103,103}" in runtime
+    assert "Text=palette.text" in colors
+    assert "Muted=palette.muted" in colors
+    assert "local textColor=preset.Text or readableTextColor(preset.Primary)" in colors
+    assert "instance.TextColor3=colors[textRole]" in runtime
     assert 'if id=="catppuccin" then id="everforest" end' in data_save
     assert 'if id=="dracula" then id="proof" end' in data_save
     assert "local function migrateThemeColors" in data_save

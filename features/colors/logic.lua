@@ -1357,12 +1357,15 @@ function colors.new(app,page)
 		local profile=app.themes and app.themes[id]
 		local defaults=profile and profile.Defaults
 		if defaults then
+			local palette=profile.Theme or {}
 			themePresets[#themePresets+1]={
 				Id=id,
 				Name=profile.Name,
 				Primary=Color3.fromRGB(defaults.PrimaryR,defaults.PrimaryG,defaults.PrimaryB),
 				Stroke=Color3.fromRGB(defaults.StrokeR,defaults.StrokeG,defaults.StrokeB),
 				Gradient=Color3.fromRGB(defaults.GradientR,defaults.GradientG,defaults.GradientB),
+				Text=palette.text,
+				Muted=palette.muted,
 			}
 		end
 	end
@@ -1386,7 +1389,7 @@ function colors.new(app,page)
 	end
 
 	for i,preset in ipairs(themePresets) do
-		local textColor=readableTextColor(preset.Primary)
+		local textColor=preset.Text or readableTextColor(preset.Primary)
 		local card=make("TextButton",{
 			BackgroundColor3=preset.Primary,
 			BorderSizePixel=0,
