@@ -483,8 +483,8 @@ end
 
 mainPageModules=(getUIMapPageModules and getUIMapPageModules("main","MainPage")) or (UIMapModule and UIMapModule.MainPage and UIMapModule.MainPage.Modules) or {
 	{api="Hitbox",name="Hitbox",column="left",order=1,title="Hitbox"},
-	{api="GameParams",name="Params",column="left",order=2,title="Game Params"},
-	{api="Boost",name="Boost",column="right",order=2,title="Boost"},
+	{api="Boost",name="Boost",column="left",order=2,title="Boost"},
+	{api="GameParams",name="Params",column="left",order=3,title="Game Params"},
 	{api="ESP",name="ESP",column="right",order=3,title="ESP"},
 	{api="QBAim",name="QBAim",column="right",order=4,title="QB Aim"},
 	{api="Testing",name="Testing",column="right",order=5,title="Testing"},

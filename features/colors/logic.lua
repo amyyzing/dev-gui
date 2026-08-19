@@ -3,17 +3,17 @@ local colors={}
 local tweenService=game:GetService("TweenService")
 
 local styleDefaults={
-	PrimaryR=12,
-	PrimaryG=12,
-	PrimaryB=12,
+	PrimaryR=17,
+	PrimaryG=17,
+	PrimaryB=20,
 
-	StrokeR=182,
-	StrokeG=180,
-	StrokeB=180,
+	StrokeR=255,
+	StrokeG=90,
+	StrokeB=163,
 
-	GradientR=182,
-	GradientG=180,
-	GradientB=180,
+	GradientR=124,
+	GradientG=92,
+	GradientB=255,
 
 	StrokeGradient=false,
 	LiquidStroke=false,
@@ -24,7 +24,7 @@ local styleDefaults={
 	StrokeThickness=1,
 	StrokeTransparency=0.84,
 	CornerRadius=0,
-	UILib="original",
+	UILib="raycast",
 	ThemePanelExpanded=false,
 	ColoursPanelExpanded=false,
 	HighlightPanelExpanded=false,
@@ -236,7 +236,8 @@ local function normalizedStyleValue(key,value,default)
 	elseif key=="CornerRadius" then
 		return 0
 	elseif key=="UILib" then
-		return styleDefaults.UILib
+		local theme=tostring(value or default):lower()
+		return ({raycast=true,catppuccin=true,dracula=true,linear=true,material=true,absolutely=true})[theme] and theme or styleDefaults.UILib
 	elseif type(default)=="number" then
 		local n=numberOrDefault(value,default)
 		local limits=numberLimits[key]
@@ -1348,22 +1349,33 @@ function colors.new(app,page)
 		SortOrder=Enum.SortOrder.LayoutOrder,
 	},themeGrid)
 
-	local themePresets={
-		{Name="Dark",Primary=Color3.fromRGB(12,12,12),Stroke=Color3.fromRGB(182,180,180),Gradient=Color3.fromRGB(182,180,180),GradientOn=false},
-		{Name="Light",Primary=Color3.fromRGB(238,238,238),Stroke=Color3.fromRGB(60,60,60),Gradient=Color3.fromRGB(60,60,60),GradientOn=false},
-		{Name="Midnight",Primary=Color3.fromRGB(12,18,38),Stroke=Color3.fromRGB(72,98,158),Gradient=Color3.fromRGB(72,98,158),GradientOn=false},
-		{Name="Crimson",Primary=Color3.fromRGB(58,17,24),Stroke=Color3.fromRGB(150,45,54),Gradient=Color3.fromRGB(150,45,54),GradientOn=false},
-		{Name="Evergreen",Primary=Color3.fromRGB(18,36,34),Stroke=Color3.fromRGB(45,112,78),Gradient=Color3.fromRGB(45,112,78),GradientOn=false},
-		{Name="Sakura",Primary=Color3.fromRGB(43,3,33),Stroke=Color3.fromRGB(215,136,236),Gradient=Color3.fromRGB(215,136,236),GradientOn=false},
-	}
+	local themePresets={}
+	for _,id in ipairs({"raycast","catppuccin","dracula","linear","material","absolutely"}) do
+		local profile=app.themes and app.themes[id]
+		local defaults=profile and profile.Defaults
+		if defaults then
+			themePresets[#themePresets+1]={
+				Id=id,
+				Name=profile.Name,
+				Primary=Color3.fromRGB(defaults.PrimaryR,defaults.PrimaryG,defaults.PrimaryB),
+				Stroke=Color3.fromRGB(defaults.StrokeR,defaults.StrokeG,defaults.StrokeB),
+				Gradient=Color3.fromRGB(defaults.GradientR,defaults.GradientG,defaults.GradientB),
+			}
+		end
+	end
 
 	local function applyThemePreset(preset)
+		style.UILib=preset.Id
 		setPrimaryColour(preset.Primary)
+		setGradientColour(preset.Gradient)
 		style.StrokeGradient=false
 		style.LiquidStroke=false
 		style.StrokeThickness=1
 		style.StrokeTransparency=0.84
 		syncColourControls()
+		if type(app.applyUIProfile)=="function" then
+			app.applyUIProfile()
+		end
 		updateEverything()
 		tweenStyleTo(preset.Stroke)
 		setPickerFromColor(getActiveColor())
@@ -2415,7 +2427,7 @@ function colors.new(app,page)
 
 		for _,entry in ipairs(themeCards) do
 			local preset=entry.Preset
-			local selected=colorsMatch(primary,preset.Primary) and colorsMatch(stroke,preset.Stroke)
+			local selected=tostring(style.UILib or ""):lower()==preset.Id and colorsMatch(primary,preset.Primary) and colorsMatch(stroke,preset.Stroke)
 
 			entry.Card.BackgroundColor3=selected and preset.Primary:Lerp(readableTextColor(preset.Primary),0.06) or preset.Primary
 			entry.Marker.Visible=selected

@@ -5,6 +5,72 @@ RunService=game:GetService("RunService")
 HttpService=game:GetService("HttpService")
 Workspace=game:GetService("Workspace")
 
+local function makeTheme(id,name,primary,stroke,gradient,shape,tones)
+	return{
+		Id=id,
+		Name=name,
+		Shape=shape,
+		Tones=tones,
+		Components={
+			TextFont=Enum.Font.Gotham,
+			TitleFont=Enum.Font.GothamBold,
+			ControlFont=Enum.Font.GothamMedium,
+			SectionPrefix=true,
+		},
+		Defaults={
+			PrimaryR=primary[1],PrimaryG=primary[2],PrimaryB=primary[3],
+			StrokeR=stroke[1],StrokeG=stroke[2],StrokeB=stroke[3],
+			GradientR=gradient[1],GradientG=gradient[2],GradientB=gradient[3],
+			StrokeGradient=false,
+			LiquidStroke=false,
+			LiquidStrokeSpeed=1,
+			LiquidStrokeDirection="Right",
+			StrokeThickness=1,
+			StrokeTransparency=0.84,
+			CornerRadius=shape.WindowRadius,
+			UILib=id,
+		},
+	}
+end
+
+local roundedShape={
+	WindowRadius=12,SectionRadius=10,ControlRadius=8,SliderRadius=10,
+	SliderHeight=24,SliderStyle="pill",WindowStrokeTransparency=0.62,
+	SectionStrokeTransparency=0.9,ControlStrokeTransparency=0.86,
+	SliderStrokeTransparency=0.86,AccentStrokeTransparency=0.56,
+}
+
+local compactShape={
+	WindowRadius=7,SectionRadius=6,ControlRadius=5,SliderRadius=5,
+	SliderHeight=24,SliderStyle="thin",WindowStrokeTransparency=0.66,
+	SectionStrokeTransparency=0.92,ControlStrokeTransparency=0.9,
+	SliderStrokeTransparency=0.9,AccentStrokeTransparency=0.62,
+}
+
+local softTones={
+	topbar=0.035,panel=0.065,card=0.105,section=0.105,button=0.065,
+	input=0.055,sliderBg=0.075,strokeSoft=0.15,sliderAccent=true,sliderBlend=0.66,
+}
+
+devThemes={
+	raycast=makeTheme("raycast","Raycast",{17,17,20},{255,90,163},{124,92,255},roundedShape,softTones),
+	catppuccin=makeTheme("catppuccin","Catppuccin",{30,30,46},{203,166,247},{137,180,250},roundedShape,softTones),
+	dracula=makeTheme("dracula","Dracula",{40,42,54},{189,147,249},{255,121,198},compactShape,softTones),
+	linear=makeTheme("linear","Linear",{16,16,20},{94,106,210},{138,143,152},compactShape,softTones),
+	material=makeTheme("material","Material",{18,18,18},{3,218,198},{187,134,252},{
+		WindowRadius=5,SectionRadius=4,ControlRadius=3,SliderRadius=3,
+		SliderHeight=24,SliderStyle="thin",WindowStrokeTransparency=0.68,
+		SectionStrokeTransparency=0.92,ControlStrokeTransparency=0.9,
+		SliderStrokeTransparency=0.9,AccentStrokeTransparency=0.62,
+	},softTones),
+	absolutely=makeTheme("absolutely","Absolutely",{9,9,12},{168,85,247},{236,72,153},{
+		WindowRadius=15,SectionRadius=12,ControlRadius=10,SliderRadius=12,
+		SliderHeight=25,SliderStyle="glow",WindowStrokeTransparency=0.58,
+		SectionStrokeTransparency=0.88,ControlStrokeTransparency=0.84,
+		SliderStrokeTransparency=0.84,AccentStrokeTransparency=0.5,
+	},softTones),
+}
+
 me=Players.LocalPlayer
 guiParent=me:WaitForChild("PlayerGui")
 
@@ -29,13 +95,13 @@ colorNames={
 }
 
 colors=setmetatable({
-	bg=Color3.fromRGB(12,12,12),
-	panel=Color3.fromRGB(24,24,24),
-	card=Color3.fromRGB(31,31,31),
-	accent=Color3.fromRGB(32,202,106),
+	bg=Color3.fromRGB(17,17,20),
+	panel=Color3.fromRGB(26,26,30),
+	card=Color3.fromRGB(34,34,39),
+	accent=Color3.fromRGB(255,90,163),
 	text=Color3.fromRGB(238,238,238),
 	muted=Color3.fromRGB(182,180,180),
-	stroke=Color3.fromRGB(182,180,180),
+	stroke=Color3.fromRGB(255,90,163),
 	red=Color3.fromRGB(254,94,86),
 	blue=Color3.fromRGB(21,103,251),
 	green=Color3.fromRGB(32,202,106),
@@ -1875,7 +1941,7 @@ local function styleByte(name,fallback)
 	return math.clamp(math.floor((tonumber(style[name]) or fallback)+0.5),0,255)
 end
 
-local styleColorDefaults={Stroke={182,180,180},Gradient={182,180,180},Primary={12,12,12}}
+local styleColorDefaults={Stroke={255,90,163},Gradient={124,92,255},Primary={17,17,20}}
 
 local function styleColor(prefix,defaults)
 	return Color3.fromRGB(
@@ -1902,11 +1968,11 @@ function getDefaultUILibProfile()
 		return UIMapModule.GetDefaultProfile()
 	end
 
-	return UIMapModule and UIMapModule.Profiles and UIMapModule.Profiles.original or {}
+	return UIMapModule and UIMapModule.Profiles and UIMapModule.Profiles.raycast or devThemes.raycast
 end
 
 function getDefaultUILibId()
-	return tostring(UIMapModule and UIMapModule.DefaultProfileId or "original")
+	return tostring(UIMapModule and UIMapModule.DefaultProfileId or "raycast")
 end
 
 function getUILibRuntimeStyle(id)
@@ -1933,7 +1999,7 @@ function getDefaultUIStyle()
 		result[k]=v
 	end
 
-	result.UILib=tostring(result.UILib or "original")
+	result.UILib=tostring(result.UILib or "raycast")
 	return result
 end
 
@@ -2024,7 +2090,7 @@ function refreshThemePalette()
 	colors.sliderFill=colors.stroke
 	colors.softStroke=colors.card:Lerp(toward,lum<0.52 and 0.18 or 0.12)
 
-	local libId=tostring(style.UILib or "original"):lower()
+	local libId=tostring(style.UILib or "raycast"):lower()
 	local libStyle=getUILibRuntimeStyle(libId)
 	local libTheme=libStyle and libStyle.Theme or {}
 
@@ -2379,7 +2445,9 @@ local function resolveStrokeRole(stroke)
 end
 
 local function strokeRoleRadius(role,shape)
-	if role=="Window" then
+	if role=="Avatar" then
+		return 999
+	elseif role=="Window" then
 		return tonumber(shape.WindowRadius) or 0
 	elseif role=="Section" then
 		return tonumber(shape.SectionRadius) or 0

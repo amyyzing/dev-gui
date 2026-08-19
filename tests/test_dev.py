@@ -117,3 +117,54 @@ def test_documented_one_line_loader_uses_railway_not_private_github_raw():
     readme = read("README.md")
     assert 'game:HttpGet("https://lint-bot-production.up.railway.app/loader/dev-gui")' in readme
     assert "raw.githubusercontent.com" not in readme
+
+
+def test_reworked_theme_list_is_complete_and_raycast_is_default():
+    runtime = read("runtime/loader-part-1.lua")
+    colors = read("features/colors/logic.lua")
+    data_save = read("data-save/data-save.lua")
+
+    expected = {
+        "raycast": "Raycast",
+        "catppuccin": "Catppuccin",
+        "dracula": "Dracula",
+        "linear": "Linear",
+        "material": "Material",
+        "absolutely": "Absolutely",
+    }
+    for theme_id, label in expected.items():
+        assert f'{theme_id}=makeTheme("{theme_id}","{label}"' in runtime
+
+    assert '{"raycast","catppuccin","dracula","linear","material","absolutely"}' in colors
+    assert "themes=devThemes" in read("runtime/loader-part-3.lua")
+
+    for path in ("gui/pc.luau", "gui/mobile.luau"):
+        assert 'uiMap.LibraryProfileId="raycast"' in read(path)
+
+    assert 'UILib="raycast"' in colors
+    assert 'UILib="raycast"' in data_save
+    assert 'return validThemes[id] and id or "raycast"' in data_save
+    for old_label in ("Dark", "Light", "Midnight", "Crimson", "Evergreen", "Sakura"):
+        assert f'Name="{old_label}"' not in colors
+
+
+def test_header_avatar_spans_title_block_and_shifts_text_on_both_platforms():
+    runtime = read("runtime/loader-part-1.lua")
+    assert 'if role=="Avatar" then' in runtime
+    assert "return 999" in runtime
+
+    for platform in ("pc", "mobile"):
+        mainframe = read(f"platforms/{platform}/gui/mainframe.lua")
+        assert 'Name="PlayerAvatar"' in mainframe
+        assert '"rbxthumb://type=AvatarHeadShot&id="' in mainframe
+        assert "(headerSubtitleY+14)-headerTitleY" in mainframe
+        assert "headerTitleX+headerAvatarSize()+10" in mainframe
+        assert 'CornerRole="Avatar"' in mainframe
+        assert "UDim2.fromOffset(headerTextX(),headerTitleY)" in mainframe
+        assert "UDim2.fromOffset(headerTextX(),headerSubtitleY)" in mainframe
+
+
+def test_auto_boost_is_in_the_left_column():
+    module_line = '{api="Boost",name="Boost",column="left",order=2,title="Boost"}'
+    for path in ("gui/pc.luau", "gui/mobile.luau", "runtime/loader-part-2.lua"):
+        assert module_line in read(path)

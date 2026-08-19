@@ -105,6 +105,7 @@ function makeCustomizeCtx()
 		Janitor=cleanupBags,
 		colors=colors,
 		style=style,
+		themes=devThemes,
 		inputService=inputService,
 		defaultStyle=getDefaultUIStyle and getDefaultUIStyle() or style,
 		screenGui=screenGui,
@@ -119,6 +120,11 @@ function makeCustomizeCtx()
 		getUIPrimaryColor=getUIPrimaryColor,
 		applyUIStrokeTheme=applyUIStrokeTheme,
 		applyUIPrimaryTheme=applyUIPrimaryTheme,
+		applyUIProfile=function()
+			if mainFrame and type(mainFrame.ApplyProfile)=="function" then
+				mainFrame.ApplyProfile(getCurrentUILibProfile())
+			end
+		end,
 		tintSlider=tintSlider,
 		onChanged=function()
 			applyUIStrokeTheme()

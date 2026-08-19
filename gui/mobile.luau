@@ -3,11 +3,12 @@
 -- 495-ui-library through UILibraryMapModule.
 local env=(getfenv and getfenv()) or _G
 local libraryMap=rawget(env,"UILibraryMapModule") or {}
+local devThemes=rawget(env,"devThemes") or {}
 
 local uiMap={}
 
 uiMap.Platform="mobile"
-uiMap.LibraryProfileId="original"
+uiMap.LibraryProfileId="raycast"
 uiMap.DefaultProfileId=uiMap.LibraryProfileId
 
 uiMap.LoaderGui={
@@ -96,8 +97,8 @@ uiMap.PageStructure={
 			Categories="main",
 			Modules={
 				{api="Hitbox",name="Hitbox",column="left",order=1,title="Hitbox"},
-				{api="GameParams",name="Params",column="left",order=2,title="Game Params"},
-				{api="Boost",name="Boost",column="right",order=2,title="Boost"},
+				{api="Boost",name="Boost",column="left",order=2,title="Boost"},
+				{api="GameParams",name="Params",column="left",order=3,title="Game Params"},
 				{api="ESP",name="ESP",column="right",order=3,title="ESP"},
 				{api="QBAim",name="QBAim",column="right",order=4,title="QB Aim"},
 				{api="Testing",name="Testing",column="right",order=5,title="Testing"},
@@ -330,8 +331,13 @@ function uiMap.GetPageColumns(id)
 end
 
 function uiMap.GetLibraryProfile(id)
+	local profileId=tostring(id or uiMap.LibraryProfileId):lower()
+	if devThemes[profileId] then
+		return devThemes[profileId]
+	end
+
 	if type(libraryMap.GetProfile)=="function" then
-		return libraryMap.GetProfile(id or uiMap.LibraryProfileId)
+		return libraryMap.GetProfile(profileId)
 	end
 
 	return libraryMap.Profiles and libraryMap.Profiles[uiMap.LibraryProfileId] or {}
@@ -353,16 +359,9 @@ function uiMap.GetDefaultProfile()
 end
 
 function uiMap.GetDefaultStyle(id)
-	local libraryDefaults={}
-
-	if type(libraryMap.GetDefaultStyle)=="function" then
-		libraryDefaults=libraryMap.GetDefaultStyle(id or uiMap.LibraryProfileId)
-	else
-		libraryDefaults=uiMap.GetLibraryProfile(id).Defaults or {}
-	end
-
-	local defaults=mergeTables(libraryDefaults,uiMap.AppStyleDefaults,{UILib=uiMap.LibraryProfileId})
-	defaults.UILib=tostring(defaults.UILib or uiMap.LibraryProfileId)
+	local profile=uiMap.GetLibraryProfile(id)
+	local profileId=tostring(profile.Id or uiMap.LibraryProfileId):lower()
+	local defaults=mergeTables(profile.Defaults or {},uiMap.AppStyleDefaults,{UILib=profileId})
 	return defaults
 end
 

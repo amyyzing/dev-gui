@@ -3,15 +3,15 @@ local dataSave={}
 local httpService=game:GetService("HttpService")
 
 local defaultStyleValues={
-	PrimaryR=12,
-	PrimaryG=12,
-	PrimaryB=12,
-	StrokeR=182,
-	StrokeG=180,
-	StrokeB=180,
-	GradientR=182,
-	GradientG=180,
-	GradientB=180,
+	PrimaryR=17,
+	PrimaryG=17,
+	PrimaryB=20,
+	StrokeR=255,
+	StrokeG=90,
+	StrokeB=163,
+	GradientR=124,
+	GradientG=92,
+	GradientB=255,
 	StrokeGradient=false,
 	LiquidStroke=false,
 	LiquidStrokeSpeed=1,
@@ -19,7 +19,7 @@ local defaultStyleValues={
 	StrokeThickness=1,
 	StrokeTransparency=0.84,
 	CornerRadius=0,
-	UILib="original",
+	UILib="raycast",
 	ThemePanelExpanded=false,
 	ColoursPanelExpanded=false,
 	HighlightPanelExpanded=false,
@@ -99,15 +99,22 @@ local defaultStyleValues={
 	QBAimHighlightOutlineTransparency=0,
 }
 
+local validThemes={raycast=true,catppuccin=true,dracula=true,linear=true,material=true,absolutely=true}
+
+local function themeId(value)
+	local id=tostring(value or ""):lower()
+	return validThemes[id] and id or "raycast"
+end
+
 local styleNumberFields={
-	{"primaryR","PrimaryR",0,255,28},
-	{"primaryG","PrimaryG",0,255,28},
-	{"primaryB","PrimaryB",0,255,28},
+	{"primaryR","PrimaryR",0,255,17},
+	{"primaryG","PrimaryG",0,255,17},
+	{"primaryB","PrimaryB",0,255,20},
 	{"strokeR","StrokeR",0,255,255},
-	{"strokeG","StrokeG",0,255,255},
-	{"strokeB","StrokeB",0,255,255},
-	{"gradientR","GradientR",0,255,255},
-	{"gradientG","GradientG",0,255,255},
+	{"strokeG","StrokeG",0,255,90},
+	{"strokeB","StrokeB",0,255,163},
+	{"gradientR","GradientR",0,255,124},
+	{"gradientG","GradientG",0,255,92},
 	{"gradientB","GradientB",0,255,255},
 	{"liquidStrokeSpeed","LiquidStrokeSpeed",0,2,1},
 	{"strokeThickness","StrokeThickness",0,8,1},
@@ -519,7 +526,7 @@ local function collectUIStylePayload(uiStyle,defaultUIStyle)
 
 	payload.liquidStrokeDirection=uiStyle.LiquidStrokeDirection
 	payload.cornerRadius=0
-	payload.uiLib=tostring(uiStyle.UILib or "")~="" and uiStyle.UILib or defaultUIStyle.UILib or "original"
+	payload.uiLib=themeId(uiStyle.UILib or defaultUIStyle.UILib)
 	payload.themePanelExpanded=uiStyle.ThemePanelExpanded and true or false
 	payload.coloursPanelExpanded=uiStyle.ColoursPanelExpanded and true or false
 	payload.highlightPanelExpanded=uiStyle.HighlightPanelExpanded and true or false
@@ -956,11 +963,7 @@ function dataSave.new(app)
 				app.style.HighlightSelectedState=tostring(uiStyle.HighlightSelectedState)
 			end
 
-			if uiStyle.uiLib~=nil and tostring(uiStyle.uiLib)~="" then
-				app.style.UILib=tostring(uiStyle.uiLib)
-			else
-				app.style.UILib=tostring(defaultUIStyle.UILib or "original")
-			end
+			app.style.UILib=themeId(uiStyle.uiLib or defaultUIStyle.UILib)
 			app.style.CornerRadius=0
 		end
 

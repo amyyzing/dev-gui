@@ -13,6 +13,7 @@ function mainFrame.new(app)
 	local inputService=app.inputService
 	local tweenService=app.TweenService
 	local runService=app.RunService
+	local localPlayer=game:GetService("Players").LocalPlayer
 	local contextActionService=game:GetService("ContextActionService")
 	local safeDisconnect=app.safeDisconnect
 	local wrapTextButton=app.wrapTextButton
@@ -159,6 +160,18 @@ function mainFrame.new(app)
 	end
 
 	loadLayoutNumbers()
+
+	local function headerAvatarSize()
+		return math.max(24,(headerSubtitleY+14)-headerTitleY)
+	end
+
+	local function headerTextX()
+		return headerTitleX+headerAvatarSize()+10
+	end
+
+	local function headerTextSize(height)
+		return UDim2.new(1,-(headerTextX()+164),0,height)
+	end
 
 	local function pageTabOffset(index)
 		return ((index-1)*pageTabWidth)+1
@@ -373,9 +386,27 @@ function mainFrame.new(app)
 	make("UICorner",{CornerRadius=UDim.new(0,0)},header)
 	local headerStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=headerStrokeTransparency},header)
 	headerStroke:SetAttribute("BaseStrokeTransparency",headerStrokeTransparency)
-	local titleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerTitleY),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=headerTitleSize,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+	local avatarSize=headerAvatarSize()
+	local playerAvatar=make("ImageLabel",{
+		Name="PlayerAvatar",
+		BackgroundColor3=colors.card or colors.panel,
+		BorderSizePixel=0,
+		Position=UDim2.fromOffset(headerTitleX,headerTitleY),
+		Size=UDim2.fromOffset(avatarSize,avatarSize),
+		Image=localPlayer and ("rbxthumb://type=AvatarHeadShot&id="..localPlayer.UserId.."&w=100&h=100") or "",
+		ScaleType=Enum.ScaleType.Crop,
+		ClipsDescendants=true,
+		ZIndex=6,
+		ThemeRole="CARD",
+		CornerRole="Avatar",
+	},header)
+	make("UICorner",{CornerRadius=UDim.new(0,999)},playerAvatar)
+	local avatarStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=0.35,StrokeRole="Accent"},playerAvatar)
+	avatarStroke:SetAttribute("BaseStrokeTransparency",0.35)
 
-	local subtitleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerSubtitleY),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
+	local titleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTextX(),headerTitleY),Size=headerTextSize(18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=headerTitleSize,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+
+	local subtitleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTextX(),headerSubtitleY),Size=headerTextSize(14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
 
 	local function makeTopButton(text,xOffset)
 		local b=make("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=colors.button or colors.bg,BorderSizePixel=0,Text=text,Font=controlFont,TextSize=17,TextColor3=colors.text,AutoButtonColor=false,Selectable=true,ZIndex=6,ThemeRole="BUTTON"},header)
@@ -432,7 +463,11 @@ function mainFrame.new(app)
 		end),
 		Position=makeFusionComputed(function(use)
 			use(profileVersionValue)
-			return UDim2.fromOffset(headerTitleX,headerTitleY)
+			return UDim2.fromOffset(headerTextX(),headerTitleY)
+		end),
+		Size=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return headerTextSize(18)
 		end),
 	})
 
@@ -451,7 +486,11 @@ function mainFrame.new(app)
 		end),
 		Position=makeFusionComputed(function(use)
 			use(profileVersionValue)
-			return UDim2.fromOffset(headerTitleX,headerSubtitleY)
+			return UDim2.fromOffset(headerTextX(),headerSubtitleY)
+		end),
+		Size=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return headerTextSize(14)
 		end),
 		Visible=makeFusionComputed(function(use)
 			use(profileVersionValue)
@@ -722,9 +761,14 @@ function mainFrame.new(app)
 			resizeHandle.Visible=resizeHandleVisible
 		end
 
-		titleText.Position=UDim2.fromOffset(headerTitleX,headerTitleY)
+		local size=headerAvatarSize()
+		playerAvatar.Position=UDim2.fromOffset(headerTitleX,headerTitleY)
+		playerAvatar.Size=UDim2.fromOffset(size,size)
+		titleText.Position=UDim2.fromOffset(headerTextX(),headerTitleY)
+		titleText.Size=headerTextSize(18)
 		titleText.TextSize=headerTitleSize
-		subtitleText.Position=UDim2.fromOffset(headerTitleX,headerSubtitleY)
+		subtitleText.Position=UDim2.fromOffset(headerTextX(),headerSubtitleY)
+		subtitleText.Size=headerTextSize(14)
 		subtitleText.TextSize=headerSubtitleSize
 		subtitleText.Visible=headerSubtitleVisible
 
