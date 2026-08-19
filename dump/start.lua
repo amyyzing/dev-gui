@@ -13,7 +13,7 @@ local runtimeFiles={
 	"runtime/loader-part-5.lua",
 }
 
-local parentEnv=(getfenv and getfenv(0)) or _G
+local parentEnv=(getfenv and getfenv()) or _G
 local config=rawget(parentEnv,"DEV_GUI_RUNTIME_CONFIG")
 if type(config)~="table" then
 	error("dev-gui runtime config is missing")

@@ -11,6 +11,12 @@ def source(path):
 
 
 class BootstrapContracts(unittest.TestCase):
+    def test_runtime_config_comes_from_the_injected_chunk_environment(self):
+        bootstrap = source("dump/start.lua")
+        self.assertIn("local parentEnv=(getfenv and getfenv()) or _G", bootstrap)
+        self.assertNotIn("getfenv(0)", bootstrap)
+        self.assertIn('rawget(parentEnv,"DEV_GUI_RUNTIME_CONFIG")', bootstrap)
+
     def test_fresh_boot_is_forwarded_without_shared_disk_cache(self):
         bootstrap = source("dump/start.lua")
         self.assertIn("if fresh then body.fresh=true end", bootstrap)
