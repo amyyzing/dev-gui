@@ -151,6 +151,22 @@ class LifecycleContracts(unittest.TestCase):
         self.assertIn("restoreAllNumberValues()", destroy)
         self.assertIn("restoreGravity()", destroy)
 
+    def test_enabled_core_params_are_locked_immediately(self):
+        params = source("features/params/logic.lua")
+        self.assertIn(
+            'workspace:GetPropertyChangedSignal("Gravity")',
+            params,
+        )
+        self.assertIn(
+            'hum:GetPropertyChangedSignal("WalkSpeed")',
+            params,
+        )
+        self.assertIn(
+            'pcall(scheduler.Register,"Heartbeat",speedForceJobId,0,forceSpeed)',
+            params,
+        )
+        self.assertIn('if stateKey=="jumpPowerValue" then', params)
+
 
 class RuntimeFallbackContracts(unittest.TestCase):
     def test_style_fallback_does_not_self_reference_parameter(self):

@@ -7,7 +7,6 @@ local runService=game:GetService("RunService")
 local me=players.LocalPlayer
 local defaultGravity=196.2
 local defaultSpeed=18
-local speedForceInterval=0.12
 local paramReapplyInterval=0.12
 local speedForceJobId="GameParamsSpeedForce"
 local defaultSelectedPage="speed"
@@ -92,8 +91,9 @@ function gameParams.new(app)
 	local scheduler=app.schedulerApi
 	local api={}
 	local speedConn=nil
+	local speedValueConn=nil
+	local speedHumanoid=nil
 	local speedScheduled=false
-	local speedElapsed=0
 	local rootConns={}
 	local folderConns=setmetatable({}, {__mode="k"})
 	local valueConns=setmetatable({}, {__mode="k"})
@@ -104,6 +104,9 @@ function gameParams.new(app)
 	local originalWalkSpeeds=setmetatable({}, {__mode="k"})
 	local originalGravity=workspace.Gravity
 	local gravityOverrideActive=false
+	local gravityConn=nil
+	local applyingGravity=false
+	local applyingSpeed=false
 	local applying=false
 	local destroyed=false
 	local stateListener=nil
@@ -182,8 +185,13 @@ function gameParams.new(app)
 	end
 
 	local function restoreGravity()
+		disconnect(gravityConn)
+		gravityConn=nil
+
 		if gravityOverrideActive then
+			applyingGravity=true
 			workspace.Gravity=originalGravity
+			applyingGravity=false
 			gravityOverrideActive=false
 		end
 	end
@@ -218,6 +226,20 @@ function gameParams.new(app)
 		return not destroyed
 	end
 
+	local function writeGravityTarget()
+		if applyingGravity or not isAlive() or not isGravityActive() then
+			return
+		end
+
+		local gravity=clampNumber(state.gravityValue,0,1000,defaultGravity)
+		state.gravityValue=gravity
+		if workspace.Gravity~=gravity then
+			applyingGravity=true
+			workspace.Gravity=gravity
+			applyingGravity=false
+		end
+	end
+
 	local function applyGravity(value)
 		local gravity=clampNumber(value,0,1000,defaultGravity)
 		state.gravityValue=gravity
@@ -226,20 +248,62 @@ function gameParams.new(app)
 				originalGravity=workspace.Gravity
 				gravityOverrideActive=true
 			end
-			workspace.Gravity=gravity
+
+			if not gravityConn then
+				gravityConn=workspace:GetPropertyChangedSignal("Gravity"):Connect(function()
+					writeGravityTarget()
+				end)
+			end
+
+			writeGravityTarget()
 		end
 		return gravity
 	end
 
+	local function writeSpeedTarget(hum)
+		if applyingSpeed or not hum or not hum.Parent or not isAlive() or not isSpeedActive() then
+			return
+		end
+
+		if originalWalkSpeeds[hum]==nil then
+			originalWalkSpeeds[hum]=hum.WalkSpeed
+		end
+
+		local target=clampSpeed(state.speedValue)
+		state.speedValue=target
+		if hum.WalkSpeed~=target then
+			applyingSpeed=true
+			hum.WalkSpeed=target
+			applyingSpeed=false
+		end
+	end
+
+	local function bindSpeedHumanoid(hum)
+		if speedHumanoid==hum and speedValueConn then
+			return
+		end
+
+		disconnect(speedValueConn)
+		speedValueConn=nil
+		speedHumanoid=hum
+
+		if not hum then
+			return
+		end
+
+		if originalWalkSpeeds[hum]==nil then
+			originalWalkSpeeds[hum]=hum.WalkSpeed
+		end
+
+		speedValueConn=hum:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+			writeSpeedTarget(hum)
+		end)
+	end
+
 	local function applySpeedValue()
 		local hum=getMyHumanoid()
-
-		if hum then
-			if originalWalkSpeeds[hum]==nil then
-				originalWalkSpeeds[hum]=hum.WalkSpeed
-			end
-			hum.WalkSpeed=state.speedValue
-		end
+		bindSpeedHumanoid(hum)
+		writeSpeedTarget(hum)
 	end
 
 	local function stopSpeedForcing(resetValue)
@@ -249,16 +313,20 @@ function gameParams.new(app)
 		speedScheduled=false
 		disconnect(speedConn)
 		speedConn=nil
-		speedElapsed=0
+		disconnect(speedValueConn)
+		speedValueConn=nil
+		speedHumanoid=nil
 
 		if resetValue then
 			state.speedValue=defaultSpeed
 		end
 
-		local hum=getMyHumanoid()
-		local original=hum and originalWalkSpeeds[hum]
-		if hum and original~=nil then
-			hum.WalkSpeed=original
+		for hum,original in pairs(originalWalkSpeeds) do
+			if hum.Parent then
+				applyingSpeed=true
+				hum.WalkSpeed=original
+				applyingSpeed=false
+			end
 			originalWalkSpeeds[hum]=nil
 		end
 	end
@@ -282,40 +350,23 @@ function gameParams.new(app)
 				return
 			end
 
-			state.speedValue=clampSpeed(state.speedValue)
-			local hum=getMyHumanoid()
-
-			if hum then
-				if originalWalkSpeeds[hum]==nil then
-					originalWalkSpeeds[hum]=hum.WalkSpeed
-				end
-
-				if hum.WalkSpeed~=state.speedValue then
-					hum.WalkSpeed=state.speedValue
-				end
-			end
+			applySpeedValue()
 		end
 
 		if scheduler and type(scheduler.Register)=="function" then
-			local ok,result=pcall(scheduler.Register,"Heartbeat",speedForceJobId,speedForceInterval,forceSpeed)
+			local ok,result=pcall(scheduler.Register,"Heartbeat",speedForceJobId,0,forceSpeed)
 			if ok and result then
 				speedScheduled=true
 				return
 			end
 		end
 
-		speedConn=runService.Heartbeat:Connect(function(dt)
+		speedConn=runService.Heartbeat:Connect(function()
 			if not isSpeedActive() or not isAlive() then
 				disconnect(speedConn)
 				speedConn=nil
 				return
 			end
-
-			speedElapsed=speedElapsed+(dt or 0)
-			if speedElapsed<speedForceInterval then
-				return
-			end
-			speedElapsed=0
 
 			forceSpeed()
 		end)
@@ -439,7 +490,11 @@ function gameParams.new(app)
 				return
 			end
 
-			queueWriteTarget()
+			if stateKey=="jumpPowerValue" then
+				writeTarget()
+			else
+				queueWriteTarget()
+			end
 		end))
 
 		table.insert(valueConns[valueObject],valueObject.AncestryChanged:Connect(function(_,parent)
