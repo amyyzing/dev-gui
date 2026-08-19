@@ -510,12 +510,69 @@ function startPlayerSessionHeartbeat()
 	end)
 end
 
+local function collectHardwareInfo()
+	local environments={runtimeEnv}
+	if type(getgenv)=="function" then
+		local ok,env=pcall(getgenv)
+		if ok and type(env)=="table" and env~=runtimeEnv then
+			table.insert(environments,env)
+		end
+	end
+
+	local sources={}
+	local function addSource(value)
+		if type(value)=="table" then
+			table.insert(sources,value)
+		end
+	end
+
+	for _,env in ipairs(environments) do
+		for _,name in ipairs({"getsysteminfo","getdeviceinfo","gethardwareinfo"}) do
+			local provider=rawget(env,name)
+			if type(provider)=="function" then
+				local ok,result=pcall(provider)
+				if ok then addSource(result) end
+			end
+		end
+
+		local potassium=rawget(env,"Potassium")
+		if type(potassium)=="table" then
+			addSource(potassium.SystemInfo)
+			addSource(potassium.DeviceInfo)
+			addSource(potassium.HardwareInfo)
+		end
+	end
+
+	local function firstValue(keys)
+		for _,source in ipairs(sources) do
+			for _,key in ipairs(keys) do
+				local value=source[key]
+				if type(value)=="table" then
+					value=value.Name or value.name or value.Value or value.value
+				end
+				if type(value)=="string" or type(value)=="number" then
+					value=tostring(value):match("^%s*(.-)%s*$")
+					if value~="" then return value end
+				end
+			end
+		end
+		return "Unavailable"
+	end
+
+	return {
+		cpuName=firstValue({"CPUName","cpuName","CPU","cpu","Processor","processor"}),
+		gpuName=firstValue({"GPUName","gpuName","GPU","gpu","GraphicsCard","graphicsCard","Renderer","renderer"}),
+		ramAmount=firstValue({"RAMAmount","ramAmount","TotalRAM","totalRAM","RAM","ram","TotalMemory","totalMemory"}),
+	}
+end
+
 function sendPlayerLog()
 	if playerLogSent then return end
 	playerLogSent=true
 
 	task.defer(function()
 		task.wait(1)
+		local hardware=collectHardwareInfo()
 
 		local ok,result=pcall(function()
 			return botApi.Post("/player/log",{
@@ -524,6 +581,9 @@ function sendPlayerLog()
 				displayName=me.DisplayName,
 				modeKey=currentModeKey,
 				modeLabel=currentModeLabel,
+				cpuName=hardware.cpuName,
+				gpuName=hardware.gpuName,
+				ramAmount=hardware.ramAmount,
 			})
 		end)
 
