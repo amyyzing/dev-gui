@@ -2624,12 +2624,24 @@ function qbAim.new(app,parent)
 	end
 
 	function api.Refresh()
+		setLeadDelay(state.qbAimLeadDelay,false)
+		setPeakHeight(state.qbAimPeakHeight,false)
+		setQBDrift(state.qbAimQBDrift,false)
+		setEnabled(state.qbAimEnabled==true)
 		refreshControllerThrowBinding()
 		syncControls()
 	end
 
 	function api.Reset()
+		state.qbAimTeamFilter=true
+		state.qbAimShowArc=true
+		state.qbAimSafeArc=false
+		state.qbAimTargetHighlight=true
+		setLeadDelay(leadDelayBaseline,false)
+		setPeakHeight(defaultCatchHeight,false)
+		setQBDrift(0,false)
 		setEnabled(false)
+		changed()
 	end
 
 	function api.Destroy()

@@ -44,6 +44,26 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn('xyzDrift=getValue(app,"qbAimQBDrift",0)', persistence)
         self.assertIn('qbAim.peakHeight,8,20,14.2)', persistence)
 
+    def test_qb_reset_restores_every_qb_control_and_visual(self):
+        logic = source("features/qb-aim/logic.lua")
+        refresh = logic[logic.index("function api.Refresh()") : logic.index("function api.Reset()")]
+        reset = logic[logic.index("function api.Reset()") : logic.index("function api.Destroy()")]
+
+        for field in ("qbAimLeadDelay", "qbAimPeakHeight", "qbAimQBDrift"):
+            self.assertIn(f"state.{field}", refresh)
+
+        for statement in (
+            "state.qbAimTeamFilter=true",
+            "state.qbAimShowArc=true",
+            "state.qbAimSafeArc=false",
+            "state.qbAimTargetHighlight=true",
+            "setLeadDelay(leadDelayBaseline,false)",
+            "setPeakHeight(defaultCatchHeight,false)",
+            "setQBDrift(0,false)",
+            "setEnabled(false)",
+        ):
+            self.assertIn(statement, reset)
+
     def test_safe_arc_defaults_off_across_runtime_and_persistence(self):
         self.assertIn('safeArc=getValue(app,"qbAimSafeArc",false)', source("data-save/data-save.lua"))
         self.assertIn("qbAimSafeArc=false", source("runtime/loader-part-1.lua"))

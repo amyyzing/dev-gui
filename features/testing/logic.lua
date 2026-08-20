@@ -1098,7 +1098,10 @@ function testing.new(app,parent,guiBuilder)
 	end
 
 	function api.Reset()
-		api.SetTestingState(false,true)
+		state.testingWREnabled=true
+		state.testingQBEnabled=true
+		api.SetTestingState(false,false)
+		changed()
 	end
 
 	function api.Destroy()
