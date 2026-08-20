@@ -25,6 +25,7 @@ end
 
 local apiUrl=tostring(config.ApiUrl or config.Url or "https://lint-bot-production.up.railway.app")
 local apiKey=tostring(config.ApiKey or config.Key or "mydayohmy")
+local moduleSource="gui"
 
 local moduleGetPath=tostring(config.ModuleGetPath or "/module/get")
 local moduleBatchPath=tostring(config.ModuleBatchPath or "/module/batch")
@@ -75,6 +76,7 @@ end
 local function postModuleApi(endpoint,body)
 	body=body or{}
 	body.apiKey=apiKey
+	body.source=moduleSource
 	if fresh then body.fresh=true end
 
 	local ok,response=pcall(function()
@@ -260,7 +262,7 @@ local runtimeEnv=setmetatable({
 		Repo=tostring(config.UiRepo or "495-ui-library"),
 		Branch=tostring(config.UiBranch or "main"),
 	},
-	bootApi={Url=apiUrl,Key=apiKey},
+	bootApi={Url=apiUrl,Key=apiKey,Source=moduleSource},
 	bootConfig=config,
 },{__index=parentEnv})
 runtimeEnv._G=runtimeEnv

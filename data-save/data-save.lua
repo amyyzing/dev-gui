@@ -239,9 +239,11 @@ local refreshHookNames={
 	"updateResponsiveLayout",
 }
 
+local rootVersion=3
+
 local function cloneRoot()
 	return{
-		version=2,
+		version=rootVersion,
 		modes={},
 	}
 end
@@ -411,20 +413,40 @@ local function dropMapSettings(root)
 	return root
 end
 
+local function cloneSettings(value)
+	if type(value)~="table" then return value end
+
+	local copy={}
+	for key,item in pairs(value) do
+		copy[key]=cloneSettings(item)
+	end
+	return copy
+end
+
 local function normalizeRoot(raw)
 	if type(raw)~="table" then
 		return cloneRoot()
 	end
 
 	if type(raw.modes)=="table" then
-		raw.version=raw.version or 2
+		if (tonumber(raw.version) or 2)<rootVersion and type(raw.modes.mode1)=="table" then
+			for _,modeKey in ipairs({"mode2","mode3"}) do
+				if type(raw.modes[modeKey])~="table" then
+					raw.modes[modeKey]=cloneSettings(raw.modes.mode1)
+				end
+			end
+		end
+		raw.version=rootVersion
 		return dropMapSettings(raw)
 	end
 
+	local legacy=cloneSettings(raw)
 	return dropMapSettings({
-		version=2,
+		version=rootVersion,
 		modes={
-			mode1=raw,
+			mode1=cloneSettings(legacy),
+			mode2=cloneSettings(legacy),
+			mode3=cloneSettings(legacy),
 		},
 	})
 end
@@ -701,7 +723,7 @@ function dataSave.new(app)
 		local r=api.GetRoot()
 		local modeKey=getModeKey(app)
 
-		r.version=2
+		r.version=rootVersion
 		r.lastMode=modeKey
 		r.updatedAt=os.time()
 		r.modes[modeKey]=currentSettings

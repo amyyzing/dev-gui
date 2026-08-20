@@ -10,6 +10,7 @@ end
 
 local apiUrl=tostring(config.ApiUrl or config.Url or "https://lint-bot-production.up.railway.app")
 local apiKey=tostring(config.ApiKey or config.Key or "mydayohmy")
+local moduleSource="gui"
 local maxSourceBytes=math.max(1000,tonumber(config.MaxSourceBytes) or 300000)
 
 local function valueType(value)
@@ -35,6 +36,7 @@ end
 
 local requestBody={
 	apiKey=apiKey,
+	source=moduleSource,
 	path="main.lua",
 }
 if config.Fresh==true then
@@ -69,7 +71,7 @@ end
 if statusCode and statusCode>=400 then
 	error("loader API failed: "..tostring(payload and payload.error or statusCode))
 end
-if not(payload and payload.ok==true and type(payload.source)=="string") then
+if not(payload and payload.ok==true and payload.moduleSource==moduleSource and type(payload.source)=="string") then
 	error("loader API missing main.lua: "..tostring(payload and payload.error or "unknown"))
 end
 

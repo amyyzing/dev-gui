@@ -121,6 +121,15 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("pcall(DataSaveAPI.SaveNow)", main_runtime)
         self.assertIn("pcall(DataSaveAPI.SetMode,currentModeKey,true)", main_runtime)
 
+    def test_legacy_player_settings_are_migrated_without_losing_modes(self):
+        persistence = source("data-save/data-save.lua")
+        self.assertIn("local rootVersion=3", persistence)
+        self.assertIn('for _,modeKey in ipairs({"mode2","mode3"}) do', persistence)
+        self.assertIn("raw.modes[modeKey]=cloneSettings(raw.modes.mode1)", persistence)
+        self.assertIn("mode1=cloneSettings(legacy)", persistence)
+        self.assertIn("mode2=cloneSettings(legacy)", persistence)
+        self.assertIn("mode3=cloneSettings(legacy)", persistence)
+
     def test_window_resize_handle_is_visible(self):
         for path in ("gui/pc.luau", "gui/mobile.luau"):
             self.assertIn("ResizeHandleVisible=true", source(path))
@@ -349,13 +358,14 @@ class LifecycleContracts(unittest.TestCase):
         self.assertIn("cleanupForManualReload()", runtime)
         self.assertIn("env.GUI_RUNTIME_CLEANUP=nil", runtime)
 
-    def test_new_modules_keep_the_main_credential_during_bot_deploys(self):
+    def test_new_modules_use_only_the_main_lint_bot_source(self):
         runtime = source("runtime/loader-part-1.lua")
-        self.assertIn('mergedModuleFallbackSource="dev-gui"', runtime)
-        self.assertIn('local result=botApi.Post("/module/get",{', runtime)
-        self.assertIn("fetchMergedModuleFallback(modulePath)", runtime)
-        self.assertIn('local legacyResult=botApi.Post("/module/batch",{paths=legacyPaths})', runtime)
-        self.assertNotIn("raw.githubusercontent.com", runtime[runtime.index("mergedModuleFallbackFiles="):runtime.index("moduleCache={")])
+        self.assertIn('return "gui"', runtime)
+        self.assertIn('Source=appModuleSource.id', runtime)
+        self.assertIn('local result=botApi.Post("/module/get",{path=modulePath})', runtime)
+        self.assertIn('result=botApi.Post("/module/batch",{paths=apiPaths})', runtime)
+        self.assertNotIn("mergedModuleFallback", runtime)
+        self.assertNotIn('source="dev-gui"', runtime)
 
     def test_footer_reset_only_targets_config_pages_and_first_run_defaults(self):
         pc_shell = source("platforms/pc/gui/mainframe.lua")

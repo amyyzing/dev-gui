@@ -21,12 +21,15 @@ def test_loader_is_bound_to_main_gui_source_and_credentials():
     dump_start = read("dump/start.lua")
     runtime = read("runtime/loader-part-1.lua")
     assert 'path="main.lua"' in loader
+    assert 'source=moduleSource' in loader
+    assert 'local moduleSource="gui"' in loader
     assert 'config.ApiKey or config.Key or "mydayohmy"' in loader
     assert 'TRUSTED_API_URL="https://lint-bot-production.up.railway.app"' in dump_start
     assert 'trustedApiUrl="https://lint-bot-production.up.railway.app"' in runtime
     assert "dev-gui-api-production.up.railway.app" not in loader + dump_start + runtime
     assert "GUI_BOOT_CONFIG" in loader
     assert "DEV_GUI_BOOT_CONFIG" not in loader
+    assert "dev-gui" not in loader + read("main.lua") + runtime
 
 
 def test_runtime_uses_main_gui_names():
