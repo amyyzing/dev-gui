@@ -18,10 +18,10 @@ getgenv().DEV_GUI_BOOT_CONFIG = {
 }
 ```
 
-Production startup downloads one commit-pinned PC or mobile bundle and caches the
-last compiled build in `dev-gui-cache`. Set `Fresh = true` to redownload the
-current bundle, or `Development = true` to use the modular Railway loader while
-working on individual files.
+The normal testing loader requests fresh modular source on every execution, so
+repository changes cannot be hidden by an older Railway bundle. Set
+`Production = true` or `UseBundle = true` only when explicitly testing the
+commit-pinned PC/mobile bundle and its `dev-gui-cache` behavior.
 
 The client uses the same API credential, saved player data, presets, announcements,
 Discord settings, and session memory as the main GUI. The fixed `dev-gui` module
@@ -30,7 +30,7 @@ The testing repository keeps its own `DEV_GUI_TOKEN` GitHub setting.
 
 ## Structure
 
-- `loader.lua` is the stable entry and normally executes one raw Railway bundle.
+- `loader.lua` is the stable entry and normally executes fresh modular source.
 - `build/bundle-manifest.json` is the authoritative bundle inventory.
 - `dump/start.lua` is retained as the modular development and recovery path.
 - `dump/init.lua` is the only public entry into implementation details.

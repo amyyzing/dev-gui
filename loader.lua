@@ -1,5 +1,5 @@
 -- DEV_GUI_CUSTOM_LOADER
--- Production uses one prebuilt bundle request. The modular path remains a dev fallback.
+-- Testing uses fresh modules by default. A prebuilt bundle remains available by explicit opt-in.
 local HttpService=game:GetService("HttpService")
 local UserInputService=game:GetService("UserInputService")
 
@@ -93,8 +93,8 @@ end
 
 local function runModularFallback(reason)
 	if config.Debug==true then warn("dev-gui using modular fallback:",reason) end
-	local body={apiKey=apiKey,source=MODULE_SOURCE,path=BOOTSTRAP_PATH}
-	if config.Fresh==true then body.fresh=true end
+	local fresh=config.Fresh~=false
+	local body={apiKey=apiKey,source=MODULE_SOURCE,path=BOOTSTRAP_PATH,fresh=fresh}
 	local ok,response=pcall(function()
 		return requestFn({
 			Url=API_URL.."/module/get",Method="POST",
@@ -121,7 +121,7 @@ local function runModularFallback(reason)
 	local runtimeEnv=setmetatable({
 		DEV_GUI_RUNTIME_CONFIG={
 			ApiKey=apiKey,ApiUrl=API_URL,ModuleSource=MODULE_SOURCE,
-			Fresh=config.Fresh==true,FetchTimeout=tonumber(config.FetchTimeout),MaxSourceBytes=tonumber(config.MaxSourceBytes),
+			Fresh=fresh,FetchTimeout=tonumber(config.FetchTimeout),MaxSourceBytes=tonumber(config.MaxSourceBytes),
 		},
 	},{__index=parentEnv})
 	runtimeEnv._G=runtimeEnv
@@ -130,8 +130,8 @@ local function runModularFallback(reason)
 	if not ran then error("dev-gui fallback failed: "..tostring(runError)) end
 end
 
-if config.Development==true or config.UseModules==true then
-	runModularFallback("development mode")
+if config.Production~=true and config.UseBundle~=true then
+	runModularFallback("testing repository source")
 	return
 end
 

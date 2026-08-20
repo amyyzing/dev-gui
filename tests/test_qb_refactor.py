@@ -202,7 +202,8 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertIn('BOOTSTRAP_PATH="dump/start.lua"', loader)
         self.assertIn('API_URL.."/bundle/get"', loader)
         self.assertIn('API_URL.."/module/get"', loader)
-        self.assertIn('config.Development==true or config.UseModules==true', loader)
+        self.assertIn('config.Production~=true and config.UseBundle~=true', loader)
+        self.assertIn('local fresh=config.Fresh~=false', loader)
         self.assertIn('manualReloadPath="loader.lua"', runtime)
         self.assertNotIn('manualReloadPath="main.lua"', runtime)
 
