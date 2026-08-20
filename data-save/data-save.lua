@@ -513,6 +513,13 @@ local function setClamped(app,stateName,value,min,max,fallback)
 end
 
 local function getModeKey(app)
+	if type(app.getCurrentModeKey)=="function" then
+		local ok,modeKey=pcall(app.getCurrentModeKey)
+		if ok and modeKey then
+			return tostring(modeKey)
+		end
+	end
+
 	return tostring(getValue(app,"CURRENT_MODE_KEY",app.currentModeKey or "mode1"))
 end
 
@@ -649,6 +656,7 @@ function dataSave.new(app)
 	local autosaveInFlightPayload=nil
 	local autosaveToken=0
 	local destroyed=false
+	local defaultSettings=nil
 
 	local function isAlive()
 		if destroyed then
@@ -686,7 +694,7 @@ function dataSave.new(app)
 
 	function api.GetSavedSettingsForCurrentMode()
 		local r=api.GetRoot()
-		return r.modes[getModeKey(app)] or {}
+		return r.modes[getModeKey(app)] or defaultSettings or {}
 	end
 
 	function api.BuildRootForSave(currentSettings)
@@ -810,6 +818,8 @@ function dataSave.new(app)
 			},
 		}
 	end
+
+	defaultSettings=api.Collect()
 
 	function api.Apply(settings)
 		if app.applySavedPlayerSettings then

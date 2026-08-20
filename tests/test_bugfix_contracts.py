@@ -109,6 +109,18 @@ class QBAimDefaultsContracts(unittest.TestCase):
         )
         self.assertNotIn('return false,"park unknown"', logic)
 
+    def test_player_settings_use_the_live_game_mode_instead_of_mode1(self):
+        persistence = source("data-save/data-save.lua")
+        runtime = source("runtime/loader-part-5.lua")
+        main_runtime = source("runtime/loader-part-2.lua")
+        self.assertIn('if type(app.getCurrentModeKey)=="function" then', persistence)
+        self.assertIn("return r.modes[getModeKey(app)] or defaultSettings or {}", persistence)
+        self.assertIn("defaultSettings=api.Collect()", persistence)
+        self.assertIn("getCurrentModeKey=function()", runtime)
+        self.assertIn("local modeChanged=nextModeKey~=currentModeKey", main_runtime)
+        self.assertIn("pcall(DataSaveAPI.SaveNow)", main_runtime)
+        self.assertIn("pcall(DataSaveAPI.SetMode,currentModeKey,true)", main_runtime)
+
     def test_window_resize_handle_is_visible(self):
         for path in ("gui/pc.luau", "gui/mobile.luau"):
             self.assertIn("ResizeHandleVisible=true", source(path))

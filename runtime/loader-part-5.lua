@@ -359,6 +359,9 @@ function buildDataSaveContext()
 		State=mainPageState,
 		Get=getPersistentValue,
 		Set=setPersistentValue,
+		getCurrentModeKey=function()
+			return currentModeKey
+		end,
 
 		hitboxPresets=hitboxPresets,
 		defaultHitboxPresets=defaultHitboxPresets,

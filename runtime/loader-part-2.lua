@@ -449,8 +449,17 @@ function makeMainCtx()
 			refreshActionStatus()
 		end,
 		setCurrentMode=function(key,label)
-			currentModeKey=tostring(key or"mode1")
+			local nextModeKey=tostring(key or"mode1")
+			local modeChanged=nextModeKey~=currentModeKey
+			if modeChanged and DataSaveAPI and type(DataSaveAPI.SaveNow)=="function" then
+				pcall(DataSaveAPI.SaveNow)
+			end
+
+			currentModeKey=nextModeKey
 			currentModeLabel=tostring(label or"Gameplay")
+			if modeChanged and DataSaveAPI and type(DataSaveAPI.SetMode)=="function" then
+				pcall(DataSaveAPI.SetMode,currentModeKey,true)
+			end
 			if mainFrame and type(mainFrame.RefreshText)=="function" then
 				mainFrame.RefreshText(description)
 			elseif modeSubtitle then
