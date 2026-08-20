@@ -241,7 +241,7 @@ function hitboxPresets.new(app,ownedSection)
 			local editor=data.presetEditor or data.PresetEditor or preset.presetEditor or preset.PresetEditor or {}
 
 			local row=make("Frame",{BackgroundColor3=colors.bg,BorderSizePixel=0,Size=UDim2.new(1,0,0,expandedOwned[code] and 178 or 32),ZIndex=6},ownedList)
-			make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=0,ApplyStrokeMode=Enum.ApplyStrokeMode.Border,BorderStrokePosition=Enum.BorderStrokePosition.Inner,ZIndex=7},row)
+			row:SetAttribute("NoStroke",true)
 
 			local toggle=make("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-20,0,30),Position=UDim2.fromOffset(10,1),Text=(expandedOwned[code] and"[-] " or"[+] ")..name.."  |  "..code,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=7},row)
 
