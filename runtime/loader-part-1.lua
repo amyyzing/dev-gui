@@ -1063,7 +1063,6 @@ function loadRemoteModule(modulePath)
 			return loadedModule
 		end
 		warn("bundled module broke while loading:",modulePath,bundleError)
-		return nil
 	end
 
 	local moduleSource=nil
