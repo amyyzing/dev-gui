@@ -777,7 +777,7 @@ function qbAim.new(app,parent)
 	local throwDelayMin=0.00
 	local throwDelayMax=0.50
 	local qbOriginHistoryMaxAge=throwDelayMax+0.25
-	local calibration={armed=false,startedAt=nil,ball=nil,missingSince=nil}
+	local calibration={armed=false,startedAt=nil,ball=nil,missingSince=nil,animationTime=0}
 	local calibrationAnimationConnection=nil
 	local calibrationHumanoidConnection=nil
 	local updateTargetHighlight=function() end
@@ -993,14 +993,16 @@ function qbAim.new(app,parent)
 		calibration.startedAt=nil
 		calibration.ball=nil
 		calibration.missingSince=nil
+		calibration.animationTime=0
 		updateCalibrationButton()
 	end
 
-	local function startCalibration(startedAt,ball)
+	local function startCalibration(startedAt,ball,animationTime)
 		if not calibration.armed or calibration.startedAt or not ball then return false end
 		calibration.startedAt=startedAt or os.clock()
 		calibration.ball=ball
 		calibration.missingSince=nil
+		calibration.animationTime=math.max(0,tonumber(animationTime) or 0)
 		updateCalibrationButton("Calibrating...")
 		return true
 	end
@@ -1029,7 +1031,7 @@ function qbAim.new(app,parent)
 			safeDisconnect(calibrationAnimationConnection)
 			calibrationAnimationConnection=animator.AnimationPlayed:Connect(function(track)
 				if calibration.armed and isThrowAnimation(track) then
-					startCalibration(os.clock(),currentHeldBall())
+					startCalibration(os.clock(),currentHeldBall(),throwReleaseWait)
 				end
 			end)
 		end
@@ -1063,7 +1065,7 @@ function qbAim.new(app,parent)
 		calibration.missingSince=calibration.missingSince or now
 		if now-calibration.missingSince<releaseConfirmStableTime then return end
 
-		local measured=calibration.missingSince-calibration.startedAt
+		local measured=calibration.missingSince-calibration.startedAt-calibration.animationTime
 		clearCalibration(false)
 		setThrowDelay(measured,true)
 		updateCalibrationButton(string.format("Calibrated %.2fs",throwDelay))
@@ -2283,7 +2285,7 @@ function qbAim.new(app,parent)
 		if not skipAnimation then
 			animationPlayed=qbAim._playThrowAnimation()
 			if animationPlayed then
-				startCalibration(os.clock(),heldBall)
+				startCalibration(os.clock(),heldBall,throwReleaseWait)
 			end
 		end
 
@@ -2299,7 +2301,7 @@ function qbAim.new(app,parent)
 			return
 		end
 
-		startCalibration(os.clock(),heldBall)
+		startCalibration(os.clock(),heldBall,0)
 		local fired,ok,err=pcall(function()
 			if modeKey=="mode1" then
 				return fireGameplayThrow(plan)

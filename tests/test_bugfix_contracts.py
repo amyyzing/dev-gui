@@ -180,11 +180,15 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn('Text="Auto Calibrate"', logic)
         self.assertIn("function api.AutoCalibrate()", logic)
         self.assertIn("animator.AnimationPlayed:Connect", logic)
-        self.assertIn("startCalibration(os.clock(),currentHeldBall())", logic)
-        self.assertIn("startCalibration(os.clock(),heldBall)", logic)
+        self.assertIn("startCalibration(os.clock(),currentHeldBall(),throwReleaseWait)", logic)
+        self.assertIn("startCalibration(os.clock(),heldBall,throwReleaseWait)", logic)
+        self.assertIn("startCalibration(os.clock(),heldBall,0)", logic)
         self.assertIn("if currentHeldBall()==calibration.ball then", logic)
         self.assertIn("now-calibration.missingSince<releaseConfirmStableTime", logic)
-        self.assertIn("local measured=calibration.missingSince-calibration.startedAt", logic)
+        self.assertIn(
+            "local measured=calibration.missingSince-calibration.startedAt-calibration.animationTime",
+            logic,
+        )
         self.assertIn("setThrowDelay(measured,true)", logic)
         self.assertIn('"QBAimAutoCalibrate"', logic)
 
