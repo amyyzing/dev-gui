@@ -187,6 +187,8 @@ class LifecycleContracts(unittest.TestCase):
         self.assertIn("local wrapInset=1", controls)
         self.assertIn('make("UIPadding",{PaddingTop=UDim.new(0,1)', presets)
         self.assertIn('ancestor:GetAttribute("NoSliderStroke")==true', controls)
+        self.assertIn('ancestor:GetAttribute("NoSectionStroke")==true', controls)
+        self.assertIn("if sectionStrokeEnabled then", controls)
         self.assertIn('container:SetAttribute("NoStroke",noStroke)', controls)
         self.assertIn('track:SetAttribute("NoStroke",noStroke)', controls)
         self.assertIn('fill:SetAttribute("NoStroke",noStroke)', controls)
@@ -200,6 +202,7 @@ class LifecycleContracts(unittest.TestCase):
         ):
             shell = source(path)
             self.assertIn('settingsPage:SetAttribute("NoSliderStroke",true)', shell)
+            self.assertIn('settingsPage:SetAttribute("NoSectionStroke",true)', shell)
             self.assertIn("function api.RevealFromLoader()", shell)
             self.assertIn("Enum.EasingStyle.Quint", shell)
 

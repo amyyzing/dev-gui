@@ -59,6 +59,13 @@ class BundleContracts(unittest.TestCase):
         self.assertIn('setLoaderProgress("registering bundled modules"', runtime)
         self.assertNotIn("task.delay(0.48", runtime)
 
+    def test_dev_gui_owns_section_creation(self):
+        manifest = json.loads((ROOT / "build" / "bundle-manifest.json").read_text(encoding="utf-8"))
+        runtime = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
+
+        self.assertNotIn("gui/gui-logic.lua", manifest["uiLibrary"])
+        self.assertIn('GuiLogic="features/colors/gui.lua"', runtime)
+
 
 if __name__ == "__main__":
     unittest.main()

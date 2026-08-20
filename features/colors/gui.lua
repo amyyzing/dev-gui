@@ -616,11 +616,19 @@ function guiLogic.new(app)
 		local descriptionOnly=options.compact==true or options.headerOnly==true
 		local hasBody=not descriptionOnly
 		local canCollapse=hasBody and options.collapsible~=false and options.Collapsible~=false
+		local sectionStrokeEnabled=options.stroke~=false
+		local ancestor=parent
+		while sectionStrokeEnabled and ancestor do
+			if ancestor:GetAttribute("NoSectionStroke")==true then
+				sectionStrokeEnabled=false
+			end
+			ancestor=ancestor.Parent
+		end
 		local sec=make("Frame",{BackgroundColor3=themeColor("SECTION",colors.card),BackgroundTransparency=componentNumber("SectionBackgroundTransparency",0),BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ClipsDescendants=true,ZIndex=4,LayoutOrder=order,ThemeRole="SECTION",CornerRole="Section"},parent)
-		sec:SetAttribute("NoStroke",options.stroke==false)
+		sec:SetAttribute("NoStroke",not sectionStrokeEnabled)
 
 		addCorner(sec,"Section")
-		if options.stroke~=false then
+		if sectionStrokeEnabled then
 			local sectionStrokeTransparency=componentNumber("SectionStrokeTransparency",0.84)
 			local sectionStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=sectionStrokeTransparency},sec)
 			sectionStroke:SetAttribute("BaseStrokeTransparency",sectionStrokeTransparency)
