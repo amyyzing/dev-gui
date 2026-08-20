@@ -140,10 +140,10 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("local function delayedQBOrigin(now,delay,currentPosition)", logic)
         self.assertIn("local targetTime=now-delay", logic)
         self.assertIn("previous.pos:Lerp(current.pos", logic)
-        self.assertIn("local smoothedStartPoint=startPoint", logic)
+        self.assertIn("setAttachmentCFrame(c2,xAxisCFrame(startPoint,plan.velocity)", logic)
         self.assertNotIn("workspace.Gravity*releaseDelay*releaseDelay", logic)
         self.assertNotIn(
-            "preview.lastStartPoint:Lerp(smoothedStartPoint,previewSmoothAmount)",
+            "preview.lastStartPoint:Lerp",
             logic,
         )
 
@@ -209,8 +209,26 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("local endPoint=catchPoint", logic)
         self.assertIn("local previewTime=catchTime", logic)
         self.assertNotIn("local endPoint=plan.landing or catchPoint", logic)
+        self.assertIn("UpdateInterval=1/120", logic)
+        self.assertIn(
+            'addSchedulerJob("RenderStepped","QBAimPreview",arcSettings.UpdateInterval,previewStep)',
+            logic,
+        )
+        self.assertIn("setAttachmentCFrame(c2,xAxisCFrame(startPoint,plan.velocity)", logic)
+        self.assertIn("setAttachmentCFrame(c1,xAxisCFrame(catchPoint,endVelocity)", logic)
+        self.assertIn("updateC1AndC3Info(plan,catchPoint,endPoint)", logic)
+        self.assertNotIn("previewSmoothAmount", logic)
+        self.assertNotIn("smoothedCatchPoint", logic)
+        self.assertIn("if preview.visible==visible then return end", logic)
+        self.assertIn("if not bound and not bindArcRigParts(center) then return nil end", logic)
         self.assertIn("instance.Enabled=visible and instance==preview.beam", logic)
         self.assertIn("descendant.Enabled=false", logic)
+
+    def test_receiver_prediction_keeps_the_binary_zero_or_21_speed_model(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn("local maxRunSpeed=21", logic)
+        self.assertIn("routeVelocity=rawVelocity.Unit*maxRunSpeed", logic)
+        self.assertIn("state.routeVelocity=Vector3.zero", logic)
 
 
 class ParamsThemeContracts(unittest.TestCase):

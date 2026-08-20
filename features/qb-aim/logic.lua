@@ -45,7 +45,10 @@ local globalMaxAngle=55
 local aimDistance=1000
 local arcPreviewEnabled=true
 local arcSettings={
-	UpdateInterval=1/60,
+	-- Receiver physics is normally 60 Hz, but rendered remote positions can update
+	-- between physics samples. Cap the expensive solve at 120 Hz so the arc can
+	-- follow those positions without scaling all the way up with 240+ FPS.
+	UpdateInterval=1/120,
 	AttachmentRoll=math.rad(90),
 }
 local trackSettings={
@@ -58,7 +61,6 @@ local freezePreviewAfterRelease=true
 local postThrowFreezeTime=0.75
 local missingBallGraceTime=0.2
 local arcMaxCurve=400
-local previewSmoothAmount=0.72
 local catchMarkerEnabled=true
 local catchMarkerSize=1.65
 local landingInfoEnabled=false
@@ -732,7 +734,7 @@ function qbAim.new(app,parent)
 	local receiverData={}
 	local qbOriginHistory={}
 	local receiverTrackElapsed=0
-	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,beamDefaultColor=nil,orig=nil,lastCatchPoint=nil,lastStartPoint=nil,lastLandingPoint=nil,ballMissingSince=nil}
+	local preview={center=nil,c2=nil,c3=nil,c1=nil,beam=nil,beamDefaultColor=nil,orig=nil,visible=nil,ballMissingSince=nil}
 	local previewFrozen=false
 	local previewFreezeStarted=0
 	local lastHeldBall=nil
@@ -1302,7 +1304,6 @@ function qbAim.new(app,parent)
 		selectedRouteLock=nil
 		previewFrozen=false
 		preview.ballMissingSince=nil
-		preview.last=0
 		reseedReceiverTracking(now)
 	end
 
@@ -1341,7 +1342,6 @@ function qbAim.new(app,parent)
 			selectedRouteLock=nil
 			previewFrozen=false
 			preview.ballMissingSince=nil
-			preview.lastCatchPoint,preview.lastStartPoint,preview.lastLandingPoint=nil,nil,nil
 		end
 
 		if enabledToggle then
@@ -1383,6 +1383,8 @@ function qbAim.new(app,parent)
 	local function setPreviewCenterVisible(visible)
 		local center=preview.center
 		if not(center and center.Parent) then return end
+		if preview.visible==visible then return end
+		preview.visible=visible
 
 		local function apply(instance)
 			if instance:IsA("BasePart") then
@@ -1417,6 +1419,7 @@ function qbAim.new(app,parent)
 		preview.beam=nil
 		preview.beamDefaultColor=nil
 		preview.orig=nil
+		preview.visible=nil
 	end
 
 	local function bindArcRigParts(center)
@@ -1465,7 +1468,13 @@ function qbAim.new(app,parent)
 		end
 
 		local center=preview.center
-		if not(center and center.Parent and bindArcRigParts(center)) then return nil end
+		if not(center and center.Parent) then return nil end
+
+		local bound=preview.c2 and preview.c2.Parent
+			and preview.c1 and preview.c1.Parent
+			and preview.c3 and preview.c3.Parent
+			and preview.beam and preview.beam.Parent
+		if not bound and not bindArcRigParts(center) then return nil end
 
 		setPreviewCenterVisible(state.qbAimShowArc~=false)
 		return preview.c2,preview.c1,preview.c3,preview.beam
@@ -1944,7 +1953,6 @@ function qbAim.new(app,parent)
 	local function clearPreviewVisuals(destroyCenter)
 		previewFrozen=false
 		preview.ballMissingSince=nil
-		preview.lastCatchPoint,preview.lastStartPoint,preview.lastLandingPoint=nil,nil,nil
 		hideQBTrailPreview()
 
 		if destroyCenter then
@@ -1973,23 +1981,10 @@ function qbAim.new(app,parent)
 		if not(startPoint and catchPoint and previewTime) then return end
 
 		local endVelocity=plan.velocity+gravityVector*previewTime
-		local smoothedStartPoint=startPoint
-		local smoothedCatchPoint=catchPoint
-		local smoothedLandingPoint=endPoint
-
-		if preview.lastCatchPoint and (smoothedCatchPoint-preview.lastCatchPoint).Magnitude<=28 then
-			smoothedCatchPoint=preview.lastCatchPoint:Lerp(smoothedCatchPoint,previewSmoothAmount)
-		end
-
-		if preview.lastLandingPoint and (smoothedLandingPoint-preview.lastLandingPoint).Magnitude<=85 then
-			smoothedLandingPoint=preview.lastLandingPoint:Lerp(smoothedLandingPoint,previewSmoothAmount)
-		end
-
-		preview.lastCatchPoint,preview.lastStartPoint,preview.lastLandingPoint=smoothedCatchPoint,smoothedStartPoint,smoothedLandingPoint
-		setAttachmentCFrame(c2,xAxisCFrame(smoothedStartPoint,plan.velocity)*CFrame.Angles(arcSettings.AttachmentRoll,0,0))
-		setAttachmentCFrame(c1,xAxisCFrame(smoothedCatchPoint,plan.velocity+gravityVector*catchTime)*CFrame.Angles(arcSettings.AttachmentRoll,0,0))
-		setAttachmentCFrame(c3,xAxisCFrame(smoothedLandingPoint,endVelocity)*CFrame.Angles(arcSettings.AttachmentRoll,0,0))
-		updateC1AndC3Info(plan,smoothedCatchPoint,smoothedLandingPoint)
+		setAttachmentCFrame(c2,xAxisCFrame(startPoint,plan.velocity)*CFrame.Angles(arcSettings.AttachmentRoll,0,0))
+		setAttachmentCFrame(c1,xAxisCFrame(catchPoint,endVelocity)*CFrame.Angles(arcSettings.AttachmentRoll,0,0))
+		setAttachmentCFrame(c3,xAxisCFrame(endPoint,endVelocity)*CFrame.Angles(arcSettings.AttachmentRoll,0,0))
+		updateC1AndC3Info(plan,catchPoint,endPoint)
 		beam.Attachment0=c2
 		beam.Attachment1=c3
 		beam.CurveSize0=math.clamp(plan.velocity.Magnitude*previewTime/3,-arcMaxCurve,arcMaxCurve)
@@ -2356,7 +2351,6 @@ function qbAim.new(app,parent)
 			selectedRouteLock=lockRoute(best)
 			previewFrozen=false
 			preview.ballMissingSince=nil
-			preview.lastCatchPoint,preview.lastStartPoint,preview.lastLandingPoint=nil,nil,nil
 			setTargetText()
 			setStatus("locked "..best.Name)
 		else
@@ -2421,7 +2415,6 @@ function qbAim.new(app,parent)
 			selectedRouteLock=nil
 			previewFrozen=false
 			preview.ballMissingSince=nil
-			preview.lastCatchPoint,preview.lastStartPoint,preview.lastLandingPoint=nil,nil,nil
 			hideQBTrailPreview()
 			clearTargetHighlights()
 		end
@@ -2735,9 +2728,6 @@ function qbAim.new(app,parent)
 			return
 		end
 
-		if now-preview.last<arcSettings.UpdateInterval then return end
-		preview.last=now
-
 		local timing=getTimingWindow()
 		local data=receiverData[trackedReceiver]
 		local plan=buildTwoPassPlan(trackedReceiver,nil,heldBall,receiverAge(data)+timing.mid)
@@ -2746,8 +2736,14 @@ function qbAim.new(app,parent)
 		end
 	end
 
-	if not addSchedulerJob("RenderStepped","QBAimPreview",0,previewStep) then
-		addConnection(runService.RenderStepped:Connect(previewStep))
+	if not addSchedulerJob("RenderStepped","QBAimPreview",arcSettings.UpdateInterval,previewStep) then
+		local previewElapsed=arcSettings.UpdateInterval
+		addConnection(runService.RenderStepped:Connect(function(dt)
+			previewElapsed=previewElapsed+(dt or 0)
+			if previewElapsed<arcSettings.UpdateInterval then return end
+			previewElapsed=previewElapsed%arcSettings.UpdateInterval
+			previewStep()
+		end))
 	end
 
 	local function hasFocusedTextBox()
