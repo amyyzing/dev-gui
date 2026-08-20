@@ -387,6 +387,10 @@ function refreshRuntimePageControls(name,forceTheme)
 		if DiscordAPI and type(DiscordAPI.Refresh)=="function" then
 			pcall(DiscordAPI.Refresh)
 		end
+	elseif name=="server" then
+		if ArcAPI and type(ArcAPI.Refresh)=="function" then
+			pcall(ArcAPI.Refresh)
+		end
 	end
 
 	if forceTheme and applyUIStrokeTheme then

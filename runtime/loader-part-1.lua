@@ -781,6 +781,8 @@ modulePaths={
 	QBAimLogic="features/qb-aim/logic.lua",
 	Testing="features/testing/gui.lua",
 	TestingLogic="features/testing/logic.lua",
+	Arc="features/arc/gui.lua",
+	ArcLogic="features/arc/logic.lua",
 	Colors="features/colors/gui.lua",
 	ColorsLogic="features/colors/logic.lua",
 	MapEditor="features/map-editor/gui.lua",
@@ -861,6 +863,7 @@ startupModuleNames={
 }
 optionalModuleNames={"CorePlayerCache","CoreBallTracker"}
 mapReloadNames={"MapEditorLogic","MapEditor","MaterialsLogic","Materials","MapCleanerLogic","MapCleaner","AdsLogic","Ads"}
+serverReloadNames={"ArcLogic","Arc"}
 customizeReloadNames={"ColorsLogic","Colors"}
 pageTwoReloadNames={"HitboxPresetsLogic","HitboxPresets","KeybindsLogic","Keybinds","PresetEditorLogic","PresetEditor"}
 settingsReloadNames={"PlayerDataLogic","PlayerData","ResetGuiLogic","ResetGui","DiscordController","DiscordView","DiscordLogic","Discord"}
@@ -2374,6 +2377,7 @@ function cleanupForManualReload(skipResidueScan)
 			"PlayerDataAPI",
 			"ResetGuiAPI",
 			"DiscordAPI",
+			"ArcAPI",
 		})
 	end
 

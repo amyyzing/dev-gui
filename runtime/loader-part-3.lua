@@ -311,6 +311,49 @@ end
 
 lazyPageBuilders.maps=buildMapPage
 
+ArcAPI=nil
+serverApiNames={"ArcAPI"}
+serverSettings=serverSettings or{Hidden=false}
+serverPageModules=(getUIMapPageModules and getUIMapPageModules("server","ServerPage")) or{
+	{name="Arc",api="ArcAPI",order=1,title="Hide Arc"},
+}
+
+function clearServerPage()
+	clearRuntimePage(serverPage,true)
+end
+
+function makeServerCtx()
+	return{
+		make=make,
+		fusion=FusionModule,
+		Services=sharedRuntime,
+		schedulerApi=jobRunner,
+		StateStore=settingsStore,
+		ThemeStore=themeRuntime,
+		Janitor=cleanupBags,
+		colors=colors,
+		makeSection=makeSection,
+		buildToggleRow=buildToggleRow,
+		safeDisconnect=safeDisconnect,
+		state=serverSettings,
+		ArcLogicModule=ArcLogicModule,
+	}
+end
+
+function buildServerPage()
+	destroyRuntimeAPIs(serverApiNames)
+	clearServerPage()
+	loadDeferredModuleNames(serverReloadNames)
+
+	for _,spec in ipairs(serverPageModules) do
+		buildRuntimeModule(spec,makeServerCtx(),serverPage)
+	end
+
+	applyUIStrokeTheme()
+end
+
+lazyPageBuilders.server=buildServerPage
+
 pagesToPreload=loaderPageNames or {}
 function buildAllRuntimePages()
 	local okAll=true

@@ -117,7 +117,9 @@ uiMap.PageStructure={
 
 		server={
 			Host="serverPage",
-			Modules={},
+			Modules={
+				{name="Arc",api="ArcAPI",order=1,title="Hide Arc"},
+			},
 		},
 
 		customize={

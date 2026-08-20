@@ -1976,13 +1976,14 @@ function qbAim.new(app,parent)
 		local startPoint=plan.origin
 		local catchPoint=plan.target or plan.c1Point
 		local catchTime=plan.time
-		local endPoint=catchPoint
-		local previewTime=catchTime
-		if not(startPoint and catchPoint and previewTime) then return end
+		local endPoint=plan.landing or catchPoint
+		local previewTime=plan.landingTime or catchTime
+		if not(startPoint and catchPoint and catchTime and endPoint and previewTime) then return end
 
+		local catchVelocity=plan.velocity+gravityVector*catchTime
 		local endVelocity=plan.velocity+gravityVector*previewTime
 		setAttachmentCFrame(c2,xAxisCFrame(startPoint,plan.velocity)*CFrame.Angles(arcSettings.AttachmentRoll,0,0))
-		setAttachmentCFrame(c1,xAxisCFrame(catchPoint,endVelocity)*CFrame.Angles(arcSettings.AttachmentRoll,0,0))
+		setAttachmentCFrame(c1,xAxisCFrame(catchPoint,catchVelocity)*CFrame.Angles(arcSettings.AttachmentRoll,0,0))
 		setAttachmentCFrame(c3,xAxisCFrame(endPoint,endVelocity)*CFrame.Angles(arcSettings.AttachmentRoll,0,0))
 		updateC1AndC3Info(plan,catchPoint,endPoint)
 		beam.Attachment0=c2
@@ -2448,7 +2449,7 @@ function qbAim.new(app,parent)
 	function api.SetShowArcState(value,fire)
 		state.qbAimShowArc=value and true or false
 		if not state.qbAimShowArc then
-			clearPreviewVisuals()
+			hideQBTrailPreview()
 			setStatus("arc hidden")
 		end
 		syncControls()

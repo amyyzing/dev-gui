@@ -40,6 +40,8 @@
     "features/qb-aim/logic.lua",
     "features/testing/gui.lua",
     "features/testing/logic.lua",
+    "features/arc/gui.lua",
+    "features/arc/logic.lua",
     "features/colors/gui.lua",
     "features/colors/logic.lua",
     "features/map-editor/gui.lua",

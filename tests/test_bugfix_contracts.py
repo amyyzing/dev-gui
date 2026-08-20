@@ -204,18 +204,21 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("setThrowDelay(measured,true)", logic)
         self.assertIn('"QBAimAutoCalibrate"', logic)
 
-    def test_qb_preview_ends_at_c1_and_only_enables_its_bound_beam(self):
+    def test_qb_preview_runs_from_c2_through_c1_to_ground_c3(self):
         logic = source("features/qb-aim/logic.lua")
-        self.assertIn("local endPoint=catchPoint", logic)
-        self.assertIn("local previewTime=catchTime", logic)
-        self.assertNotIn("local endPoint=plan.landing or catchPoint", logic)
+        self.assertIn("local endPoint=plan.landing or catchPoint", logic)
+        self.assertIn("local previewTime=plan.landingTime or catchTime", logic)
+        self.assertIn("local catchVelocity=plan.velocity+gravityVector*catchTime", logic)
         self.assertIn("UpdateInterval=1/120", logic)
         self.assertIn(
             'addSchedulerJob("RenderStepped","QBAimPreview",arcSettings.UpdateInterval,previewStep)',
             logic,
         )
         self.assertIn("setAttachmentCFrame(c2,xAxisCFrame(startPoint,plan.velocity)", logic)
-        self.assertIn("setAttachmentCFrame(c1,xAxisCFrame(catchPoint,endVelocity)", logic)
+        self.assertIn("setAttachmentCFrame(c1,xAxisCFrame(catchPoint,catchVelocity)", logic)
+        self.assertIn("setAttachmentCFrame(c3,xAxisCFrame(endPoint,endVelocity)", logic)
+        self.assertIn("beam.Attachment0=c2", logic)
+        self.assertIn("beam.Attachment1=c3", logic)
         self.assertIn("updateC1AndC3Info(plan,catchPoint,endPoint)", logic)
         self.assertNotIn("previewSmoothAmount", logic)
         self.assertNotIn("smoothedCatchPoint", logic)
@@ -223,6 +226,16 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("if not bound and not bindArcRigParts(center) then return nil end", logic)
         self.assertIn("instance.Enabled=visible and instance==preview.beam", logic)
         self.assertIn("descendant.Enabled=false", logic)
+
+    def test_qb_arc_toggle_only_hides_the_existing_preview(self):
+        logic = source("features/qb-aim/logic.lua")
+        setter = logic[
+            logic.index("function api.SetShowArcState") :
+            logic.index("function api.SetTargetHighlightState")
+        ]
+        self.assertIn("hideQBTrailPreview()", setter)
+        self.assertNotIn("clearPreviewVisuals", setter)
+        self.assertNotIn("destroyPreviewCenter", setter)
 
     def test_receiver_prediction_keeps_the_binary_zero_or_21_speed_model(self):
         logic = source("features/qb-aim/logic.lua")
@@ -271,6 +284,28 @@ class PresetContracts(unittest.TestCase):
 
 
 class LifecycleContracts(unittest.TestCase):
+    def test_server_hide_arc_preserves_the_game_arc_and_excludes_qb_preview(self):
+        arc = source("features/arc/logic.lua")
+        runtime = source("runtime/loader-part-3.lua")
+        refresh = source("runtime/loader-part-2.lua")
+        cleanup = source("runtime/loader-part-1.lua")
+
+        for ui_map in (source("gui/pc.luau"), source("gui/mobile.luau")):
+            self.assertIn('{name="Arc",api="ArcAPI",order=1,title="Hide Arc"}', ui_map)
+
+        self.assertIn('["Hide Arc"]={Title="HIDE ARC"', source("gui/description.lua"))
+        self.assertIn('instance.Name=="ThrowingArc"', arc)
+        self.assertIn('ancestor.Name=="DevGuiClonedCenter"', arc)
+        self.assertIn('beam:GetPropertyChangedSignal("Enabled")', arc)
+        self.assertIn("desired=beam.Enabled", arc)
+        self.assertIn("beam.Enabled=false", arc)
+        self.assertIn("beam.Enabled=record.desired", arc)
+        self.assertNotIn(":Destroy()", arc)
+        self.assertIn("lazyPageBuilders.server=buildServerPage", runtime)
+        self.assertIn('elseif name=="server" then', refresh)
+        self.assertIn('pcall(ArcAPI.Refresh)', refresh)
+        self.assertIn('"ArcAPI"', cleanup)
+
     def test_footer_reset_only_targets_config_pages_and_first_run_defaults(self):
         pc_shell = source("platforms/pc/gui/mainframe.lua")
         mobile_shell = source("platforms/mobile/gui/mainframe.lua")

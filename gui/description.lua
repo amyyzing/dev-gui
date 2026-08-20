@@ -46,6 +46,10 @@ description.Categories={
 			["Workspace"]={Title="WORKSPACE",description=blank},
 		},
 
+		Server={
+			["Hide Arc"]={Title="HIDE ARC",description=blank},
+		},
+
 		Customize={
 			["Customisation"]={Title="CUSTOMIZATION",description=blank},
 			["Colours"]={Title="COLORS",description=blank},
