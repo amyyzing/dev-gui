@@ -118,38 +118,38 @@ if config.Development==true or config.UseModules==true then
 end
 
 local timings={Platform=platform}
-local chunk=memoryCache and config.Fresh~=true and memoryCache.Chunk or nil
+local useCachedBundle=memoryCache~=nil and config.Fresh~=true
+local chunk=nil
 local bundleSource=nil
-local buildId=memoryCache and config.Fresh~=true and memoryCache.BuildId or nil
+local buildId=useCachedBundle and memoryCache.BuildId or nil
 local requestOk=true
 local response=nil
 local status=nil
 
-if not chunk then
-	local requestBody={apiKey=apiKey,source=MODULE_SOURCE,platform=platform}
-	local networkStarted=os.clock()
-	requestOk,response=pcall(function()
-		return requestFn({
-			Url=API_URL.."/bundle/get",Method="POST",
-			Headers={["Content-Type"]="application/json",["X-Dev-Gui-Client"]="bundle-loader"},
-			Body=HttpService:JSONEncode(requestBody),
-		})
-	end)
-	timings.Network=os.clock()-networkStarted
-	status=requestOk and tonumber(response and(response.StatusCode or response.Status)) or nil
-	if requestOk and(not status or status<400) then
-		bundleSource=response and(response.Body or response.body)
-		local compileStarted=os.clock()
-		local compileError
-		chunk,compileError=compileBundle(bundleSource,"@dev-gui/"..platform..".bundle.luau")
-		timings.Compile=os.clock()-compileStarted
-		if not chunk and config.Debug==true then warn("dev-gui bundle compile failed:",compileError) end
-		if chunk then
-			buildId=tostring(responseHeader(response,"X-Dev-Gui-Build") or bundleSource:match('BuildId="([0-9a-fA-F]+)"') or "")
-		end
+local requestBody={apiKey=apiKey,source=MODULE_SOURCE,platform=platform}
+if useCachedBundle then requestBody.buildId=memoryCache.BuildId end
+local networkStarted=os.clock()
+requestOk,response=pcall(function()
+	return requestFn({
+		Url=API_URL.."/bundle/get",Method="POST",
+		Headers={["Content-Type"]="application/json",["X-Dev-Gui-Client"]="bundle-loader"},
+		Body=HttpService:JSONEncode(requestBody),
+	})
+end)
+timings.Network=os.clock()-networkStarted
+status=requestOk and tonumber(response and(response.StatusCode or response.Status)) or nil
+if requestOk and status==304 and useCachedBundle then
+	chunk=memoryCache.Chunk
+elseif requestOk and(not status or status<400) then
+	bundleSource=response and(response.Body or response.body)
+	local compileStarted=os.clock()
+	local compileError
+	chunk,compileError=compileBundle(bundleSource,"@dev-gui/"..platform..".bundle.luau")
+	timings.Compile=os.clock()-compileStarted
+	if not chunk and config.Debug==true then warn("dev-gui bundle compile failed:",compileError) end
+	if chunk then
+		buildId=tostring(responseHeader(response,"X-Dev-Gui-Build") or bundleSource:match('BuildId="([0-9a-fA-F]+)"') or "")
 	end
-else
-	timings.Network=0
 end
 
 if not chunk and memoryCache then

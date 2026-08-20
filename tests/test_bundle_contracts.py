@@ -43,12 +43,14 @@ class BundleContracts(unittest.TestCase):
         for relative in manifest["uiLibrary"]:
             self.assertTrue((ui_root / relative).is_file(), relative)
 
-    def test_normal_loader_uses_memory_only_bundle_cache(self):
+    def test_normal_loader_revalidates_its_memory_only_bundle_cache(self):
         loader = (ROOT / "loader.lua").read_text(encoding="utf-8")
         self.assertEqual(loader.count('API_URL.."/bundle/get"'), 1)
         self.assertIn('rawget(sharedEnv,"DEV_GUI_BUNDLE_CACHE")', loader)
-        self.assertIn('local chunk=memoryCache and config.Fresh~=true and memoryCache.Chunk or nil', loader)
-        self.assertIn('timings.Network=0', loader)
+        self.assertIn('local useCachedBundle=memoryCache~=nil and config.Fresh~=true', loader)
+        self.assertIn('if useCachedBundle then requestBody.buildId=memoryCache.BuildId end', loader)
+        self.assertIn('if requestOk and status==304 and useCachedBundle then', loader)
+        self.assertIn('chunk=memoryCache.Chunk', loader)
         self.assertIn('sharedEnv.DEV_GUI_BUNDLE_CACHE={Platform=platform,BuildId=buildId,Chunk=chunk}', loader)
         self.assertIn('runModularFallback', loader)
         self.assertIn('local fresh=config.Fresh~=false', loader)
