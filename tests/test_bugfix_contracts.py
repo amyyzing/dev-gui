@@ -344,6 +344,16 @@ class LifecycleContracts(unittest.TestCase):
         self.assertIn("cleanupForManualReload()", runtime)
         self.assertIn("env.GUI_RUNTIME_CLEANUP=nil", runtime)
 
+    def test_new_modules_have_a_main_repository_fallback_during_bot_deploys(self):
+        runtime = source("runtime/loader-part-1.lua")
+        self.assertIn(
+            'mainRepositoryRawUrl="https://raw.githubusercontent.com/amyyzing/gui/main/"',
+            runtime,
+        )
+        self.assertIn("fetchMergedModuleFallback(modulePath)", runtime)
+        self.assertIn('local legacyResult=botApi.Post("/module/batch",{paths=legacyPaths})', runtime)
+        self.assertNotIn("raw.githubusercontent.com/amyyzing/dev-gui", runtime)
+
     def test_footer_reset_only_targets_config_pages_and_first_run_defaults(self):
         pc_shell = source("platforms/pc/gui/mainframe.lua")
         mobile_shell = source("platforms/mobile/gui/mainframe.lua")

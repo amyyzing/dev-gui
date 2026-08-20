@@ -931,6 +931,38 @@ for _,path in ipairs(modulePathsFromNames(optionalModuleNames)) do
 end
 maxModuleBytes=300000
 
+mergedModuleFallbackFiles={
+	["dump/conn.lua"]=true,
+	["dump/life.lua"]=true,
+	["dump/input.lua"]=true,
+	["dump/api.lua"]=true,
+	["dump/load.lua"]=true,
+	["dump/save.lua"]=true,
+	["dump/lib.lua"]=true,
+	["dump/create.lua"]=true,
+	["dump/ui.lua"]=true,
+	["dump/init.lua"]=true,
+	["features/arc/gui.lua"]=true,
+	["features/arc/logic.lua"]=true,
+	["features/discord/core.lua"]=true,
+	["features/discord/view.lua"]=true,
+}
+mainRepositoryRawUrl="https://raw.githubusercontent.com/amyyzing/gui/main/"
+
+function fetchMergedModuleFallback(modulePath)
+	if not mergedModuleFallbackFiles[modulePath] then
+		return nil,"fallback path blocked"
+	end
+
+	local ok,source=pcall(function()
+		return game:HttpGet(mainRepositoryRawUrl..modulePath,true)
+	end)
+	if not ok or type(source)~="string" or source=="" then
+		return nil,ok and "fallback module missing" or tostring(source)
+	end
+	return source,nil
+end
+
 moduleCache={}
 moduleSources={}
 bundledModuleFactories=rawget(getfenv(),"bootBundledModules")
@@ -1081,6 +1113,9 @@ function loadRemoteModule(modulePath)
 			moduleSource=result.source
 		else
 			loadError=result and result.error or "unknown"
+			if mergedModuleFallbackFiles[modulePath] then
+				moduleSource,loadError=fetchMergedModuleFallback(modulePath)
+			end
 		end
 	end
 
@@ -1151,7 +1186,33 @@ function loadRemoteModuleBatch(paths)
 	if #apiPaths>0 then
 		result=botApi.Post("/module/batch",{paths=apiPaths})
 		if not(result and result.ok and type(result.modules)=="table") then
-			return false,result and result.error or "module batch missing"
+			local legacyPaths={}
+			for _,modulePath in ipairs(apiPaths) do
+				if not mergedModuleFallbackFiles[modulePath] then
+					table.insert(legacyPaths,modulePath)
+				end
+			end
+
+			result={ok=true,modules={},errors={}}
+			if #legacyPaths>0 then
+				local legacyResult=botApi.Post("/module/batch",{paths=legacyPaths})
+				if not(legacyResult and legacyResult.ok and type(legacyResult.modules)=="table") then
+					return false,legacyResult and legacyResult.error or "module batch missing"
+				end
+				result.modules=legacyResult.modules
+				result.errors=legacyResult.errors or{}
+			end
+
+			for _,modulePath in ipairs(apiPaths) do
+				if mergedModuleFallbackFiles[modulePath] then
+					local source,fallbackError=fetchMergedModuleFallback(modulePath)
+					if source then
+						result.modules[modulePath]={source=source}
+					else
+						result.errors[modulePath]=fallbackError
+					end
+				end
+			end
 		end
 	end
 
