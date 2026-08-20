@@ -1632,8 +1632,8 @@ function qbAim.new(app,parent)
 	end
 
 	local function predictedY(position,playerRoot,delay)
-		delay=math.max(0,tonumber(delay) or 0)
-		if delay<=0 or not isAirborne(playerRoot) then
+		delay=tonumber(delay) or 0
+		if delay==0 or not isAirborne(playerRoot) then
 			return position.Y
 		end
 
@@ -1653,7 +1653,7 @@ function qbAim.new(app,parent)
 	end
 
 	local function origin(qbRoot,ball,releaseDelay)
-		releaseDelay=math.max(0,tonumber(releaseDelay) or 0)
+		releaseDelay=tonumber(releaseDelay) or 0
 
 		local fallbackPosition=ball and ball.Position or qbRoot.Position
 		local c2Pos=c2Position()
@@ -1674,13 +1674,13 @@ function qbAim.new(app,parent)
 		end
 
 		local dx,dz=0,0
-		if releaseDelay>0 then
+		if releaseDelay~=0 then
 			local rootVelocity=movementAwareRootVelocity(qbRoot)
 			dx=rootVelocity.X*releaseDelay
 			dz=rootVelocity.Z*releaseDelay
 		end
 
-		if releaseDelay>0 and isAirborne(qbRoot) then
+		if releaseDelay~=0 and isAirborne(qbRoot) then
 			local verticalVelocity=releaseVerticalVelocity(qbRoot,ball)
 			local yOffset=verticalVelocity*releaseDelay-0.5*workspace.Gravity*releaseDelay*releaseDelay
 			basePosition=basePosition+Vector3.new(0,yOffset,0)
@@ -2206,14 +2206,16 @@ function qbAim.new(app,parent)
 		end
 
 		local delay=math.clamp(tonumber(state.qbAimThrowDelay) or defaultThrowDelay,throwDelayMin,throwDelayMax)
-		local sampledOrigin=origin(qbRoot,releaseBall or currentHeldBall(),delay)
-		local plan=buildPlan(receiver,ballPower,releaseBall,(wrOffset or 0)+delay,sampledOrigin,delay)
+		local timingOffset=(wrOffset or 0)-delay
+		local sampledOrigin=origin(qbRoot,releaseBall or currentHeldBall(),-delay)
+		local plan=buildPlan(receiver,ballPower,releaseBall,timingOffset,sampledOrigin,-delay)
 		if plan then
 			plan.centerReleaseOrigin=sampledOrigin
 			plan.throwDelay=delay
+			plan.throwTimingOffset=-delay
 			plan.releaseTimingOffset=0
 			plan.releaseYOffset=0
-			plan.receiverTimingOffset=(wrOffset or 0)+delay
+			plan.receiverTimingOffset=timingOffset
 		end
 
 		return plan

@@ -126,7 +126,7 @@ class QBAimDefaultsContracts(unittest.TestCase):
             logic,
         )
 
-    def test_throw_delay_replaces_drift_and_advances_qb_and_wr_together(self):
+    def test_throw_delay_replaces_drift_and_rewinds_qb_and_wr_together(self):
         production = "\n".join(
             source(path)
             for path in (
@@ -150,9 +150,11 @@ class QBAimDefaultsContracts(unittest.TestCase):
             self.assertNotIn(removed, production)
 
         logic = source("features/qb-aim/logic.lua")
-        self.assertIn("origin(qbRoot,releaseBall or currentHeldBall(),delay)", logic)
-        self.assertIn("(wrOffset or 0)+delay", logic)
-        self.assertIn("predictedY(catchPosition,receiverRoot,releaseDelay)+catchHeight", logic)
+        self.assertIn("local timingOffset=(wrOffset or 0)-delay", logic)
+        self.assertIn("origin(qbRoot,releaseBall or currentHeldBall(),-delay)", logic)
+        self.assertIn("sampledOrigin,-delay)", logic)
+        self.assertIn("plan.throwTimingOffset=-delay", logic)
+        self.assertNotIn("(wrOffset or 0)+delay", logic)
 
     def test_qb_peak_is_relative_to_receiver_y_in_every_mode(self):
         logic = source("features/qb-aim/logic.lua")
