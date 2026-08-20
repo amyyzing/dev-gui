@@ -1366,13 +1366,26 @@ loaderBoxH=tonumber(loaderBoxConfig.H) or 320
 loaderPageNames=type(loaderGuiMap.PreloadPages)=="table" and loaderGuiMap.PreloadPages or {"maps","customize","page2","settings","server"}
 loaderStepTotal=#startupModuleFiles+#loaderPageNames+4
 
+local loaderRaycast=devThemes.raycast.Theme
+local loaderColors={
+	bg=loaderRaycast.bg,
+	topbar=loaderRaycast.topbar,
+	panel=loaderRaycast.panel,
+	text=loaderRaycast.text,
+	muted=loaderRaycast.muted,
+	stroke=loaderRaycast.stroke,
+	accent=loaderRaycast.sliderFill,
+	secondary=Color3.fromRGB(207,47,152),
+	error=Color3.fromRGB(254,94,86),
+}
+
 loaderCurrent=0
 loaderPhaseCurrent=#startupModuleFiles
 loaderPhaseItems={}
 loaderPhaseNames=type(loaderGuiMap.Phases)=="table" and loaderGuiMap.Phases or {"setup","modules","gui","ready"}
 loaderOverlay=make("Frame",{
 	Name="Loader",
-	BackgroundColor3=Color3.fromRGB(8,10,18),
+	BackgroundColor3=loaderColors.bg,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	Size=UDim2.new(1,0,1,0),
@@ -1383,7 +1396,7 @@ loaderBackdropA=make("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,-112,0.5,-66),
 	Size=UDim2.fromOffset(2,2),
-	BackgroundColor3=colors.green,
+	BackgroundColor3=loaderColors.accent,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ZIndex=loaderLayer,
@@ -1394,7 +1407,7 @@ loaderBackdropB=make("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,128,0.5,82),
 	Size=UDim2.fromOffset(2,2),
-	BackgroundColor3=colors.blue,
+	BackgroundColor3=loaderColors.secondary,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ZIndex=loaderLayer,
@@ -1405,7 +1418,7 @@ loaderBox=make("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,0,0.5,0),
 	Size=UDim2.fromOffset(loaderBoxW,loaderBoxH),
-	BackgroundColor3=colors.bg,
+	BackgroundColor3=loaderColors.bg,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ZIndex=loaderLayer+1,
@@ -1418,18 +1431,18 @@ if runtimePlatform=="mobile" then
 	loaderScale=math.min(1,(viewport.X-16)/loaderBoxW,(viewport.Y-16)/loaderBoxH)
 end
 loaderBoxScale=make("UIScale",{Scale=math.max(0.72,loaderScale)},loaderBox)
-loaderBoxStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=1},loaderBox)
+loaderBoxStroke=make("UIStroke",{Color=loaderColors.stroke,Thickness=1,Transparency=1},loaderBox)
 loaderBoxGradient=make("UIGradient",{
 	Color=ColorSequence.new({
-		ColorSequenceKeypoint.new(0,colors.topbar or colors.bg),
-		ColorSequenceKeypoint.new(1,colors.bg),
+		ColorSequenceKeypoint.new(0,loaderColors.topbar),
+		ColorSequenceKeypoint.new(1,loaderColors.bg),
 	}),
 	Rotation=90,
 },loaderBox)
 make("UIPadding",{PaddingTop=UDim.new(0,20),PaddingLeft=UDim.new(0,18),PaddingRight=UDim.new(0,18),PaddingBottom=UDim.new(0,20)},loaderBox)
 
 loaderAccent=make("Frame",{
-	BackgroundColor3=colors.green,
+	BackgroundColor3=loaderColors.accent,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	Position=UDim2.new(0,0,0,0),
@@ -1441,13 +1454,13 @@ loaderPercentPill=make("Frame",{
 	AnchorPoint=Vector2.new(1,0),
 	Position=UDim2.new(1,0,0,18),
 	Size=UDim2.fromOffset(70,24),
-	BackgroundColor3=colors.panel,
+	BackgroundColor3=loaderColors.panel,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ZIndex=loaderLayer+2,
 },loaderBox)
 make("UICorner",{CornerRadius=UDim.new(0,0)},loaderPercentPill)
-loaderPercentPillStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=1},loaderPercentPill)
+loaderPercentPillStroke=make("UIStroke",{Color=loaderColors.stroke,Thickness=1,Transparency=1},loaderPercentPill)
 
 local titleText=make("TextLabel",{
 	BackgroundTransparency=1,
@@ -1456,7 +1469,7 @@ local titleText=make("TextLabel",{
 	Text=tostring(loaderText.Title or "untitled gui"),
 	Font=Enum.Font.GothamMedium,
 	TextSize=16,
-	TextColor3=colors.text,
+	TextColor3=loaderColors.text,
 	TextTransparency=1,
 	TextXAlignment=Enum.TextXAlignment.Left,
 	ZIndex=loaderLayer+2,
@@ -1469,7 +1482,7 @@ local subtitleText=make("TextLabel",{
 	Text=tostring(loaderText.Subtitle or "loading files and gui"),
 	Font=Enum.Font.Gotham,
 	TextSize=11,
-	TextColor3=colors.muted,
+	TextColor3=loaderColors.muted,
 	TextTransparency=1,
 	TextXAlignment=Enum.TextXAlignment.Left,
 	ZIndex=loaderLayer+2,
@@ -1482,7 +1495,7 @@ loaderStatus=make("TextLabel",{
 	Text=tostring(loaderText.InitialStatus or "loading modules..."),
 	Font=Enum.Font.Gotham,
 	TextSize=12,
-	TextColor3=colors.muted,
+	TextColor3=loaderColors.muted,
 	TextTransparency=1,
 	TextWrapped=true,
 	TextXAlignment=Enum.TextXAlignment.Left,
@@ -1492,7 +1505,7 @@ loaderStatus=make("TextLabel",{
 loaderTrack=make("Frame",{
 	Position=UDim2.fromOffset(0,148),
 	Size=UDim2.new(1,0,0,12),
-	BackgroundColor3=colors.panel,
+	BackgroundColor3=loaderColors.panel,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ClipsDescendants=true,
@@ -1500,11 +1513,11 @@ loaderTrack=make("Frame",{
 },loaderBox)
 make("UICorner",{CornerRadius=UDim.new(0,0)},loaderTrack)
 
-loaderTrackStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=1},loaderTrack)
+loaderTrackStroke=make("UIStroke",{Color=loaderColors.stroke,Thickness=1,Transparency=1},loaderTrack)
 
 loaderFill=make("Frame",{
 	Size=UDim2.new(0,0,1,0),
-	BackgroundColor3=colors.green,
+	BackgroundColor3=loaderColors.accent,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ZIndex=loaderLayer+3,
@@ -1513,7 +1526,7 @@ make("UICorner",{CornerRadius=UDim.new(0,0)},loaderFill)
 
 loaderFillGlow=make("Frame",{
 	Size=UDim2.new(0,0,1,0),
-	BackgroundColor3=colors.green,
+	BackgroundColor3=loaderColors.accent,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ZIndex=loaderLayer+2,
@@ -1541,7 +1554,7 @@ loaderPulse=make("Frame",{
 	AnchorPoint=Vector2.new(0.5,0.5),
 	Position=UDim2.new(0.5,0,0.5,0),
 	Size=UDim2.fromOffset(loaderBoxW,loaderBoxH),
-	BackgroundColor3=colors.green,
+	BackgroundColor3=loaderColors.accent,
 	BackgroundTransparency=1,
 	BorderSizePixel=0,
 	ZIndex=loaderLayer,
@@ -1554,7 +1567,7 @@ loaderPercent=make("TextLabel",{
 	Text="0%",
 	Font=Enum.Font.GothamMedium,
 	TextSize=12,
-	TextColor3=colors.text,
+	TextColor3=loaderColors.text,
 	TextTransparency=1,
 	TextXAlignment=Enum.TextXAlignment.Center,
 	ZIndex=loaderLayer+3,
@@ -1571,7 +1584,7 @@ local phaseGap=8
 local phaseWidth=math.max(54,math.floor((loaderBoxW-36-(phaseGap*3))/4))
 for index,name in ipairs(loaderPhaseNames) do
 	local item=make("Frame",{
-		BackgroundColor3=colors.panel,
+		BackgroundColor3=loaderColors.panel,
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset((index-1)*(phaseWidth+phaseGap),0),
@@ -1583,7 +1596,7 @@ for index,name in ipairs(loaderPhaseNames) do
 		AnchorPoint=Vector2.new(0,0.5),
 		Position=UDim2.fromOffset(12,21),
 		Size=UDim2.fromOffset(8,8),
-		BackgroundColor3=colors.muted,
+		BackgroundColor3=loaderColors.muted,
 		BackgroundTransparency=1,
 		BorderSizePixel=0,
 		ZIndex=loaderLayer+3,
@@ -1596,7 +1609,7 @@ for index,name in ipairs(loaderPhaseNames) do
 		Text=name,
 		Font=Enum.Font.Gotham,
 		TextSize=11,
-		TextColor3=colors.muted,
+		TextColor3=loaderColors.muted,
 		TextTransparency=1,
 		SkipTextRole=true,
 		TextXAlignment=Enum.TextXAlignment.Left,
@@ -1635,14 +1648,14 @@ end
 
 local function setLoaderPhase(activeIndex,isProblem)
 	activeIndex=math.clamp(tonumber(activeIndex) or 1,1,#loaderPhaseNames)
-	local activeColor=isProblem and colors.red or colors.green
+	local activeColor=isProblem and loaderColors.error or loaderColors.accent
 
 	for index,item in ipairs(loaderPhaseItems) do
 		local completed=index<activeIndex
 		local active=index==activeIndex
-		local itemBg=active and activeColor or colors.panel
-		local dotBg=(completed or active) and activeColor or colors.muted
-		local textColor=(completed or active) and colors.text or colors.muted
+		local itemBg=active and activeColor or loaderColors.panel
+		local dotBg=(completed or active) and activeColor or loaderColors.muted
+		local textColor=(completed or active) and loaderColors.text or loaderColors.muted
 		local bgTransparency=active and 0.08 or 0.36
 		local dotTransparency=(completed or active) and 0 or 0.42
 
@@ -1707,23 +1720,23 @@ function setLoaderProgress(text,current,total,isProblem)
 
 	local pct=math.clamp(current/total,0,1)
 	loaderStatus.Text=tostring(text or "loading...")
-	loaderStatus.TextColor3=isProblem and colors.red or colors.muted
+	loaderStatus.TextColor3=isProblem and loaderColors.error or loaderColors.muted
 	loaderPercent.Text=math.floor(pct*100+0.5).."%"
-	loaderFill.BackgroundColor3=isProblem and colors.red or colors.green
-	loaderFillGlow.BackgroundColor3=isProblem and colors.red or colors.green
+	loaderFill.BackgroundColor3=isProblem and loaderColors.error or loaderColors.accent
+	loaderFillGlow.BackgroundColor3=isProblem and loaderColors.error or loaderColors.accent
 	if loaderPercentPillStroke then
-		TweenService:Create(loaderPercentPillStroke,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=isProblem and colors.red or colors.stroke,Transparency=isProblem and 0.08 or 0.35}):Play()
+		TweenService:Create(loaderPercentPillStroke,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=isProblem and loaderColors.error or loaderColors.stroke,Transparency=isProblem and 0.08 or 0.35}):Play()
 	end
 	TweenService:Create(loaderFill,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
 	TweenService:Create(loaderFillGlow,TweenInfo.new(0.16,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Size=UDim2.new(pct,0,1,0)}):Play()
 	setLoaderPhase(loaderPhaseFromStatus(text,current,total),isProblem)
 
 	if loaderAccent then
-		loaderAccent.BackgroundColor3=isProblem and colors.red or colors.green
+		loaderAccent.BackgroundColor3=isProblem and loaderColors.error or loaderColors.accent
 	end
 
 	if loaderPulse then
-		loaderPulse.BackgroundColor3=isProblem and colors.red or colors.green
+		loaderPulse.BackgroundColor3=isProblem and loaderColors.error or loaderColors.accent
 		loaderPulse.BackgroundTransparency=0.95
 		loaderPulse.Size=UDim2.fromOffset(loaderBoxW,loaderBoxH)
 		TweenService:Create(loaderPulse,TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{
@@ -1733,9 +1746,9 @@ function setLoaderProgress(text,current,total,isProblem)
 	end
 
 	if isProblem and loaderBoxStroke then
-		TweenService:Create(loaderBoxStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=colors.red,Transparency=0}):Play()
+		TweenService:Create(loaderBoxStroke,TweenInfo.new(0.12,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=loaderColors.error,Transparency=0}):Play()
 	else
-		TweenService:Create(loaderBoxStroke,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=colors.stroke,Transparency=0}):Play()
+		TweenService:Create(loaderBoxStroke,TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{Color=loaderColors.stroke,Transparency=0}):Play()
 	end
 end
 
@@ -2244,28 +2257,34 @@ function refreshThemePalette()
 	style.CornerRadius=(libStyle.Shape and libStyle.Shape.WindowRadius) or 0
 end
 
+local function isFixedLoaderThemeInstance(instance)
+	return loaderOverlay and (instance==loaderOverlay or instance:IsDescendantOf(loaderOverlay))
+end
+
 function applyUIPrimaryTheme()
 	refreshThemePalette()
 
 	if not screenGui then return end
 
 	for _,instance in ipairs(screenGui:GetDescendants()) do
-		if instance:IsA("GuiObject") then
-			local role=instance:GetAttribute("ThemeRole")
-			if role and colors[role] then
-				instance.BackgroundColor3=colors[role]
+		if not isFixedLoaderThemeInstance(instance) then
+			if instance:IsA("GuiObject") then
+				local role=instance:GetAttribute("ThemeRole")
+				if role and colors[role] then
+					instance.BackgroundColor3=colors[role]
+				end
 			end
-		end
 
-		if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
-			local skipTextRole=instance:GetAttribute("SkipTextRole")
-			local textRole=instance:GetAttribute("ThemeTextRole")
-			if not textRole and not skipTextRole then
-				textRole="TEXT"
-				instance:SetAttribute("ThemeTextRole",textRole)
-			end
-			if textRole and colors[textRole] and not skipTextRole then
-				instance.TextColor3=colors[textRole]
+			if instance:IsA("TextLabel") or instance:IsA("TextButton") or instance:IsA("TextBox") then
+				local skipTextRole=instance:GetAttribute("SkipTextRole")
+				local textRole=instance:GetAttribute("ThemeTextRole")
+				if not textRole and not skipTextRole then
+					textRole="TEXT"
+					instance:SetAttribute("ThemeTextRole",textRole)
+				end
+				if textRole and colors[textRole] and not skipTextRole then
+					instance.TextColor3=colors[textRole]
+				end
 			end
 		end
 	end
@@ -2610,7 +2629,7 @@ applyUIStrokeTheme=function()
 	for instance in pairs(themeStrokes) do
 		if not instance.Parent then
 			themeStrokes[instance]=nil
-		elseif instance:IsDescendantOf(screenGui) then
+		elseif instance:IsDescendantOf(screenGui) and not isFixedLoaderThemeInstance(instance) then
 			local strokeParent=instance.Parent
 			if strokeParent and strokeParent:GetAttribute("NoStroke")==true then
 				instance.Transparency=1

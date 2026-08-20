@@ -28,6 +28,14 @@ class BootstrapContracts(unittest.TestCase):
         self.assertIn(expected, source("gui/pc.luau"))
         self.assertIn(expected, source("gui/mobile.luau"))
 
+    def test_loader_keeps_the_raycast_palette(self):
+        runtime = source("runtime/loader-part-1.lua")
+
+        self.assertIn("local loaderRaycast=devThemes.raycast.Theme", runtime)
+        self.assertIn("BackgroundColor3=loaderColors.accent", runtime)
+        self.assertIn("isProblem and loaderColors.error or loaderColors.accent", runtime)
+        self.assertGreaterEqual(runtime.count("not isFixedLoaderThemeInstance(instance)"), 2)
+
 
 class QBAimDefaultsContracts(unittest.TestCase):
     def test_new_user_qb_tuning_defaults_are_consistent(self):
