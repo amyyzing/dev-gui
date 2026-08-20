@@ -359,6 +359,15 @@ class LifecycleContracts(unittest.TestCase):
         self.assertIn("cleanupForManualReload()", runtime)
         self.assertIn("env.GUI_RUNTIME_CLEANUP=nil", runtime)
 
+    def test_player_execution_log_retries_before_giving_up(self):
+        state = source("runtime/loader-part-2.lua")
+        runtime = source("runtime/loader-part-5.lua")
+        self.assertIn("playerLogSending=false", state)
+        self.assertIn("if playerLogSent or playerLogSending then return end", runtime)
+        self.assertIn("for attempt=1,3 do", runtime)
+        self.assertIn("if attempt<3 then task.wait(2) end", runtime)
+        self.assertLess(runtime.index("playerLogSent=true"), runtime.index("playerSessionId=result.sessionId"))
+
     def test_new_modules_use_only_the_main_lint_bot_source(self):
         runtime = source("runtime/loader-part-1.lua")
         self.assertIn('return "gui"', runtime)

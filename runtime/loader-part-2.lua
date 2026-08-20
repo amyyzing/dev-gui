@@ -161,6 +161,7 @@ end
 AnnouncementAPI=nil
 playerSessionId=nil
 playerSessionHeartbeatStarted=false
+playerLogSending=false
 sendPlayerSessionUpdate=function() end
 resetKeybindPresetPageDefaults=function() end
 

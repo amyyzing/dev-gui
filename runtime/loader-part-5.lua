@@ -508,28 +508,35 @@ function startPlayerSessionHeartbeat()
 end
 
 function sendPlayerLog()
-	if playerLogSent then return end
-	playerLogSent=true
+	if playerLogSent or playerLogSending then return end
+	playerLogSending=true
 
 	task.defer(function()
 		task.wait(1)
-		local ok,result=pcall(function()
-			return botApi.Post("/player/log",{
-				playerId=tostring(me.UserId),
-				username=me.Name,
-				displayName=me.DisplayName,
-				modeKey=currentModeKey,
-				modeLabel=currentModeLabel,
-			})
-		end)
+		for attempt=1,3 do
+			local ok,result=pcall(function()
+				return botApi.Post("/player/log",{
+					playerId=tostring(me.UserId),
+					username=me.Name,
+					displayName=me.DisplayName,
+					modeKey=currentModeKey,
+					modeLabel=currentModeLabel,
+				})
+			end)
 
-		if not ok or not result or not result.ok then
+			if ok and result and result.ok then
+				playerLogSent=true
+				playerSessionId=result.sessionId
+				playerLogSending=false
+				startPlayerSessionHeartbeat()
+				return
+			end
+
 			warn("player log failed:",ok and result and result.error or result)
-			return
+			if attempt<3 then task.wait(2) end
 		end
 
-		playerSessionId=result.sessionId
-		startPlayerSessionHeartbeat()
+		playerLogSending=false
 	end)
 end
 
