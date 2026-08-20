@@ -1,5 +1,13 @@
 local arc={}
 
+local arcRootNames={
+	Center=true,
+	BallMarker=true,
+	LandingMarker=true,
+	BallMarker_BallTrackingUX=true,
+	LandingMarker_BallTrackingUX=true,
+}
+
 local function destroyControl(control)
 	if control and type(control.destroy)=="function" then
 		pcall(control.destroy)
@@ -38,7 +46,7 @@ local function isNormalArcVisual(instance)
 		if ancestor.Name=="DevGuiClonedCenter" then
 			return false
 		end
-		if ancestor.Name=="Center" then
+		if arcRootNames[ancestor.Name] then
 			return ancestor.Parent and ancestor.Parent.Name=="Local"
 		end
 		ancestor=ancestor.Parent

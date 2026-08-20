@@ -294,7 +294,15 @@ class LifecycleContracts(unittest.TestCase):
             self.assertIn('{name="Arc",api="ArcAPI",order=1,title="Hide Arc"}', ui_map)
 
         self.assertIn('["Hide Arc"]={Title="HIDE ARC"', source("gui/description.lua"))
-        self.assertIn('ancestor.Name=="Center"', arc)
+        for arc_root in (
+            "Center",
+            "BallMarker",
+            "LandingMarker",
+            "BallMarker_BallTrackingUX",
+            "LandingMarker_BallTrackingUX",
+        ):
+            self.assertIn(f"{arc_root}=true", arc)
+        self.assertIn("arcRootNames[ancestor.Name]", arc)
         self.assertIn('ancestor.Parent.Name=="Local"', arc)
         self.assertIn('ancestor.Name=="DevGuiClonedCenter"', arc)
         for visual_class in (
