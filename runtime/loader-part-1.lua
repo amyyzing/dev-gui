@@ -442,6 +442,10 @@ function make(class, properties, parent)
 	if parent~=nil then
 		instance.Parent=parent
 	end
+	if class=="UIStroke" and parent and parent:GetAttribute("NoStroke")==true then
+		instance.Enabled=false
+		instance.Transparency=1
+	end
 	if class=="UICorner" and parent and parent:IsA("GuiObject") then
 		parent.ClipsDescendants=true
 	end
@@ -2604,8 +2608,13 @@ applyUIStrokeTheme=function()
 		if not instance.Parent then
 			themeStrokes[instance]=nil
 		elseif instance:IsDescendantOf(screenGui) then
-			local role=resolveStrokeRole(instance)
-			if role~="Fixed" then
+			local strokeParent=instance.Parent
+			if strokeParent and strokeParent:GetAttribute("NoStroke")==true then
+				instance.Transparency=1
+				pcall(function() instance.Enabled=false end)
+			else
+				local role=resolveStrokeRole(instance)
+				if role~="Fixed" then
 				local accentRole=role=="Window" or role=="Accent"
 				local softColor=colors.softStroke or (colors.card and colors.card:Lerp(colors.text or color,0.12)) or color
 
@@ -2656,6 +2665,7 @@ applyUIStrokeTheme=function()
 						strokeGradients[gradient]=nil
 						gradient:Destroy()
 					end
+				end
 				end
 			end
 		end

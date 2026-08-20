@@ -615,6 +615,7 @@ function guiLogic.new(app)
 		local hasBody=not descriptionOnly
 		local canCollapse=hasBody and options.collapsible~=false and options.Collapsible~=false
 		local sec=make("Frame",{BackgroundColor3=themeColor("SECTION",colors.card),BackgroundTransparency=componentNumber("SectionBackgroundTransparency",0),BorderSizePixel=0,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ClipsDescendants=true,ZIndex=4,LayoutOrder=order,ThemeRole="SECTION",CornerRole="Section"},parent)
+		sec:SetAttribute("NoStroke",options.stroke==false)
 
 		addCorner(sec,"Section")
 		if options.stroke~=false then

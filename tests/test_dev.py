@@ -241,6 +241,9 @@ def test_requested_control_copy_and_spacing_contracts():
     assert 'buildSlider(section,"Alpha"' not in hitbox
     assert "stroke=false" in hitbox
     assert "if options.stroke~=false then" in read("features/colors/gui.lua")
+    assert 'sec:SetAttribute("NoStroke",options.stroke==false)' in read("features/colors/gui.lua")
+    assert 'parent:GetAttribute("NoStroke")==true' in runtime
+    assert 'strokeParent:GetAttribute("NoStroke")==true' in runtime
     assert 'makeSection(parent,5,"Testing","",{' in testing
     assert 'label=target=="Stroke" and "Secondary" or target' in colors
     assert 'button.Size=UDim2.new(0.5,-4,1,0)' in colors
