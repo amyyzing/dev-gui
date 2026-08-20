@@ -18,10 +18,10 @@ getgenv().DEV_GUI_BOOT_CONFIG = {
 }
 ```
 
-The normal testing loader requests fresh modular source on every execution, so
-repository changes cannot be hidden by an older Railway bundle. Set
-`Production = true` or `UseBundle = true` only when explicitly testing the
-commit-pinned PC/mobile bundle and its `dev-gui-cache` behavior.
+The normal loader requests one platform bundle and never reads or writes a disk
+cache. During the current game session it may reuse a validated compiled bundle
+from process memory after Railway confirms the build is unchanged. Set
+`Development = true` only when explicitly testing fresh modular source.
 
 The client uses its own API credential and Railway volume. Saved player data,
 presets, announcements, settings, and session memory are isolated from the main
@@ -30,7 +30,7 @@ repository instead of `gui`.
 
 ## Structure
 
-- `loader.lua` is the stable entry and normally executes fresh modular source.
+- `loader.lua` is the stable, memory-only bundled entry.
 - `build/bundle-manifest.json` is the authoritative bundle inventory.
 - `dump/start.lua` is retained as the modular development and recovery path.
 - `dump/init.lua` is the only public entry into implementation details.

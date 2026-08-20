@@ -1,5 +1,5 @@
 -- DEV_GUI_CUSTOM_LOADER
--- Testing uses fresh modules by default. A prebuilt bundle remains available by explicit opt-in.
+-- Normal execution uses the platform bundle and keeps any reuse in process memory only.
 local HttpService=game:GetService("HttpService")
 local UserInputService=game:GetService("UserInputService")
 
@@ -52,9 +52,6 @@ local function detectPlatform()
 end
 
 local platform=detectPlatform()
-local cacheFolder="dev-gui-cache"
-local cacheSourcePath=cacheFolder.."/"..platform..".luau"
-local cacheBuildPath=cacheFolder.."/"..platform..".version"
 
 local function compileBundle(source,label)
 	if type(source)~="string" or source=="" or #source>MAX_BUNDLE_BYTES then return nil,"bundle source is invalid" end
@@ -62,27 +59,12 @@ local function compileBundle(source,label)
 	return loadstring(source,label)
 end
 
-local function readBundleCache()
-	if type(isfile)~="function" or type(readfile)~="function" then return nil,nil,nil end
-	local ok,source,buildId=pcall(function()
-		if not isfile(cacheSourcePath) or not isfile(cacheBuildPath) then return nil,nil end
-		return readfile(cacheSourcePath),readfile(cacheBuildPath)
-	end)
-	if not ok or type(source)~="string" or type(buildId)~="string" then return nil,nil,nil end
-	buildId=buildId:match("^%s*([0-9a-fA-F]+)")
-	if not buildId then return nil,nil,nil end
-	local chunk=compileBundle(source,"@"..cacheSourcePath)
-	if not chunk then return nil,nil,nil end
-	return source,buildId,chunk
-end
-
-local function writeBundleCache(source,buildId)
-	if type(writefile)~="function" then return end
-	pcall(function()
-		if type(isfolder)=="function" and type(makefolder)=="function" and not isfolder(cacheFolder) then makefolder(cacheFolder) end
-		writefile(cacheSourcePath,source)
-		writefile(cacheBuildPath,buildId)
-	end)
+local memoryCache=rawget(sharedEnv,"DEV_GUI_BUNDLE_CACHE")
+if type(memoryCache)~="table"
+	or memoryCache.Platform~=platform
+	or type(memoryCache.BuildId)~="string"
+	or type(memoryCache.Chunk)~="function" then
+	memoryCache=nil
 end
 
 local function responseHeader(response,name)
@@ -130,15 +112,14 @@ local function runModularFallback(reason)
 	if not ran then error("dev-gui fallback failed: "..tostring(runError)) end
 end
 
-if config.Production~=true and config.UseBundle~=true then
+if config.Development==true or config.UseModules==true then
 	runModularFallback("testing repository source")
 	return
 end
 
 local timings={Platform=platform}
-local cachedSource,cachedBuild,cachedChunk=readBundleCache()
 local requestBody={apiKey=apiKey,source=MODULE_SOURCE,platform=platform}
-if cachedChunk and config.Fresh~=true then requestBody.buildId=cachedBuild end
+if memoryCache and config.Fresh~=true then requestBody.buildId=memoryCache.BuildId end
 
 local networkStarted=os.clock()
 local requestOk,response=pcall(function()
@@ -154,10 +135,9 @@ local chunk=nil
 local bundleSource=nil
 local buildId=nil
 local status=requestOk and tonumber(response and(response.StatusCode or response.Status)) or nil
-if requestOk and status==304 and cachedChunk then
-	chunk=cachedChunk
-	bundleSource=cachedSource
-	buildId=cachedBuild
+if requestOk and status==304 and memoryCache then
+	chunk=memoryCache.Chunk
+	buildId=memoryCache.BuildId
 elseif requestOk and(not status or status<400) then
 	bundleSource=response and(response.Body or response.body)
 	local compileStarted=os.clock()
@@ -167,14 +147,12 @@ elseif requestOk and(not status or status<400) then
 	if not chunk and config.Debug==true then warn("dev-gui bundle compile failed:",compileError) end
 	if chunk then
 		buildId=tostring(responseHeader(response,"X-Dev-Gui-Build") or bundleSource:match('BuildId="([0-9a-fA-F]+)"') or "")
-		if buildId~="" then writeBundleCache(bundleSource,buildId) end
 	end
 end
 
-if not chunk and cachedChunk then
-	chunk=cachedChunk
-	bundleSource=cachedSource
-	buildId=cachedBuild
+if not chunk and memoryCache then
+	chunk=memoryCache.Chunk
+	buildId=memoryCache.BuildId
 end
 if not chunk then
 	runModularFallback(requestOk and("bundle unavailable (status "..tostring(status)..")") or tostring(response))
@@ -185,6 +163,11 @@ if setfenv then setfenv(chunk,parentEnv) end
 local executeStarted=os.clock()
 local ran,runError=xpcall(chunk,traceback)
 timings.Execute=os.clock()-executeStarted
+if ran and buildId~="" then
+	sharedEnv.DEV_GUI_BUNDLE_CACHE={Platform=platform,BuildId=buildId,Chunk=chunk}
+elseif not ran then
+	sharedEnv.DEV_GUI_BUNDLE_CACHE=nil
+end
 timings.Total=os.clock()-started
 timings.BuildId=buildId
 timings.Runtime=sharedEnv.DEV_GUI_LAST_BOOT_TIMINGS
