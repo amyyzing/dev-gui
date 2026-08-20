@@ -65,7 +65,7 @@ local function postModuleApi(endpoint,body)
 			Method="POST",
 			Headers={
 				["Content-Type"]="application/json",
-				["X-Dev-Gui-Client"]="runtime",
+				["X-Gui-Client"]="runtime",
 			},
 			Body=HttpService:JSONEncode(body),
 		})
@@ -218,7 +218,7 @@ local runtimeEnv=setmetatable({
 	bootConfig={
 		AppId="gui",
 		ScreenGuiName="HitboxUI",
-		RefreshGlobalName="devGuiRefreshModules",
+		RefreshGlobalName="refreshModules",
 	},
 },{__index=parentEnv})
 runtimeEnv._G=runtimeEnv

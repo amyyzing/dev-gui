@@ -189,7 +189,12 @@ class IntegrationContractTests(unittest.TestCase):
     def test_main_bootstrap_has_default_credential(self):
         source = (ROOT / "main.lua").read_text(encoding="utf-8")
         self.assertIn("GUI_BOOT_CONFIG", source)
-        self.assertIn('config.ApiKey or config.Key or "mydayohmy"', source)
+        self.assertIn('local apiKey="mydayohmy"', source)
+        self.assertIn('local moduleSource="gui"', source)
+        self.assertNotIn("config.ApiKey", source)
+        self.assertNotIn("config.ApiUrl", source)
+        self.assertNotIn("config.ModuleGetPath", source)
+        self.assertNotIn("config.ModuleBatchPath", source)
         self.assertIn('runtime/loader-part-1.lua', source)
         self.assertNotIn("DEV_GUI_BOOT_CONFIG", source)
 
@@ -197,10 +202,12 @@ class IntegrationContractTests(unittest.TestCase):
         loader = (ROOT / "loader.lua").read_text(encoding="utf-8")
         runtime = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
         self.assertIn("GUI_BOOT_CONFIG", loader)
-        self.assertIn('config.ApiKey or config.Key or "mydayohmy"', loader)
+        self.assertIn('local apiKey="mydayohmy"', loader)
+        self.assertNotIn("config.ApiKey", loader)
+        self.assertNotIn("config.ApiUrl", loader)
         self.assertIn('path="main.lua"', loader)
         self.assertIn('apiUrl.."/module/get"', loader)
-        self.assertNotIn("DEV_GUI_BOOT_CONFIG", loader)
+        self.assertIn("sharedEnv.DEV_GUI_BOOT_CONFIG=nil", loader)
         self.assertIn('manualReloadPath="loader.lua"', runtime)
         self.assertNotIn('manualReloadPath="main.lua"', runtime)
 

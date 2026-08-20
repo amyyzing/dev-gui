@@ -23,13 +23,17 @@ def test_loader_is_bound_to_main_gui_source_and_credentials():
     assert 'path="main.lua"' in loader
     assert 'source=moduleSource' in loader
     assert 'local moduleSource="gui"' in loader
-    assert 'config.ApiKey or config.Key or "mydayohmy"' in loader
+    assert 'local apiKey="mydayohmy"' in loader
+    assert "config.ApiKey" not in loader
+    assert "config.ApiUrl" not in loader
     assert 'TRUSTED_API_URL="https://lint-bot-production.up.railway.app"' in dump_start
     assert 'trustedApiUrl="https://lint-bot-production.up.railway.app"' in runtime
     assert "dev-gui-api-production.up.railway.app" not in loader + dump_start + runtime
     assert "GUI_BOOT_CONFIG" in loader
-    assert "DEV_GUI_BOOT_CONFIG" not in loader
-    assert "dev-gui" not in loader + read("main.lua") + runtime
+    assert "sharedEnv.DEV_GUI_BOOT_CONFIG=nil" in loader
+    assert 'source="dev-gui"' not in loader + read("main.lua") + runtime
+    assert "gui-runtime-cache" not in read("main.lua")
+    assert "readCachedSource" not in read("main.lua")
 
 
 def test_runtime_uses_main_gui_names():
@@ -162,8 +166,8 @@ def test_reworked_theme_list_is_complete_and_raycast_is_default():
     assert 'if id=="dracula" then id="proof" end' in data_save
     assert "local function migrateThemeColors" in data_save
     assert "if tonumber(style[field])~=old[i] then return id end" in data_save
-    assert "themes=devThemes" in read("runtime/loader-part-5.lua")
-    assert "themes=devThemes" in read("runtime/loader-part-3.lua")
+    assert "themes=guiThemes" in read("runtime/loader-part-5.lua")
+    assert "themes=guiThemes" in read("runtime/loader-part-3.lua")
 
     for path in ("gui/pc.luau", "gui/mobile.luau"):
         assert 'uiMap.LibraryProfileId="raycast"' in read(path)

@@ -31,7 +31,7 @@ class BootstrapContracts(unittest.TestCase):
     def test_loader_keeps_the_raycast_palette(self):
         runtime = source("runtime/loader-part-1.lua")
 
-        self.assertIn("local loaderRaycast=devThemes.raycast.Theme", runtime)
+        self.assertIn("local loaderRaycast=guiThemes.raycast.Theme", runtime)
         self.assertIn("BackgroundColor3=loaderColors.accent", runtime)
         self.assertIn("isProblem and loaderColors.error or loaderColors.accent", runtime)
         self.assertGreaterEqual(runtime.count("not isFixedLoaderThemeInstance(instance)"), 2)
@@ -351,8 +351,9 @@ class LifecycleContracts(unittest.TestCase):
     def test_normal_reexecution_cleans_the_previous_runtime(self):
         loader = source("loader.lua")
         runtime = source("runtime/loader-part-1.lua")
-        self.assertIn('rawget(sharedEnv,"GUI_RUNTIME_CLEANUP")', loader)
-        self.assertIn("sharedEnv.GUI_RUNTIME_CLEANUP=nil", loader)
+        self.assertIn('{"GUI_RUNTIME_CLEANUP","DEV_GUI_RUNTIME_CLEANUP"}', loader)
+        self.assertIn("local cleanup=rawget(sharedEnv,cleanupName)", loader)
+        self.assertIn("sharedEnv[cleanupName]=nil", loader)
         self.assertIn('type(cleanup)=="function"', loader)
         self.assertIn("env.GUI_RUNTIME_CLEANUP=function()", runtime)
         self.assertIn("cleanupForManualReload()", runtime)

@@ -105,7 +105,7 @@ function makeCustomizeCtx()
 		Janitor=cleanupBags,
 		colors=colors,
 		style=style,
-		themes=devThemes,
+		themes=guiThemes,
 		inputService=inputService,
 		defaultStyle=getDefaultUIStyle and getDefaultUIStyle() or style,
 		screenGui=screenGui,

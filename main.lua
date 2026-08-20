@@ -23,19 +23,15 @@ if type(config)~="table" then
 	config={}
 end
 
-local apiUrl=tostring(config.ApiUrl or config.Url or "https://lint-bot-production.up.railway.app")
-local apiKey=tostring(config.ApiKey or config.Key or "mydayohmy")
+local apiUrl="https://lint-bot-production.up.railway.app"
+local apiKey="mydayohmy"
 local moduleSource="gui"
 
-local moduleGetPath=tostring(config.ModuleGetPath or "/module/get")
-local moduleBatchPath=tostring(config.ModuleBatchPath or "/module/batch")
+local moduleGetPath="/module/get"
+local moduleBatchPath="/module/batch"
 local maxSourceBytes=math.max(1000,tonumber(config.MaxSourceBytes) or 300000)
 local fetchTimeout=math.max(5,tonumber(config.FetchTimeout) or 30)
 local fresh=config.Fresh==true
-local cacheConfig=type(config.Cache)=="table" and config.Cache or {}
-local cacheEnabled=config.CacheEnabled==true or cacheConfig.Enabled==true
-local cacheRoot=tostring(cacheConfig.Folder or config.CacheFolder or "gui-runtime-cache")
-local cacheVersion=tostring(cacheConfig.Version or config.Version or "dev")
 
 local allowedRuntimeFiles={}
 for _,path in ipairs(runtimeFiles) do
@@ -108,51 +104,6 @@ local function validateSource(path,source)
 	return true,nil
 end
 
-local function safePathComponent(value)
-	local cleaned=tostring(value):gsub("[^%w%._%-]","_")
-	return cleaned~="" and cleaned or "dev"
-end
-
-local cacheFolder=cacheRoot.."/"..safePathComponent(cacheVersion)
-
-local function cacheAvailable()
-	return cacheEnabled
-		and type(isfile)=="function"
-		and type(readfile)=="function"
-		and type(writefile)=="function"
-end
-
-local function ensureCacheFolder()
-	if not cacheAvailable() or type(makefolder)~="function" then return end
-	pcall(makefolder,cacheRoot)
-	pcall(makefolder,cacheFolder)
-end
-
-local function cachePath(path)
-	return cacheFolder.."/"..path:gsub("[/\\]","_")
-end
-
-local function readCachedSource(path)
-	if not cacheAvailable() then return nil end
-	local filePath=cachePath(path)
-	local existsOk,exists=pcall(isfile,filePath)
-	if not existsOk or not exists then return nil end
-
-	local readOk,source=pcall(readfile,filePath)
-	if not readOk then return nil end
-	local valid=validateSource(path,source)
-	if not valid then return nil end
-	local chunk=loadstring(source,"@"..path)
-	if not chunk then return nil end
-	return source
-end
-
-local function writeCachedSource(path,source)
-	if not cacheAvailable() then return end
-	ensureCacheFolder()
-	pcall(writefile,cachePath(path),source)
-end
-
 local function fetchOne(path)
 	local payload,apiError=postModuleApi(moduleGetPath,{path=path})
 	if not payload then return nil,apiError end
@@ -216,27 +167,13 @@ local function fetchMissingSources(paths)
 end
 
 local runtimeSources={}
-local fetchedSources={}
-local missingPaths={}
+local sources,errors=fetchMissingSources(runtimeFiles)
 for _,path in ipairs(runtimeFiles) do
-	local source=not fresh and readCachedSource(path) or nil
-	if source then
-		runtimeSources[path]=source
-	else
-		missingPaths[#missingPaths+1]=path
-	end
-end
-
-if #missingPaths>0 then
-	local sources,errors=fetchMissingSources(missingPaths)
-	for _,path in ipairs(missingPaths) do
-		local source=sources[path]
-		if not source then error("bootstrap fetch failed "..path..": "..tostring(errors[path])) end
-		local valid,validationError=validateSource(path,source)
-		if not valid then error("bootstrap blocked "..path..": "..tostring(validationError)) end
-		runtimeSources[path]=source
-		fetchedSources[path]=source
-	end
+	local source=sources[path]
+	if not source then error("bootstrap fetch failed "..path..": "..tostring(errors[path])) end
+	local valid,validationError=validateSource(path,source)
+	if not valid then error("bootstrap blocked "..path..": "..tostring(validationError)) end
+	runtimeSources[path]=source
 end
 
 local chunks={}
@@ -249,21 +186,17 @@ for _,path in ipairs(runtimeFiles) do
 	chunks[path]=chunk
 end
 
-for path,source in pairs(fetchedSources) do
-	writeCachedSource(path,source)
-end
-
 local runtimeEnv=setmetatable({
 	runtimeFilesFromLoader=runtimeFiles,
 	runtimeSourcesFromLoader=runtimeSources,
 	bootPlatform=detectClientPlatform(),
 	bootUiLibrary={
-		Owner=tostring(config.UiOwner or "amyyzing"),
-		Repo=tostring(config.UiRepo or "495-ui-library"),
-		Branch=tostring(config.UiBranch or "main"),
+		Owner="amyyzing",
+		Repo="495-ui-library",
+		Branch="main",
 	},
 	bootApi={Url=apiUrl,Key=apiKey,Source=moduleSource},
-	bootConfig=config,
+	bootConfig={Fresh=fresh},
 },{__index=parentEnv})
 runtimeEnv._G=runtimeEnv
 

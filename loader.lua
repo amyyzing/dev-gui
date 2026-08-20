@@ -8,8 +8,8 @@ if type(config)~="table" then
 	config={}
 end
 
-local apiUrl=tostring(config.ApiUrl or config.Url or "https://lint-bot-production.up.railway.app")
-local apiKey=tostring(config.ApiKey or config.Key or "mydayohmy")
+local apiUrl="https://lint-bot-production.up.railway.app"
+local apiKey="mydayohmy"
 local moduleSource="gui"
 local maxSourceBytes=math.max(1000,tonumber(config.MaxSourceBytes) or 300000)
 
@@ -88,11 +88,41 @@ if not chunk then
 	error("loader compile failed: "..tostring(compileError))
 end
 
-local cleanup=rawget(sharedEnv,"GUI_RUNTIME_CLEANUP")
-sharedEnv.GUI_RUNTIME_CLEANUP=nil
-if type(cleanup)=="function" then
-	pcall(cleanup)
+for _,cleanupName in ipairs({"GUI_RUNTIME_CLEANUP","DEV_GUI_RUNTIME_CLEANUP"}) do
+	local cleanup=rawget(sharedEnv,cleanupName)
+	sharedEnv[cleanupName]=nil
+	if type(cleanup)=="function" then
+		pcall(cleanup)
+	end
 end
+sharedEnv.DEV_GUI_BOOT_CONFIG=nil
+sharedEnv.DEV_GUI_BUNDLE_CACHE=nil
+sharedEnv.DEV_GUI_LAST_BOOT_TIMINGS=nil
+sharedEnv.DEV_GUI_RUNTIME_CONFIG=nil
+sharedEnv.devGuiRefreshModules=nil
+
+pcall(function()
+	local contextActions=game:GetService("ContextActionService")
+	for _,actionName in ipairs({
+		"DevGui_MouseInputSink",
+		"DevGui_QBAim_ControllerThrow",
+		"DevGui_QBAim_ControllerToggle",
+	}) do
+		contextActions:UnbindAction(actionName)
+	end
+end)
+
+pcall(function()
+	local players=game:GetService("Players")
+	local parents={game:GetService("CoreGui")}
+	if players.LocalPlayer then
+		parents[#parents+1]=players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	end
+	for _,parent in ipairs(parents) do
+		local oldGui=parent and parent:FindFirstChild("DevGuiUI")
+		if oldGui then oldGui:Destroy() end
+	end
+end)
 
 local parentEnv=(getfenv and getfenv(0)) or _G
 if setfenv then

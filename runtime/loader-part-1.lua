@@ -49,7 +49,7 @@ local function exactTheme(id,name,primary,accent,secondary,palette)
 	return theme
 end
 
-devThemes={
+guiThemes={
 	raycast=exactTheme("raycast","Raycast",{16,16,16},{255,99,99},{207,47,152},{
 		bg={16,16,16},topbar={16,16,16},panel={20,20,20},card={21,21,21},section={20,20,20},
 		button={21,21,21},input={21,21,21},sliderBg={21,21,21},sliderFill={255,99,99},
@@ -1367,7 +1367,7 @@ loaderBoxH=tonumber(loaderBoxConfig.H) or 320
 loaderPageNames=type(loaderGuiMap.PreloadPages)=="table" and loaderGuiMap.PreloadPages or {"maps","customize","page2","settings","server"}
 loaderStepTotal=#startupModuleFiles+#loaderPageNames+4
 
-local loaderRaycast=devThemes.raycast.Theme
+local loaderRaycast=guiThemes.raycast.Theme
 local loaderColors={
 	bg=loaderRaycast.bg,
 	topbar=loaderRaycast.topbar,
@@ -2096,7 +2096,7 @@ function getDefaultUILibProfile()
 		return UIMapModule.GetDefaultProfile()
 	end
 
-	return UIMapModule and UIMapModule.Profiles and UIMapModule.Profiles.raycast or devThemes.raycast
+	return UIMapModule and UIMapModule.Profiles and UIMapModule.Profiles.raycast or guiThemes.raycast
 end
 
 function getDefaultUILibId()

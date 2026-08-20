@@ -3,7 +3,7 @@
 -- 495-ui-library through UILibraryMapModule.
 local env=(getfenv and getfenv()) or _G
 local libraryMap=rawget(env,"UILibraryMapModule") or {}
-local devThemes=rawget(env,"devThemes") or {}
+local guiThemes=rawget(env,"guiThemes") or {}
 
 local uiMap={}
 
@@ -334,8 +334,8 @@ end
 
 function uiMap.GetLibraryProfile(id)
 	local profileId=tostring(id or uiMap.LibraryProfileId):lower()
-	if devThemes[profileId] then
-		return devThemes[profileId]
+	if guiThemes[profileId] then
+		return guiThemes[profileId]
 	end
 
 	if type(libraryMap.GetProfile)=="function" then
