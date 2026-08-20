@@ -114,19 +114,21 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("if ok and played==true then", logic)
         self.assertIn('return true,"pumpfake"', logic)
 
-    def test_qb_c2_origin_is_not_visually_lerped_but_keeps_jump_prediction(self):
+    def test_qb_c2_origin_uses_recorded_history_instead_of_reverse_physics(self):
         logic = source("features/qb-aim/logic.lua")
         self.assertIn('buildSlider(sectionBody,"Throw Delay"', logic)
-        self.assertIn("local function isAirborne(playerRoot)", logic)
-        self.assertIn("humanoid.FloorMaterial==Enum.Material.Air", logic)
-        self.assertIn("workspace.Gravity*releaseDelay*releaseDelay", logic)
+        self.assertIn("local function recordQBOrigin(now,qbRoot,ball)", logic)
+        self.assertIn("local function delayedQBOrigin(now,delay,currentPosition)", logic)
+        self.assertIn("local targetTime=now-delay", logic)
+        self.assertIn("previous.pos:Lerp(current.pos", logic)
         self.assertIn("local smoothedStartPoint=startPoint", logic)
+        self.assertNotIn("workspace.Gravity*releaseDelay*releaseDelay", logic)
         self.assertNotIn(
             "preview.lastStartPoint:Lerp(smoothedStartPoint,previewSmoothAmount)",
             logic,
         )
 
-    def test_throw_delay_replaces_drift_and_rewinds_qb_and_wr_together(self):
+    def test_throw_delay_replaces_drift_and_delays_only_recorded_qb_origin(self):
         production = "\n".join(
             source(path)
             for path in (
@@ -150,15 +152,16 @@ class QBAimDefaultsContracts(unittest.TestCase):
             self.assertNotIn(removed, production)
 
         logic = source("features/qb-aim/logic.lua")
-        self.assertIn("local timingOffset=(wrOffset or 0)-delay", logic)
-        self.assertIn("origin(qbRoot,releaseBall or currentHeldBall(),-delay)", logic)
-        self.assertIn("sampledOrigin,-delay)", logic)
-        self.assertIn("plan.throwTimingOffset=-delay", logic)
+        self.assertIn("delayedQBOrigin(now,delay,currentOrigin)", logic)
+        self.assertIn("buildPlan(receiver,ballPower,releaseBall,wrOffset or 0,sampledOrigin)", logic)
+        self.assertIn("plan.originHistoryDelay=delay", logic)
+        self.assertIn("plan.receiverTimingOffset=wrOffset or 0", logic)
         self.assertNotIn("(wrOffset or 0)+delay", logic)
+        self.assertNotIn("(wrOffset or 0)-delay", logic)
 
     def test_qb_peak_is_relative_to_receiver_y_in_every_mode(self):
         logic = source("features/qb-aim/logic.lua")
-        self.assertIn("predictedY(catchPosition,receiverRoot,releaseDelay)+catchHeight", logic)
+        self.assertIn("local catchY=catchPosition.Y+catchHeight", logic)
         self.assertNotIn("local function fieldGroundY", logic)
         self.assertNotIn("workspace:Raycast(position+Vector3.new(0,30,0)", logic)
 

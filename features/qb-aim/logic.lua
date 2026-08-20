@@ -33,7 +33,6 @@ local receiverConfidenceMin=0.30
 local receiverConfidenceMax=1.00
 local receiverStaleAfter=0.35
 local qbLaunchYBias=0
-local qbAirborneVelocityMargin=2
 local centerGroundFallbackMargin=2.50
 local centerMaxAboveBall=8.00
 local centerMaxYDelta=10.00
@@ -753,6 +752,7 @@ function qbAim.new(app,parent)
 	local trackedReceiver=nil
 	local selectedRouteLock=nil
 	local receiverData={}
+	local qbOriginHistory={}
 	local receiverTrackElapsed=0
 	local preview={last=0,center=nil,c2=nil,c3=nil,c1=nil,beam=nil,beamDefaultColor=nil,orig=nil,lastCatchPoint=nil,lastStartPoint=nil,lastLandingPoint=nil,ballMissingSince=nil}
 	local previewFrozen=false
@@ -798,6 +798,7 @@ function qbAim.new(app,parent)
 	local peakHeightMax=20.00
 	local throwDelayMin=0.00
 	local throwDelayMax=0.50
+	local qbOriginHistoryMaxAge=throwDelayMax+0.25
 	local updateTargetHighlight=function() end
 	local schedulerJobs={}
 
@@ -1223,6 +1224,7 @@ function qbAim.new(app,parent)
 	local function noteHeldBallState(ball,now)
 		now=now or os.clock()
 		if not ball then
+			if lastHeldBall then table.clear(qbOriginHistory) end
 			lastHeldBall=nil
 			return
 		end
@@ -1232,6 +1234,7 @@ function qbAim.new(app,parent)
 		end
 
 		lastHeldBall=ball
+		table.clear(qbOriginHistory)
 		possessionSettleUntil=now+possessionSettleTime
 		selectedRouteLock=nil
 		previewFrozen=false
@@ -1622,39 +1625,7 @@ function qbAim.new(app,parent)
 		return rootPosition,"root"
 	end
 
-	local function isAirborne(playerRoot)
-		local humanoid=playerRoot and playerRoot.Parent and playerRoot.Parent:FindFirstChildOfClass("Humanoid")
-		if humanoid then
-			return humanoid.FloorMaterial==Enum.Material.Air
-		end
-
-		return playerRoot and math.abs(playerRoot.AssemblyLinearVelocity.Y)>=qbAirborneVelocityMargin or false
-	end
-
-	local function predictedY(position,playerRoot,delay)
-		delay=tonumber(delay) or 0
-		if delay==0 or not isAirborne(playerRoot) then
-			return position.Y
-		end
-
-		local velocityY=playerRoot.AssemblyLinearVelocity.Y
-		return position.Y+velocityY*delay-0.5*workspace.Gravity*delay*delay
-	end
-
-	local function releaseVerticalVelocity(qbRoot,ball)
-		local rootVelocity=qbRoot and qbRoot.AssemblyLinearVelocity or Vector3.zero
-		local ballVelocity=ball and ball.AssemblyLinearVelocity or Vector3.zero
-
-		if math.abs(ballVelocity.Y)>=qbAirborneVelocityMargin then
-			return ballVelocity.Y,"ball"
-		end
-
-		return rootVelocity.Y,"root"
-	end
-
-	local function origin(qbRoot,ball,releaseDelay)
-		releaseDelay=tonumber(releaseDelay) or 0
-
+	local function origin(qbRoot,ball)
 		local fallbackPosition=ball and ball.Position or qbRoot.Position
 		local c2Pos=c2Position()
 		local basePosition=fallbackPosition
@@ -1673,20 +1644,47 @@ function qbAim.new(app,parent)
 			end
 		end
 
-		local dx,dz=0,0
-		if releaseDelay~=0 then
-			local rootVelocity=movementAwareRootVelocity(qbRoot)
-			dx=rootVelocity.X*releaseDelay
-			dz=rootVelocity.Z*releaseDelay
+		return Vector3.new(basePosition.X,basePosition.Y+qbLaunchYBias,basePosition.Z)
+	end
+
+	local function recordQBOrigin(now,qbRoot,ball)
+		if not qbRoot then return nil end
+		now=now or os.clock()
+		local position=origin(qbRoot,ball)
+		local latest=qbOriginHistory[#qbOriginHistory]
+		if latest and now-latest.t<=1e-5 then
+			latest.t=now
+			latest.pos=position
+		else
+			qbOriginHistory[#qbOriginHistory+1]={t=now,pos=position}
 		end
 
-		if releaseDelay~=0 and isAirborne(qbRoot) then
-			local verticalVelocity=releaseVerticalVelocity(qbRoot,ball)
-			local yOffset=verticalVelocity*releaseDelay-0.5*workspace.Gravity*releaseDelay*releaseDelay
-			basePosition=basePosition+Vector3.new(0,yOffset,0)
+		while #qbOriginHistory>2 and now-qbOriginHistory[2].t>qbOriginHistoryMaxAge do
+			table.remove(qbOriginHistory,1)
+		end
+		return position
+	end
+
+	local function delayedQBOrigin(now,delay,currentPosition)
+		delay=math.clamp(tonumber(delay) or 0,throwDelayMin,throwDelayMax)
+		if delay<=0 or #qbOriginHistory==0 then
+			return currentPosition
 		end
 
-		return Vector3.new(basePosition.X+dx,basePosition.Y+qbLaunchYBias,basePosition.Z+dz)
+		local targetTime=now-delay
+		local first=qbOriginHistory[1]
+		if targetTime<=first.t then return first.pos end
+
+		for index=2,#qbOriginHistory do
+			local current=qbOriginHistory[index]
+			if current.t>=targetTime then
+				local previous=qbOriginHistory[index-1]
+				local span=math.max(current.t-previous.t,1e-6)
+				return previous.pos:Lerp(current.pos,math.clamp((targetTime-previous.t)/span,0,1))
+			end
+		end
+
+		return qbOriginHistory[#qbOriginHistory].pos
 	end
 
 	local function ensureC1Marker()
@@ -2144,7 +2142,7 @@ function qbAim.new(app,parent)
 		return data and data.lastSeen and math.max(0,os.clock()-data.lastSeen) or receiverStaleAfter
 	end
 
-	local function buildPlan(receiver,ballPower,releaseBall,receiverReleaseOffset,originOverride,releaseDelay)
+	local function buildPlan(receiver,ballPower,releaseBall,receiverReleaseOffset,originOverride)
 		if not canTargetReceiver(receiver) then
 			return nil,nil
 		end
@@ -2160,11 +2158,11 @@ function qbAim.new(app,parent)
 		end
 
 		receiverReleaseOffset=receiverReleaseOffset or 0
-		local originPosition=originOverride or origin(qbRoot,ball,0)
+		local originPosition=originOverride or origin(qbRoot,ball)
 		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
 		local catchPosition=receiverAnchorPosition or receiverRoot.Position
-		local catchY=predictedY(catchPosition,receiverRoot,releaseDelay)+catchHeight
+		local catchY=catchPosition.Y+catchHeight
 		return mathCore.solve({
 			originPosition=originPosition,
 			receiverPosition=receiverRoot.Position,
@@ -2206,16 +2204,17 @@ function qbAim.new(app,parent)
 		end
 
 		local delay=math.clamp(tonumber(state.qbAimThrowDelay) or defaultThrowDelay,throwDelayMin,throwDelayMax)
-		local timingOffset=(wrOffset or 0)-delay
-		local sampledOrigin=origin(qbRoot,releaseBall or currentHeldBall(),-delay)
-		local plan=buildPlan(receiver,ballPower,releaseBall,timingOffset,sampledOrigin,-delay)
+		local now=os.clock()
+		local currentOrigin=recordQBOrigin(now,qbRoot,releaseBall or currentHeldBall())
+		local sampledOrigin=delayedQBOrigin(now,delay,currentOrigin)
+		local plan=buildPlan(receiver,ballPower,releaseBall,wrOffset or 0,sampledOrigin)
 		if plan then
 			plan.centerReleaseOrigin=sampledOrigin
 			plan.throwDelay=delay
-			plan.throwTimingOffset=-delay
+			plan.originHistoryDelay=delay
 			plan.releaseTimingOffset=0
 			plan.releaseYOffset=0
-			plan.receiverTimingOffset=timingOffset
+			plan.receiverTimingOffset=wrOffset or 0
 		end
 
 		return plan
@@ -2487,8 +2486,10 @@ function qbAim.new(app,parent)
 	end
 
 	local function setEnabled(value)
+		local wasEnabled=enabled
 		enabled=value and isAvailable() and true or false
 		state.qbAimEnabled=enabled
+		if enabled~=wasEnabled then table.clear(qbOriginHistory) end
 		if not enabled then
 			trackedReceiver=nil
 			selectedRouteLock=nil
@@ -2701,6 +2702,10 @@ function qbAim.new(app,parent)
 		receiverTrackElapsed=0
 
 		local now=os.clock()
+		local qbRoot=rootOfPlayer(localPlayer) or root(localPlayer.Character)
+		if qbRoot then
+			recordQBOrigin(now,qbRoot,currentHeldBall())
+		end
 		for _,player in ipairs(currentPlayers()) do
 			if canTargetReceiver(player) then
 				local receiverRoot=rootOfPlayer(player)
