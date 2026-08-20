@@ -41,23 +41,25 @@ class QBAimDefaultsContracts(unittest.TestCase):
     def test_new_user_qb_tuning_defaults_are_consistent(self):
         self.assertIn("qbAimLeadDelay=0.38", source("runtime/loader-part-1.lua"))
         self.assertIn("qbAimPeakHeight=14.2", source("runtime/loader-part-1.lua"))
-        self.assertIn("qbAimQBDrift=0", source("runtime/loader-part-1.lua"))
-        self.assertIn("qbAimQBYDrift=0", source("runtime/loader-part-1.lua"))
+        self.assertIn("qbAimThrowDelay=0.1", source("runtime/loader-part-1.lua"))
         self.assertIn("qbAimPeakHeight=14.2,", source("runtime/loader-part-2.lua"))
+        self.assertIn("qbAimThrowDelay=0.1,", source("runtime/loader-part-2.lua"))
         self.assertIn("local defaultCatchHeight=14.2", source("features/qb-aim/logic.lua"))
+        self.assertIn("local defaultThrowDelay=0.10", source("features/qb-aim/logic.lua"))
 
         persistence = source("data-save/data-save.lua")
         self.assertIn('leadDelay=getValue(app,"qbAimLeadDelay",0.38)', persistence)
         self.assertIn('peakHeight=getValue(app,"qbAimPeakHeight",14.2)', persistence)
-        self.assertIn('xyzDrift=getValue(app,"qbAimQBDrift",0)', persistence)
+        self.assertIn('throwDelay=getValue(app,"qbAimThrowDelay",0.1)', persistence)
         self.assertIn('qbAim.peakHeight,8,20,14.2)', persistence)
+        self.assertIn('qbAim.throwDelay,0,0.5,0.1)', persistence)
 
     def test_qb_reset_restores_every_qb_control_and_visual(self):
         logic = source("features/qb-aim/logic.lua")
         refresh = logic[logic.index("function api.Refresh()") : logic.index("function api.Reset()")]
         reset = logic[logic.index("function api.Reset()") : logic.index("function api.Destroy()")]
 
-        for field in ("qbAimLeadDelay", "qbAimPeakHeight", "qbAimQBDrift"):
+        for field in ("qbAimLeadDelay", "qbAimPeakHeight", "qbAimThrowDelay"):
             self.assertIn(f"state.{field}", refresh)
 
         for statement in (
@@ -67,7 +69,7 @@ class QBAimDefaultsContracts(unittest.TestCase):
             "state.qbAimTargetHighlight=true",
             "setLeadDelay(leadDelayBaseline,false)",
             "setPeakHeight(defaultCatchHeight,false)",
-            "setQBDrift(0,false)",
+            "setThrowDelay(defaultThrowDelay,false)",
             "setEnabled(false)",
         ):
             self.assertIn(statement, reset)
@@ -114,18 +116,47 @@ class QBAimDefaultsContracts(unittest.TestCase):
 
     def test_qb_c2_origin_is_not_visually_lerped_but_keeps_jump_prediction(self):
         logic = source("features/qb-aim/logic.lua")
-        self.assertIn('buildSlider(sectionBody,"XYZ Drift"', logic)
-        self.assertIn("local useHorizontalReleasePrediction=true", logic)
-        self.assertIn("local useVerticalReleasePrediction=true", logic)
+        self.assertIn('buildSlider(sectionBody,"Throw Delay"', logic)
+        self.assertIn("local function isAirborne(playerRoot)", logic)
+        self.assertIn("humanoid.FloorMaterial==Enum.Material.Air", logic)
+        self.assertIn("workspace.Gravity*releaseDelay*releaseDelay", logic)
         self.assertIn("local smoothedStartPoint=startPoint", logic)
         self.assertNotIn(
             "preview.lastStartPoint:Lerp(smoothedStartPoint,previewSmoothAmount)",
             logic,
         )
 
+    def test_throw_delay_replaces_drift_and_advances_qb_and_wr_together(self):
+        production = "\n".join(
+            source(path)
+            for path in (
+                "features/qb-aim/logic.lua",
+                "runtime/loader-part-1.lua",
+                "runtime/loader-part-2.lua",
+                "runtime/loader-part-5.lua",
+                "data-save/data-save.lua",
+                "gui/description.lua",
+            )
+        )
+        for removed in (
+            "qbAimQBDrift",
+            "qbAimQBYDrift",
+            "SetQBXYZDrift",
+            "SetQBDrift",
+            "SetQBYDrift",
+            "XYZ Drift",
+            "xyzDrift",
+        ):
+            self.assertNotIn(removed, production)
+
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn("origin(qbRoot,releaseBall or currentHeldBall(),delay)", logic)
+        self.assertIn("(wrOffset or 0)+delay", logic)
+        self.assertIn("predictedY(catchPosition,receiverRoot,releaseDelay)+catchHeight", logic)
+
     def test_qb_peak_is_relative_to_receiver_y_in_every_mode(self):
         logic = source("features/qb-aim/logic.lua")
-        self.assertIn("return position.Y+catchHeight", logic)
+        self.assertIn("predictedY(catchPosition,receiverRoot,releaseDelay)+catchHeight", logic)
         self.assertNotIn("local function fieldGroundY", logic)
         self.assertNotIn("workspace:Raycast(position+Vector3.new(0,30,0)", logic)
 

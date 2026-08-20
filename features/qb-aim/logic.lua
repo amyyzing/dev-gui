@@ -17,7 +17,6 @@ local modelBallSpeed=95
 local remotePower=100 -- remote power
 local gameplayBallPower=modelBallSpeed
 local squadsBallPower=modelBallSpeed
-local playerGravity=196.2
 local defaultCatchHeight=14.2 -- jump peak
 local catchHeight=defaultCatchHeight
 local catchSolveYBias=0.00
@@ -33,19 +32,11 @@ local receiverAccelMax=48
 local receiverConfidenceMin=0.30
 local receiverConfidenceMax=1.00
 local receiverStaleAfter=0.35
-local qbReleaseDelay=0.25
 local qbLaunchYBias=0
-local qbGroundRootY=3.648
-local qbAirborneYMargin=0.35
 local qbAirborneVelocityMargin=2
-local qbRiseFactor=0
-local qbFallFactor=0
-local qbMaxYCorrection=4.25
 local centerGroundFallbackMargin=2.50
 local centerMaxAboveBall=8.00
 local centerMaxYDelta=10.00
-local useHorizontalReleasePrediction=true
-local useVerticalReleasePrediction=true
 local qbHorizontalDeadzone=0.75
 local qbHorizontalSpeedMax=24
 local minTime,maxTime=0.35,6
@@ -98,10 +89,8 @@ local releaseTimingRadiusMin=1/60
 local releaseTimingRadiusMax=0.06
 local releaseTimingPingScale=0.25
 local centerMaxReleaseDistance=12.00
--- QB Drift
-local qbDriftTime=0
-local qbVerticalDriftTime=0
-local qbVerticalDriftMax=6.00
+local defaultThrowDelay=0.10
+local throwDelay=defaultThrowDelay
 -- Throw Steps
 --   1. lock the wr
 --   2. wait
@@ -802,15 +791,13 @@ function qbAim.new(app,parent)
 	local peakHeightSliderKnob=nil
 	local peakHeightSliderControl=nil
 	local peakHeightDragging=false
-	local qbDriftSliderControl=nil
+	local throwDelaySliderControl=nil
 	local leadDelayMin=0.00
 	local leadDelayMax=1.50
 	local peakHeightMin=8.00
 	local peakHeightMax=20.00
-	local qbDriftMin=-0.20
-	local qbDriftMax=0.20
-	local qbYDriftMin=-0.20
-	local qbYDriftMax=0.20
+	local throwDelayMin=0.00
+	local throwDelayMax=0.50
 	local updateTargetHighlight=function() end
 	local schedulerJobs={}
 
@@ -845,19 +832,15 @@ function qbAim.new(app,parent)
 		state.qbAimPeakHeight=catchHeight
 	end
 
-	if state.qbAimQBDrift==nil then
-		state.qbAimQBDrift=qbDriftTime
-	end
-
-	if state.qbAimQBYDrift==nil then
-		state.qbAimQBYDrift=tonumber(state.qbAimQBDrift) or qbVerticalDriftTime
+	if state.qbAimThrowDelay==nil then
+		state.qbAimThrowDelay=defaultThrowDelay
 	end
 
 	leadDelay=math.clamp(tonumber(state.qbAimLeadDelay) or leadDelay,leadDelayMin,leadDelayMax)
 	catchHeight=math.clamp(tonumber(state.qbAimPeakHeight) or catchHeight,peakHeightMin,peakHeightMax)
 	state.qbAimPeakHeight=catchHeight
-	state.qbAimQBDrift=math.clamp(tonumber(state.qbAimQBDrift) or qbDriftTime,qbDriftMin,qbDriftMax)
-	state.qbAimQBYDrift=math.clamp(state.qbAimQBDrift,qbYDriftMin,qbYDriftMax)
+	throwDelay=math.clamp(tonumber(state.qbAimThrowDelay) or defaultThrowDelay,throwDelayMin,throwDelayMax)
+	state.qbAimThrowDelay=throwDelay
 	local function addConnection(connection)
 		table.insert(connections,connection)
 		return connection
@@ -904,10 +887,6 @@ function qbAim.new(app,parent)
 		end
 
 		return player and player.Character and root(player.Character) or nil
-	end
-
-	local function catchYForPosition(position)
-		return position.Y+catchHeight
 	end
 
 	local function teamOf(player)
@@ -998,9 +977,9 @@ function qbAim.new(app,parent)
 		end
 	end
 
-	local function updateDriftVisuals()
-		if qbDriftSliderControl then
-			qbDriftSliderControl.set(state.qbAimQBDrift)
+	local function updateThrowDelayVisuals()
+		if throwDelaySliderControl then
+			throwDelaySliderControl.set(throwDelay)
 		end
 	end
 
@@ -1021,24 +1000,21 @@ function qbAim.new(app,parent)
 		return true
 	end
 
-	local function setQBDrift(value,showStatus)
+	local function setThrowDelay(value,showStatus)
 		local numberValue=tonumber(value)
 		if not numberValue then
+			updateThrowDelayVisuals()
 			return false
 		end
 
-		local drift=math.clamp(numberValue,qbDriftMin,qbDriftMax)
-		state.qbAimQBDrift=drift
-		state.qbAimQBYDrift=math.clamp(drift,qbYDriftMin,qbYDriftMax)
-		updateDriftVisuals()
+		throwDelay=math.clamp(numberValue,throwDelayMin,throwDelayMax)
+		state.qbAimThrowDelay=throwDelay
+		updateThrowDelayVisuals()
 		if showStatus then
+			setStatus(string.format("throw delay %.2fs",throwDelay))
 			changed()
 		end
 		return true
-	end
-
-	local function setQBYDrift(value,showStatus)
-		return setQBDrift(value,showStatus)
 	end
 
 	local function setPeakHeight(value,showStatus)
@@ -1324,7 +1300,7 @@ function qbAim.new(app,parent)
 
 		updateLeadDelayVisuals()
 		updatePeakHeightVisuals()
-		updateDriftVisuals()
+		updateThrowDelayVisuals()
 		setTargetText()
 
 		if not isAvailable() then
@@ -1646,15 +1622,23 @@ function qbAim.new(app,parent)
 		return rootPosition,"root"
 	end
 
-	local function qbYCorrection(qbRoot)
-		local y=qbRoot.Position.Y
-		local vy=qbRoot.AssemblyLinearVelocity.Y
-		if not(math.abs(vy)>=qbAirborneVelocityMargin or y>qbGroundRootY+qbAirborneYMargin) then
-			return 0
+	local function isAirborne(playerRoot)
+		local humanoid=playerRoot and playerRoot.Parent and playerRoot.Parent:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			return humanoid.FloorMaterial==Enum.Material.Air
 		end
 
-		local raw=vy>=0 and vy*qbReleaseDelay*qbRiseFactor or -vy*qbReleaseDelay*qbFallFactor
-		return math.clamp(raw,0,qbMaxYCorrection)
+		return playerRoot and math.abs(playerRoot.AssemblyLinearVelocity.Y)>=qbAirborneVelocityMargin or false
+	end
+
+	local function predictedY(position,playerRoot,delay)
+		delay=math.max(0,tonumber(delay) or 0)
+		if delay<=0 or not isAirborne(playerRoot) then
+			return position.Y
+		end
+
+		local velocityY=playerRoot.AssemblyLinearVelocity.Y
+		return position.Y+velocityY*delay-0.5*workspace.Gravity*delay*delay
 	end
 
 	local function releaseVerticalVelocity(qbRoot,ball)
@@ -1668,11 +1652,8 @@ function qbAim.new(app,parent)
 		return rootVelocity.Y,"root"
 	end
 
-	local function origin(qbRoot,ball,xzReleaseOffset,yReleaseOffset)
-		xzReleaseOffset=xzReleaseOffset or 0
-		if yReleaseOffset==nil then
-			yReleaseOffset=0
-		end
+	local function origin(qbRoot,ball,releaseDelay)
+		releaseDelay=math.max(0,tonumber(releaseDelay) or 0)
 
 		local fallbackPosition=ball and ball.Position or qbRoot.Position
 		local c2Pos=c2Position()
@@ -1693,22 +1674,19 @@ function qbAim.new(app,parent)
 		end
 
 		local dx,dz=0,0
-		if useHorizontalReleasePrediction and xzReleaseOffset~=0 then
+		if releaseDelay>0 then
 			local rootVelocity=movementAwareRootVelocity(qbRoot)
-			dx=rootVelocity.X*xzReleaseOffset
-			dz=rootVelocity.Z*xzReleaseOffset
+			dx=rootVelocity.X*releaseDelay
+			dz=rootVelocity.Z*releaseDelay
 		end
 
-		if useVerticalReleasePrediction and yReleaseOffset~=0 then
+		if releaseDelay>0 and isAirborne(qbRoot) then
 			local verticalVelocity=releaseVerticalVelocity(qbRoot,ball)
-			local airborne=math.abs(verticalVelocity)>=qbAirborneVelocityMargin or qbRoot.Position.Y>qbGroundRootY+qbAirborneYMargin
-			if airborne then
-				local yOffset=verticalVelocity*yReleaseOffset-0.5*playerGravity*yReleaseOffset*yReleaseOffset
-				basePosition=basePosition+Vector3.new(0,math.clamp(yOffset,-qbVerticalDriftMax,qbVerticalDriftMax),0)
-			end
+			local yOffset=verticalVelocity*releaseDelay-0.5*workspace.Gravity*releaseDelay*releaseDelay
+			basePosition=basePosition+Vector3.new(0,yOffset,0)
 		end
 
-		return Vector3.new(basePosition.X+dx,basePosition.Y+qbLaunchYBias+qbYCorrection(qbRoot),basePosition.Z+dz)
+		return Vector3.new(basePosition.X+dx,basePosition.Y+qbLaunchYBias,basePosition.Z+dz)
 	end
 
 	local function ensureC1Marker()
@@ -2166,7 +2144,7 @@ function qbAim.new(app,parent)
 		return data and data.lastSeen and math.max(0,os.clock()-data.lastSeen) or receiverStaleAfter
 	end
 
-	local function buildPlan(receiver,ballPower,releaseOffset,releaseBall,receiverReleaseOffset,yReleaseOffset,originOverride)
+	local function buildPlan(receiver,ballPower,releaseBall,receiverReleaseOffset,originOverride,releaseDelay)
 		if not canTargetReceiver(receiver) then
 			return nil,nil
 		end
@@ -2181,13 +2159,12 @@ function qbAim.new(app,parent)
 			return nil
 		end
 
-		releaseOffset=releaseOffset or 0
-		receiverReleaseOffset=receiverReleaseOffset==nil and releaseOffset or receiverReleaseOffset
-		yReleaseOffset=yReleaseOffset or 0
-		local originPosition=originOverride or origin(qbRoot,ball,0,yReleaseOffset)
+		receiverReleaseOffset=receiverReleaseOffset or 0
+		local originPosition=originOverride or origin(qbRoot,ball,0)
 		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
-		local catchY=catchYForPosition(receiverAnchorPosition or receiverRoot.Position)
+		local catchPosition=receiverAnchorPosition or receiverRoot.Position
+		local catchY=predictedY(catchPosition,receiverRoot,releaseDelay)+catchHeight
 		return mathCore.solve({
 			originPosition=originPosition,
 			receiverPosition=receiverRoot.Position,
@@ -2197,7 +2174,7 @@ function qbAim.new(app,parent)
 			shape=shape,
 			ballPower=ballPower or currentBallPower(),
 			qbVelocity=movementAwareRootVelocity(qbRoot),
-			qbReleaseOffset=releaseOffset,
+			qbReleaseOffset=0,
 			receiverReleaseOffset=receiverReleaseOffset,
 			predictorState=predictorState,
 			catchY=catchY,
@@ -2228,17 +2205,15 @@ function qbAim.new(app,parent)
 			return nil
 		end
 
-		local xzDrift=math.clamp(tonumber(state.qbAimQBDrift) or qbDriftTime,qbDriftMin,qbDriftMax)
-		local yDrift=math.clamp(tonumber(state.qbAimQBYDrift) or qbVerticalDriftTime,qbYDriftMin,qbYDriftMax)
-		local sampledOrigin=origin(qbRoot,releaseBall or currentHeldBall(),xzDrift,yDrift)
-		local plan=buildPlan(receiver,ballPower,0,releaseBall,wrOffset,0,sampledOrigin)
+		local delay=math.clamp(tonumber(state.qbAimThrowDelay) or defaultThrowDelay,throwDelayMin,throwDelayMax)
+		local sampledOrigin=origin(qbRoot,releaseBall or currentHeldBall(),delay)
+		local plan=buildPlan(receiver,ballPower,releaseBall,(wrOffset or 0)+delay,sampledOrigin,delay)
 		if plan then
 			plan.centerReleaseOrigin=sampledOrigin
-			plan.originDriftXZ=xzDrift
-			plan.originDriftY=yDrift
+			plan.throwDelay=delay
 			plan.releaseTimingOffset=0
 			plan.releaseYOffset=0
-			plan.receiverTimingOffset=wrOffset
+			plan.receiverTimingOffset=(wrOffset or 0)+delay
 		end
 
 		return plan
@@ -2587,22 +2562,14 @@ function qbAim.new(app,parent)
 		setPeakHeight(value,fire~=false)
 	end
 
-	function api.SetQBDrift(value,fire)
-		setQBDrift(value,fire~=false)
-	end
-
-	function api.SetQBXYZDrift(value,fire)
-		setQBDrift(value,fire~=false)
-	end
-
-	function api.SetQBYDrift(value,fire)
-		setQBYDrift(value,fire~=false)
+	function api.SetThrowDelay(value,fire)
+		setThrowDelay(value,fire~=false)
 	end
 
 	function api.Refresh()
 		setLeadDelay(state.qbAimLeadDelay,false)
 		setPeakHeight(state.qbAimPeakHeight,false)
-		setQBDrift(state.qbAimQBDrift,false)
+		setThrowDelay(state.qbAimThrowDelay,false)
 		setEnabled(state.qbAimEnabled==true)
 		refreshControllerThrowBinding()
 		syncControls()
@@ -2615,7 +2582,7 @@ function qbAim.new(app,parent)
 		state.qbAimTargetHighlight=true
 		setLeadDelay(leadDelayBaseline,false)
 		setPeakHeight(defaultCatchHeight,false)
-		setQBDrift(0,false)
+		setThrowDelay(defaultThrowDelay,false)
 		setEnabled(false)
 		changed()
 	end
@@ -2701,8 +2668,8 @@ function qbAim.new(app,parent)
 		peakHeightSliderControl=buildSlider(sectionBody,"Peak Height",peakHeightMin,peakHeightMax,catchHeight,2,function(value)
 			api.SetPeakHeight(value,true)
 		end)
-		qbDriftSliderControl=buildSlider(sectionBody,"XYZ Drift",qbDriftMin,qbDriftMax,state.qbAimQBDrift,2,function(value)
-			api.SetQBDrift(value,true)
+		throwDelaySliderControl=buildSlider(sectionBody,"Throw Delay",throwDelayMin,throwDelayMax,throwDelay,2,function(value)
+			api.SetThrowDelay(value,true)
 		end)
 	else
 		leadDelayFrame=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,26),ZIndex=6},sectionBody)
@@ -2721,7 +2688,7 @@ function qbAim.new(app,parent)
 
 	updateLeadDelayVisuals()
 	updatePeakHeightVisuals()
-	updateDriftVisuals()
+	updateThrowDelayVisuals()
 
 	local function receiverTrackStep(dt)
 		if not(enabled and isAvailable()) then return end

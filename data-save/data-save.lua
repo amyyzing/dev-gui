@@ -777,7 +777,7 @@ function dataSave.new(app)
 				targetHighlight=getValue(app,"qbAimTargetHighlight",true),
 				leadDelay=getValue(app,"qbAimLeadDelay",0.38),
 				peakHeight=getValue(app,"qbAimPeakHeight",14.2),
-				xyzDrift=getValue(app,"qbAimQBDrift",0),
+				throwDelay=getValue(app,"qbAimThrowDelay",0.1),
 			},
 
 			testing={
@@ -906,12 +906,7 @@ function dataSave.new(app)
 		applyBoolean(app,"setQBAimTargetHighlight","qbAimTargetHighlight",qbAim.targetHighlight)
 		applyClamped(app,"setQBAimLeadDelay","qbAimLeadDelay",qbAim.leadDelay,0,1.5,0.38)
 		applyClamped(app,"setQBAimPeakHeight","qbAimPeakHeight",qbAim.peakHeight,8,20,14.2)
-		local savedDrift=qbAim.xyzDrift
-		if savedDrift==nil then savedDrift=qbAim.qbDrift end
-		if savedDrift==nil then savedDrift=qbAim.serverXZLead end
-		if savedDrift==nil then savedDrift=qbAim.serverYLead end
-		applyClamped(app,"setQBAimXYZDrift","qbAimQBDrift",savedDrift,-0.2,0.2,0)
-		app.qbAimQBYDrift=app.qbAimQBDrift
+		applyClamped(app,"setQBAimThrowDelay","qbAimThrowDelay",qbAim.throwDelay,0,0.5,0.1)
 
 		local testing=settings.testing or {}
 		applyBoolean(app,"setTestingState","testingEnabled",testing.enabled)
