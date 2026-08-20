@@ -947,18 +947,27 @@ mergedModuleFallbackFiles={
 	["features/discord/core.lua"]=true,
 	["features/discord/view.lua"]=true,
 }
-mainRepositoryRawUrl="https://raw.githubusercontent.com/amyyzing/gui/main/"
+mergedModuleFallbackSource="dev-gui"
 
 function fetchMergedModuleFallback(modulePath)
 	if not mergedModuleFallbackFiles[modulePath] then
 		return nil,"fallback path blocked"
 	end
 
-	local ok,source=pcall(function()
-		return game:HttpGet(mainRepositoryRawUrl..modulePath,true)
-	end)
-	if not ok or type(source)~="string" or source=="" then
-		return nil,ok and "fallback module missing" or tostring(source)
+	local result=botApi.Post("/module/get",{
+		path=modulePath,
+		source=mergedModuleFallbackSource,
+		fresh=true,
+	})
+	if not(result and result.ok and type(result.source)=="string" and result.source~="") then
+		return nil,result and result.error or "fallback module missing"
+	end
+
+	local source=result.source
+	if modulePath=="dump/init.lua" then
+		source=source:gsub('or "dev%-gui"','or "gui"'):gsub('AppId="dev%-gui"','AppId="gui"')
+	elseif modulePath=="features/arc/logic.lua" then
+		source=source:gsub("DevGuiClonedCenter","ClonedCenter")
 	end
 	return source,nil
 end
