@@ -4,8 +4,6 @@ local arcRootNames={
 	Center=true,
 	BallMarker=true,
 	LandingMarker=true,
-	BallMarker_BallTrackingUX=true,
-	LandingMarker_BallTrackingUX=true,
 }
 
 local function destroyControl(control)

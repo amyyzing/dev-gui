@@ -298,10 +298,10 @@ class LifecycleContracts(unittest.TestCase):
             "Center",
             "BallMarker",
             "LandingMarker",
-            "BallMarker_BallTrackingUX",
-            "LandingMarker_BallTrackingUX",
         ):
             self.assertIn(f"{arc_root}=true", arc)
+        self.assertNotIn("BallMarker_BallTrackingUX=true", arc)
+        self.assertNotIn("LandingMarker_BallTrackingUX=true", arc)
         self.assertIn("arcRootNames[ancestor.Name]", arc)
         self.assertIn('ancestor.Parent.Name=="Local"', arc)
         self.assertIn('ancestor.Name=="DevGuiClonedCenter"', arc)
