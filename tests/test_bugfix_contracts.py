@@ -185,7 +185,9 @@ class LifecycleContracts(unittest.TestCase):
         loader = source("runtime/loader-part-1.lua")
 
         self.assertIn("local wrapInset=1", controls)
-        self.assertIn('make("UIPadding",{PaddingTop=UDim.new(0,1)', presets)
+        self.assertIn('make("UIPadding",{PaddingTop=UDim.new(0,4),PaddingLeft=UDim.new(0,4),PaddingRight=UDim.new(0,4),PaddingBottom=UDim.new(0,4)},ownedList)', presets)
+        self.assertIn('Size=UDim2.new(1,0,0,expandedOwned[code] and 178 or 32)', presets)
+        self.assertIn('make("UIPadding",{PaddingTop=UDim.new(0,4),PaddingLeft=UDim.new(0,4),PaddingRight=UDim.new(0,4),PaddingBottom=UDim.new(0,4)},page2Wrap)', source("runtime/loader-part-4.lua"))
         self.assertIn('ancestor:GetAttribute("NoSliderStroke")==true', controls)
         self.assertIn('ancestor:GetAttribute("NoSectionStroke")==true', controls)
         self.assertIn("if sectionStrokeEnabled then", controls)
