@@ -773,7 +773,6 @@ function dataSave.new(app)
 				enabled=getValue(app,"qbAimEnabled",false),
 				teamFilter=getValue(app,"qbAimTeamFilter",true),
 				showArc=getValue(app,"qbAimShowArc",true),
-				safeArc=getValue(app,"qbAimSafeArc",false),
 				targetHighlight=getValue(app,"qbAimTargetHighlight",true),
 				leadDelay=getValue(app,"qbAimLeadDelay",0.38),
 				peakHeight=getValue(app,"qbAimPeakHeight",14.2),
@@ -902,7 +901,6 @@ function dataSave.new(app)
 		applyBoolean(app,"setQBAimState","qbAimEnabled",qbAim.enabled)
 		applyBoolean(app,"setQBAimTeamFilter","qbAimTeamFilter",qbAim.teamFilter)
 		applyBoolean(app,"setQBAimShowArc","qbAimShowArc",qbAim.showArc)
-		applyBoolean(app,"setQBAimSafeArc","qbAimSafeArc",qbAim.safeArc)
 		applyBoolean(app,"setQBAimTargetHighlight","qbAimTargetHighlight",qbAim.targetHighlight)
 		applyClamped(app,"setQBAimLeadDelay","qbAimLeadDelay",qbAim.leadDelay,0,1.5,0.38)
 		applyClamped(app,"setQBAimPeakHeight","qbAimPeakHeight",qbAim.peakHeight,8,20,14.2)

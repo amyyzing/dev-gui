@@ -65,7 +65,6 @@ class QBAimDefaultsContracts(unittest.TestCase):
         for statement in (
             "state.qbAimTeamFilter=true",
             "state.qbAimShowArc=true",
-            "state.qbAimSafeArc=false",
             "state.qbAimTargetHighlight=true",
             "setLeadDelay(leadDelayBaseline,false)",
             "setPeakHeight(defaultCatchHeight,false)",
@@ -74,18 +73,26 @@ class QBAimDefaultsContracts(unittest.TestCase):
         ):
             self.assertIn(statement, reset)
 
-    def test_safe_arc_defaults_off_across_runtime_and_persistence(self):
-        self.assertIn('safeArc=getValue(app,"qbAimSafeArc",false)', source("data-save/data-save.lua"))
-        self.assertIn("qbAimSafeArc=false", source("runtime/loader-part-1.lua"))
-        self.assertIn("qbAimSafeArc=false,", source("runtime/loader-part-2.lua"))
-        self.assertIn(
-            'setQBAimSafeArc={"qbAimSafeArc",false,"QBAim","SetSafeArcState",true}',
-            source("runtime/loader-part-5.lua"),
+    def test_safe_arc_is_removed_from_qb_aim_state_ui_and_persistence(self):
+        production = "\n".join(
+            source(path)
+            for path in (
+                "features/qb-aim/logic.lua",
+                "runtime/loader-part-1.lua",
+                "runtime/loader-part-2.lua",
+                "runtime/loader-part-5.lua",
+                "data-save/data-save.lua",
+                "gui/description.lua",
+            )
         )
-
-        logic = source("features/qb-aim/logic.lua")
-        self.assertIn("state.qbAimSafeArc=false", logic)
-        self.assertIn('buildToggleRow(sectionBody,"Safe Arc",state.qbAimSafeArc==true', logic)
+        for removed in (
+            "qbAimSafeArc",
+            "SetSafeArcState",
+            "Safe Arc",
+            "trajectoryCanBeDefended",
+            "interceptionCore",
+        ):
+            self.assertNotIn(removed, production)
 
     def test_park_uses_the_active_minigame_session(self):
         logic = source("features/qb-aim/logic.lua")
@@ -159,11 +166,27 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertNotIn("(wrOffset or 0)+delay", logic)
         self.assertNotIn("(wrOffset or 0)-delay", logic)
 
-    def test_qb_peak_is_relative_to_receiver_y_in_every_mode(self):
+    def test_qb_peak_is_absolute_in_gameplay_and_squad_but_relative_in_park(self):
         logic = source("features/qb-aim/logic.lua")
-        self.assertIn("local catchY=catchPosition.Y+catchHeight", logic)
+        self.assertIn(
+            'local catchY=getModeKey(app)=="mode2" and catchPosition.Y+catchHeight or catchHeight',
+            logic,
+        )
         self.assertNotIn("local function fieldGroundY", logic)
         self.assertNotIn("workspace:Raycast(position+Vector3.new(0,30,0)", logic)
+
+    def test_auto_calibrate_uses_one_throw_animation_and_stable_ball_release(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn('Text="Auto Calibrate"', logic)
+        self.assertIn("function api.AutoCalibrate()", logic)
+        self.assertIn("animator.AnimationPlayed:Connect", logic)
+        self.assertIn("startCalibration(os.clock(),currentHeldBall())", logic)
+        self.assertIn("startCalibration(os.clock(),heldBall)", logic)
+        self.assertIn("if currentHeldBall()==calibration.ball then", logic)
+        self.assertIn("now-calibration.missingSince<releaseConfirmStableTime", logic)
+        self.assertIn("local measured=calibration.missingSince-calibration.startedAt", logic)
+        self.assertIn("setThrowDelay(measured,true)", logic)
+        self.assertIn('"QBAimAutoCalibrate"', logic)
 
     def test_qb_preview_ends_at_c1_and_only_enables_its_bound_beam(self):
         logic = source("features/qb-aim/logic.lua")

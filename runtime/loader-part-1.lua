@@ -230,7 +230,6 @@ qbAimThrowKey=Enum.KeyCode.T
 qbAimToggleKey=Enum.KeyCode.P
 qbAimTeamFilter=true
 qbAimShowArc=true
-qbAimSafeArc=false
 qbAimTargetHighlight=true
 qbAimLeadDelay=0.38
 qbAimPeakHeight=14.2

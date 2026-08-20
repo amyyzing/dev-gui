@@ -164,7 +164,6 @@ description.Categories={
 			["Enabled"]="qb aim",
 			["Team Filter"]="team",
 			["Show Arc"]="arc",
-			["Safe Arc"]="safe arc",
 			["Target Highlight"]="highlight",
 			["Lead Adjust"]="lead",
 			["Peak Height"]="peak",

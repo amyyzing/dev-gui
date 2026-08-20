@@ -207,7 +207,7 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertIn('manualReloadPath="loader.lua"', runtime)
         self.assertNotIn('manualReloadPath="main.lua"', runtime)
 
-    def test_shared_interception_module_is_registered_and_consumed(self):
+    def test_shared_interception_module_is_registered_for_testing_only(self):
         loader = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
         context = (ROOT / "runtime" / "loader-part-2.lua").read_text(encoding="utf-8")
         production = (ROOT / "features" / "qb-aim" / "logic.lua").read_text(encoding="utf-8")
@@ -215,7 +215,7 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertIn('QBInterception="features/qb-aim/interception.lua"', loader)
         self.assertLess(loader.index('"QBInterception","QBAimMath"'), loader.index('"QBAimMath","QBAimLogic"'))
         self.assertIn("QBInterceptionModule=QBInterceptionModule", context)
-        self.assertIn("interceptionCore.Evaluate", production)
+        self.assertNotIn("interceptionCore.Evaluate", production)
         self.assertIn("interceptionCore.Evaluate", testing)
 
 

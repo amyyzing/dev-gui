@@ -332,7 +332,6 @@ mainPageDefaults={
 	qbAimEnabled=false,
 	qbAimTeamFilter=true,
 	qbAimShowArc=true,
-	qbAimSafeArc=false,
 	qbAimTargetHighlight=true,
 	qbAimLeadDelay=0.38,
 	qbAimPeakHeight=14.2,
