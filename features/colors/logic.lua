@@ -1036,7 +1036,7 @@ function colors.new(app,page)
 		},row)
 
 		local valueBox=make("TextBox",{
-			BackgroundColor3=themeColor("INPUT",colors.panel),
+			BackgroundColor3=themeColor("MUTED",colors.muted),
 			BorderSizePixel=0,
 			ClearTextOnFocus=false,
 			Size=UDim2.fromOffset(48,24),
@@ -1047,7 +1047,7 @@ function colors.new(app,page)
 			TextColor3=colors.text,
 			TextXAlignment=Enum.TextXAlignment.Center,
 			ZIndex=6,
-			ThemeRole="INPUT",
+			ThemeRole="MUTED",
 			CornerRole="Control",
 		},row)
 		addCorner(valueBox,"Control")
@@ -1761,7 +1761,7 @@ function colors.new(app,page)
 
 	local hexBody=modeBodies.Hex
 	hexBox=make("TextBox",{
-		BackgroundColor3=themeColor("INPUT",colors.panel),
+		BackgroundColor3=themeColor("MUTED",colors.muted),
 		BorderSizePixel=0,
 		ClearTextOnFocus=false,
 		Position=UDim2.fromOffset(0,8),
@@ -1772,7 +1772,7 @@ function colors.new(app,page)
 		TextColor3=colors.text,
 		TextXAlignment=Enum.TextXAlignment.Center,
 		ZIndex=6,
-		ThemeRole="INPUT",
+		ThemeRole="MUTED",
 		CornerRole="Control",
 	},hexBody)
 	addCorner(hexBox,"Control")
@@ -2485,7 +2485,7 @@ function colors.new(app,page)
 		end
 
 		if hexBox then
-			hexBox.BackgroundColor3=themeColor("INPUT",colors.panel)
+			hexBox.BackgroundColor3=themeColor("MUTED",colors.muted)
 		end
 
 		if highlightModeLabel then

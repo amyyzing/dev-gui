@@ -92,7 +92,7 @@ class BoostContracts(unittest.TestCase):
 
     def test_bypass_cooldown_is_persisted_and_independent(self):
         boost = source("features/boost/logic.lua")
-        self.assertIn('buildToggleRow(section,"Bypass Cooldown"', boost)
+        self.assertIn('buildToggleRow(section,"bypass cooldown"', boost)
         self.assertIn("function api.SetBypassCooldownState(value,fire)", boost)
         self.assertIn("not state.boostBypassCooldown and not boostReady", boost)
         self.assertIn("if not state.boostBypassCooldown then", boost)

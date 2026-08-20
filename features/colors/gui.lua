@@ -15,7 +15,7 @@ function guiLogic.new(app)
 	local getUILibRuntimeStyle=app.getUILibRuntimeStyle
 
 	local api={}
-	local wrapInset=0
+	local wrapInset=1
 	local emptyTable={}
 	local defaultShape={WindowRadius=0,SectionRadius=0,ControlRadius=0,SliderRadius=0,SliderHeight=26,SliderStyle="original"}
 	local toggleTickAlphas={0.25,0.5,0.75}
@@ -519,9 +519,10 @@ function guiLogic.new(app)
 		local padX=componentNumber("TextBoxPaddingX",4)
 		local parent=box.Parent
 		local wrap=Instance.new("Frame")
+		local unfilledColor=themeColor("MUTED",colors.muted)
 
 		wrap.Name=box.Name~="" and (box.Name.."_Wrap") or "TextBoxWrap"
-		wrap.BackgroundColor3=bgColor or colors.panel
+		wrap.BackgroundColor3=unfilledColor
 		wrap.BorderSizePixel=0
 		wrap.ClipsDescendants=false
 		wrap.Active=true
@@ -531,7 +532,7 @@ function guiLogic.new(app)
 		wrap.Visible=box.Visible
 		wrap.ZIndex=math.max((box.ZIndex or 2)-1,1)
 		wrap.Parent=parent
-		markThemeRole(wrap,wrap.BackgroundColor3)
+		wrap:SetAttribute("ThemeRole","MUTED")
 		addCorner(wrap,"Control")
 
 		local strokeTransparency=componentNumber("ControlStrokeTransparency",0.78)
@@ -926,9 +927,9 @@ function guiLogic.new(app)
 	end
 
 	function api.makeBox(parent,w,textValue,placeholder)
-		local b=make("TextBox",{Size=UDim2.fromOffset(w,componentNumber("TextBoxHeight",28)),BackgroundColor3=themeColor("INPUT",colors.panel),BorderSizePixel=0,ClearTextOnFocus=false,Text=textValue,PlaceholderText=placeholder or "",Font=componentFont("TextFont",Enum.Font.Gotham),TextSize=componentNumber("InputTextSize",13),TextColor3=colors.text,PlaceholderColor3=colors.muted,ZIndex=6,ThemeRole="INPUT"},parent)
-		local wrap,stroke=api.wrapTextBox(b,themeColor("INPUT",colors.panel),2)
-		wrap:SetAttribute("ThemeRole","INPUT")
+		local unfilledColor=themeColor("MUTED",colors.muted)
+		local b=make("TextBox",{Size=UDim2.fromOffset(w,componentNumber("TextBoxHeight",28)),BackgroundColor3=unfilledColor,BorderSizePixel=0,ClearTextOnFocus=false,Text=textValue,PlaceholderText=placeholder or "",Font=componentFont("TextFont",Enum.Font.Gotham),TextSize=componentNumber("InputTextSize",13),TextColor3=colors.text,PlaceholderColor3=colors.muted,ZIndex=6,ThemeRole="MUTED"},parent)
+		local wrap,stroke=api.wrapTextBox(b,unfilledColor,2)
 		local boxConnections={}
 		local function connectBox(signal,fn)
 			local connection=signal:Connect(fn)
@@ -945,12 +946,12 @@ function guiLogic.new(app)
 		end
 
 		connectBox(b.Focused,function()
-			wrap.BackgroundColor3=themeColor("INPUT",colors.panel)
+			wrap.BackgroundColor3=themeColor("MUTED",colors.muted)
 			stroke.Thickness=1
 		end)
 
 		connectBox(b.FocusLost,function()
-			wrap.BackgroundColor3=themeColor("INPUT",colors.panel)
+			wrap.BackgroundColor3=themeColor("MUTED",colors.muted)
 			stroke.Thickness=1
 		end)
 
@@ -1004,7 +1005,16 @@ function guiLogic.new(app)
 		local containerRole=tostring(componentValue("SliderContainerRole","SECTION"))
 		local containerCorner=tostring(componentValue("SliderContainerCornerRole",containerRole=="BUTTON" and "Control" or "Section"))
 		local trackRole="MUTED"
-		local valueRole=tostring(componentValue("SliderValueBoxRole","INPUT"))
+		local valueRole="MUTED"
+		local noStroke=false
+		local ancestor=parent
+		while ancestor do
+			if ancestor:GetAttribute("NoSliderStroke")==true then
+				noStroke=true
+				break
+			end
+			ancestor=ancestor.Parent
+		end
 		local sliderTweenInfo=TweenInfo.new(componentNumber("SliderTweenTime",0.14),Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 		local sliderGlowInfo=TweenInfo.new(componentNumber("SliderGlowTweenTime",0.16),Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 		local sliderGlowIdleTransparency=componentNumber("SliderGlowIdleTransparency",0.84)
@@ -1014,6 +1024,7 @@ function guiLogic.new(app)
 		local sliderFillTransparency=componentNumber("SliderFillTransparency",0)
 		local sliderTrackTransparency=0.70
 		local container=make("Frame",{BackgroundColor3=themeColor(containerRole,themeColor("SECTION",colors.card)),BackgroundTransparency=componentNumber("SliderContainerTransparency",1),BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole=containerRole,CornerRole=containerCorner},parent)
+		container:SetAttribute("NoStroke",noStroke)
 		addCorner(container,containerCorner)
 		local containerStrokeTransparency=componentNumber("SliderContainerStrokeTransparency",1)
 		local containerStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=containerStrokeTransparency},container)
@@ -1021,6 +1032,7 @@ function guiLogic.new(app)
 		make("TextLabel",{BackgroundTransparency=1,Position=labelPosition,Size=labelSize,Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false,Visible=hasLabel},container)
 
 		local track=make("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor(trackRole,colors.panel),BackgroundTransparency=sliderTrackTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=6,ThemeRole=trackRole,CornerRole="Slider"},container)
+		track:SetAttribute("NoStroke",noStroke)
 		addCorner(track,"Slider")
 		local trackStrokeTransparency=componentNumber("SliderTrackStrokeTransparency",0.78)
 		local trackStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=trackStrokeTransparency},track)
@@ -1030,6 +1042,7 @@ function guiLogic.new(app)
 		addCorner(fillGlow,"Slider")
 
 		local fill=make("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",colors.stroke),BackgroundTransparency=sliderFillTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=8,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
+		fill:SetAttribute("NoStroke",noStroke)
 		addCorner(fill,"Slider")
 		local fillStroke=make("UIStroke",{Color=themeColor("SLIDER_FILL",colors.stroke),Thickness=componentNumber("SliderGlowStrokeThickness",2),Transparency=sliderGlowStrokeIdleTransparency},fill)
 		fillStroke:SetAttribute("StrokeRole","Accent")
@@ -1045,6 +1058,7 @@ function guiLogic.new(app)
 		local hit=make("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=12,AutoButtonColor=false,Selectable=true},track)
 		local valueBoxHeight=componentNumber("SliderValueBoxHeight",math.max(componentNumber("TextBoxHeight",24),sliderHeight))
 		local valueBox=make("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor(valueRole,colors.panel),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole=valueRole,CornerRole="Control",Selectable=true},container)
+		valueBox:SetAttribute("NoStroke",noStroke)
 		valueBox.Visible=valueBoxVisible
 		addCorner(valueBox,"Control")
 		local valueStrokeTransparency=componentNumber("SliderValueBoxStrokeTransparency",componentNumber("ControlStrokeTransparency",0.78))

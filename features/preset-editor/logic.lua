@@ -114,18 +114,18 @@ function presetEditor.new(app,editorSection,keybinds,hitboxPresets)
 			return app.makeBox(parent,w,textValue,placeholder)
 		end
 
-		local normalBg=colors.input or colors.panel
-		local b=make("TextBox",{Size=UDim2.fromOffset(w,28),BackgroundColor3=normalBg,BorderSizePixel=0,ClearTextOnFocus=false,Text=textValue or"",PlaceholderText=placeholder or"",Font=Enum.Font.Gotham,TextSize=13,TextColor3=colors.text,PlaceholderColor3=colors.muted,ZIndex=6,ThemeRole="INPUT"},parent)
+		local normalBg=colors.muted
+		local b=make("TextBox",{Size=UDim2.fromOffset(w,28),BackgroundColor3=normalBg,BorderSizePixel=0,ClearTextOnFocus=false,Text=textValue or"",PlaceholderText=placeholder or"",Font=Enum.Font.Gotham,TextSize=13,TextColor3=colors.text,PlaceholderColor3=colors.muted,ZIndex=6,ThemeRole="MUTED"},parent)
 		local wrap,stroke=wrapTextBox(b,normalBg,2)
-		wrap:SetAttribute("ThemeRole","INPUT")
+		wrap:SetAttribute("ThemeRole","MUTED")
 
 		connect(b.Focused,function()
-			wrap.BackgroundColor3=colors.input or colors.panel
+			wrap.BackgroundColor3=colors.muted
 			stroke.Thickness=2
 		end)
 
 		connect(b.FocusLost,function()
-			wrap.BackgroundColor3=colors.input or colors.panel
+			wrap.BackgroundColor3=colors.muted
 			stroke.Thickness=2
 		end)
 

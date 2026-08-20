@@ -1747,6 +1747,9 @@ function finishLoader()
 	setLoaderProgress(tostring(loaderText.ReadyStatus or "all loaded"),loaderStepTotal,loaderStepTotal,false)
 
 	loaderAlive=false
+	if mainFrame and type(mainFrame.RevealFromLoader)=="function" then
+		mainFrame.RevealFromLoader()
+	end
 	local tweenInfo=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 	TweenService:Create(loaderOverlay,tweenInfo,{BackgroundTransparency=1}):Play()
 

@@ -136,23 +136,52 @@ class PresetContracts(unittest.TestCase):
 
 
 class LifecycleContracts(unittest.TestCase):
-    def test_footer_reset_targets_every_page_and_first_run_defaults(self):
+    def test_footer_reset_only_targets_config_pages_and_first_run_defaults(self):
         pc_shell = source("platforms/pc/gui/mainframe.lua")
         mobile_shell = source("platforms/mobile/gui/mainframe.lua")
         runtime2 = source("runtime/loader-part-2.lua")
-        runtime3 = source("runtime/loader-part-3.lua")
         runtime4 = source("runtime/loader-part-4.lua")
 
         for shell in (pc_shell, mobile_shell):
             self.assertIn("local resetVisibleValue=true", shell)
-            self.assertIn("resetBtn.Visible=true", shell)
-            self.assertNotIn('activePageName~="settings"', shell)
+            self.assertIn(
+                'local visible=activePageName=="main" or '
+                'activePageName=="customize" or activePageName=="page2"',
+                shell,
+            )
+            self.assertIn("resetBtn.Visible=visible", shell)
+            self.assertIn("resetWrap.Visible=visible", shell)
 
         self.assertIn('type(api.Reset)=="function"', runtime2)
-        self.assertIn("function resetMapPageDefaults()", runtime3)
-        for page in ("main", "page2", "customize", "maps", "settings", "server"):
+        for page in ("main", "page2", "customize"):
             self.assertIn(f'activePageName=="{page}"', runtime4)
+        for page in ("maps", "settings", "server"):
+            self.assertNotIn(f'elseif activePageName=="{page}"', runtime4)
         self.assertIn("pageHost.CanvasPosition=Vector2.new(0,0)", runtime4)
+
+    def test_control_spacing_main_slider_strokes_and_loader_handoff(self):
+        controls = source("features/colors/gui.lua")
+        presets = source("features/hitbox-presets/logic.lua")
+        loader = source("runtime/loader-part-1.lua")
+
+        self.assertIn("local wrapInset=1", controls)
+        self.assertIn('make("UIPadding",{PaddingTop=UDim.new(0,1)', presets)
+        self.assertIn('ancestor:GetAttribute("NoSliderStroke")==true', controls)
+        self.assertIn('container:SetAttribute("NoStroke",noStroke)', controls)
+        self.assertIn('track:SetAttribute("NoStroke",noStroke)', controls)
+        self.assertIn('fill:SetAttribute("NoStroke",noStroke)', controls)
+        self.assertIn('valueBox:SetAttribute("NoStroke",noStroke)', controls)
+
+        for path in (
+            "platforms/pc/gui/mainframe.lua",
+            "platforms/mobile/gui/mainframe.lua",
+        ):
+            shell = source(path)
+            self.assertIn('settingsPage:SetAttribute("NoSliderStroke",true)', shell)
+            self.assertIn("function api.RevealFromLoader()", shell)
+            self.assertIn("Enum.EasingStyle.Quint", shell)
+
+        self.assertIn('type(mainFrame.RevealFromLoader)=="function"', loader)
 
     def test_map_page_state_is_session_only_and_anti_material_starts_off(self):
         data_save = source("data-save/data-save.lua")

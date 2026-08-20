@@ -579,12 +579,6 @@ trackRuntimeConnection(resetBtn.Activated:Connect(function()
 		resetKeybindPresetPageDefaults()
 	elseif activePageName=="customize" then
 		resetCustomizePageDefaults()
-	elseif activePageName=="maps" then
-		resetMapPageDefaults()
-	elseif activePageName=="settings" then
-		resetSettingsPageDefaults()
-	elseif activePageName=="server" then
-		refreshRuntimePageControls("server",true)
 	end
 
 	if pageHost and pageHost:IsA("ScrollingFrame") then

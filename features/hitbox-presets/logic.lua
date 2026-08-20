@@ -116,6 +116,7 @@ function hitboxPresets.new(app,ownedSection)
 	end))
 
 	local ownedList=make("ScrollingFrame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,190),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BorderSizePixel=0,ZIndex=5},ownedSection)
+	make("UIPadding",{PaddingTop=UDim.new(0,1),PaddingLeft=UDim.new(0,1),PaddingRight=UDim.new(0,1),PaddingBottom=UDim.new(0,1)},ownedList)
 	make("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},ownedList)
 
 	function api.SetRefreshAll(fn)

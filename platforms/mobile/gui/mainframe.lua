@@ -658,6 +658,7 @@ function mainFrame.new(app)
 	make("UIPadding",{PaddingTop=UDim.new(0,2),PaddingLeft=UDim.new(0,3),PaddingRight=UDim.new(0,7),PaddingBottom=UDim.new(0,2)},pageHost)
 
 	local settingsPage=make("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=true,ZIndex=3,LayoutOrder=1},pageHost)
+	settingsPage:SetAttribute("NoSliderStroke",true)
 	make("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},settingsPage)
 
 	local mapPage=make("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=2},pageHost)
@@ -1016,9 +1017,10 @@ function mainFrame.new(app)
 	hydrateFusion(resetWrap,{Visible=resetVisibleValue})
 
 	refreshFooterResetButton=function()
-		resetBtn.Visible=true
+		local visible=activePageName=="main" or activePageName=="customize" or activePageName=="page2"
+		resetBtn.Visible=visible
 		resetBtn.Text=text("RESET")
-		resetWrap.Visible=true
+		resetWrap.Visible=visible
 	end
 
 	refreshFooterResetButton()
@@ -1365,6 +1367,26 @@ function mainFrame.new(app)
 
 	function api.RefreshFooterResetButton()
 		refreshFooterResetButton()
+	end
+
+	function api.RevealFromLoader()
+		if api._revealedFromLoader or not(root and root.Parent) then return end
+		api._revealedFromLoader=true
+
+		if rootPositionTween then rootPositionTween:Cancel() end
+		if api._revealScaleTween then api._revealScaleTween:Cancel() end
+
+		local targetPosition=root.Position
+		local targetScale=uiScale.Scale
+		root.Position=UDim2.new(targetPosition.X.Scale,targetPosition.X.Offset,targetPosition.Y.Scale,targetPosition.Y.Offset+14)
+		uiScale.Scale=targetScale*0.975
+		root.Visible=true
+
+		local info=TweenInfo.new(0.28,Enum.EasingStyle.Quint,Enum.EasingDirection.Out)
+		rootPositionTween=tweenService:Create(root,info,{Position=targetPosition})
+		api._revealScaleTween=tweenService:Create(uiScale,info,{Scale=targetScale})
+		rootPositionTween:Play()
+		api._revealScaleTween:Play()
 	end
 
 	function api.UpdateResponsiveLayout()
