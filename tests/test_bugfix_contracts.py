@@ -123,6 +123,20 @@ class QBAimDefaultsContracts(unittest.TestCase):
             logic,
         )
 
+    def test_qb_peak_is_relative_to_receiver_y_in_every_mode(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn("return position.Y+catchHeight", logic)
+        self.assertNotIn("local function fieldGroundY", logic)
+        self.assertNotIn("workspace:Raycast(position+Vector3.new(0,30,0)", logic)
+
+    def test_qb_preview_ends_at_c1_and_only_enables_its_bound_beam(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn("local endPoint=catchPoint", logic)
+        self.assertIn("local previewTime=catchTime", logic)
+        self.assertNotIn("local endPoint=plan.landing or catchPoint", logic)
+        self.assertIn("instance.Enabled=visible and instance==preview.beam", logic)
+        self.assertIn("descendant.Enabled=false", logic)
+
 
 class ParamsThemeContracts(unittest.TestCase):
     def test_light_theme_text_toggles_have_distinct_dark_states(self):

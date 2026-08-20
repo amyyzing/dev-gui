@@ -548,7 +548,7 @@ local function prepPreviewObject(object)
 			instance.CanTouch=false
 			instance.CanQuery=false
 		elseif instance:IsA("Beam") then
-			instance.Enabled=true
+			instance.Enabled=false
 		end
 	end
 
@@ -906,34 +906,8 @@ function qbAim.new(app,parent)
 		return player and player.Character and root(player.Character) or nil
 	end
 
-	local function fieldGroundY(position)
-		if typeof(position)~="Vector3" then
-			return 0
-		end
-
-		local params=RaycastParams.new()
-		local ignore={}
-		params.FilterType=Enum.RaycastFilterType.Exclude
-
-		for _,player in ipairs(currentPlayers()) do
-			local character=characterOf(player)
-			if character then
-				ignore[#ignore+1]=character
-			end
-		end
-
-		params.FilterDescendantsInstances=ignore
-
-		local result=workspace:Raycast(position+Vector3.new(0,30,0),Vector3.new(0,-220,0),params)
-		if result and result.Position.Y<=position.Y-1 then
-			return result.Position.Y
-		end
-
-		return 0
-	end
-
 	local function catchYForPosition(position)
-		return fieldGroundY(position)+catchHeight
+		return position.Y+catchHeight
 	end
 
 	local function teamOf(player)
@@ -1379,7 +1353,7 @@ function qbAim.new(app,parent)
 				end
 				instance.Transparency=visible and (instance:GetAttribute("QBAimPreviewTransparency") or 0) or 1
 			elseif instance:IsA("Beam") then
-				instance.Enabled=visible
+				instance.Enabled=visible and instance==preview.beam
 			elseif instance:IsA("Attachment") then
 				pcall(function()
 					instance.Visible=visible
@@ -1422,8 +1396,10 @@ function qbAim.new(app,parent)
 		preview.beam=nil
 		for _,descendant in ipairs(center:GetDescendants()) do
 			if descendant:IsA("Beam") then
-				preview.beam=descendant
-				break
+				if not preview.beam then
+					preview.beam=descendant
+				end
+				descendant.Enabled=false
 			end
 		end
 
@@ -2084,10 +2060,10 @@ function qbAim.new(app,parent)
 
 		local startPoint=plan.origin
 		local catchPoint=plan.target or plan.c1Point
-		local endPoint=plan.landing or catchPoint
-		local previewTime=plan.landingTime or plan.time
 		local catchTime=plan.time
-		if not(startPoint and catchPoint and endPoint and previewTime and catchTime) then return end
+		local endPoint=catchPoint
+		local previewTime=catchTime
+		if not(startPoint and catchPoint and previewTime) then return end
 
 		local endVelocity=plan.velocity+gravityVector*previewTime
 		local smoothedStartPoint=startPoint
