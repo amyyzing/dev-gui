@@ -3,7 +3,7 @@
 local HttpService=game:GetService("HttpService")
 local UserInputService=game:GetService("UserInputService")
 
-local TRUSTED_API_URL="https://lint-bot-production.up.railway.app"
+local TRUSTED_API_URL="https://dev-gui-api-production.up.railway.app"
 local TRUSTED_MODULE_SOURCE="dev-gui"
 local runtimeFiles={
 	"runtime/loader-part-1.lua",

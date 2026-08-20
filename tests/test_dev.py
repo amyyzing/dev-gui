@@ -18,9 +18,15 @@ def test_dump_file_names_stay_short_and_flat():
 
 def test_loader_is_bound_to_dev_gui_source_and_dump_bootstrap():
     loader = read("loader.lua")
+    dump_start = read("dump/start.lua")
+    runtime = read("runtime/loader-part-1.lua")
     assert 'MODULE_SOURCE="dev-gui"' in loader
     assert 'BOOTSTRAP_PATH="dump/start.lua"' in loader
-    assert 'DEFAULT_API_KEY="mydayohmy"' in loader
+    assert 'API_URL="https://dev-gui-api-production.up.railway.app"' in loader
+    assert 'DEFAULT_API_KEY="dev-gui-4145ccb4cdf3a8cca616d7109c9a0fbe16e91c56f629e371de52b9fe7c2c49c6"' in loader
+    assert 'TRUSTED_API_URL="https://dev-gui-api-production.up.railway.app"' in dump_start
+    assert 'trustedApiUrl="https://dev-gui-api-production.up.railway.app"' in runtime
+    assert "lint-bot-production.up.railway.app" not in loader + dump_start + runtime
     assert "DEV_GUI_BOOT_CONFIG" in loader
     assert "GUI_BOOT_CONFIG" not in loader.replace("DEV_GUI_BOOT_CONFIG", "")
 
@@ -115,7 +121,7 @@ def test_new_modules_are_registered_for_remote_loading():
 
 def test_documented_one_line_loader_uses_railway_not_private_github_raw():
     readme = read("README.md")
-    assert 'game:HttpGet("https://lint-bot-production.up.railway.app/loader/dev-gui")' in readme
+    assert 'game:HttpGet("https://dev-gui-api-production.up.railway.app/loader/dev-gui")' in readme
     assert "raw.githubusercontent.com" not in readme
 
 

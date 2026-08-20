@@ -190,14 +190,14 @@ class IntegrationContractTests(unittest.TestCase):
         source = (ROOT / "main.lua").read_text(encoding="utf-8")
         self.assertIn("DEV_GUI_BOOT_CONFIG", source)
         self.assertIn('MODULE_SOURCE="dev-gui"', source)
-        self.assertIn('DEFAULT_API_KEY="dev-gui"', source)
+        self.assertIn('DEFAULT_API_KEY="dev-gui-4145ccb4cdf3a8cca616d7109c9a0fbe16e91c56f629e371de52b9fe7c2c49c6"', source)
         self.assertIn('LOADER_PATH="loader.lua"', source)
 
     def test_loader_is_the_user_and_refresh_entry_point(self):
         loader = (ROOT / "loader.lua").read_text(encoding="utf-8")
         runtime = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
         self.assertIn("DEV_GUI_BOOT_CONFIG", loader)
-        self.assertIn('DEFAULT_API_KEY="mydayohmy"', loader)
+        self.assertIn('DEFAULT_API_KEY="dev-gui-4145ccb4cdf3a8cca616d7109c9a0fbe16e91c56f629e371de52b9fe7c2c49c6"', loader)
         self.assertIn('MODULE_SOURCE="dev-gui"', loader)
         self.assertIn('BOOTSTRAP_PATH="dump/start.lua"', loader)
         self.assertIn('API_URL.."/bundle/get"', loader)

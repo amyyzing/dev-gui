@@ -604,7 +604,7 @@ end
 
 appModuleSource={id=getModuleSource()}
 
-trustedApiUrl="https://lint-bot-production.up.railway.app"
+trustedApiUrl="https://dev-gui-api-production.up.railway.app"
 
 allowedApiPaths={
 	["/module/get"]=true,

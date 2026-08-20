@@ -2,10 +2,10 @@
 -- Compatibility entry for callers that still execute main.lua directly.
 local HttpService=game:GetService("HttpService")
 
-local API_URL="https://lint-bot-production.up.railway.app"
+local API_URL="https://dev-gui-api-production.up.railway.app"
 local MODULE_SOURCE="dev-gui"
 local LOADER_PATH="loader.lua"
-local DEFAULT_API_KEY="dev-gui"
+local DEFAULT_API_KEY="dev-gui-4145ccb4cdf3a8cca616d7109c9a0fbe16e91c56f629e371de52b9fe7c2c49c6"
 local MAX_LOADER_BYTES=200000
 
 local parentEnv=(getfenv and getfenv(0)) or _G
