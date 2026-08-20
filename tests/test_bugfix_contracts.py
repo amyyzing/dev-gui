@@ -190,6 +190,11 @@ class QBAimDefaultsContracts(unittest.TestCase):
     def test_auto_calibrate_uses_one_throw_animation_and_stable_ball_release(self):
         logic = source("features/qb-aim/logic.lua")
         self.assertIn('Text="Auto Calibrate"', logic)
+        self.assertIn(
+            'BackgroundColor3=colors.muted,BackgroundTransparency=0.70',
+            logic,
+        )
+        self.assertIn('ThemeRole="MUTED"', logic)
         self.assertIn("function api.AutoCalibrate()", logic)
         self.assertIn("animator.AnimationPlayed:Connect", logic)
         self.assertIn("startCalibration(os.clock(),currentHeldBall(),throwReleaseWait)", logic)

@@ -2600,7 +2600,7 @@ function qbAim.new(app,parent)
 		end))
 	end
 
-	autoCalibrateButton=make("TextButton",{Size=UDim2.new(1,0,0,30),BackgroundColor3=colors.button or colors.bg,BorderSizePixel=0,Text="Auto Calibrate",Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.text,AutoButtonColor=true,ZIndex=7,ThemeRole="BUTTON",CornerRole="Control"},sectionBody)
+	autoCalibrateButton=make("TextButton",{Size=UDim2.new(1,0,0,30),BackgroundColor3=colors.muted,BackgroundTransparency=0.70,BorderSizePixel=0,Text="Auto Calibrate",Font=Enum.Font.Gotham,TextSize=12,TextColor3=colors.text,AutoButtonColor=true,ZIndex=7,ThemeRole="MUTED",CornerRole="Control"},sectionBody)
 	addConnection(autoCalibrateButton.Activated:Connect(api.AutoCalibrate))
 
 	updateLeadDelayVisuals()
