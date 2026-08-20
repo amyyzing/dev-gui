@@ -51,6 +51,8 @@ class BundleContracts(unittest.TestCase):
         self.assertIn('if useCachedBundle then requestBody.buildId=memoryCache.BuildId end', loader)
         self.assertIn('if requestOk and status==304 and useCachedBundle then', loader)
         self.assertIn('chunk=memoryCache.Chunk', loader)
+        self.assertIn('rawget(sharedEnv,"DEV_GUI_RUNTIME_CLEANUP")', loader)
+        self.assertEqual(loader.count("stopPreviousRuntime()"), 3)
         self.assertIn('sharedEnv.DEV_GUI_BUNDLE_CACHE={Platform=platform,BuildId=buildId,Chunk=chunk}', loader)
         self.assertIn('runModularFallback', loader)
         self.assertIn('local fresh=config.Fresh~=false', loader)

@@ -2336,6 +2336,13 @@ function destroyKnownGuiResidue()
 end
 
 function cleanupForManualReload(skipResidueScan)
+	if type(getgenv)=="function" then
+		local envOk,env=pcall(getgenv)
+		if envOk and type(env)=="table" then
+			env.DEV_GUI_RUNTIME_CLEANUP=nil
+		end
+	end
+
 	if DataSaveAPI and type(DataSaveAPI.SaveNow)=="function" then
 		pcall(DataSaveAPI.SaveNow)
 	end
@@ -2407,6 +2414,15 @@ function cleanupForManualReload(skipResidueScan)
 
 	if not skipResidueScan then
 		destroyKnownGuiResidue()
+	end
+end
+
+if type(getgenv)=="function" then
+	local envOk,env=pcall(getgenv)
+	if envOk and type(env)=="table" then
+		env.DEV_GUI_RUNTIME_CLEANUP=function()
+			cleanupForManualReload()
+		end
 	end
 end
 

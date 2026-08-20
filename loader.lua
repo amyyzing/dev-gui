@@ -22,6 +22,12 @@ if type(config)~="table" then config={} end
 local apiKey=tostring(config.ApiKey or config.Key or DEFAULT_API_KEY)
 if apiKey=="" then error("dev-gui loader requires an API key") end
 
+local function stopPreviousRuntime()
+	local cleanup=rawget(sharedEnv,"DEV_GUI_RUNTIME_CLEANUP")
+	sharedEnv.DEV_GUI_RUNTIME_CLEANUP=nil
+	if type(cleanup)=="function" then pcall(cleanup) end
+end
+
 local function valueType(value)
 	if type(typeof)=="function" then return typeof(value) end
 	return type(value)
@@ -108,6 +114,7 @@ local function runModularFallback(reason)
 	},{__index=parentEnv})
 	runtimeEnv._G=runtimeEnv
 	if setfenv then setfenv(chunk,runtimeEnv) end
+	stopPreviousRuntime()
 	local ran,runError=xpcall(chunk,traceback)
 	if not ran then error("dev-gui fallback failed: "..tostring(runError)) end
 end
@@ -162,6 +169,7 @@ if not chunk then
 end
 
 if setfenv then setfenv(chunk,parentEnv) end
+stopPreviousRuntime()
 local executeStarted=os.clock()
 local ran,runError=xpcall(chunk,traceback)
 timings.Execute=os.clock()-executeStarted

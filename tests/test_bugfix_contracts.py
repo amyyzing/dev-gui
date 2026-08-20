@@ -334,6 +334,16 @@ class LifecycleContracts(unittest.TestCase):
         self.assertIn('pcall(ArcAPI.Refresh)', refresh)
         self.assertIn('"ArcAPI"', cleanup)
 
+    def test_normal_reexecution_cleans_the_previous_runtime(self):
+        loader = source("loader.lua")
+        runtime = source("runtime/loader-part-1.lua")
+        self.assertIn('rawget(sharedEnv,"DEV_GUI_RUNTIME_CLEANUP")', loader)
+        self.assertIn("sharedEnv.DEV_GUI_RUNTIME_CLEANUP=nil", loader)
+        self.assertEqual(loader.count("stopPreviousRuntime()"), 3)
+        self.assertIn("env.DEV_GUI_RUNTIME_CLEANUP=function()", runtime)
+        self.assertIn("cleanupForManualReload()", runtime)
+        self.assertIn("env.DEV_GUI_RUNTIME_CLEANUP=nil", runtime)
+
     def test_footer_reset_only_targets_config_pages_and_first_run_defaults(self):
         pc_shell = source("platforms/pc/gui/mainframe.lua")
         mobile_shell = source("platforms/mobile/gui/mainframe.lua")
