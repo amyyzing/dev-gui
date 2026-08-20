@@ -2431,7 +2431,23 @@ function refreshRemoteModulesNow()
 	warn("reloading gui")
 	cleanupForManualReload()
 	task.defer(function()
+		local bootConfig=nil
+		local previousDevelopment=nil
+		if type(getgenv)=="function" then
+			local envOk,env=pcall(getgenv)
+			if envOk and type(env)=="table" then
+				bootConfig=rawget(env,"DEV_GUI_BOOT_CONFIG")
+				if type(bootConfig)~="table" then
+					bootConfig={}
+					env.DEV_GUI_BOOT_CONFIG=bootConfig
+				end
+				previousDevelopment=bootConfig.Development
+				bootConfig.Development=true
+				env.DEV_GUI_BUNDLE_CACHE=nil
+			end
+		end
 		local ok,reloadErr=pcall(chunk)
+		if bootConfig then bootConfig.Development=previousDevelopment end
 		if not ok then
 			warn("update run failed:",reloadErr)
 		end

@@ -46,8 +46,9 @@ class BundleContracts(unittest.TestCase):
     def test_normal_loader_uses_memory_only_bundle_cache(self):
         loader = (ROOT / "loader.lua").read_text(encoding="utf-8")
         self.assertEqual(loader.count('API_URL.."/bundle/get"'), 1)
-        self.assertIn('status==304 and memoryCache', loader)
         self.assertIn('rawget(sharedEnv,"DEV_GUI_BUNDLE_CACHE")', loader)
+        self.assertIn('local chunk=memoryCache and config.Fresh~=true and memoryCache.Chunk or nil', loader)
+        self.assertIn('timings.Network=0', loader)
         self.assertIn('sharedEnv.DEV_GUI_BUNDLE_CACHE={Platform=platform,BuildId=buildId,Chunk=chunk}', loader)
         self.assertIn('runModularFallback', loader)
         self.assertIn('local fresh=config.Fresh~=false', loader)
@@ -55,6 +56,10 @@ class BundleContracts(unittest.TestCase):
         self.assertIn('if config.Development==true or config.UseModules==true then', loader)
         for disk_api in ("readfile", "writefile", "isfile", "isfolder", "makefolder"):
             self.assertNotIn(disk_api, loader)
+
+        runtime = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
+        self.assertIn('bootConfig.Development=true', runtime)
+        self.assertIn('env.DEV_GUI_BUNDLE_CACHE=nil', runtime)
 
     def test_runtime_prefers_bundle_factories_before_remote_calls(self):
         runtime = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
