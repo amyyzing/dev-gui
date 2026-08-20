@@ -243,7 +243,7 @@ function hitboxPresets.new(app,ownedSection)
 			local row=make("Frame",{BackgroundColor3=colors.bg,BorderSizePixel=0,Size=UDim2.new(1,0,0,expandedOwned[code] and 178 or 32),ZIndex=6},ownedList)
 			make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=0,ApplyStrokeMode=Enum.ApplyStrokeMode.Border,BorderStrokePosition=Enum.BorderStrokePosition.Inner,ZIndex=7},row)
 
-			local toggle=make("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-8,0,30),Position=UDim2.fromOffset(4,1),Text=(expandedOwned[code] and"[-] " or"[+] ")..name.."  |  "..code,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=7},row)
+			local toggle=make("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-20,0,30),Position=UDim2.fromOffset(10,1),Text=(expandedOwned[code] and"[-] " or"[+] ")..name.."  |  "..code,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=7},row)
 
 			trackConnection(toggle.Activated:Connect(function()
 				expandedOwned[code]=not expandedOwned[code]
