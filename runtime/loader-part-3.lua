@@ -105,6 +105,7 @@ function makeCustomizeCtx()
 		Janitor=cleanupBags,
 		colors=colors,
 		style=style,
+		themes=devThemes,
 		inputService=inputService,
 		defaultStyle=getDefaultUIStyle and getDefaultUIStyle() or style,
 		screenGui=screenGui,
@@ -119,6 +120,11 @@ function makeCustomizeCtx()
 		getUIPrimaryColor=getUIPrimaryColor,
 		applyUIStrokeTheme=applyUIStrokeTheme,
 		applyUIPrimaryTheme=applyUIPrimaryTheme,
+		applyUIProfile=function()
+			if mainFrame and type(mainFrame.ApplyProfile)=="function" then
+				mainFrame.ApplyProfile(getCurrentUILibProfile())
+			end
+		end,
 		tintSlider=tintSlider,
 		onChanged=function()
 			applyUIStrokeTheme()
@@ -196,7 +202,9 @@ function ensureWorldSettings()
 	end
 
 	if type(mapSettings.OriginalMaterials)~="table" then
-		mapSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
+		mapSettings.OriginalMaterials={}
+	elseif getmetatable(mapSettings.OriginalMaterials)~=nil then
+		setmetatable(mapSettings.OriginalMaterials,nil)
 	end
 end
 
@@ -211,7 +219,10 @@ function resetMapRuntimeState()
 		safeDisconnect(mapSettings.Conn)
 		mapSettings.Conn=nil
 	end
-
+	if mapSettings.RemoveConn then
+		safeDisconnect(mapSettings.RemoveConn)
+		mapSettings.RemoveConn=nil
+	end
 	for part,material in pairs(mapSettings.OriginalMaterials or {}) do
 		if part and part.Parent and part:IsA("BasePart") then
 			pcall(function()
@@ -221,7 +232,7 @@ function resetMapRuntimeState()
 	end
 
 	mapSettings.SmoothPlastic=false
-	mapSettings.OriginalMaterials=setmetatable({}, {__mode="k"})
+	mapSettings.OriginalMaterials={}
 	potatoMode=false
 end
 
@@ -243,9 +254,6 @@ function makeMapCtx(name)
 		getCurrentModeKey=function()
 			return currentModeKey
 		end,
-		onChanged=function()
-			requestPlayerAutosave()
-		end,
 	}
 
 	if name=="MapEditor" then
@@ -258,7 +266,6 @@ function makeMapCtx(name)
 			if mapSettings then
 				mapSettings.SmoothPlastic=potatoMode
 			end
-			requestPlayerAutosave()
 		end
 	elseif name=="MapCleaner" then
 		app.MapCleanerLogicModule=MapCleanerLogicModule
@@ -282,6 +289,13 @@ function buildMapPage()
 	applyUIStrokeTheme()
 end
 
+function resetMapPageDefaults()
+	resetMapRuntimeState()
+	clearMapPage()
+	lazyPageBuilt.maps=false
+	ensureRuntimePageBuilt("maps")
+end
+
 rebuildMapFromModules=function()
 	resetMapRuntimeState()
 
@@ -296,6 +310,49 @@ rebuildMapFromModules=function()
 end
 
 lazyPageBuilders.maps=buildMapPage
+
+ArcAPI=nil
+serverApiNames={"ArcAPI"}
+serverSettings=serverSettings or{Hidden=false}
+serverPageModules=(getUIMapPageModules and getUIMapPageModules("server","ServerPage")) or{
+	{name="Arc",api="ArcAPI",order=1,title="Hide Arc"},
+}
+
+function clearServerPage()
+	clearRuntimePage(serverPage,true)
+end
+
+function makeServerCtx()
+	return{
+		make=make,
+		fusion=FusionModule,
+		Services=sharedRuntime,
+		schedulerApi=jobRunner,
+		StateStore=settingsStore,
+		ThemeStore=themeRuntime,
+		Janitor=cleanupBags,
+		colors=colors,
+		makeSection=makeSection,
+		buildToggleRow=buildToggleRow,
+		safeDisconnect=safeDisconnect,
+		state=serverSettings,
+		ArcLogicModule=ArcLogicModule,
+	}
+end
+
+function buildServerPage()
+	destroyRuntimeAPIs(serverApiNames)
+	clearServerPage()
+	loadDeferredModuleNames(serverReloadNames)
+
+	for _,spec in ipairs(serverPageModules) do
+		buildRuntimeModule(spec,makeServerCtx(),serverPage)
+	end
+
+	applyUIStrokeTheme()
+end
+
+lazyPageBuilders.server=buildServerPage
 
 pagesToPreload=loaderPageNames or {}
 function buildAllRuntimePages()

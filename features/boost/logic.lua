@@ -505,7 +505,7 @@ function boost.new(app,parent)
 		api.SetAlwaysBoostState(value,true)
 	end)
 
-	bypassCooldownToggle=buildToggleRow(section,"Bypass Cooldown",state.boostBypassCooldown,function(value)
+	bypassCooldownToggle=buildToggleRow(section,"bypass cooldown",state.boostBypassCooldown,function(value)
 		api.SetBypassCooldownState(value,true)
 	end)
 

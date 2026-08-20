@@ -46,6 +46,10 @@ description.Categories={
 			["Workspace"]={Title="WORKSPACE",description=blank},
 		},
 
+		Server={
+			["Hide Arc"]={Title="HIDE ARC",description=blank},
+		},
+
 		Customize={
 			["Customisation"]={Title="CUSTOMIZATION",description=blank},
 			["Colours"]={Title="COLORS",description=blank},
@@ -164,13 +168,10 @@ description.Categories={
 			["Enabled"]="qb aim",
 			["Team Filter"]="team",
 			["Show Arc"]="arc",
-			["Safe Arc"]="safe arc",
 			["Target Highlight"]="highlight",
 			["Lead Adjust"]="lead",
 			["Peak Height"]="peak",
-			["QB XZ Drift"]="xyz drift",
-			["QB Y Drift"]="xyz drift",
-			["XYZ Drift"]="xyz drift",
+			["Throw Delay"]="throw delay",
 			["QB Aim Lock Receiver"]="pick wr",
 			["QB Aim Throw"]="throw",
 			["QB Aim Toggle"]="aimbot",

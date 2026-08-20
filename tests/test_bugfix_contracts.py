@@ -11,32 +11,88 @@ def source(path):
 
 
 class BootstrapContracts(unittest.TestCase):
-    def test_fresh_boot_bypasses_disk_cache(self):
-        bootstrap = source("main.lua")
-        self.assertIn(
-            "local source=not fresh and readCachedSource(path) or nil",
-            bootstrap,
-        )
+    def test_runtime_config_comes_from_the_injected_chunk_environment(self):
+        bootstrap = source("dump/start.lua")
+        self.assertIn("local parentEnv=(getfenv and getfenv()) or _G", bootstrap)
+        self.assertNotIn("getfenv(0)", bootstrap)
+        self.assertIn('rawget(parentEnv,"GUI_RUNTIME_CONFIG")', bootstrap)
+
+    def test_fresh_boot_is_forwarded_without_shared_disk_cache(self):
+        bootstrap = source("dump/start.lua")
+        self.assertIn("if fresh then body.fresh=true end", bootstrap)
+        self.assertNotIn("readCachedSource", bootstrap)
+        self.assertNotIn("gui-runtime-cache", bootstrap)
 
     def test_all_optional_pages_are_preloaded_on_every_platform(self):
         expected = 'PreloadPages={"maps","server","customize","page2","settings"}'
         self.assertIn(expected, source("gui/pc.luau"))
         self.assertIn(expected, source("gui/mobile.luau"))
 
+    def test_loader_keeps_the_raycast_palette(self):
+        runtime = source("runtime/loader-part-1.lua")
+
+        self.assertIn("local loaderRaycast=devThemes.raycast.Theme", runtime)
+        self.assertIn("BackgroundColor3=loaderColors.accent", runtime)
+        self.assertIn("isProblem and loaderColors.error or loaderColors.accent", runtime)
+        self.assertGreaterEqual(runtime.count("not isFixedLoaderThemeInstance(instance)"), 2)
+
 
 class QBAimDefaultsContracts(unittest.TestCase):
-    def test_safe_arc_defaults_off_across_runtime_and_persistence(self):
-        self.assertIn('safeArc=getValue(app,"qbAimSafeArc",false)', source("data-save/data-save.lua"))
-        self.assertIn("qbAimSafeArc=false", source("runtime/loader-part-1.lua"))
-        self.assertIn("qbAimSafeArc=false,", source("runtime/loader-part-2.lua"))
-        self.assertIn(
-            'setQBAimSafeArc={"qbAimSafeArc",false,"QBAim","SetSafeArcState",true}',
-            source("runtime/loader-part-5.lua"),
-        )
+    def test_new_user_qb_tuning_defaults_are_consistent(self):
+        self.assertIn("qbAimLeadDelay=0.38", source("runtime/loader-part-1.lua"))
+        self.assertIn("qbAimPeakHeight=14.2", source("runtime/loader-part-1.lua"))
+        self.assertIn("qbAimThrowDelay=0.1", source("runtime/loader-part-1.lua"))
+        self.assertIn("qbAimPeakHeight=14.2,", source("runtime/loader-part-2.lua"))
+        self.assertIn("qbAimThrowDelay=0.1,", source("runtime/loader-part-2.lua"))
+        self.assertIn("local defaultCatchHeight=14.2", source("features/qb-aim/logic.lua"))
+        self.assertIn("local defaultThrowDelay=0.10", source("features/qb-aim/logic.lua"))
 
+        persistence = source("data-save/data-save.lua")
+        self.assertIn('leadDelay=getValue(app,"qbAimLeadDelay",0.38)', persistence)
+        self.assertIn('peakHeight=getValue(app,"qbAimPeakHeight",14.2)', persistence)
+        self.assertIn('throwDelay=getValue(app,"qbAimThrowDelay",0.1)', persistence)
+        self.assertIn('qbAim.peakHeight,8,20,14.2)', persistence)
+        self.assertIn('qbAim.throwDelay,0,0.5,0.1)', persistence)
+
+    def test_qb_reset_restores_every_qb_control_and_visual(self):
         logic = source("features/qb-aim/logic.lua")
-        self.assertIn("state.qbAimSafeArc=false", logic)
-        self.assertIn('buildToggleRow(sectionBody,"Safe Arc",state.qbAimSafeArc==true', logic)
+        refresh = logic[logic.index("function api.Refresh()") : logic.index("function api.Reset()")]
+        reset = logic[logic.index("function api.Reset()") : logic.index("function api.Destroy()")]
+
+        for field in ("qbAimLeadDelay", "qbAimPeakHeight", "qbAimThrowDelay"):
+            self.assertIn(f"state.{field}", refresh)
+
+        for statement in (
+            "state.qbAimTeamFilter=true",
+            "state.qbAimShowArc=true",
+            "state.qbAimTargetHighlight=true",
+            "setLeadDelay(leadDelayBaseline,false)",
+            "setPeakHeight(defaultCatchHeight,false)",
+            "setThrowDelay(defaultThrowDelay,false)",
+            "setEnabled(false)",
+        ):
+            self.assertIn(statement, reset)
+
+    def test_safe_arc_is_removed_from_qb_aim_state_ui_and_persistence(self):
+        production = "\n".join(
+            source(path)
+            for path in (
+                "features/qb-aim/logic.lua",
+                "runtime/loader-part-1.lua",
+                "runtime/loader-part-2.lua",
+                "runtime/loader-part-5.lua",
+                "data-save/data-save.lua",
+                "gui/description.lua",
+            )
+        )
+        for removed in (
+            "qbAimSafeArc",
+            "SetSafeArcState",
+            "Safe Arc",
+            "trajectoryCanBeDefended",
+            "interceptionCore",
+        ):
+            self.assertNotIn(removed, production)
 
     def test_park_uses_the_active_minigame_session(self):
         logic = source("features/qb-aim/logic.lua")
@@ -53,6 +109,18 @@ class QBAimDefaultsContracts(unittest.TestCase):
         )
         self.assertNotIn('return false,"park unknown"', logic)
 
+    def test_player_settings_use_the_live_game_mode_instead_of_mode1(self):
+        persistence = source("data-save/data-save.lua")
+        runtime = source("runtime/loader-part-5.lua")
+        main_runtime = source("runtime/loader-part-2.lua")
+        self.assertIn('if type(app.getCurrentModeKey)=="function" then', persistence)
+        self.assertIn("return r.modes[getModeKey(app)] or defaultSettings or {}", persistence)
+        self.assertIn("defaultSettings=api.Collect()", persistence)
+        self.assertIn("getCurrentModeKey=function()", runtime)
+        self.assertIn("local modeChanged=nextModeKey~=currentModeKey", main_runtime)
+        self.assertIn("pcall(DataSaveAPI.SaveNow)", main_runtime)
+        self.assertIn("pcall(DataSaveAPI.SetMode,currentModeKey,true)", main_runtime)
+
     def test_window_resize_handle_is_visible(self):
         for path in ("gui/pc.luau", "gui/mobile.luau"):
             self.assertIn("ResizeHandleVisible=true", source(path))
@@ -65,16 +133,115 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("if ok and played==true then", logic)
         self.assertIn('return true,"pumpfake"', logic)
 
-    def test_qb_c2_origin_is_not_visually_lerped_but_keeps_jump_prediction(self):
+    def test_qb_c2_origin_uses_recorded_history_instead_of_reverse_physics(self):
         logic = source("features/qb-aim/logic.lua")
-        self.assertIn('buildSlider(sectionBody,"XYZ Drift"', logic)
-        self.assertIn("local useHorizontalReleasePrediction=true", logic)
-        self.assertIn("local useVerticalReleasePrediction=true", logic)
-        self.assertIn("local smoothedStartPoint=startPoint", logic)
+        self.assertIn('buildSlider(sectionBody,"Throw Delay"', logic)
+        self.assertIn("local function recordQBOrigin(now,qbRoot,ball)", logic)
+        self.assertIn("local function delayedQBOrigin(now,delay,currentPosition)", logic)
+        self.assertIn("local targetTime=now-delay", logic)
+        self.assertIn("previous.pos:Lerp(current.pos", logic)
+        self.assertIn("setAttachmentCFrame(c2,xAxisCFrame(startPoint,plan.velocity)", logic)
+        self.assertNotIn("workspace.Gravity*releaseDelay*releaseDelay", logic)
         self.assertNotIn(
-            "preview.lastStartPoint:Lerp(smoothedStartPoint,previewSmoothAmount)",
+            "preview.lastStartPoint:Lerp",
             logic,
         )
+
+    def test_throw_delay_replaces_drift_and_delays_only_recorded_qb_origin(self):
+        production = "\n".join(
+            source(path)
+            for path in (
+                "features/qb-aim/logic.lua",
+                "runtime/loader-part-1.lua",
+                "runtime/loader-part-2.lua",
+                "runtime/loader-part-5.lua",
+                "data-save/data-save.lua",
+                "gui/description.lua",
+            )
+        )
+        for removed in (
+            "qbAimQBDrift",
+            "qbAimQBYDrift",
+            "SetQBXYZDrift",
+            "SetQBDrift",
+            "SetQBYDrift",
+            "XYZ Drift",
+            "xyzDrift",
+        ):
+            self.assertNotIn(removed, production)
+
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn("delayedQBOrigin(now,delay,currentOrigin)", logic)
+        self.assertIn("buildPlan(receiver,ballPower,releaseBall,wrOffset or 0,sampledOrigin)", logic)
+        self.assertIn("plan.originHistoryDelay=delay", logic)
+        self.assertIn("plan.receiverTimingOffset=wrOffset or 0", logic)
+        self.assertNotIn("(wrOffset or 0)+delay", logic)
+        self.assertNotIn("(wrOffset or 0)-delay", logic)
+
+    def test_qb_peak_is_absolute_in_gameplay_and_squad_but_relative_in_park(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn(
+            'local catchY=getModeKey(app)=="mode2" and catchPosition.Y+catchHeight or catchHeight',
+            logic,
+        )
+        self.assertNotIn("local function fieldGroundY", logic)
+        self.assertNotIn("workspace:Raycast(position+Vector3.new(0,30,0)", logic)
+
+    def test_auto_calibrate_uses_one_throw_animation_and_stable_ball_release(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn('Text="Auto Calibrate"', logic)
+        self.assertIn("function api.AutoCalibrate()", logic)
+        self.assertIn("animator.AnimationPlayed:Connect", logic)
+        self.assertIn("startCalibration(os.clock(),currentHeldBall(),throwReleaseWait)", logic)
+        self.assertIn("startCalibration(os.clock(),heldBall,throwReleaseWait)", logic)
+        self.assertIn("startCalibration(os.clock(),heldBall,0)", logic)
+        self.assertIn("if currentHeldBall()==calibration.ball then", logic)
+        self.assertIn("now-calibration.missingSince<releaseConfirmStableTime", logic)
+        self.assertIn(
+            "local measured=calibration.missingSince-calibration.startedAt-calibration.animationTime",
+            logic,
+        )
+        self.assertIn("setThrowDelay(measured,true)", logic)
+        self.assertIn('"QBAimAutoCalibrate"', logic)
+
+    def test_qb_preview_runs_from_c2_through_c1_to_ground_c3(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn("local endPoint=plan.landing or catchPoint", logic)
+        self.assertIn("local previewTime=plan.landingTime or catchTime", logic)
+        self.assertIn("local catchVelocity=plan.velocity+gravityVector*catchTime", logic)
+        self.assertIn("UpdateInterval=1/120", logic)
+        self.assertIn(
+            'addSchedulerJob("RenderStepped","QBAimPreview",arcSettings.UpdateInterval,previewStep)',
+            logic,
+        )
+        self.assertIn("setAttachmentCFrame(c2,xAxisCFrame(startPoint,plan.velocity)", logic)
+        self.assertIn("setAttachmentCFrame(c1,xAxisCFrame(catchPoint,catchVelocity)", logic)
+        self.assertIn("setAttachmentCFrame(c3,xAxisCFrame(endPoint,endVelocity)", logic)
+        self.assertIn("beam.Attachment0=c2", logic)
+        self.assertIn("beam.Attachment1=c3", logic)
+        self.assertIn("updateC1AndC3Info(plan,catchPoint,endPoint)", logic)
+        self.assertNotIn("previewSmoothAmount", logic)
+        self.assertNotIn("smoothedCatchPoint", logic)
+        self.assertIn("if preview.visible==visible then return end", logic)
+        self.assertIn("if not bound and not bindArcRigParts(center) then return nil end", logic)
+        self.assertIn("instance.Enabled=visible and instance==preview.beam", logic)
+        self.assertIn("descendant.Enabled=false", logic)
+
+    def test_qb_arc_toggle_only_hides_the_existing_preview(self):
+        logic = source("features/qb-aim/logic.lua")
+        setter = logic[
+            logic.index("function api.SetShowArcState") :
+            logic.index("function api.SetTargetHighlightState")
+        ]
+        self.assertIn("hideQBTrailPreview()", setter)
+        self.assertNotIn("clearPreviewVisuals", setter)
+        self.assertNotIn("destroyPreviewCenter", setter)
+
+    def test_receiver_prediction_keeps_the_binary_zero_or_21_speed_model(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn("local maxRunSpeed=21", logic)
+        self.assertIn("routeVelocity=rawVelocity.Unit*maxRunSpeed", logic)
+        self.assertIn("state.routeVelocity=Vector3.zero", logic)
 
 
 class ParamsThemeContracts(unittest.TestCase):
@@ -117,6 +284,141 @@ class PresetContracts(unittest.TestCase):
 
 
 class LifecycleContracts(unittest.TestCase):
+    def test_server_hide_arc_preserves_the_game_arc_and_excludes_qb_preview(self):
+        arc = source("features/arc/logic.lua")
+        runtime = source("runtime/loader-part-3.lua")
+        refresh = source("runtime/loader-part-2.lua")
+        cleanup = source("runtime/loader-part-1.lua")
+
+        for ui_map in (source("gui/pc.luau"), source("gui/mobile.luau")):
+            self.assertIn('{name="Arc",api="ArcAPI",order=1,title="Hide Arc"}', ui_map)
+
+        self.assertIn('["Hide Arc"]={Title="HIDE ARC"', source("gui/description.lua"))
+        for arc_root in (
+            "Center",
+            "BallMarker",
+            "LandingMarker",
+        ):
+            self.assertIn(f"{arc_root}=true", arc)
+        self.assertNotIn("BallMarker_BallTrackingUX=true", arc)
+        self.assertNotIn("LandingMarker_BallTrackingUX=true", arc)
+        self.assertIn("arcRootNames[ancestor.Name]", arc)
+        self.assertIn('ancestor.Parent.Name=="Local"', arc)
+        self.assertIn('ancestor.Name=="ClonedCenter"', arc)
+        for visual_class in (
+            "BasePart",
+            "Decal",
+            "Texture",
+            "Attachment",
+            "GuiObject",
+            "GuiBase3d",
+            "Beam",
+            "Trail",
+            "ParticleEmitter",
+            "Highlight",
+            "BillboardGui",
+            "SurfaceGui",
+        ):
+            self.assertIn(f'instance:IsA("{visual_class}")', arc)
+        self.assertIn('return "Transparency",1', arc)
+        self.assertIn('return "Transparency",NumberSequence.new(1)', arc)
+        self.assertIn('return "Opacity",0', arc)
+        self.assertIn('return "Visible",false', arc)
+        self.assertIn('return "Enabled",false', arc)
+        self.assertIn("instance:GetPropertyChangedSignal(property)", arc)
+        self.assertIn("instance[record.property]=record.hidden", arc)
+        self.assertIn("instance[record.property]=record.desired", arc)
+        self.assertNotIn(":Destroy()", arc)
+        self.assertIn("lazyPageBuilders.server=buildServerPage", runtime)
+        self.assertIn('elseif name=="server" then', refresh)
+        self.assertIn('pcall(ArcAPI.Refresh)', refresh)
+        self.assertIn('"ArcAPI"', cleanup)
+
+    def test_normal_reexecution_cleans_the_previous_runtime(self):
+        loader = source("loader.lua")
+        runtime = source("runtime/loader-part-1.lua")
+        self.assertIn('rawget(sharedEnv,"GUI_RUNTIME_CLEANUP")', loader)
+        self.assertIn("sharedEnv.GUI_RUNTIME_CLEANUP=nil", loader)
+        self.assertIn('type(cleanup)=="function"', loader)
+        self.assertIn("env.GUI_RUNTIME_CLEANUP=function()", runtime)
+        self.assertIn("cleanupForManualReload()", runtime)
+        self.assertIn("env.GUI_RUNTIME_CLEANUP=nil", runtime)
+
+    def test_footer_reset_only_targets_config_pages_and_first_run_defaults(self):
+        pc_shell = source("platforms/pc/gui/mainframe.lua")
+        mobile_shell = source("platforms/mobile/gui/mainframe.lua")
+        runtime2 = source("runtime/loader-part-2.lua")
+        runtime4 = source("runtime/loader-part-4.lua")
+
+        for shell in (pc_shell, mobile_shell):
+            self.assertIn("local resetVisibleValue=true", shell)
+            self.assertIn(
+                'local visible=activePageName=="main" or '
+                'activePageName=="customize" or activePageName=="page2"',
+                shell,
+            )
+            self.assertIn("resetBtn.Visible=visible", shell)
+            self.assertIn("resetWrap.Visible=visible", shell)
+
+        self.assertIn('type(api.Reset)=="function"', runtime2)
+        for page in ("main", "page2", "customize"):
+            self.assertIn(f'activePageName=="{page}"', runtime4)
+        for page in ("maps", "settings", "server"):
+            self.assertNotIn(f'elseif activePageName=="{page}"', runtime4)
+        self.assertIn("pageHost.CanvasPosition=Vector2.new(0,0)", runtime4)
+
+    def test_control_spacing_main_slider_strokes_and_loader_handoff(self):
+        controls = source("features/colors/gui.lua")
+        presets = source("features/hitbox-presets/logic.lua")
+        loader = source("runtime/loader-part-1.lua")
+
+        self.assertIn("local wrapInset=1", controls)
+        self.assertIn('make("UIPadding",{PaddingTop=UDim.new(0,4),PaddingLeft=UDim.new(0,1),PaddingRight=UDim.new(0,1),PaddingBottom=UDim.new(0,4)},ownedList)', presets)
+        self.assertIn('Size=UDim2.new(1,0,0,expandedOwned[code] and 178 or 32)', presets)
+        self.assertIn('row:SetAttribute("NoStroke",true)', presets)
+        self.assertNotIn('BorderStrokePosition=Enum.BorderStrokePosition.Inner', presets)
+        self.assertIn('Size=UDim2.new(1,-20,0,30),Position=UDim2.fromOffset(10,1)', presets)
+        self.assertIn('make("UIPadding",{PaddingTop=UDim.new(0,4),PaddingLeft=UDim.new(0,4),PaddingRight=UDim.new(0,4),PaddingBottom=UDim.new(0,4)},page2Wrap)', source("runtime/loader-part-4.lua"))
+        self.assertIn('ancestor:GetAttribute("NoSliderStroke")==true', controls)
+        self.assertIn('ancestor:GetAttribute("NoSectionStroke")==true', controls)
+        self.assertIn("if sectionStrokeEnabled then", controls)
+        self.assertIn('container:SetAttribute("NoStroke",noStroke)', controls)
+        self.assertIn('track:SetAttribute("NoStroke",noStroke)', controls)
+        self.assertIn('fill:SetAttribute("NoStroke",noStroke)', controls)
+        self.assertIn('valueBox:SetAttribute("NoStroke",noStroke)', controls)
+        self.assertIn("wrap.BackgroundTransparency=0.70", controls)
+        self.assertIn("BackgroundTransparency=sliderTrackTransparency", controls)
+
+        for path in (
+            "platforms/pc/gui/mainframe.lua",
+            "platforms/mobile/gui/mainframe.lua",
+        ):
+            shell = source(path)
+            self.assertIn('settingsPage:SetAttribute("NoSliderStroke",true)', shell)
+            self.assertIn('settingsPage:SetAttribute("NoSectionStroke",true)', shell)
+            self.assertIn("function api.RevealFromLoader()", shell)
+            self.assertIn("Enum.EasingStyle.Quint", shell)
+
+        self.assertIn('type(mainFrame.RevealFromLoader)=="function"', loader)
+
+    def test_map_page_state_is_session_only_and_anti_material_starts_off(self):
+        data_save = source("data-save/data-save.lua")
+        self.assertNotIn("smoothPlastic=", data_save)
+        self.assertNotIn("workspaceSettings", data_save)
+        self.assertIn("settings.workspace=nil", data_save)
+        self.assertIn("settings.Workspace=nil", data_save)
+
+        runtime = source("runtime/loader-part-1.lua")
+        self.assertIn("mapSettings={SmoothPlastic=false", runtime)
+
+        maps = source("runtime/loader-part-3.lua")
+        context = maps[maps.index("function makeMapCtx") : maps.index("function buildMapPage")]
+        self.assertNotIn("requestPlayerAutosave()", context)
+
+        startup = source("runtime/loader-part-5.lua")
+        self.assertNotIn("mapSettings=mapSettings", startup)
+        self.assertNotIn("mapSettings.SmoothPlastic and ensureRuntimePageBuilt", startup)
+
     def test_fallback_player_data_modal_is_destroyed(self):
         player_data = source("features/data/logic.lua")
         self.assertIn("local function closeActiveModal()", player_data)
@@ -180,6 +482,13 @@ class LifecycleContracts(unittest.TestCase):
         self.assertIn("workspace:GetDescendants()", materials)
         self.assertIn("part.Material=Enum.Material.SmoothPlastic", materials)
         self.assertIn("workspace.DescendantAdded:Connect", materials)
+        self.assertIn("workspace.DescendantRemoving:Connect", materials)
+        self.assertIn("restorePart(worldSettings,inst)", materials)
+        self.assertIn("for part in pairs(worldSettings.OriginalMaterials)", materials)
+        self.assertNotIn("part and part.Parent", materials)
+        self.assertIn("ws.OriginalMaterials={}", materials)
+        self.assertNotIn('OriginalMaterials=setmetatable({}, {__mode="k"})', materials)
+        self.assertIn("mapSettings={SmoothPlastic=false, OriginalMaterials={}}", source("runtime/loader-part-1.lua"))
         self.assertNotIn("OriginalVisuals", materials)
         self.assertNotIn("RenderFidelity", materials)
         self.assertNotIn("CastShadow", materials)

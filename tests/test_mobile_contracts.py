@@ -72,6 +72,7 @@ class MobileFeatureContracts(unittest.TestCase):
 
     def test_qb_toggle_supports_controller_bindings(self):
         qb = source("features/qb-aim/logic.lua")
+        self.assertIn('controllerThrowActionName="QBAim_ControllerThrow"', qb)
         self.assertIn('controllerToggleActionName="QBAim_ControllerToggle"', qb)
         self.assertIn('configuredBinding("getQBAimToggleKey",Enum.KeyCode.P)', qb)
         self.assertIn("setEnabled(not enabled)", qb)

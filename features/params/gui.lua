@@ -10,7 +10,7 @@ local wheelSideGap=14
 local wheelGlowPad=6
 local wheelInnerRadius=0.22
 local wheelOuterRadius=0.43
-local wheelGapDegrees=8
+local wheelGapDegrees=12
 local wheelGlowLayers={
 	{pad=2,z=5},
 	{pad=4,z=4},
@@ -92,14 +92,11 @@ local function atan2(y,x)
 end
 
 local function inAngleRange(angle,startAngle,finishAngle)
-	local start=startAngle+wheelGapDegrees
-	local finish=finishAngle-wheelGapDegrees
-
-	if finish>360 then
-		return angle>=start or angle<=(finish-360)
+	if finishAngle>360 then
+		return angle>=startAngle or angle<=(finishAngle-360)
 	end
 
-	return angle>=start and angle<=finish
+	return angle>=startAngle and angle<=finishAngle
 end
 
 local function decodeHex(hex)
@@ -417,6 +414,8 @@ function paramsGui.new(app,parent)
 		local active=lightTheme and darkenColor(activeBase,0.28) or activeBase
 		local coreColor=lightTheme and darkenColor(active,0.04) or brightenColor(active,0.04)
 		local muted=mutedColor()
+		local haloColor=lightTheme and darkenColor(coreColor,0.10) or brightenColor(coreColor,0.16)
+		local highlightColor=lightTheme and Color3.new(0,0,0) or Color3.new(1,1,1)
 
 		for _,pageKey in ipairs(pageOrder) do
 			local isSelected=pageKey==selected
@@ -427,9 +426,6 @@ function paramsGui.new(app,parent)
 			local midGlowTransparency=isSelected and 0.78 or 1
 			local farGlowTransparency=1
 			local outerGlowTransparency=1
-			local haloColor=lightTheme and darkenColor(coreColor,0.10) or brightenColor(coreColor,0.16)
-			local highlightColor=lightTheme and Color3.new(0,0,0) or Color3.new(1,1,1)
-
 			if wheelImages[pageKey] then
 				if animate then
 					tweenObject(wheelImages[pageKey],{ImageColor3=targetColor,ImageTransparency=targetTransparency})
@@ -535,6 +531,7 @@ function paramsGui.new(app,parent)
 		wheelWrap=make("Frame",{
 			AnchorPoint=Vector2.new(1,0),
 			BackgroundTransparency=1,
+			BorderSizePixel=0,
 			Position=UDim2.new(1,0,0,0),
 			Size=UDim2.fromOffset(wheelWidth+wheelGlowPad*2,wheelHeight+wheelGlowPad*2),
 			ZIndex=6,
@@ -546,6 +543,7 @@ function paramsGui.new(app,parent)
 			Position=UDim2.fromOffset(wheelGlowPad,wheelGlowPad),
 			Size=UDim2.fromOffset(wheelWidth,wheelHeight),
 			BackgroundTransparency=1,
+			BorderSizePixel=0,
 			ClipsDescendants=false,
 			ZIndex=6,
 		},wheelWrap)
@@ -583,7 +581,7 @@ function paramsGui.new(app,parent)
 			end
 
 			for _,sector in ipairs(wheelSectors) do
-				if inAngleRange(angle,sector.start,sector.finish) then
+				if inAngleRange(angle,sector.start+wheelGapDegrees/2,sector.finish-wheelGapDegrees/2) then
 					return sector.key
 				end
 			end
@@ -602,6 +600,7 @@ function paramsGui.new(app,parent)
 					local pad=layer.pad
 					local glow=make("ImageLabel",{
 						BackgroundTransparency=1,
+						BorderSizePixel=0,
 						Position=UDim2.new(pieceData.x,-pad,pieceData.y,-pad),
 						Size=UDim2.new(pieceData.w,pad*2,pieceData.h,pad*2),
 						Image=glowPiece,
@@ -616,6 +615,7 @@ function paramsGui.new(app,parent)
 
 				wheelImages[pageKey]=make("ImageLabel",{
 					BackgroundTransparency=1,
+					BorderSizePixel=0,
 					Position=UDim2.fromScale(pieceData.x,pieceData.y),
 					Size=UDim2.fromScale(pieceData.w,pieceData.h),
 					Image=normalPiece,
@@ -628,6 +628,7 @@ function paramsGui.new(app,parent)
 
 				wheelHighlightImages[pageKey]=make("ImageLabel",{
 					BackgroundTransparency=1,
+					BorderSizePixel=0,
 					Position=UDim2.fromScale(pieceData.x,pieceData.y),
 					Size=UDim2.fromScale(pieceData.w,pieceData.h),
 					Image=normalPiece,
@@ -663,6 +664,7 @@ function paramsGui.new(app,parent)
 				Position=UDim2.fromScale(0.5,0.5),
 				Size=UDim2.fromOffset(centerSize,centerSize),
 				BackgroundTransparency=1,
+				BorderSizePixel=0,
 				Image=assets._center,
 				ImageColor3=inputColor(),
 				ImageTransparency=0.03,

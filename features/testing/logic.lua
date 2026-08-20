@@ -790,7 +790,7 @@ function testing.new(app,parent,guiBuilder)
 		local parent=parentFolder or workspace
 		local existing=parent:FindFirstChild("TestingC1Marker")
 		marker=(existing and existing:IsA("BasePart")) and existing or Instance.new("Part")
-		marker.Name="TestingC1Marker"
+			marker.Name="TestingC1Marker"
 		styleMarker(marker)
 		marker.Parent=parent
 
@@ -832,7 +832,7 @@ function testing.new(app,parent,guiBuilder)
 		local parent=parentFolder or workspace
 		local existing=parent:FindFirstChild("TestingC1GroundMarker")
 		groundMarker=(existing and existing:IsA("BasePart")) and existing or Instance.new("Part")
-		groundMarker.Name="TestingC1GroundMarker"
+			groundMarker.Name="TestingC1GroundMarker"
 		styleGroundMarker(groundMarker)
 		groundMarker.Parent=parent
 		return groundMarker
@@ -1098,7 +1098,10 @@ function testing.new(app,parent,guiBuilder)
 	end
 
 	function api.Reset()
-		api.SetTestingState(false,true)
+		state.testingWREnabled=true
+		state.testingQBEnabled=true
+		api.SetTestingState(false,false)
+		changed()
 	end
 
 	function api.Destroy()

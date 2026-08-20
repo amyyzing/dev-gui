@@ -76,6 +76,7 @@ mainFrame=MainFrameModule.new({
 	make=make,
 	fusion=FusionModule,
 	colors=colors,
+	style=style,
 	description=description,
 	windowState=windowState,
 	uiProfile=getCurrentUILibProfile and getCurrentUILibProfile() or nil,
@@ -91,6 +92,7 @@ mainFrame=MainFrameModule.new({
 	getUIPrimaryColor=getUIPrimaryColor,
 	getUIStrokeColor=getUIStrokeColor,
 	getUIStrokeGradientColor=getUIStrokeGradientColor,
+	getHeaderArt=getHeaderArt,
 	isAlive=function()
 		return toolAlive
 	end,
@@ -330,12 +332,10 @@ mainPageDefaults={
 	qbAimEnabled=false,
 	qbAimTeamFilter=true,
 	qbAimShowArc=true,
-	qbAimSafeArc=false,
 	qbAimTargetHighlight=true,
 	qbAimLeadDelay=0.38,
-	qbAimPeakHeight=14.00,
-	qbAimQBDrift=0,
-	qbAimQBYDrift=0,
+	qbAimPeakHeight=14.2,
+	qbAimThrowDelay=0.1,
 	testingEnabled=false,
 	testingWREnabled=true,
 	testingQBEnabled=true,
@@ -386,6 +386,10 @@ function refreshRuntimePageControls(name,forceTheme)
 		end
 		if DiscordAPI and type(DiscordAPI.Refresh)=="function" then
 			pcall(DiscordAPI.Refresh)
+		end
+	elseif name=="server" then
+		if ArcAPI and type(ArcAPI.Refresh)=="function" then
+			pcall(ArcAPI.Refresh)
 		end
 	end
 
@@ -449,8 +453,17 @@ function makeMainCtx()
 			refreshActionStatus()
 		end,
 		setCurrentMode=function(key,label)
-			currentModeKey=tostring(key or"mode1")
+			local nextModeKey=tostring(key or"mode1")
+			local modeChanged=nextModeKey~=currentModeKey
+			if modeChanged and DataSaveAPI and type(DataSaveAPI.SaveNow)=="function" then
+				pcall(DataSaveAPI.SaveNow)
+			end
+
+			currentModeKey=nextModeKey
 			currentModeLabel=tostring(label or"Gameplay")
+			if modeChanged and DataSaveAPI and type(DataSaveAPI.SetMode)=="function" then
+				pcall(DataSaveAPI.SetMode,currentModeKey,true)
+			end
 			if mainFrame and type(mainFrame.RefreshText)=="function" then
 				mainFrame.RefreshText(description)
 			elseif modeSubtitle then
@@ -483,8 +496,8 @@ end
 
 mainPageModules=(getUIMapPageModules and getUIMapPageModules("main","MainPage")) or (UIMapModule and UIMapModule.MainPage and UIMapModule.MainPage.Modules) or {
 	{api="Hitbox",name="Hitbox",column="left",order=1,title="Hitbox"},
-	{api="GameParams",name="Params",column="left",order=2,title="Game Params"},
-	{api="Boost",name="Boost",column="right",order=2,title="Boost"},
+	{api="Boost",name="Boost",column="left",order=2,title="Boost"},
+	{api="GameParams",name="Params",column="left",order=3,title="Game Params"},
 	{api="ESP",name="ESP",column="right",order=3,title="ESP"},
 	{api="QBAim",name="QBAim",column="right",order=4,title="QB Aim"},
 	{api="Testing",name="Testing",column="right",order=5,title="Testing"},
@@ -556,13 +569,17 @@ function resetMainPageDefaults()
 	for key,value in pairs(mainPageDefaults) do
 		mainPageState[key]=value
 	end
+	syncMainState()
 
 	for _,api in pairs(mainPageApis) do
-		if api and type(api.Refresh)=="function" then
+		if api and type(api.Reset)=="function" then
+			pcall(api.Reset)
+		elseif api and type(api.Refresh)=="function" then
 			pcall(api.Refresh)
 		end
 	end
 
 	syncMainState()
+	refreshRuntimePageControls("main",true)
 	requestPlayerAutosave()
 end

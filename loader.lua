@@ -86,6 +86,12 @@ if not chunk then
 	error("loader compile failed: "..tostring(compileError))
 end
 
+local cleanup=rawget(sharedEnv,"GUI_RUNTIME_CLEANUP")
+sharedEnv.GUI_RUNTIME_CLEANUP=nil
+if type(cleanup)=="function" then
+	pcall(cleanup)
+end
+
 local parentEnv=(getfenv and getfenv(0)) or _G
 if setfenv then
 	setfenv(chunk,parentEnv)

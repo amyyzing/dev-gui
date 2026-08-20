@@ -3,15 +3,15 @@ local dataSave={}
 local httpService=game:GetService("HttpService")
 
 local defaultStyleValues={
-	PrimaryR=12,
-	PrimaryG=12,
-	PrimaryB=12,
-	StrokeR=182,
-	StrokeG=180,
-	StrokeB=180,
-	GradientR=182,
-	GradientG=180,
-	GradientB=180,
+	PrimaryR=16,
+	PrimaryG=16,
+	PrimaryB=16,
+	StrokeR=255,
+	StrokeG=99,
+	StrokeB=99,
+	GradientR=207,
+	GradientG=47,
+	GradientB=152,
 	StrokeGradient=false,
 	LiquidStroke=false,
 	LiquidStrokeSpeed=1,
@@ -19,7 +19,7 @@ local defaultStyleValues={
 	StrokeThickness=1,
 	StrokeTransparency=0.84,
 	CornerRadius=0,
-	UILib="original",
+	UILib="raycast",
 	ThemePanelExpanded=false,
 	ColoursPanelExpanded=false,
 	HighlightPanelExpanded=false,
@@ -99,16 +99,53 @@ local defaultStyleValues={
 	QBAimHighlightOutlineTransparency=0,
 }
 
+local validThemes={raycast=true,everforest=true,proof=true,linear=true,material=true,absolutely=true}
+
+local function themeId(value)
+	local id=tostring(value or ""):lower()
+	if id=="catppuccin" then id="everforest" end
+	if id=="dracula" then id="proof" end
+	return validThemes[id] and id or "raycast"
+end
+
+local themeColorFields={"PrimaryR","PrimaryG","PrimaryB","StrokeR","StrokeG","StrokeB","GradientR","GradientG","GradientB"}
+local oldThemeColors={
+	raycast={17,17,20,255,90,163,124,92,255},
+	catppuccin={30,30,46,203,166,247,137,180,250},
+	everforest={253,246,227,141,161,1,53,167,124},
+	dracula={40,42,54,189,147,249,255,121,198},
+	linear={16,16,20,94,106,210,138,143,152},
+	material={18,18,18,3,218,198,187,134,252},
+	absolutely={9,9,12,168,85,247,236,72,153},
+}
+
+local function migrateThemeColors(style,rawId,themes)
+	local raw=tostring(rawId or ""):lower()
+	local id=themeId(raw)
+	local old=oldThemeColors[raw] or oldThemeColors[id]
+	local defaults=themes and themes[id] and themes[id].Defaults
+	if not old or not defaults then return id end
+
+	for i,field in ipairs(themeColorFields) do
+		if tonumber(style[field])~=old[i] then return id end
+	end
+
+	for _,field in ipairs(themeColorFields) do
+		style[field]=defaults[field]
+	end
+	return id
+end
+
 local styleNumberFields={
-	{"primaryR","PrimaryR",0,255,28},
-	{"primaryG","PrimaryG",0,255,28},
-	{"primaryB","PrimaryB",0,255,28},
+	{"primaryR","PrimaryR",0,255,16},
+	{"primaryG","PrimaryG",0,255,16},
+	{"primaryB","PrimaryB",0,255,16},
 	{"strokeR","StrokeR",0,255,255},
-	{"strokeG","StrokeG",0,255,255},
-	{"strokeB","StrokeB",0,255,255},
-	{"gradientR","GradientR",0,255,255},
-	{"gradientG","GradientG",0,255,255},
-	{"gradientB","GradientB",0,255,255},
+	{"strokeG","StrokeG",0,255,99},
+	{"strokeB","StrokeB",0,255,99},
+	{"gradientR","GradientR",0,255,207},
+	{"gradientG","GradientG",0,255,47},
+	{"gradientB","GradientB",0,255,152},
 	{"liquidStrokeSpeed","LiquidStrokeSpeed",0,2,1},
 	{"strokeThickness","StrokeThickness",0,8,1},
 	{"strokeTransparency","StrokeTransparency",0,1,0.55},
@@ -364,6 +401,16 @@ local function encodePresetEditor(presetEditor)
 	return output
 end
 
+local function dropMapSettings(root)
+	for _,settings in pairs(root.modes or {}) do
+		if type(settings)=="table" then
+			settings.workspace=nil
+			settings.Workspace=nil
+		end
+	end
+	return root
+end
+
 local function normalizeRoot(raw)
 	if type(raw)~="table" then
 		return cloneRoot()
@@ -371,15 +418,15 @@ local function normalizeRoot(raw)
 
 	if type(raw.modes)=="table" then
 		raw.version=raw.version or 2
-		return raw
+		return dropMapSettings(raw)
 	end
 
-	return{
+	return dropMapSettings({
 		version=2,
 		modes={
 			mode1=raw,
 		},
-	}
+	})
 end
 
 local function getValue(app,name,default)
@@ -466,6 +513,13 @@ local function setClamped(app,stateName,value,min,max,fallback)
 end
 
 local function getModeKey(app)
+	if type(app.getCurrentModeKey)=="function" then
+		local ok,modeKey=pcall(app.getCurrentModeKey)
+		if ok and modeKey then
+			return tostring(modeKey)
+		end
+	end
+
 	return tostring(getValue(app,"CURRENT_MODE_KEY",app.currentModeKey or "mode1"))
 end
 
@@ -509,7 +563,7 @@ local function collectUIStylePayload(uiStyle,defaultUIStyle)
 
 	payload.liquidStrokeDirection=uiStyle.LiquidStrokeDirection
 	payload.cornerRadius=0
-	payload.uiLib=tostring(uiStyle.UILib or "")~="" and uiStyle.UILib or defaultUIStyle.UILib or "original"
+	payload.uiLib=themeId(uiStyle.UILib or defaultUIStyle.UILib)
 	payload.themePanelExpanded=uiStyle.ThemePanelExpanded and true or false
 	payload.coloursPanelExpanded=uiStyle.ColoursPanelExpanded and true or false
 	payload.highlightPanelExpanded=uiStyle.HighlightPanelExpanded and true or false
@@ -602,6 +656,7 @@ function dataSave.new(app)
 	local autosaveInFlightPayload=nil
 	local autosaveToken=0
 	local destroyed=false
+	local defaultSettings=nil
 
 	local function isAlive()
 		if destroyed then
@@ -639,7 +694,7 @@ function dataSave.new(app)
 
 	function api.GetSavedSettingsForCurrentMode()
 		local r=api.GetRoot()
-		return r.modes[getModeKey(app)] or {}
+		return r.modes[getModeKey(app)] or defaultSettings or {}
 	end
 
 	function api.BuildRootForSave(currentSettings)
@@ -726,11 +781,10 @@ function dataSave.new(app)
 				enabled=getValue(app,"qbAimEnabled",false),
 				teamFilter=getValue(app,"qbAimTeamFilter",true),
 				showArc=getValue(app,"qbAimShowArc",true),
-				safeArc=getValue(app,"qbAimSafeArc",false),
 				targetHighlight=getValue(app,"qbAimTargetHighlight",true),
 				leadDelay=getValue(app,"qbAimLeadDelay",0.38),
-				peakHeight=getValue(app,"qbAimPeakHeight",14.00),
-				xyzDrift=getValue(app,"qbAimQBDrift",0),
+				peakHeight=getValue(app,"qbAimPeakHeight",14.2),
+				throwDelay=getValue(app,"qbAimThrowDelay",0.1),
 			},
 
 			testing={
@@ -754,10 +808,6 @@ function dataSave.new(app)
 			presetEditor=collectPresetEditor(app),
 			uiStyle=collectUIStylePayload(uiStyle,defaultUIStyle),
 
-			workspace={
-				smoothPlastic=app.mapSettings and app.mapSettings.SmoothPlastic and true or false,
-			},
-
 			window={
 				w=uiWindow.W,
 				h=uiWindow.H,
@@ -768,6 +818,8 @@ function dataSave.new(app)
 			},
 		}
 	end
+
+	defaultSettings=api.Collect()
 
 	function api.Apply(settings)
 		if app.applySavedPlayerSettings then
@@ -859,16 +911,10 @@ function dataSave.new(app)
 		applyBoolean(app,"setQBAimState","qbAimEnabled",qbAim.enabled)
 		applyBoolean(app,"setQBAimTeamFilter","qbAimTeamFilter",qbAim.teamFilter)
 		applyBoolean(app,"setQBAimShowArc","qbAimShowArc",qbAim.showArc)
-		applyBoolean(app,"setQBAimSafeArc","qbAimSafeArc",qbAim.safeArc)
 		applyBoolean(app,"setQBAimTargetHighlight","qbAimTargetHighlight",qbAim.targetHighlight)
 		applyClamped(app,"setQBAimLeadDelay","qbAimLeadDelay",qbAim.leadDelay,0,1.5,0.38)
-		applyClamped(app,"setQBAimPeakHeight","qbAimPeakHeight",qbAim.peakHeight,8,20,14.00)
-		local savedDrift=qbAim.xyzDrift
-		if savedDrift==nil then savedDrift=qbAim.qbDrift end
-		if savedDrift==nil then savedDrift=qbAim.serverXZLead end
-		if savedDrift==nil then savedDrift=qbAim.serverYLead end
-		applyClamped(app,"setQBAimXYZDrift","qbAimQBDrift",savedDrift,-0.2,0.2,0)
-		app.qbAimQBYDrift=app.qbAimQBDrift
+		applyClamped(app,"setQBAimPeakHeight","qbAimPeakHeight",qbAim.peakHeight,8,20,14.2)
+		applyClamped(app,"setQBAimThrowDelay","qbAimThrowDelay",qbAim.throwDelay,0,0.5,0.1)
 
 		local testing=settings.testing or {}
 		applyBoolean(app,"setTestingState","testingEnabled",testing.enabled)
@@ -950,17 +996,9 @@ function dataSave.new(app)
 				app.style.HighlightSelectedState=tostring(uiStyle.HighlightSelectedState)
 			end
 
-			if uiStyle.uiLib~=nil and tostring(uiStyle.uiLib)~="" then
-				app.style.UILib=tostring(uiStyle.uiLib)
-			else
-				app.style.UILib=tostring(defaultUIStyle.UILib or "original")
-			end
+			local savedTheme=uiStyle.uiLib or uiStyle.UILib or defaultUIStyle.UILib
+			app.style.UILib=migrateThemeColors(app.style,savedTheme,app.themes)
 			app.style.CornerRadius=0
-		end
-
-		local workspaceSettings=settings.workspace or settings.Workspace or {}
-		if app.mapSettings then
-			app.mapSettings.SmoothPlastic=workspaceSettings.smoothPlastic and true or false
 		end
 
 		local window=settings.window or {}

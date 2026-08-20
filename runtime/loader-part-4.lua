@@ -263,6 +263,10 @@ function makeDiscordCtx()
 		Janitor=cleanupBags,
 		colors=colors,
 		botApi=botApi,
+		UI=Dump and Dump.UI,
+		Dump=Dump,
+		DiscordControllerModule=DiscordControllerModule,
+		DiscordViewModule=DiscordViewModule,
 		DiscordLogicModule=DiscordLogicModule,
 		makeSection=makeSection,
 		wrapTextButton=wrapTextButton,
@@ -478,6 +482,7 @@ function buildPage2()
 	loadDeferredModuleNames(pageTwoReloadNames)
 
 	local page2Wrap=make("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,ZIndex=4,LayoutOrder=1},futurePage)
+	make("UIPadding",{PaddingTop=UDim.new(0,4),PaddingLeft=UDim.new(0,4),PaddingRight=UDim.new(0,4),PaddingBottom=UDim.new(0,4)},page2Wrap)
 	make("UIListLayout",{FillDirection=Enum.FillDirection.Vertical,Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},page2Wrap)
 
 	local sections={}
@@ -554,6 +559,18 @@ resetKeybindPresetPageDefaults=function()
 	requestPlayerAutosave()
 end
 
+function resetSettingsPageDefaults()
+	if mainFrame and type(mainFrame.resetGui)=="function" then
+		pcall(mainFrame.resetGui,true)
+	end
+
+	if ResetGuiAPI and type(ResetGuiAPI.Refresh)=="function" then
+		pcall(ResetGuiAPI.Refresh)
+	end
+
+	refreshRuntimePageControls("settings",true)
+end
+
 trackRuntimeConnection(resetBtn.Activated:Connect(function()
 	local activePageName=getActivePageName()
 
@@ -563,6 +580,10 @@ trackRuntimeConnection(resetBtn.Activated:Connect(function()
 		resetKeybindPresetPageDefaults()
 	elseif activePageName=="customize" then
 		resetCustomizePageDefaults()
+	end
+
+	if pageHost and pageHost:IsA("ScrollingFrame") then
+		pageHost.CanvasPosition=Vector2.new(0,0)
 	end
 
 	refreshActionStatus()

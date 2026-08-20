@@ -2,11 +2,46 @@
 -- This composes the app's pages and window chrome using the reusable controls
 -- injected from 495-ui-library.
 local mainFrame={}
+local players=game:GetService("Players")
+
+local function avatarSize(titleY,subtitleY)
+	return math.max(24,(subtitleY+14)-titleY)
+end
+
+local function titleX(titleXValue,titleY,subtitleY)
+	return titleXValue+avatarSize(titleY,subtitleY)+10
+end
+
+local function titleSize(titleXValue,titleY,subtitleY,height)
+	return UDim2.new(1,-(titleX(titleXValue,titleY,subtitleY)+164),0,height)
+end
+
+local function turnPage(tweenService,state,frame,direction)
+	if state._pageTurnTween then
+		state._pageTurnTween:Cancel()
+		state._pageTurnTween=nil
+	end
+	if state._pageTurnFrame and state._pageTurnFrame.Parent then
+		state._pageTurnFrame.Position=UDim2.fromScale(0,0)
+		state._pageTurnFrame.Rotation=0
+	end
+	if not frame or direction==0 then return end
+
+	frame.Position=UDim2.new(direction*0.05,0,0,0)
+	frame.Rotation=direction*3
+	state._pageTurnFrame=frame
+	state._pageTurnTween=tweenService:Create(frame,TweenInfo.new(0.22,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{
+		Position=UDim2.fromScale(0,0),
+		Rotation=0,
+	})
+	state._pageTurnTween:Play()
+end
 
 function mainFrame.new(app)
 	local make=app.New or app.make
 	local fusion=app.Fusion or app.fusion
 	local colors=app.colors
+	local style=type(app.style)=="table" and app.style or {}
 	local description=app.Description or app.description or {}
 	local windowState=app.windowState
 	local screenGui=app.SG or app.screenGui
@@ -373,9 +408,64 @@ function mainFrame.new(app)
 	make("UICorner",{CornerRadius=UDim.new(0,0)},header)
 	local headerStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=headerStrokeTransparency},header)
 	headerStroke:SetAttribute("BaseStrokeTransparency",headerStrokeTransparency)
-	local titleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerTitleY),Size=UDim2.new(1,-180,0,18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=headerTitleSize,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+	api.headerArt=make("ImageLabel",{
+		Name="HeaderArt",
+		BackgroundTransparency=1,
+		Size=UDim2.fromScale(1,1),
+		Image="",
+		ImageTransparency=0.08,
+		ScaleType=Enum.ScaleType.Crop,
+		ClipsDescendants=true,
+		ZIndex=4,
+		SkipThemeRole=true,
+	},header)
+	make("Frame",{
+		BackgroundColor3=colors.topbar or colors.bg,
+		BackgroundTransparency=0.42,
+		BorderSizePixel=0,
+		Size=UDim2.fromScale(1,1),
+		ZIndex=4,
+		ThemeRole="TOPBAR",
+	},header)
+	api.headerArtToken=0
+	function api.RefreshHeaderArt()
+		api.headerArtToken=api.headerArtToken+1
+		local token=api.headerArtToken
+		api.headerArt.Image=""
+		api.headerArt.Visible=false
+		local profile=currentProfile()
+		local id=tostring(profile and profile.Id or "raycast"):lower()
+		if style.UseThemePalette==false or type(app.getHeaderArt)~="function" then
+			return
+		end
+		task.spawn(function()
+			local ok,image=pcall(app.getHeaderArt,id)
+			if destroyed or token~=api.headerArtToken or not api.headerArt.Parent then return end
+			api.headerArt.Image=ok and image or ""
+			api.headerArt.Visible=ok and type(image)=="string" and image~=""
+		end)
+	end
+	api.RefreshHeaderArt()
+	api.avatar=make("ImageLabel",{
+		Name="PlayerAvatar",
+		BackgroundColor3=colors.card or colors.panel,
+		BackgroundTransparency=1,
+		BorderSizePixel=0,
+		Position=UDim2.fromOffset(headerTitleX,headerTitleY),
+		Size=UDim2.fromOffset(avatarSize(headerTitleY,headerSubtitleY),avatarSize(headerTitleY,headerSubtitleY)),
+		Image=players.LocalPlayer and ("rbxthumb://type=AvatarHeadShot&id="..players.LocalPlayer.UserId.."&w=100&h=100") or "",
+		ScaleType=Enum.ScaleType.Crop,
+		ClipsDescendants=true,
+		ZIndex=6,
+		ThemeRole="CARD",
+		CornerRole="Control",
+	},header)
+	make("UICorner",{CornerRadius=UDim.new(0,0)},api.avatar)
+	local avatarStroke=make("UIStroke",{Color=getUIStrokeColor(),Thickness=1,Transparency=0.35,StrokeRole="Fixed"},api.avatar)
 
-	local subtitleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(headerTitleX,headerSubtitleY),Size=UDim2.new(1,-180,0,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=colors.muted,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
+	local titleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerTitleY),Size=titleSize(headerTitleX,headerTitleY,headerSubtitleY,18),Text=desc("Main.Title","untitled gui"),Font=titleFont,TextSize=headerTitleSize,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},header)
+
+	local subtitleText=make("TextLabel",{BackgroundTransparency=1,Position=UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerSubtitleY),Size=titleSize(headerTitleX,headerTitleY,headerSubtitleY,14),Text=desc("Main.Description",getModeLabel().." loaded"),Font=textFont,TextSize=headerSubtitleSize,TextColor3=colors.text,TextRole="TEXT",TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5,Visible=headerSubtitleVisible},header)
 
 	local function makeTopButton(text,xOffset)
 		local b=make("TextButton",{Size=UDim2.fromOffset(topButtonSize,topButtonSize),Position=UDim2.new(1,xOffset,0.5,-topButtonSize/2),BackgroundColor3=colors.button or colors.bg,BorderSizePixel=0,Text=text,Font=controlFont,TextSize=17,TextColor3=colors.text,AutoButtonColor=false,Selectable=true,ZIndex=6,ThemeRole="BUTTON"},header)
@@ -432,7 +522,11 @@ function mainFrame.new(app)
 		end),
 		Position=makeFusionComputed(function(use)
 			use(profileVersionValue)
-			return UDim2.fromOffset(headerTitleX,headerTitleY)
+			return UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerTitleY)
+		end),
+		Size=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return titleSize(headerTitleX,headerTitleY,headerSubtitleY,18)
 		end),
 	})
 
@@ -451,7 +545,11 @@ function mainFrame.new(app)
 		end),
 		Position=makeFusionComputed(function(use)
 			use(profileVersionValue)
-			return UDim2.fromOffset(headerTitleX,headerSubtitleY)
+			return UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerSubtitleY)
+		end),
+		Size=makeFusionComputed(function(use)
+			use(profileVersionValue)
+			return titleSize(headerTitleX,headerTitleY,headerSubtitleY,14)
 		end),
 		Visible=makeFusionComputed(function(use)
 			use(profileVersionValue)
@@ -537,6 +635,8 @@ function mainFrame.new(app)
 	make("UIPadding",{PaddingTop=UDim.new(0,2),PaddingLeft=UDim.new(0,3),PaddingRight=UDim.new(0,7),PaddingBottom=UDim.new(0,2)},pageHost)
 
 	local settingsPage=make("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=true,ZIndex=3,LayoutOrder=1},pageHost)
+	settingsPage:SetAttribute("NoSliderStroke",true)
+	settingsPage:SetAttribute("NoSectionStroke",true)
 	make("UIListLayout",{Padding=UDim.new(0,0),SortOrder=Enum.SortOrder.LayoutOrder},settingsPage)
 
 	local mapPage=make("Frame",{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,ClipsDescendants=true,Visible=false,ZIndex=3,LayoutOrder=2},pageHost)
@@ -709,6 +809,7 @@ function mainFrame.new(app)
 	end
 
 	local function applyChromeProfile()
+		avatarStroke.Color=getUIStrokeColor()
 		rootStroke:SetAttribute("BaseStrokeTransparency",rootStrokeTransparency)
 		rootStroke.Transparency=rootStrokeTransparency
 		headerStroke:SetAttribute("BaseStrokeTransparency",headerStrokeTransparency)
@@ -722,9 +823,13 @@ function mainFrame.new(app)
 			resizeHandle.Visible=resizeHandleVisible
 		end
 
-		titleText.Position=UDim2.fromOffset(headerTitleX,headerTitleY)
+		api.avatar.Position=UDim2.fromOffset(headerTitleX,headerTitleY)
+		api.avatar.Size=UDim2.fromOffset(avatarSize(headerTitleY,headerSubtitleY),avatarSize(headerTitleY,headerSubtitleY))
+		titleText.Position=UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerTitleY)
+		titleText.Size=titleSize(headerTitleX,headerTitleY,headerSubtitleY,18)
 		titleText.TextSize=headerTitleSize
-		subtitleText.Position=UDim2.fromOffset(headerTitleX,headerSubtitleY)
+		subtitleText.Position=UDim2.fromOffset(titleX(headerTitleX,headerTitleY,headerSubtitleY),headerSubtitleY)
+		subtitleText.Size=titleSize(headerTitleX,headerTitleY,headerSubtitleY,14)
 		subtitleText.TextSize=headerSubtitleSize
 		subtitleText.Visible=headerSubtitleVisible
 
@@ -739,9 +844,19 @@ function mainFrame.new(app)
 	end
 
 	local refreshFooterResetButton=function() end
+	api._pageFrames={
+		main=settingsPage,
+		maps=mapPage,
+		server=serverPage,
+		customize=uiSettingsPage,
+		page2=futurePage,
+		settings=actualSettingsPage,
+	}
 
 	local function setActivePage(name)
-		activePageName=name or "main"
+		name=name or "main"
+		turnPage(tweenService,api,api._pageFrames[name],name==activePageName and 0 or (getPageIndex(name)<getPageIndex(activePageName) and -1 or 1))
+		activePageName=name
 		if activePageValue then
 			activePageValue:set(activePageName)
 		end
@@ -828,7 +943,7 @@ function mainFrame.new(app)
 
 	updateResponsiveLayout()
 
-	local footer=make("Frame",{BackgroundColor3=colors.bg,BackgroundTransparency=0,Size=UDim2.new(1,0,0,footerHeight),ZIndex=8,LayoutOrder=4,ThemeRole="BG"},main)
+	local footer=make("Frame",{BackgroundColor3=colors.bg,BackgroundTransparency=0,BorderSizePixel=0,Size=UDim2.new(1,0,0,footerHeight),ZIndex=8,LayoutOrder=4,ThemeRole="BG"},main)
 	make("UIListLayout",{FillDirection=Enum.FillDirection.Horizontal,Padding=UDim.new(0,footerGap),SortOrder=Enum.SortOrder.LayoutOrder,HorizontalAlignment=Enum.HorizontalAlignment.Right,VerticalAlignment=Enum.VerticalAlignment.Center},footer)
 
 	function api.RefreshESPStatus() end
@@ -852,10 +967,7 @@ function mainFrame.new(app)
 	end
 
 	local resetBtn,resetWrap=makeFooterBtn("Reset",94)
-	local resetVisibleValue=makeFusionComputed(function(use)
-		local page=use(activePageValue)
-		return page~="settings" and page~="maps" and page~="server"
-	end)
+	local resetVisibleValue=true
 
 	hydrateFusion(resetBtn,{
 		Visible=resetVisibleValue,
@@ -867,10 +979,10 @@ function mainFrame.new(app)
 	hydrateFusion(resetWrap,{Visible=resetVisibleValue})
 
 	refreshFooterResetButton=function()
-		local showReset=activePageName~="settings" and activePageName~="maps" and activePageName~="server"
-		resetBtn.Visible=showReset
+		local visible=activePageName=="main" or activePageName=="customize" or activePageName=="page2"
+		resetBtn.Visible=visible
 		resetBtn.Text=text("RESET")
-		resetWrap.Visible=showReset
+		resetWrap.Visible=visible
 	end
 
 	refreshFooterResetButton()
@@ -1179,6 +1291,26 @@ function mainFrame.new(app)
 		refreshFooterResetButton()
 	end
 
+	function api.RevealFromLoader()
+		if api._revealedFromLoader or not(root and root.Parent) then return end
+		api._revealedFromLoader=true
+
+		if rootPositionTween then rootPositionTween:Cancel() end
+		if api._revealScaleTween then api._revealScaleTween:Cancel() end
+
+		local targetPosition=root.Position
+		local targetScale=uiScale.Scale
+		root.Position=UDim2.new(targetPosition.X.Scale,targetPosition.X.Offset,targetPosition.Y.Scale,targetPosition.Y.Offset+14)
+		uiScale.Scale=targetScale*0.975
+		root.Visible=true
+
+		local info=TweenInfo.new(0.28,Enum.EasingStyle.Quint,Enum.EasingDirection.Out)
+		rootPositionTween=tweenService:Create(root,info,{Position=targetPosition})
+		api._revealScaleTween=tweenService:Create(uiScale,info,{Scale=targetScale})
+		rootPositionTween:Play()
+		api._revealScaleTween:Play()
+	end
+
 	function api.UpdateResponsiveLayout()
 		updateResponsiveLayout()
 	end
@@ -1199,16 +1331,19 @@ function mainFrame.new(app)
 	end
 
 	function api.RefreshTheme()
+		api.RefreshHeaderArt()
 		pageShell.BackgroundTransparency=pageShellTransparency
 		pageSlider.BackgroundTransparency=pageSliderTransparency
 		applyChromeProfile()
 		paintPageTabs()
 		paintResizeHandle(resizing)
+		avatarStroke.Color=getUIStrokeColor()
 		bumpFusionValue(profileVersionValue)
 	end
 
 	function api.ApplyProfile(profile)
 		loadProfile(profile or currentProfile())
+		api.RefreshHeaderArt()
 		loadLayoutNumbers()
 
 		windowState.MinW=layoutNumber(windowProfile,"MinW",windowState.MinW or 560)
@@ -1260,6 +1395,7 @@ function mainFrame.new(app)
 	end
 
 	function api.Destroy()
+		api.headerArtToken=api.headerArtToken+1
 		safeDisconnect(dragConn)
 		dragConn=nil
 		cleanupAll()

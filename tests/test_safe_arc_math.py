@@ -52,41 +52,25 @@ class SafeArcContracts(unittest.TestCase):
         self.assertIn("local arc=readVisualThrowArcState() or CurrentThrowArcState", testing)
         self.assertNotIn("local db=opponent and isDB", testing)
 
-    def test_production_colors_use_the_rendered_beam_duration(self):
-        logic = source("features/qb-aim/logic.lua")
-        self.assertIn(
-            "updateArcSafetyColor(beam,unsafe,interceptInfo,previewTime)",
-            logic,
-        )
-        self.assertNotIn(
-            "updateArcSafetyColor(beam,unsafe,interceptInfo,catchTime)",
-            logic,
-        )
-
-    def test_unsafe_arc_recolors_the_whole_beam(self):
+    def test_testing_can_still_recolor_its_diagnostic_beam(self):
         production = source("features/qb-aim/logic.lua")
         testing = source("features/testing/logic.lua")
-        self.assertIn("WholeBeamWarning=true,", production)
+        self.assertNotIn("WholeBeamWarning", production)
         self.assertIn(
             "info and info.windows or nil,\n\t\t\t\tarc.flightTime,\n\t\t\t\ttrue",
             testing,
         )
 
-    def test_safe_arc_does_not_add_unrelated_release_stability_gates(self):
+    def test_qb_aim_no_longer_blocks_or_recolors_throws(self):
         logic = source("features/qb-aim/logic.lua")
-        self.assertNotIn('return nil,"receiver too uncertain"', logic)
-        self.assertNotIn('return nil,"timing unstable"', logic)
-        self.assertIn("if trajectoryCanBeDefended(plan,receiver) then", logic)
-
-    def test_safe_arc_is_an_arrival_race_using_catchbox_dimensions(self):
-        logic = source("features/qb-aim/logic.lua")
-        self.assertIn("local catchBox=getPlayerCatchVolume(player)", logic)
-        self.assertIn(
-            "interceptionCore.FindWindows(arc,{receiverParticipant})",
-            logic,
-        )
-        self.assertIn("if window.startTime<=receiverStartTime then", logic)
-        self.assertIn('reason="receiver_first"', logic)
+        for removed in (
+            "interceptionCore",
+            "trajectoryCanBeDefended",
+            "updateArcSafetyColor",
+            'setStatus("not safe")',
+            "Safe Arc",
+        ):
+            self.assertNotIn(removed, logic)
 
 
 class EspCatchBoxContracts(unittest.TestCase):

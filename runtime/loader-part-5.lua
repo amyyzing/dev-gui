@@ -200,13 +200,10 @@ local saveStateSetters={
 	setQBAimState={"qbAimEnabled",true,"QBAim","SetQBAimState"},
 	setQBAimTeamFilter={"qbAimTeamFilter",true,"QBAim","SetTeamFilterState",true},
 	setQBAimShowArc={"qbAimShowArc",true,"QBAim","SetShowArcState",true},
-	setQBAimSafeArc={"qbAimSafeArc",false,"QBAim","SetSafeArcState",true},
 	setQBAimTargetHighlight={"qbAimTargetHighlight",true,"QBAim","SetTargetHighlightState",true},
 	setQBAimLeadDelay={"qbAimLeadDelay",false,"QBAim","SetLeadDelay",true},
 	setQBAimPeakHeight={"qbAimPeakHeight",false,"QBAim","SetPeakHeight",true},
-	setQBAimXYZDrift={"qbAimQBDrift",false,"QBAim","SetQBXYZDrift",true},
-	setQBAimQBDrift={"qbAimQBDrift",false,"QBAim","SetQBDrift",true},
-	setQBAimQBYDrift={"qbAimQBDrift",false,"QBAim","SetQBYDrift",true},
+	setQBAimThrowDelay={"qbAimThrowDelay",false,"QBAim","SetThrowDelay",true},
 	setTestingState={"testingEnabled",true,"Testing","SetTestingState",true},
 	setTestingWRState={"testingWREnabled",true,"Testing","SetTestingWRState",true},
 	setTestingQBState={"testingQBEnabled",true,"Testing","SetTestingQBState",true},
@@ -362,6 +359,9 @@ function buildDataSaveContext()
 		State=mainPageState,
 		Get=getPersistentValue,
 		Set=setPersistentValue,
+		getCurrentModeKey=function()
+			return currentModeKey
+		end,
 
 		hitboxPresets=hitboxPresets,
 		defaultHitboxPresets=defaultHitboxPresets,
@@ -369,8 +369,8 @@ function buildDataSaveContext()
 		expandedOwned=expandedOwnedPresets,
 
 		style=style,
+		themes=devThemes,
 		windowState=windowState,
-		mapSettings=mapSettings,
 		root=root,
 		getDefaultUIStyle=getDefaultUIStyle,
 
@@ -420,9 +420,6 @@ function rebuildDataSaveFromModule(loadRemoteData)
 			end
 		end)
 
-		if mapSettings and mapSettings.SmoothPlastic and ensureRuntimePageBuilt then
-			pcall(ensureRuntimePageBuilt,"maps")
-		end
 	end
 
 	refreshAllUI()

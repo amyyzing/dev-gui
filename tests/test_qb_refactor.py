@@ -189,9 +189,9 @@ class IntegrationContractTests(unittest.TestCase):
     def test_main_bootstrap_has_default_credential(self):
         source = (ROOT / "main.lua").read_text(encoding="utf-8")
         self.assertIn("GUI_BOOT_CONFIG", source)
-        self.assertNotIn('local loaderPath="loader.lua"', source)
         self.assertIn('config.ApiKey or config.Key or "mydayohmy"', source)
-        self.assertLess(source.index("local chunks={}"), source.index("for _,path in ipairs(runtimeFiles) do\n\tlocal chunk=chunks[path]"))
+        self.assertIn('runtime/loader-part-1.lua', source)
+        self.assertNotIn("DEV_GUI_BOOT_CONFIG", source)
 
     def test_loader_is_the_user_and_refresh_entry_point(self):
         loader = (ROOT / "loader.lua").read_text(encoding="utf-8")
@@ -200,10 +200,11 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertIn('config.ApiKey or config.Key or "mydayohmy"', loader)
         self.assertIn('path="main.lua"', loader)
         self.assertIn('apiUrl.."/module/get"', loader)
+        self.assertNotIn("DEV_GUI_BOOT_CONFIG", loader)
         self.assertIn('manualReloadPath="loader.lua"', runtime)
         self.assertNotIn('manualReloadPath="main.lua"', runtime)
 
-    def test_shared_interception_module_is_registered_and_consumed(self):
+    def test_shared_interception_module_is_registered_for_testing_only(self):
         loader = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
         context = (ROOT / "runtime" / "loader-part-2.lua").read_text(encoding="utf-8")
         production = (ROOT / "features" / "qb-aim" / "logic.lua").read_text(encoding="utf-8")
@@ -211,7 +212,7 @@ class IntegrationContractTests(unittest.TestCase):
         self.assertIn('QBInterception="features/qb-aim/interception.lua"', loader)
         self.assertLess(loader.index('"QBInterception","QBAimMath"'), loader.index('"QBAimMath","QBAimLogic"'))
         self.assertIn("QBInterceptionModule=QBInterceptionModule", context)
-        self.assertIn("interceptionCore.Evaluate", production)
+        self.assertNotIn("interceptionCore.Evaluate", production)
         self.assertIn("interceptionCore.Evaluate", testing)
 
 

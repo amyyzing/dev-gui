@@ -3,17 +3,17 @@ local colors={}
 local tweenService=game:GetService("TweenService")
 
 local styleDefaults={
-	PrimaryR=12,
-	PrimaryG=12,
-	PrimaryB=12,
+	PrimaryR=16,
+	PrimaryG=16,
+	PrimaryB=16,
 
-	StrokeR=182,
-	StrokeG=180,
-	StrokeB=180,
+	StrokeR=255,
+	StrokeG=99,
+	StrokeB=99,
 
-	GradientR=182,
-	GradientG=180,
-	GradientB=180,
+	GradientR=207,
+	GradientG=47,
+	GradientB=152,
 
 	StrokeGradient=false,
 	LiquidStroke=false,
@@ -24,7 +24,8 @@ local styleDefaults={
 	StrokeThickness=1,
 	StrokeTransparency=0.84,
 	CornerRadius=0,
-	UILib="original",
+	UILib="raycast",
+	UseThemePalette=true,
 	ThemePanelExpanded=false,
 	ColoursPanelExpanded=false,
 	HighlightPanelExpanded=false,
@@ -132,6 +133,7 @@ local colorFields={
 local boolFields={
 	StrokeGradient=true,
 	LiquidStroke=true,
+	UseThemePalette=true,
 	ThemePanelExpanded=true,
 	ColoursPanelExpanded=true,
 	HighlightPanelExpanded=true,
@@ -236,7 +238,10 @@ local function normalizedStyleValue(key,value,default)
 	elseif key=="CornerRadius" then
 		return 0
 	elseif key=="UILib" then
-		return styleDefaults.UILib
+		local theme=tostring(value or default):lower()
+		if theme=="catppuccin" then theme="everforest" end
+		if theme=="dracula" then theme="proof" end
+		return ({raycast=true,everforest=true,proof=true,linear=true,material=true,absolutely=true})[theme] and theme or styleDefaults.UILib
 	elseif type(default)=="number" then
 		local n=numberOrDefault(value,default)
 		local limits=numberLimits[key]
@@ -383,27 +388,34 @@ function colors.new(app,page)
 		return dx*dx+dy*dy
 	end
 
-	local function objectLocalPointer(object,input)
+	local function pointerOffset(object,input)
 		local point=pointerPosition(input)
 		local inset=guiInset()
 		local pos=object.AbsolutePosition
 		local size=object.AbsoluteSize
-		local best=point
+		local bestOffset=Vector2.new(0,0)
 		local bestDistance=distanceToRect(point,pos,size)
 		local candidates={
-			point-inset,
-			point+inset,
+			-inset,
+			inset,
 		}
 
-		for _,candidate in ipairs(candidates) do
+		for _,offset in ipairs(candidates) do
+			local candidate=point+offset
 			local candidateDistance=distanceToRect(candidate,pos,size)
 			if candidateDistance<bestDistance then
-				best=candidate
+				bestOffset=offset
 				bestDistance=candidateDistance
 			end
 		end
+		return bestOffset
+	end
 
-		return best.X-pos.X,best.Y-pos.Y,math.max(size.X,1),math.max(size.Y,1)
+	local function objectLocalPointer(object,input,offset)
+		local point=pointerPosition(input)+(offset or pointerOffset(object,input))
+		local pos=object.AbsolutePosition
+		local size=object.AbsoluteSize
+		return math.clamp(point.X-pos.X,0,size.X),math.clamp(point.Y-pos.Y,0,size.Y),math.max(size.X,1),math.max(size.Y,1)
 	end
 
 	local function trackConnection(connection)
@@ -708,8 +720,10 @@ function colors.new(app,page)
 	local highlightHoverMode=nil
 	local pickerHue,pickerSat,pickerVal=0,0,1
 	local colorDrag=nil
+	local colorDragOffset=nil
 	local highlightPickerHue,highlightPickerSat,highlightPickerVal=0,0,1
 	local highlightColorDrag=nil
+	local highlightColorDragOffset=nil
 
 	local targetButtons={}
 	local modeButtons={}
@@ -727,6 +741,8 @@ function colors.new(app,page)
 	local highlightWheelCanvas=nil
 	local highlightWheelCenterCap=nil
 	local modeBodies={}
+	local syncHighlightControls=function() end
+	local setHighlightPickerFromColor=function() end
 	local colorPreview,previewHex,hexBox
 	local svBase,svCursor,hueCursor
 	local highlightSvBase,highlightSvCursor,highlightHueCursor,highlightPreviewHex,highlightPickerPreview
@@ -743,6 +759,7 @@ function colors.new(app,page)
 		end
 
 		instance:SetAttribute("CornerRole",role or "Control")
+		instance.ClipsDescendants=true
 		return make("UICorner",{CornerRadius=UDim.new(0,0)},instance)
 	end
 
@@ -1010,6 +1027,7 @@ function colors.new(app,page)
 			Position=UDim2.fromOffset(0,0),
 			Size=UDim2.fromOffset(labelWidth,28),
 			Text=labelText,
+			SkipTranslation=true,
 			Font=Enum.Font.GothamBold,
 			TextSize=12,
 			TextColor3=colors.text,
@@ -1018,7 +1036,8 @@ function colors.new(app,page)
 		},row)
 
 		local valueBox=make("TextBox",{
-			BackgroundColor3=themeColor("INPUT",colors.panel),
+			BackgroundColor3=themeColor("MUTED",colors.muted),
+			BackgroundTransparency=0.70,
 			BorderSizePixel=0,
 			ClearTextOnFocus=false,
 			Size=UDim2.fromOffset(48,24),
@@ -1029,19 +1048,20 @@ function colors.new(app,page)
 			TextColor3=colors.text,
 			TextXAlignment=Enum.TextXAlignment.Center,
 			ZIndex=6,
-			ThemeRole="INPUT",
+			ThemeRole="MUTED",
 			CornerRole="Control",
 		},row)
 		addCorner(valueBox,"Control")
 
 		local track=make("Frame",{
-			BackgroundColor3=themeColor("SLIDER_BG",colors.bg),
+			BackgroundColor3=themeColor("MUTED",colors.muted),
+			BackgroundTransparency=0.70,
 			BorderSizePixel=0,
 			Position=UDim2.fromOffset(labelWidth+4,9),
 			Size=UDim2.new(1,-(labelWidth+64),0,10),
 			ClipsDescendants=true,
 			ZIndex=6,
-			ThemeRole="SLIDER_BG",
+			ThemeRole="MUTED",
 			CornerRole="Slider",
 		},row)
 		addCorner(track,"Slider")
@@ -1068,6 +1088,7 @@ function colors.new(app,page)
 		local value=startVal
 		local dragging=false
 		local dragInput=nil
+		local dragOffset=nil
 
 		local function roundTo(v,d)
 			local m=10^d
@@ -1081,7 +1102,7 @@ function colors.new(app,page)
 		end
 
 		local function valueFromMouse(input)
-			local x,_,w=objectLocalPointer(track,input)
+			local x,_,w=objectLocalPointer(track,input,dragOffset)
 			local pct=math.clamp(x/w,0,1)
 			return roundTo(minVal+(maxVal-minVal)*pct,decimals)
 		end
@@ -1099,6 +1120,7 @@ function colors.new(app,page)
 			if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 				dragging=true
 				dragInput=input
+				dragOffset=pointerOffset(track,input)
 				valueBox:ReleaseFocus()
 				setValue(valueFromMouse(input),true)
 			end
@@ -1114,6 +1136,7 @@ function colors.new(app,page)
 			if input==dragInput or (dragInput and dragInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1) then
 				dragging=false
 				dragInput=nil
+				dragOffset=nil
 			end
 		end))
 
@@ -1224,11 +1247,6 @@ function colors.new(app,page)
 	end
 
 	getActiveColor=function()
-		if activeTarget=="HighlightFill" or activeTarget=="HighlightOutline" then
-			activeHighlightTarget=activeTarget=="HighlightFill" and "Fill" or "Outline"
-			return getActiveHighlightColor()
-		end
-
 		if activeTarget=="Primary" then
 			return getUIPrimaryColor()
 		end
@@ -1241,12 +1259,6 @@ function colors.new(app,page)
 	end
 
 	local function writeActiveColor(color)
-		if activeTarget=="HighlightFill" or activeTarget=="HighlightOutline" then
-			activeHighlightTarget=activeTarget=="HighlightFill" and "Fill" or "Outline"
-			writeActiveHighlightColor(color)
-			return
-		end
-
 		if activeTarget=="Primary" then
 			setPrimaryColour(color)
 		else
@@ -1285,21 +1297,20 @@ function colors.new(app,page)
 	local function setHighlightMode(modeKey)
 		style.HighlightSelectedMode=normalizeHighlightMode(modeKey)
 		style.HighlightSelectedState=normalizeHighlightState(style.HighlightSelectedState,activeHighlightMode())
-		setPickerFromColor(getActiveColor())
-		syncPickerControls()
+		setHighlightPickerFromColor(getActiveHighlightColor())
+		syncHighlightControls()
 	end
 
 	local function setHighlightState(stateKey)
 		style.HighlightSelectedState=normalizeHighlightState(stateKey,activeHighlightMode())
-		setPickerFromColor(getActiveColor())
-		syncPickerControls()
+		setHighlightPickerFromColor(getActiveHighlightColor())
+		syncHighlightControls()
 	end
 
 	local function setHighlightTarget(target)
 		activeHighlightTarget=target=="Outline" and "Outline" or "Fill"
-		activeTarget=activeHighlightTarget=="Fill" and "HighlightFill" or "HighlightOutline"
-		setPickerFromColor(getActiveColor())
-		syncPickerControls()
+		setHighlightPickerFromColor(getActiveHighlightColor())
+		syncHighlightControls()
 	end
 
 	local introRow=make("Frame",{
@@ -1348,30 +1359,45 @@ function colors.new(app,page)
 		SortOrder=Enum.SortOrder.LayoutOrder,
 	},themeGrid)
 
-	local themePresets={
-		{Name="Dark",Primary=Color3.fromRGB(12,12,12),Stroke=Color3.fromRGB(182,180,180),Gradient=Color3.fromRGB(182,180,180),GradientOn=false},
-		{Name="Light",Primary=Color3.fromRGB(238,238,238),Stroke=Color3.fromRGB(60,60,60),Gradient=Color3.fromRGB(60,60,60),GradientOn=false},
-		{Name="Midnight",Primary=Color3.fromRGB(12,18,38),Stroke=Color3.fromRGB(72,98,158),Gradient=Color3.fromRGB(72,98,158),GradientOn=false},
-		{Name="Crimson",Primary=Color3.fromRGB(58,17,24),Stroke=Color3.fromRGB(150,45,54),Gradient=Color3.fromRGB(150,45,54),GradientOn=false},
-		{Name="Evergreen",Primary=Color3.fromRGB(18,36,34),Stroke=Color3.fromRGB(45,112,78),Gradient=Color3.fromRGB(45,112,78),GradientOn=false},
-		{Name="Sakura",Primary=Color3.fromRGB(43,3,33),Stroke=Color3.fromRGB(215,136,236),Gradient=Color3.fromRGB(215,136,236),GradientOn=false},
-	}
+	local themePresets={}
+	for _,id in ipairs({"raycast","everforest","proof","linear","material","absolutely"}) do
+		local profile=app.themes and app.themes[id]
+		local defaults=profile and profile.Defaults
+		if defaults then
+			local palette=profile.Theme or {}
+			themePresets[#themePresets+1]={
+				Id=id,
+				Name=profile.Name,
+				Primary=Color3.fromRGB(defaults.PrimaryR,defaults.PrimaryG,defaults.PrimaryB),
+				Stroke=Color3.fromRGB(defaults.StrokeR,defaults.StrokeG,defaults.StrokeB),
+				Gradient=Color3.fromRGB(defaults.GradientR,defaults.GradientG,defaults.GradientB),
+				Text=palette.text,
+				Muted=palette.muted,
+			}
+		end
+	end
 
 	local function applyThemePreset(preset)
+		style.UILib=preset.Id
+		style.UseThemePalette=true
 		setPrimaryColour(preset.Primary)
+		setMainColour(preset.Stroke)
+		setGradientColour(preset.Gradient)
 		style.StrokeGradient=false
 		style.LiquidStroke=false
 		style.StrokeThickness=1
 		style.StrokeTransparency=0.84
 		syncColourControls()
+		if type(app.applyUIProfile)=="function" then
+			app.applyUIProfile()
+		end
 		updateEverything()
-		tweenStyleTo(preset.Stroke)
 		setPickerFromColor(getActiveColor())
 		syncPickerControls()
 	end
 
 	for i,preset in ipairs(themePresets) do
-		local textColor=readableTextColor(preset.Primary)
+		local textColor=preset.Text or readableTextColor(preset.Primary)
 		local card=make("TextButton",{
 			BackgroundColor3=preset.Primary,
 			BorderSizePixel=0,
@@ -1401,7 +1427,7 @@ function colors.new(app,page)
 			Position=UDim2.fromOffset(6,0),
 			Size=UDim2.new(1,-12,1,0),
 			Text=preset.Name,
-			Font=Enum.Font.GothamBold,
+			Font=Enum.Font.Gotham,
 			TextSize=11,
 			TextColor3=textColor,
 			SkipTextRole=true,
@@ -1411,7 +1437,13 @@ function colors.new(app,page)
 		},card)
 
 		trackConnection(card.Activated:Connect(function()
-			applyThemePreset(preset)
+			if tostring(style.UILib or ""):lower()==preset.Id and style.UseThemePalette~=false then
+				style.UseThemePalette=false
+				updateEverything()
+				syncPickerControls()
+			else
+				applyThemePreset(preset)
+			end
 		end))
 
 		themeCards[#themeCards+1]={Preset=preset,Card=card,Marker=marker,label=label}
@@ -1433,7 +1465,9 @@ function colors.new(app,page)
 	},targetRow)
 
 	for i,target in ipairs({"Primary","Stroke"}) do
-		local button,marker=makeFlatButton(targetRow,target,i)
+		local label=target=="Stroke" and "Secondary" or target
+		local button,marker=makeFlatButton(targetRow,label,i,0.5)
+		button.Size=UDim2.new(0.5,-4,1,0)
 		trackConnection(button.Activated:Connect(function()
 			setActiveTarget(target)
 		end))
@@ -1539,9 +1573,11 @@ function colors.new(app,page)
 	local svSquare=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,0,0),
 		BorderSizePixel=0,
-		Position=UDim2.fromOffset(0,8),
-		Size=UDim2.fromOffset(148,104),
+		Position=UDim2.fromOffset(22,8),
+		Size=UDim2.fromOffset(104,104),
+		ClipsDescendants=true,
 		SkipThemeRole=true,
+		CornerRole="Section",
 		ZIndex=6,
 	},squareBody)
 	svBase=svSquare
@@ -1551,6 +1587,7 @@ function colors.new(app,page)
 		BackgroundColor3=Color3.fromRGB(255,255,255),
 		BorderSizePixel=0,
 		Size=UDim2.new(1,0,1,0),
+		ClipsDescendants=true,
 		SkipThemeRole=true,
 		ZIndex=7,
 	},svSquare)
@@ -1566,6 +1603,7 @@ function colors.new(app,page)
 		BackgroundColor3=Color3.fromRGB(0,0,0),
 		BorderSizePixel=0,
 		Size=UDim2.new(1,0,1,0),
+		ClipsDescendants=true,
 		SkipThemeRole=true,
 		ZIndex=8,
 	},svSquare)
@@ -1593,6 +1631,7 @@ function colors.new(app,page)
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset(158,8),
 		Size=UDim2.fromOffset(18,104),
+		ClipsDescendants=true,
 		SkipThemeRole=true,
 		ZIndex=6,
 	},squareBody)
@@ -1613,7 +1652,8 @@ function colors.new(app,page)
 	hueCursor=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
 		BorderSizePixel=0,
-		Size=UDim2.new(1,0,0,3),
+		Position=UDim2.fromOffset(2,0),
+		Size=UDim2.new(1,-4,0,3),
 		SkipThemeRole=true,
 		ZIndex=8,
 	},hueStrip)
@@ -1643,12 +1683,12 @@ function colors.new(app,page)
 
 	local function updateColorDrag(input)
 		if colorDrag=="SV" and svSquare.AbsoluteSize.X>0 then
-			local x,y,w,h=objectLocalPointer(svSquare,input)
+			local x,y,w,h=objectLocalPointer(svSquare,input,colorDragOffset)
 			pickerSat=math.clamp(x/w,0,1)
 			pickerVal=1-math.clamp(y/h,0,1)
 			applyActiveColor(Color3.fromHSV(pickerHue,pickerSat,pickerVal),true)
 		elseif colorDrag=="Hue" and hueStrip.AbsoluteSize.Y>0 then
-			local _,y,_,h=objectLocalPointer(hueStrip,input)
+			local _,y,_,h=objectLocalPointer(hueStrip,input,colorDragOffset)
 			pickerHue=math.clamp(y/h,0,1)
 			applyActiveColor(Color3.fromHSV(pickerHue,pickerSat,pickerVal),true)
 		end
@@ -1659,6 +1699,7 @@ function colors.new(app,page)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			colorDrag="SV"
 			colorDragInput=input
+			colorDragOffset=pointerOffset(svSquare,input)
 			updateColorDrag(input)
 		end
 	end))
@@ -1667,6 +1708,7 @@ function colors.new(app,page)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			colorDrag="Hue"
 			colorDragInput=input
+			colorDragOffset=pointerOffset(hueStrip,input)
 			updateColorDrag(input)
 		end
 	end))
@@ -1681,19 +1723,20 @@ function colors.new(app,page)
 		if input==colorDragInput or (colorDragInput and colorDragInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1) then
 			colorDrag=nil
 			colorDragInput=nil
+			colorDragOffset=nil
 		end
 	end))
 
 	local rgbBody=modeBodies.RGB
 	make("UIListLayout",{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},rgbBody)
-	rgbSliders.R=makeMiniSlider(rgbBody,"Red",0,255,0,0,Color3.fromRGB(255,0,0),function()
-		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.green.get(),rgbSliders.B.get()),false)
+	rgbSliders.R=makeMiniSlider(rgbBody,"R",0,255,0,0,Color3.fromRGB(255,0,0),function()
+		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.G.get(),rgbSliders.B.get()),false)
 	end)
-	rgbSliders.green=makeMiniSlider(rgbBody,"Green",0,255,0,0,Color3.fromRGB(0,255,0),function()
-		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.green.get(),rgbSliders.B.get()),false)
+	rgbSliders.G=makeMiniSlider(rgbBody,"G",0,255,0,0,Color3.fromRGB(0,255,0),function()
+		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.G.get(),rgbSliders.B.get()),false)
 	end)
-	rgbSliders.B=makeMiniSlider(rgbBody,"Blue",0,255,0,0,Color3.fromRGB(0,120,255),function()
-		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.green.get(),rgbSliders.B.get()),false)
+	rgbSliders.B=makeMiniSlider(rgbBody,"B",0,255,0,0,Color3.fromRGB(0,120,255),function()
+		applyActiveColor(Color3.fromRGB(rgbSliders.R.get(),rgbSliders.G.get(),rgbSliders.B.get()),false)
 	end)
 
 	local hsvBody=modeBodies.HSV
@@ -1710,7 +1753,7 @@ function colors.new(app,page)
 		pickerVal=math.clamp(hsvSliders.V.get()/100,0,1)
 		applyActiveColor(Color3.fromHSV(pickerHue,pickerSat,pickerVal),true)
 	end)
-	hsvSliders.V=makeMiniSlider(hsvBody,"Value",0,100,0,0,getUIStrokeColor(),function()
+	hsvSliders.V=makeMiniSlider(hsvBody,"Val",0,100,0,0,getUIStrokeColor(),function()
 		pickerHue=math.clamp(hsvSliders.H.get()/360,0,1)
 		pickerSat=math.clamp(hsvSliders.S.get()/100,0,1)
 		pickerVal=math.clamp(hsvSliders.V.get()/100,0,1)
@@ -1719,7 +1762,8 @@ function colors.new(app,page)
 
 	local hexBody=modeBodies.Hex
 	hexBox=make("TextBox",{
-		BackgroundColor3=themeColor("INPUT",colors.panel),
+		BackgroundColor3=themeColor("MUTED",colors.muted),
+		BackgroundTransparency=0.70,
 		BorderSizePixel=0,
 		ClearTextOnFocus=false,
 		Position=UDim2.fromOffset(0,8),
@@ -1730,7 +1774,7 @@ function colors.new(app,page)
 		TextColor3=colors.text,
 		TextXAlignment=Enum.TextXAlignment.Center,
 		ZIndex=6,
-		ThemeRole="INPUT",
+		ThemeRole="MUTED",
 		CornerRole="Control",
 	},hexBody)
 	addCorner(hexBox,"Control")
@@ -1767,9 +1811,7 @@ function colors.new(app,page)
 
 	trackConnection(applyHex.Activated:Connect(commitHex))
 
-	local syncHighlightControls
-
-	local function setHighlightPickerFromColor(color)
+	setHighlightPickerFromColor=function(color)
 		highlightPickerHue,highlightPickerSat,highlightPickerVal=toHSV(color)
 	end
 
@@ -1782,11 +1824,13 @@ function colors.new(app,page)
 		end
 
 		if highlightSvCursor then
-			highlightSvCursor.Position=UDim2.new(highlightPickerSat,-4,1-highlightPickerVal,-4)
+			local x=highlightPickerSat
+			local y=1-highlightPickerVal
+			highlightSvCursor.Position=UDim2.new(x,math.floor(-8*x+0.5),y,math.floor(-8*y+0.5))
 		end
 
 		if highlightHueCursor then
-			highlightHueCursor.Position=UDim2.new(0,0,highlightPickerHue,-1)
+			highlightHueCursor.Position=UDim2.new(0,2,highlightPickerHue,math.floor(-3*highlightPickerHue+0.5))
 		end
 
 		if highlightPickerPreview then
@@ -1808,13 +1852,13 @@ function colors.new(app,page)
 
 	local function updateHighlightColorDrag(input)
 		if highlightColorDrag=="SV" and highlightSvBase and highlightSvBase.AbsoluteSize.X>0 then
-			local x,y,w,h=objectLocalPointer(highlightSvBase,input)
+			local x,y,w,h=objectLocalPointer(highlightSvBase,input,highlightColorDragOffset)
 			highlightPickerSat=math.clamp(x/w,0,1)
 			highlightPickerVal=1-math.clamp(y/h,0,1)
 			applyHighlightPickerColor(Color3.fromHSV(highlightPickerHue,highlightPickerSat,highlightPickerVal))
 		elseif highlightColorDrag=="Hue" and highlightHueCursor and highlightHueCursor.Parent and highlightHueCursor.Parent.AbsoluteSize.Y>0 then
 			local hueStrip=highlightHueCursor.Parent
-			local _,y,_,h=objectLocalPointer(hueStrip,input)
+			local _,y,_,h=objectLocalPointer(hueStrip,input,highlightColorDragOffset)
 			highlightPickerHue=math.clamp(y/h,0,1)
 			applyHighlightPickerColor(Color3.fromHSV(highlightPickerHue,highlightPickerSat,highlightPickerVal))
 		end
@@ -1925,13 +1969,6 @@ function colors.new(app,page)
 			local key=mode.key
 			local isSelected=key==selected
 			local isHover=key==highlightHoverMode
-			local isCustom=style[mode.prefix.."CustomColor"]==true
-			for _,state in ipairs(mode.states or {}) do
-				if style[mode.prefix..(state.suffix or "").."CustomColor"]==true then
-					isCustom=true
-					break
-				end
-			end
 			local color=muted
 			local transparency=0.74
 			local highlightTransparency=1
@@ -1946,11 +1983,6 @@ function colors.new(app,page)
 				nearGlowTransparency=isHover and 0.42 or 0.54
 				midGlowTransparency=isHover and 0.62 or 0.72
 				farGlowTransparency=isHover and 0.82 or 0.90
-			elseif isCustom then
-				color=core
-				transparency=isHover and 0.24 or 0.40
-				nearGlowTransparency=isHover and 0.72 or 0.92
-				midGlowTransparency=isHover and 0.86 or 0.98
 			elseif isHover then
 				color=brightenColor(muted,0.13)
 				transparency=0.60
@@ -2257,9 +2289,11 @@ function colors.new(app,page)
 	highlightSvBase=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,0,0),
 		BorderSizePixel=0,
-		Position=UDim2.fromOffset(0,8),
-		Size=UDim2.fromOffset(148,104),
+		Position=UDim2.fromOffset(22,8),
+		Size=UDim2.fromOffset(104,104),
+		ClipsDescendants=true,
 		SkipThemeRole=true,
+		CornerRole="Section",
 		ZIndex=6,
 	},highlightPickerBody)
 	addCorner(highlightSvBase,"Section")
@@ -2268,6 +2302,7 @@ function colors.new(app,page)
 		BackgroundColor3=Color3.fromRGB(255,255,255),
 		BorderSizePixel=0,
 		Size=UDim2.new(1,0,1,0),
+		ClipsDescendants=true,
 		SkipThemeRole=true,
 		ZIndex=7,
 	},highlightSvBase)
@@ -2283,6 +2318,7 @@ function colors.new(app,page)
 		BackgroundColor3=Color3.fromRGB(0,0,0),
 		BorderSizePixel=0,
 		Size=UDim2.new(1,0,1,0),
+		ClipsDescendants=true,
 		SkipThemeRole=true,
 		ZIndex=8,
 	},highlightSvBase)
@@ -2310,6 +2346,7 @@ function colors.new(app,page)
 		BorderSizePixel=0,
 		Position=UDim2.fromOffset(158,8),
 		Size=UDim2.fromOffset(18,104),
+		ClipsDescendants=true,
 		SkipThemeRole=true,
 		ZIndex=6,
 	},highlightPickerBody)
@@ -2330,7 +2367,8 @@ function colors.new(app,page)
 	highlightHueCursor=make("Frame",{
 		BackgroundColor3=Color3.fromRGB(255,255,255),
 		BorderSizePixel=0,
-		Size=UDim2.new(1,0,0,3),
+		Position=UDim2.fromOffset(2,0),
+		Size=UDim2.new(1,-4,0,3),
 		SkipThemeRole=true,
 		ZIndex=8,
 	},highlightHueStrip)
@@ -2363,6 +2401,7 @@ function colors.new(app,page)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			highlightColorDrag="SV"
 			highlightColorDragInput=input
+			highlightColorDragOffset=pointerOffset(highlightSvBase,input)
 			updateHighlightColorDrag(input)
 		end
 	end))
@@ -2371,6 +2410,7 @@ function colors.new(app,page)
 		if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
 			highlightColorDrag="Hue"
 			highlightColorDragInput=input
+			highlightColorDragOffset=pointerOffset(highlightHueStrip,input)
 			updateHighlightColorDrag(input)
 		end
 	end))
@@ -2385,6 +2425,7 @@ function colors.new(app,page)
 		if input==highlightColorDragInput or (highlightColorDragInput and highlightColorDragInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1) then
 			highlightColorDrag=nil
 			highlightColorDragInput=nil
+			highlightColorDragOffset=nil
 		end
 	end))
 
@@ -2409,13 +2450,12 @@ function colors.new(app,page)
 	end)
 
 	paintChoices=function()
-		local primary=getUIPrimaryColor()
 		local stroke=getUIStrokeColor()
 		local activeColor=getActiveColor()
 
 		for _,entry in ipairs(themeCards) do
 			local preset=entry.Preset
-			local selected=colorsMatch(primary,preset.Primary) and colorsMatch(stroke,preset.Stroke)
+			local selected=tostring(style.UILib or ""):lower()==preset.Id and style.UseThemePalette~=false
 
 			entry.Card.BackgroundColor3=selected and preset.Primary:Lerp(readableTextColor(preset.Primary),0.06) or preset.Primary
 			entry.Marker.Visible=selected
@@ -2447,7 +2487,7 @@ function colors.new(app,page)
 		end
 
 		if hexBox then
-			hexBox.BackgroundColor3=themeColor("INPUT",colors.panel)
+			hexBox.BackgroundColor3=themeColor("MUTED",colors.muted)
 		end
 
 		if highlightModeLabel then
@@ -2464,11 +2504,13 @@ function colors.new(app,page)
 		end
 
 		if svCursor then
-			svCursor.Position=UDim2.new(pickerSat,-4,1-pickerVal,-4)
+			local x=pickerSat
+			local y=1-pickerVal
+			svCursor.Position=UDim2.new(x,math.floor(-8*x+0.5),y,math.floor(-8*y+0.5))
 		end
 
 		if hueCursor then
-			hueCursor.Position=UDim2.new(0,0,pickerHue,-1)
+			hueCursor.Position=UDim2.new(0,2,pickerHue,math.floor(-3*pickerHue+0.5))
 		end
 
 		if colorPreview then
@@ -2489,7 +2531,7 @@ function colors.new(app,page)
 
 		if rgbSliders.R then
 			rgbSliders.R.set(clampByte(color.R*255),false)
-			rgbSliders.green.set(clampByte(color.G*255),false)
+			rgbSliders.G.set(clampByte(color.G*255),false)
 			rgbSliders.B.set(clampByte(color.B*255),false)
 		end
 

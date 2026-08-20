@@ -116,6 +116,7 @@ function hitboxPresets.new(app,ownedSection)
 	end))
 
 	local ownedList=make("ScrollingFrame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,190),CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ScrollBarThickness=4,BorderSizePixel=0,ZIndex=5},ownedSection)
+	make("UIPadding",{PaddingTop=UDim.new(0,4),PaddingLeft=UDim.new(0,1),PaddingRight=UDim.new(0,1),PaddingBottom=UDim.new(0,4)},ownedList)
 	make("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},ownedList)
 
 	function api.SetRefreshAll(fn)
@@ -239,10 +240,10 @@ function hitboxPresets.new(app,ownedSection)
 			local data=preset.Data or preset.data or {}
 			local editor=data.presetEditor or data.PresetEditor or preset.presetEditor or preset.PresetEditor or {}
 
-			local row=make("Frame",{BackgroundColor3=colors.bg,BorderSizePixel=0,Size=UDim2.new(1,-6,0,expandedOwned[code] and 178 or 32),ZIndex=6},ownedList)
-			make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=0},row)
+			local row=make("Frame",{BackgroundColor3=colors.bg,BorderSizePixel=0,Size=UDim2.new(1,0,0,expandedOwned[code] and 178 or 32),ZIndex=6},ownedList)
+			row:SetAttribute("NoStroke",true)
 
-			local toggle=make("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-8,0,30),Position=UDim2.fromOffset(4,1),Text=(expandedOwned[code] and"[-] " or"[+] ")..name.."  |  "..code,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=7},row)
+			local toggle=make("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,-20,0,30),Position=UDim2.fromOffset(10,1),Text=(expandedOwned[code] and"[-] " or"[+] ")..name.."  |  "..code,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=7},row)
 
 			trackConnection(toggle.Activated:Connect(function()
 				expandedOwned[code]=not expandedOwned[code]
