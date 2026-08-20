@@ -1,6 +1,6 @@
 # dev-gui
 
-`dev-gui` is a development clone of [`amyyzing/gui`](https://github.com/amyyzing/gui) with an isolated Railway module source and a small declarative Luau UI surface.
+`dev-gui` is a development clone of [`amyyzing/gui`](https://github.com/amyyzing/gui) with its own Railway module source and a small declarative Luau UI surface.
 
 ## Loader
 
@@ -23,8 +23,10 @@ last compiled build in `dev-gui-cache`. Set `Fresh = true` to redownload the
 current bundle, or `Development = true` to use the modular Railway loader while
 working on individual files.
 
-The client API key is only a routing boundary; an executor can inspect it. The testing repository is public, so this source does not reuse the main GUI's GitHub token.
-The deployed `DEV_GUI_KEY` must be `dev-gui`, matching the loader's clone-only routing key.
+The client uses the same API credential, saved player data, presets, announcements,
+Discord settings, and session memory as the main GUI. The fixed `dev-gui` module
+source still makes Railway fetch code from this repository instead of `gui`.
+The testing repository keeps its own `DEV_GUI_TOKEN` GitHub setting.
 
 ## Structure
 

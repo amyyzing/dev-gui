@@ -20,7 +20,7 @@ def test_loader_is_bound_to_dev_gui_source_and_dump_bootstrap():
     loader = read("loader.lua")
     assert 'MODULE_SOURCE="dev-gui"' in loader
     assert 'BOOTSTRAP_PATH="dump/start.lua"' in loader
-    assert 'DEFAULT_API_KEY="dev-gui"' in loader
+    assert 'DEFAULT_API_KEY="mydayohmy"' in loader
     assert "DEV_GUI_BOOT_CONFIG" in loader
     assert "GUI_BOOT_CONFIG" not in loader.replace("DEV_GUI_BOOT_CONFIG", "")
 

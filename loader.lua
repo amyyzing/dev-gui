@@ -5,7 +5,7 @@ local UserInputService=game:GetService("UserInputService")
 
 local API_URL="https://lint-bot-production.up.railway.app"
 local MODULE_SOURCE="dev-gui"
-local DEFAULT_API_KEY="dev-gui"
+local DEFAULT_API_KEY="mydayohmy"
 local BOOTSTRAP_PATH="dump/start.lua"
 local MAX_BOOTSTRAP_BYTES=300000
 local MAX_BUNDLE_BYTES=12000000
