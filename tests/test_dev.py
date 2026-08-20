@@ -306,7 +306,13 @@ def test_header_art_is_center_cropped_for_every_theme():
     for name in names:
         image = ROOT / "assets" / "headers" / f"{name}.png"
         assert image.is_file() and image.stat().st_size > 1000
-        assert f'{name}="https://raw.githubusercontent.com/amyyzing/gui/main/assets/headers/{name}.png"' in runtime
+        assert f"\t{name}=true," in runtime
+
+    assert 'Url=trustedApiUrl.."/asset/header"' in runtime
+    assert "apiKey=getApiKey()" in runtime
+    assert "source=getModuleSource()" in runtime
+    assert "raw.githubusercontent.com/amyyzing/dev-gui" not in runtime
+    assert "raw.githubusercontent.com/amyyzing/gui/main/assets/headers" not in runtime
 
     for platform in ("pc", "mobile"):
         shell = read(f"platforms/{platform}/gui/mainframe.lua")

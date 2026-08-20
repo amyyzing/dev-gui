@@ -128,15 +128,26 @@ colors=setmetatable({
 	end,
 })
 
-local headerArtUrls={
-	raycast="https://raw.githubusercontent.com/amyyzing/gui/main/assets/headers/raycast.png",
-	everforest="https://raw.githubusercontent.com/amyyzing/gui/main/assets/headers/everforest.png",
-	proof="https://raw.githubusercontent.com/amyyzing/gui/main/assets/headers/proof.png",
-	linear="https://raw.githubusercontent.com/amyyzing/gui/main/assets/headers/linear.png",
-	material="https://raw.githubusercontent.com/amyyzing/gui/main/assets/headers/material.png",
-	absolutely="https://raw.githubusercontent.com/amyyzing/gui/main/assets/headers/absolutely.png",
+local headerArtIds={
+	raycast=true,
+	everforest=true,
+	proof=true,
+	linear=true,
+	material=true,
+	absolutely=true,
 }
 local headerArtCache={}
+
+local function isPng(data)
+	return type(data)=="string"
+		and #data>8
+		and string.byte(data,1)==137
+		and data:sub(2,4)=="PNG"
+		and string.byte(data,5)==13
+		and string.byte(data,6)==10
+		and string.byte(data,7)==26
+		and string.byte(data,8)==10
+end
 
 function getHeaderArt(id)
 	id=tostring(id or "raycast"):lower()
@@ -144,19 +155,39 @@ function getHeaderArt(id)
 		return headerArtCache[id]
 	end
 
-	local url=headerArtUrls[id]
 	local assetFn=getcustomasset or getsynasset
-	if not url or type(writefile)~="function" or type(assetFn)~="function" then
+	if not headerArtIds[id] or type(writefile)~="function" or type(assetFn)~="function" then
 		return nil
 	end
 
-	local path="gui_header_"..id.."_1.png"
+	local path="gui_header_"..id.."_2.png"
 	local exists=type(isfile)=="function" and isfile(path)
 	if not exists then
-		local ok,data=pcall(function()
-			return game:HttpGet(url,true)
+		local requestFn=botApi and botApi.GetRequestFunction and botApi.GetRequestFunction()
+		if not requestFn then
+			return nil
+		end
+
+		local ok,response=pcall(function()
+			return requestFn({
+				Url=trustedApiUrl.."/asset/header",
+				Method="POST",
+				Headers={
+					["Content-Type"]="application/json",
+				},
+				Body=HttpService:JSONEncode({
+					apiKey=getApiKey(),
+					source=getModuleSource(),
+					id=id,
+				}),
+			})
 		end)
-		if not ok or type(data)~="string" or #data<8 then
+		if not ok then
+			return nil
+		end
+		local status=tonumber(response and(response.StatusCode or response.Status))
+		local data=response and(response.Body or response.body)
+		if (status and status>=400) or not isPng(data) then
 			return nil
 		end
 		local wrote=pcall(writefile,path,data)
