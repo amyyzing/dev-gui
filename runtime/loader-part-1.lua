@@ -928,6 +928,10 @@ maxModuleBytes=300000
 
 moduleCache={}
 moduleSources={}
+bundledModuleFactories=rawget(getfenv(),"bootBundledModules")
+if type(bundledModuleFactories)~="table" then
+	bundledModuleFactories=nil
+end
 if type(runtimeSourcesFromLoader)=="table" then
 	for path,source in pairs(runtimeSourcesFromLoader) do
 		moduleSources[path]=source
@@ -1019,6 +1023,30 @@ function fetchExternalModule(modulePath)
 	return result.source,nil
 end
 
+function loadBundledModule(modulePath)
+	local factory=bundledModuleFactories and bundledModuleFactories[modulePath]
+	if type(factory)~="function" then
+		return nil,"not bundled"
+	end
+
+	if setfenv then
+		setfenv(factory,getfenv())
+	end
+	local ok,loadedModule=xpcall(factory,function(err)
+		if debug and type(debug.traceback)=="function" then
+			return debug.traceback(tostring(err),2)
+		end
+		return tostring(err)
+	end)
+	if not ok then
+		return nil,loadedModule
+	end
+
+	moduleCache[modulePath]=loadedModule
+	moduleSources[modulePath]="bundled"
+	return loadedModule,nil
+end
+
 function loadRemoteModule(modulePath)
 	if not isAllowedModulePath(modulePath) then
 		warn("module path blocked:",modulePath)
@@ -1027,6 +1055,15 @@ function loadRemoteModule(modulePath)
 
 	if moduleCache[modulePath] then
 		return moduleCache[modulePath]
+	end
+
+	if bundledModuleFactories and bundledModuleFactories[modulePath] then
+		local loadedModule,bundleError=loadBundledModule(modulePath)
+		if loadedModule~=nil then
+			return loadedModule
+		end
+		warn("bundled module broke while loading:",modulePath,bundleError)
+		return nil
 	end
 
 	local moduleSource=nil
@@ -1078,6 +1115,22 @@ function loadRemoteModuleBatch(paths)
 
 	if #pendingPaths==0 then
 		return true,nil
+	end
+
+	if bundledModuleFactories then
+		local failed=0
+		for index,modulePath in ipairs(pendingPaths) do
+			local loadedModule=loadRemoteModule(modulePath)
+			if loadedModule~=nil then
+				setLoadedModuleByPath(modulePath,loadedModule)
+			elseif not optionalModuleFileSet[modulePath] then
+				failed=failed+1
+			end
+			if index%8==0 or index==#pendingPaths then
+				setLoaderProgress("registering bundled modules",math.min(index,loaderStepTotal),loaderStepTotal,failed>0)
+			end
+		end
+		return failed==0,failed>0 and "bundled module failed" or nil
 	end
 
 	local apiPaths={}
@@ -1690,34 +1743,25 @@ function finishLoader()
 	subtitleText.Text=tostring(loaderText.ReadySubtitle or "")
 	setLoaderProgress(tostring(loaderText.ReadyStatus or "all loaded"),loaderStepTotal,loaderStepTotal,false)
 
-	playLoaderKeyframes({
-		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.18,{BackgroundTransparency=0.88,Size=UDim2.fromOffset(loaderBoxW+60,loaderBoxH+54)}},
-		{loaderPulse,Enum.EasingDirection.Out,Enum.EasingStyle.Quad,0.28,{BackgroundTransparency=1,Size=UDim2.fromOffset(loaderBoxW+140,loaderBoxH+110)}},
-	},true)
+	loaderAlive=false
+	local tweenInfo=TweenInfo.new(0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
+	TweenService:Create(loaderOverlay,tweenInfo,{BackgroundTransparency=1}):Play()
 
-	task.delay(0.48,function()
-		if not loaderOverlay or not loaderOverlay.Parent then return end
-		loaderAlive=false
-
-		local tweenInfo=TweenInfo.new(0.2,Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
-		TweenService:Create(loaderOverlay,tweenInfo,{BackgroundTransparency=1}):Play()
-
-		for _,instance in ipairs(loaderOverlay:GetDescendants()) do
-			if instance:IsA("TextLabel") or instance:IsA("TextButton") then
-				TweenService:Create(instance,tweenInfo,{TextTransparency=1}):Play()
-			elseif instance:IsA("Frame") then
-				TweenService:Create(instance,tweenInfo,{BackgroundTransparency=1}):Play()
-			elseif instance:IsA("UIStroke") then
-				TweenService:Create(instance,tweenInfo,{Transparency=1}):Play()
-			end
+	for _,instance in ipairs(loaderOverlay:GetDescendants()) do
+		if instance:IsA("TextLabel") or instance:IsA("TextButton") then
+			TweenService:Create(instance,tweenInfo,{TextTransparency=1}):Play()
+		elseif instance:IsA("Frame") then
+			TweenService:Create(instance,tweenInfo,{BackgroundTransparency=1}):Play()
+		elseif instance:IsA("UIStroke") then
+			TweenService:Create(instance,tweenInfo,{Transparency=1}):Play()
 		end
+	end
 
-		task.delay(0.24,function()
-			if loaderOverlay then
-				loaderOverlay:Destroy()
-				loaderOverlay=nil
-			end
-		end)
+	task.delay(0.2,function()
+		if loaderOverlay then
+			loaderOverlay:Destroy()
+			loaderOverlay=nil
+		end
 	end)
 end
 

@@ -14,17 +14,23 @@ Optional boot flags use a clone-only global, so they do not alter the main GUI l
 
 ```lua
 getgenv().DEV_GUI_BOOT_CONFIG = {
-    Fresh = true,
-    FetchTimeout = 30,
+    Debug = true,
 }
 ```
+
+Production startup downloads one commit-pinned PC or mobile bundle and caches the
+last compiled build in `dev-gui-cache`. Set `Fresh = true` to redownload the
+current bundle, or `Development = true` to use the modular Railway loader while
+working on individual files.
 
 The client API key is only a routing boundary; an executor can inspect it. The testing repository is public, so this source does not reuse the main GUI's GitHub token.
 The deployed `DEV_GUI_KEY` must be `dev-gui`, matching the loader's clone-only routing key.
 
 ## Structure
 
-- `loader.lua` is the stable entry and loads `dump/start.lua` through Railway.
+- `loader.lua` is the stable entry and normally executes one raw Railway bundle.
+- `build/bundle-manifest.json` is the authoritative bundle inventory.
+- `dump/start.lua` is retained as the modular development and recovery path.
 - `dump/init.lua` is the only public entry into implementation details.
 - `dump/ui.lua` exposes the small `UI.createThing(parent, options)` API.
 - `dump/lib.lua` is the only file that knows the positional 495 UI-library helpers.
