@@ -8,18 +8,38 @@ local function destroyControl(control)
 	end
 end
 
-local function isNormalArcBeam(instance)
-	if not(instance and instance:IsA("Beam") and instance.Name=="ThrowingArc") then
-		return false
+local function hiddenVisualProperty(instance)
+	if instance:IsA("BasePart") or instance:IsA("Decal") or instance:IsA("Texture") then
+		return "Transparency",1
 	end
+	if instance:IsA("Beam") or instance:IsA("Trail") or instance:IsA("ParticleEmitter") then
+		return "Transparency",NumberSequence.new(1)
+	end
+	if instance:IsA("Smoke") then
+		return "Opacity",0
+	end
+	if instance:IsA("Attachment") or instance:IsA("GuiObject")
+		or instance:IsA("GuiBase3d") or instance:IsA("ForceField") then
+		return "Visible",false
+	end
+	if instance:IsA("Fire") or instance:IsA("Sparkles") or instance:IsA("Highlight")
+		or instance:IsA("Light")
+		or instance:IsA("BillboardGui") or instance:IsA("SurfaceGui") then
+		return "Enabled",false
+	end
+	return nil,nil
+end
 
-	local ancestor=instance.Parent
+local function isNormalArcVisual(instance)
+	if not instance then return false end
+
+	local ancestor=instance
 	while ancestor and ancestor~=workspace do
 		if ancestor.Name=="DevGuiClonedCenter" then
 			return false
 		end
 		if ancestor.Name=="Center" then
-			return true
+			return ancestor.Parent and ancestor.Parent.Name=="Local"
 		end
 		ancestor=ancestor.Parent
 	end
@@ -39,31 +59,44 @@ function arc.new(app,page)
 	local trackedRoots=setmetatable({},{__mode="k"})
 	local records=setmetatable({},{__mode="k"})
 
-	local function forceHidden(beam)
-		if not(beam and beam.Parent and beam.Enabled) then return end
-		beam.Enabled=false
+	local function forceHidden(instance,record)
+		if not(instance and instance.Parent and record) then return end
+		pcall(function()
+			instance[record.property]=record.hidden
+		end)
 	end
 
-	local function trackBeam(beam)
-		if not hidden or records[beam] or not isNormalArcBeam(beam) then return end
+	local function trackVisual(instance)
+		if not hidden or records[instance] or not isNormalArcVisual(instance) then return end
+		local property,hiddenValue=hiddenVisualProperty(instance)
+		if not property then return end
 
-		local record={desired=beam.Enabled,connection=nil}
-		records[beam]=record
-		record.connection=beam:GetPropertyChangedSignal("Enabled"):Connect(function()
-			if not hidden or not beam.Enabled then return end
-			record.desired=true
-			forceHidden(beam)
+		local ok,desired=pcall(function()
+			return instance[property]
 		end)
-		forceHidden(beam)
+		if not ok then return end
+
+		local record={property=property,hidden=hiddenValue,desired=desired,connection=nil}
+		records[instance]=record
+		record.connection=instance:GetPropertyChangedSignal(property):Connect(function()
+			if not hidden then return end
+			local readOk,current=pcall(function()
+				return instance[property]
+			end)
+			if not readOk or current==hiddenValue then return end
+			record.desired=current
+			forceHidden(instance,record)
+		end)
+		forceHidden(instance,record)
 	end
 
 	local function watchRoot(root)
 		if not(root and root.Parent) or trackedRoots[root] then return end
 		trackedRoots[root]=true
 		for _,descendant in ipairs(root:GetDescendants()) do
-			trackBeam(descendant)
+			trackVisual(descendant)
 		end
-		rootConnections[#rootConnections+1]=root.DescendantAdded:Connect(trackBeam)
+		rootConnections[#rootConnections+1]=root.DescendantAdded:Connect(trackVisual)
 	end
 
 	local function startHiding()
@@ -85,14 +118,14 @@ function arc.new(app,page)
 		end
 		table.clear(trackedRoots)
 
-		for beam,record in pairs(records) do
+		for instance,record in pairs(records) do
 			safeDisconnect(record.connection)
-			if beam and beam.Parent then
+			if instance and instance.Parent then
 				pcall(function()
-					beam.Enabled=record.desired
+					instance[record.property]=record.desired
 				end)
 			end
-			records[beam]=nil
+			records[instance]=nil
 		end
 	end
 

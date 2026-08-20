@@ -294,12 +294,32 @@ class LifecycleContracts(unittest.TestCase):
             self.assertIn('{name="Arc",api="ArcAPI",order=1,title="Hide Arc"}', ui_map)
 
         self.assertIn('["Hide Arc"]={Title="HIDE ARC"', source("gui/description.lua"))
-        self.assertIn('instance.Name=="ThrowingArc"', arc)
+        self.assertIn('ancestor.Name=="Center"', arc)
+        self.assertIn('ancestor.Parent.Name=="Local"', arc)
         self.assertIn('ancestor.Name=="DevGuiClonedCenter"', arc)
-        self.assertIn('beam:GetPropertyChangedSignal("Enabled")', arc)
-        self.assertIn("desired=beam.Enabled", arc)
-        self.assertIn("beam.Enabled=false", arc)
-        self.assertIn("beam.Enabled=record.desired", arc)
+        for visual_class in (
+            "BasePart",
+            "Decal",
+            "Texture",
+            "Attachment",
+            "GuiObject",
+            "GuiBase3d",
+            "Beam",
+            "Trail",
+            "ParticleEmitter",
+            "Highlight",
+            "BillboardGui",
+            "SurfaceGui",
+        ):
+            self.assertIn(f'instance:IsA("{visual_class}")', arc)
+        self.assertIn('return "Transparency",1', arc)
+        self.assertIn('return "Transparency",NumberSequence.new(1)', arc)
+        self.assertIn('return "Opacity",0', arc)
+        self.assertIn('return "Visible",false', arc)
+        self.assertIn('return "Enabled",false', arc)
+        self.assertIn("instance:GetPropertyChangedSignal(property)", arc)
+        self.assertIn("instance[record.property]=record.hidden", arc)
+        self.assertIn("instance[record.property]=record.desired", arc)
         self.assertNotIn(":Destroy()", arc)
         self.assertIn("lazyPageBuilders.server=buildServerPage", runtime)
         self.assertIn('elseif name=="server" then', refresh)
