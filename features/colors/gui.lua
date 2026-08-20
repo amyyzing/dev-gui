@@ -523,6 +523,7 @@ function guiLogic.new(app)
 
 		wrap.Name=box.Name~="" and (box.Name.."_Wrap") or "TextBoxWrap"
 		wrap.BackgroundColor3=unfilledColor
+		wrap.BackgroundTransparency=0.70
 		wrap.BorderSizePixel=0
 		wrap.ClipsDescendants=false
 		wrap.Active=true
@@ -1057,7 +1058,7 @@ function guiLogic.new(app)
 
 		local hit=make("TextButton",{BackgroundTransparency=1,Text="",Size=UDim2.new(1,0,1,0),ZIndex=12,AutoButtonColor=false,Selectable=true},track)
 		local valueBoxHeight=componentNumber("SliderValueBoxHeight",math.max(componentNumber("TextBoxHeight",24),sliderHeight))
-		local valueBox=make("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor(valueRole,colors.panel),BackgroundTransparency=componentNumber("SliderValueBoxTransparency",0),BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole=valueRole,CornerRole="Control",Selectable=true},container)
+		local valueBox=make("TextBox",{AnchorPoint=Vector2.new(1,0.5),Position=UDim2.new(1,-rightPadding,valueBoxYScale,valueBoxYOffset),Size=UDim2.fromOffset(math.max(1,valueBoxWidth),valueBoxHeight),BackgroundColor3=themeColor(valueRole,colors.panel),BackgroundTransparency=sliderTrackTransparency,BorderSizePixel=0,ClearTextOnFocus=false,Text=fmtNumber(startVal,decimals),Font=componentFont("ControlFont",Enum.Font.GothamMedium),TextSize=componentNumber("SliderValueTextSize",12),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=6,ThemeRole=valueRole,CornerRole="Control",Selectable=true},container)
 		valueBox:SetAttribute("NoStroke",noStroke)
 		valueBox.Visible=valueBoxVisible
 		addCorner(valueBox,"Control")

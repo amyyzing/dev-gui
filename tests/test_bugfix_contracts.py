@@ -171,6 +171,8 @@ class LifecycleContracts(unittest.TestCase):
         self.assertIn('track:SetAttribute("NoStroke",noStroke)', controls)
         self.assertIn('fill:SetAttribute("NoStroke",noStroke)', controls)
         self.assertIn('valueBox:SetAttribute("NoStroke",noStroke)', controls)
+        self.assertIn("wrap.BackgroundTransparency=0.70", controls)
+        self.assertIn("BackgroundTransparency=sliderTrackTransparency", controls)
 
         for path in (
             "platforms/pc/gui/mainframe.lua",

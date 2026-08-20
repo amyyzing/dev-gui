@@ -1037,6 +1037,7 @@ function colors.new(app,page)
 
 		local valueBox=make("TextBox",{
 			BackgroundColor3=themeColor("MUTED",colors.muted),
+			BackgroundTransparency=0.70,
 			BorderSizePixel=0,
 			ClearTextOnFocus=false,
 			Size=UDim2.fromOffset(48,24),
@@ -1762,6 +1763,7 @@ function colors.new(app,page)
 	local hexBody=modeBodies.Hex
 	hexBox=make("TextBox",{
 		BackgroundColor3=themeColor("MUTED",colors.muted),
+		BackgroundTransparency=0.70,
 		BorderSizePixel=0,
 		ClearTextOnFocus=false,
 		Position=UDim2.fromOffset(0,8),
