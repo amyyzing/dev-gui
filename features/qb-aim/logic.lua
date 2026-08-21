@@ -67,8 +67,6 @@ local landingInfoEnabled=false
 local landingInfoSize=UDim2.new(0,220,0,78)
 local landingInfoOffset=Vector3.new(0,3.2,0)
 local circleTangentMargin=1e-6
-local catchAnchorMaxOffset=10
-local catchAnchorBlend=1.00
 local playThrowAnimation=true
 local throwAnimationName="UF_QuarterbackThrow"
 local throwAnimationSpeed=1.35
@@ -316,22 +314,6 @@ local function getPlayerTeamID(player)
 
 	if ok then
 		return tostring(value)
-	end
-
-	return nil
-end
-
-local function getPlayerTackleBox(player)
-	local replicated=player and player:FindFirstChild("Replicated")
-	local tackleBoxValue=replicated and replicated:FindFirstChild("TackleBox")
-	if not tackleBoxValue then return nil end
-
-	local ok,value=pcall(function()
-		return tackleBoxValue.Value
-	end)
-
-	if ok and typeof(value)=="Instance" and value:IsA("BasePart") and value.Parent then
-		return value
 	end
 
 	return nil
@@ -1698,25 +1680,6 @@ function qbAim.new(app,parent)
 		return velocity,movementShape(originPosition,receiverRoot.Position,velocity),state
 	end
 
-	local function receiverCatchAnchor(receiver,receiverRoot)
-		if not receiverRoot then
-			return nil,"none"
-		end
-
-		local rootPosition=receiverRoot.Position
-		local tackleBox=getPlayerTackleBox(receiver)
-		if tackleBox then
-			local boxPosition=tackleBox.Position
-			local offset=boxPosition-rootPosition
-			if flat(offset).Magnitude<=catchAnchorMaxOffset and math.abs(offset.Y)<=catchAnchorMaxOffset then
-				local blended=rootPosition:Lerp(boxPosition,catchAnchorBlend)
-				return Vector3.new(blended.X,rootPosition.Y,blended.Z),"tackle_box"
-			end
-		end
-
-		return rootPosition,"root"
-	end
-
 	local function origin(qbRoot,ball)
 		local fallbackPosition=ball and ball.Position or qbRoot.Position
 		local c2Pos=c2Position()
@@ -2108,13 +2071,12 @@ function qbAim.new(app,parent)
 
 		receiverReleaseOffset=receiverReleaseOffset or 0
 		local originPosition=originOverride or origin(qbRoot,ball)
-		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
-		local catchPosition=receiverAnchorPosition or receiverRoot.Position
+		local receiverPosition=receiverRoot.Position
 		local groundY=0
 		local catchY=catchHeight
 		if getModeKey(app)=="mode2" then
-			groundY=fieldGroundY(catchPosition)
+			groundY=fieldGroundY(receiverPosition)
 			if not groundY then
 				return nil,nil
 			end
@@ -2122,9 +2084,7 @@ function qbAim.new(app,parent)
 		end
 		return mathCore.solve({
 			originPosition=originPosition,
-			receiverPosition=receiverRoot.Position,
-			receiverAnchorPosition=receiverAnchorPosition,
-			receiverAnchorSource=receiverAnchorSource,
+			receiverPosition=receiverPosition,
 			targetVelocity=targetVelocity,
 			shape=shape,
 			ballPower=ballPower or currentBallPower(),

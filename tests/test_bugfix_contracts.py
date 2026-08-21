@@ -189,6 +189,23 @@ class QBAimDefaultsContracts(unittest.TestCase):
 
     def test_qb_peak_uses_the_field_plane_in_park_only(self):
         logic = source("features/qb-aim/logic.lua")
+        math_source = source("features/qb-aim/math.lua")
+
+        for removed in (
+            "getPlayerTackleBox",
+            "receiverCatchAnchor",
+            "receiverAnchorPosition",
+            "receiverAnchorSource",
+            "catchAnchorMaxOffset",
+            "catchAnchorBlend",
+            'FindFirstChild("TackleBox")',
+        ):
+            self.assertNotIn(removed, logic)
+            self.assertNotIn(removed, math_source)
+
+        self.assertIn("local receiverPosition=receiverRoot.Position", logic)
+        self.assertIn("receiverPosition=receiverPosition,", logic)
+        self.assertIn("local receiverBasePosition=params.receiverPosition", math_source)
         self.assertIn("local function fieldGroundY(position)", logic)
         self.assertIn("for _,player in ipairs(currentPlayers()) do", logic)
         self.assertIn("params.FilterDescendantsInstances=ignore", logic)
@@ -198,14 +215,13 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("local catchY=catchHeight", logic)
         self.assertIn('if getModeKey(app)=="mode2" then', logic)
         self.assertIn("local groundY=0", logic)
-        self.assertIn("groundY=fieldGroundY(catchPosition)", logic)
+        self.assertIn("groundY=fieldGroundY(receiverPosition)", logic)
         self.assertIn("if not groundY then", logic)
         self.assertIn("catchY=groundY+catchHeight", logic)
         self.assertIn("groundY=groundY,", logic)
         self.assertNotIn("fieldGroundY(catchPosition) or 0", logic)
         self.assertNotIn("catchPosition.Y+catchHeight", logic)
 
-        math_source = source("features/qb-aim/math.lua")
         self.assertIn("local function landing(originPosition,velocity,groundY)", math_source)
         self.assertIn("local height=originPosition.Y-groundY", math_source)
         self.assertIn(

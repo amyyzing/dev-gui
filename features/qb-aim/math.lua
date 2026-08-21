@@ -405,7 +405,7 @@ function qbAimMath.solve(params)
 	local wrVel=clampMagnitude(flat(params.targetVelocity or Vector3.zero),maxRunSpeed)
 	local qbVel=clampMagnitude(flat(params.qbVelocity or Vector3.zero),maxRunSpeed)
 	local originPosition=params.originPosition
-	local receiverBasePosition=params.receiverAnchorPosition or params.receiverPosition
+	local receiverBasePosition=params.receiverPosition
 	if not(originPosition and receiverBasePosition) then
 		return nil
 	end
@@ -534,8 +534,6 @@ function qbAimMath.solve(params)
 		best.qbReleaseOffset=qbReleaseOffset
 		best.qbSharedReleaseOffset=qbReleaseOffset
 		best.receiverReleaseOffset=receiverReleaseOffset
-		best.receiverAnchorSource=params.receiverAnchorSource or "root"
-		best.receiverAnchorPosition=receiverBasePosition
 		best.futureReleaseOriginLatch=qbReleaseOffset>0
 		best.remoteFireDelayed=params.remoteFireDelayed~=false
 	end
