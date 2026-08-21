@@ -77,6 +77,34 @@ class BundleContracts(unittest.TestCase):
         self.assertNotIn("gui/gui-logic.lua", manifest["uiLibrary"])
         self.assertIn('GuiLogic="features/colors/gui.lua"', runtime)
 
+    def test_ui_library_owns_the_current_theme_catalog(self):
+        manifest = json.loads((ROOT / "build" / "bundle-manifest.json").read_text(encoding="utf-8"))
+        ui_root = ROOT.parent / "495-ui-library"
+        library_map = (ui_root / "gui" / "library-map.lua").read_text(encoding="utf-8")
+        expected = {"raycast", "everforest", "proof", "linear", "material", "absolutely"}
+
+        self.assertEqual(
+            {Path(path).stem for path in manifest["uiLibrary"] if path.startswith("design/themes/")},
+            expected,
+        )
+        self.assertIn('libraryMap.DefaultProfileId="raycast"', library_map)
+        self.assertIn('UnfilledRole="MUTED"', library_map)
+        self.assertIn('UnfilledTransparency=0.70', library_map)
+        for theme in expected:
+            self.assertIn(f'{theme}=profile("{theme}"', library_map)
+
+        for path in (ROOT / "gui" / "pc.luau", ROOT / "gui" / "mobile.luau"):
+            source = path.read_text(encoding="utf-8")
+            self.assertLess(source.index("libraryMap.GetProfile(profileId)"), source.index("guiThemes[profileId]"))
+
+    def test_auto_calibrate_uses_the_unfilled_control_role(self):
+        qb = (ROOT / "features" / "qb-aim" / "logic.lua").read_text(encoding="utf-8")
+        line = next(line for line in qb.splitlines() if "autoCalibrateButton=make" in line)
+        self.assertIn("BackgroundColor3=colors.MUTED or colors.muted", line)
+        self.assertIn("BackgroundTransparency=0.70", line)
+        self.assertIn('ThemeRole="MUTED"', line)
+        self.assertIn("AutoButtonColor=false", line)
+
 
 if __name__ == "__main__":
     unittest.main()

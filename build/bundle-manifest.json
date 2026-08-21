@@ -84,12 +84,12 @@
   },
   "uiLibrary": [
     "design/resolver.lua",
-    "design/themes/crimson.lua",
-    "design/themes/dark.lua",
-    "design/themes/evergreen.lua",
-    "design/themes/light.lua",
-    "design/themes/midnight.lua",
-    "design/themes/sakura.lua",
+    "design/themes/absolutely.lua",
+    "design/themes/everforest.lua",
+    "design/themes/linear.lua",
+    "design/themes/material.lua",
+    "design/themes/proof.lua",
+    "design/themes/raycast.lua",
     "design/tokens.lua",
     "gui/fusion.lua",
     "gui/library-map.lua"

@@ -334,12 +334,12 @@ end
 
 function uiMap.GetLibraryProfile(id)
 	local profileId=tostring(id or uiMap.LibraryProfileId):lower()
-	if guiThemes[profileId] then
-		return guiThemes[profileId]
-	end
-
 	if type(libraryMap.GetProfile)=="function" then
 		return libraryMap.GetProfile(profileId)
+	end
+
+	if guiThemes[profileId] then
+		return guiThemes[profileId]
 	end
 
 	return libraryMap.Profiles and libraryMap.Profiles[uiMap.LibraryProfileId] or {}

@@ -1028,24 +1028,16 @@ function guiLogic.new(app)
 		local sliderGlowInfo=TweenInfo.new(componentNumber("SliderGlowTweenTime",0.16),Enum.EasingStyle.Quad,Enum.EasingDirection.Out)
 		local sliderGlowIdleTransparency=componentNumber("SliderGlowIdleTransparency",0.84)
 		local sliderGlowActiveTransparency=componentNumber("SliderGlowActiveTransparency",0.52)
-		local sliderGlowStrokeIdleTransparency=componentNumber("SliderGlowStrokeIdleTransparency",0.72)
-		local sliderGlowStrokeActiveTransparency=componentNumber("SliderGlowStrokeActiveTransparency",0.24)
 		local sliderFillTransparency=componentNumber("SliderFillTransparency",0)
 		local sliderTrackTransparency=0.70
 		local container=make("Frame",{BackgroundColor3=themeColor(containerRole,themeColor("SECTION",colors.card)),BackgroundTransparency=componentNumber("SliderContainerTransparency",1),BorderSizePixel=0,Size=UDim2.new(1,0,0,rowHeight),ZIndex=5,ThemeRole=containerRole,CornerRole=containerCorner},parent)
 		container:SetAttribute("NoStroke",noStroke)
 		addCorner(container,containerCorner)
-		local containerStrokeTransparency=componentNumber("SliderContainerStrokeTransparency",1)
-		local containerStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=containerStrokeTransparency},container)
-		containerStroke:SetAttribute("BaseStrokeTransparency",containerStrokeTransparency)
 		make("TextLabel",{BackgroundTransparency=1,Position=labelPosition,Size=labelSize,Text=labelText,Font=componentFont("ControlFont",s.SliderStyle=="thin" and Enum.Font.Code or Enum.Font.GothamMedium),TextSize=componentNumber("SliderLabelSize",s.SliderStyle=="thin" and 11 or 12),TextColor3=colors.text,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=6,Selectable=false,Visible=hasLabel},container)
 
 		local track=make("Frame",{AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(1,-(trackLeft+trackRight),0,sliderHeight),Position=UDim2.new(0,trackLeft,trackYScale,trackYOffset),BackgroundColor3=themeColor(trackRole,colors.panel),BackgroundTransparency=sliderTrackTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=6,ThemeRole=trackRole,CornerRole="Slider"},container)
 		track:SetAttribute("NoStroke",noStroke)
 		addCorner(track,"Slider")
-		local trackStrokeTransparency=componentNumber("SliderTrackStrokeTransparency",0.78)
-		local trackStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=trackStrokeTransparency},track)
-		trackStroke:SetAttribute("BaseStrokeTransparency",trackStrokeTransparency)
 
 		local fillGlow=make("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",colors.stroke),BackgroundTransparency=sliderGlowIdleTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=7,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
 		addCorner(fillGlow,"Slider")
@@ -1053,9 +1045,6 @@ function guiLogic.new(app)
 		local fill=make("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=themeColor("SLIDER_FILL",colors.stroke),BackgroundTransparency=sliderFillTransparency,BorderSizePixel=0,ClipsDescendants=true,ZIndex=8,ThemeRole="SLIDER_FILL",CornerRole="Slider"},track)
 		fill:SetAttribute("NoStroke",noStroke)
 		addCorner(fill,"Slider")
-		local fillStroke=make("UIStroke",{Color=themeColor("SLIDER_FILL",colors.stroke),Thickness=componentNumber("SliderGlowStrokeThickness",2),Transparency=sliderGlowStrokeIdleTransparency},fill)
-		fillStroke:SetAttribute("StrokeRole","Accent")
-		fillStroke:SetAttribute("BaseStrokeTransparency",sliderGlowStrokeIdleTransparency)
 
 		local knobVisible=componentValue("SliderKnobVisible",false)==true
 		local knobWidth=knobVisible and (s.SliderStyle=="windui" and 10 or (s.SliderStyle=="thin" and 2 or 3)) or 0
@@ -1070,9 +1059,6 @@ function guiLogic.new(app)
 		valueBox:SetAttribute("NoStroke",noStroke)
 		valueBox.Visible=valueBoxVisible
 		addCorner(valueBox,"Control")
-		local valueStrokeTransparency=componentNumber("SliderValueBoxStrokeTransparency",componentNumber("ControlStrokeTransparency",0.78))
-		local valueStroke=make("UIStroke",{Color=colors.stroke,Thickness=1,Transparency=valueStrokeTransparency},valueBox)
-		valueStroke:SetAttribute("BaseStrokeTransparency",valueStrokeTransparency)
 		local value=startVal
 		local valueState=makeFusionValue(value)
 		local dragging=false
@@ -1082,7 +1068,6 @@ function guiLogic.new(app)
 		local fillTween=nil
 		local fillGlowTween=nil
 		local fillGlowFadeTween=nil
-		local fillStrokeTween=nil
 		local knobTween=nil
 		local glowSerial=0
 		local connections={}
@@ -1111,10 +1096,6 @@ function guiLogic.new(app)
 				fillGlowFadeTween:Cancel()
 				fillGlowFadeTween=nil
 			end
-			if fillStrokeTween then
-				fillStrokeTween:Cancel()
-				fillStrokeTween=nil
-			end
 			if knobTween then
 				knobTween:Cancel()
 				knobTween=nil
@@ -1130,10 +1111,8 @@ function guiLogic.new(app)
 				cancelSliderTweens()
 				fillTween=tweenService:Create(fill,sliderTweenInfo,{Size=fillSize})
 				fillGlowTween=tweenService:Create(fillGlow,sliderTweenInfo,{Size=fillSize,BackgroundTransparency=sliderGlowActiveTransparency})
-				fillStrokeTween=tweenService:Create(fillStroke,sliderGlowInfo,{Transparency=sliderGlowStrokeActiveTransparency})
 				fillTween:Play()
 				fillGlowTween:Play()
-				fillStrokeTween:Play()
 
 				if knobVisible then
 					knobTween=tweenService:Create(knob,sliderTweenInfo,{Position=knobPosition})
@@ -1148,15 +1127,12 @@ function guiLogic.new(app)
 					end
 					fillGlowFadeTween=tweenService:Create(fillGlow,sliderGlowInfo,{BackgroundTransparency=sliderGlowIdleTransparency})
 					fillGlowFadeTween:Play()
-					fillStrokeTween=tweenService:Create(fillStroke,sliderGlowInfo,{Transparency=sliderGlowStrokeIdleTransparency})
-					fillStrokeTween:Play()
 				end)
 			else
 				cancelSliderTweens()
 				fill.Size=fillSize
 				fillGlow.Size=fillSize
 				fillGlow.BackgroundTransparency=sliderGlowIdleTransparency
-				fillStroke.Transparency=sliderGlowStrokeIdleTransparency
 			end
 
 			if knobVisible then
