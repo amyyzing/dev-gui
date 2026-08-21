@@ -881,8 +881,8 @@ function qbAim.new(app,parent)
 		params.FilterDescendantsInstances=ignore
 		params.IgnoreWater=true
 
-		local result=workspace:Raycast(position+Vector3.new(0,30,0),Vector3.new(0,-220,0),params)
-		if result and result.Position.Y<=position.Y-1 then
+		local result=workspace:Raycast(position,Vector3.new(0,-220,0),params)
+		if result and result.Position.Y<=position.Y then
 			return result.Position.Y
 		end
 
@@ -2113,7 +2113,11 @@ function qbAim.new(app,parent)
 		local catchPosition=receiverAnchorPosition or receiverRoot.Position
 		local catchY=catchHeight
 		if getModeKey(app)=="mode2" then
-			catchY=(fieldGroundY(catchPosition) or 0)+catchHeight
+			local groundY=fieldGroundY(catchPosition)
+			if not groundY then
+				return nil,nil
+			end
+			catchY=groundY+catchHeight
 		end
 		return mathCore.solve({
 			originPosition=originPosition,

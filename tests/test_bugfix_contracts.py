@@ -192,10 +192,15 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("local function fieldGroundY(position)", logic)
         self.assertIn("for _,player in ipairs(currentPlayers()) do", logic)
         self.assertIn("params.FilterDescendantsInstances=ignore", logic)
-        self.assertIn("workspace:Raycast(position+Vector3.new(0,30,0)", logic)
+        self.assertIn(
+            "workspace:Raycast(position,Vector3.new(0,-220,0),params)", logic
+        )
         self.assertIn("local catchY=catchHeight", logic)
         self.assertIn('if getModeKey(app)=="mode2" then', logic)
-        self.assertIn("catchY=(fieldGroundY(catchPosition) or 0)+catchHeight", logic)
+        self.assertIn("local groundY=fieldGroundY(catchPosition)", logic)
+        self.assertIn("if not groundY then", logic)
+        self.assertIn("catchY=groundY+catchHeight", logic)
+        self.assertNotIn("fieldGroundY(catchPosition) or 0", logic)
         self.assertNotIn("catchPosition.Y+catchHeight", logic)
 
     def test_auto_calibrate_uses_one_throw_animation_and_stable_ball_release(self):
