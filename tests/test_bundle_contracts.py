@@ -80,6 +80,21 @@ class BundleContracts(unittest.TestCase):
         self.assertNotIn("gui/gui-logic.lua", manifest["uiLibrary"])
         self.assertIn('GuiLogic="features/colors/gui.lua"', runtime)
 
+    def test_theme_modules_have_no_legacy_names(self):
+        manifest = json.loads((ROOT / "build" / "bundle-manifest.json").read_text(encoding="utf-8"))
+        runtime = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
+        expected = {"raycast", "everforest", "proof", "linear", "material", "absolutely"}
+        retired = {"dark", "light", "midnight", "crimson", "evergreen", "sakura"}
+        theme_names = {
+            Path(path).stem
+            for path in manifest["uiLibrary"]
+            if path.startswith("design/themes/")
+        }
+
+        self.assertEqual(theme_names, expected)
+        for name in retired:
+            self.assertNotIn(f"design/themes/{name}.lua", runtime)
+
 
 if __name__ == "__main__":
     unittest.main()

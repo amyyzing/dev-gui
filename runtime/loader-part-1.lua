@@ -744,12 +744,12 @@ modulePaths={
 	StateStore="state/store.lua",
 	DesignTokens="design/tokens.lua",
 	DesignThemeResolver="design/resolver.lua",
-	DesignThemeDark="design/themes/dark.lua",
-	DesignThemeLight="design/themes/light.lua",
-	DesignThemeMidnight="design/themes/midnight.lua",
-	DesignThemeCrimson="design/themes/crimson.lua",
-	DesignThemeEvergreen="design/themes/evergreen.lua",
-	DesignThemeSakura="design/themes/sakura.lua",
+	DesignThemeRaycast="design/themes/raycast.lua",
+	DesignThemeEverforest="design/themes/everforest.lua",
+	DesignThemeProof="design/themes/proof.lua",
+	DesignThemeLinear="design/themes/linear.lua",
+	DesignThemeMaterial="design/themes/material.lua",
+	DesignThemeAbsolutely="design/themes/absolutely.lua",
 	Announcement="announcement.lua",
 	GuiFusion="gui/fusion.lua",
 	GuiLogic="features/colors/gui.lua",
@@ -816,12 +816,12 @@ modulePaths={
 
 local uiLibraryModulePaths={
 	"design/resolver.lua",
-	"design/themes/crimson.lua",
-	"design/themes/dark.lua",
-	"design/themes/evergreen.lua",
-	"design/themes/light.lua",
-	"design/themes/midnight.lua",
-	"design/themes/sakura.lua",
+	"design/themes/absolutely.lua",
+	"design/themes/everforest.lua",
+	"design/themes/linear.lua",
+	"design/themes/material.lua",
+	"design/themes/proof.lua",
+	"design/themes/raycast.lua",
 	"design/tokens.lua",
 	"gui/fusion.lua",
 	"gui/library-map.lua",
@@ -841,18 +841,18 @@ moduleGlobalNames={
 	StateStore="StateStore",
 	DesignTokens="DesignTokens",
 	DesignThemeResolver="DesignThemeResolver",
-	DesignThemeDark="DesignThemeDark",
-	DesignThemeLight="DesignThemeLight",
-	DesignThemeMidnight="DesignThemeMidnight",
-	DesignThemeCrimson="DesignThemeCrimson",
-	DesignThemeEvergreen="DesignThemeEvergreen",
-	DesignThemeSakura="DesignThemeSakura",
+	DesignThemeRaycast="DesignThemeRaycast",
+	DesignThemeEverforest="DesignThemeEverforest",
+	DesignThemeProof="DesignThemeProof",
+	DesignThemeLinear="DesignThemeLinear",
+	DesignThemeMaterial="DesignThemeMaterial",
+	DesignThemeAbsolutely="DesignThemeAbsolutely",
 	GuiFusion="FusionModule",
 	Dump="Dump",
 }
 startupModuleNames={
 	"CoreScope","CoreSignal","CoreScheduler","CorePlayerCache","CoreBallTracker",
-	"StateStore","DesignTokens","DesignThemeResolver","DesignThemeDark","DesignThemeLight","DesignThemeMidnight","DesignThemeCrimson","DesignThemeEvergreen","DesignThemeSakura",
+	"StateStore","DesignTokens","DesignThemeResolver","DesignThemeRaycast","DesignThemeEverforest","DesignThemeProof","DesignThemeLinear","DesignThemeMaterial","DesignThemeAbsolutely",
 	"GuiFusion","GuiLogic","UILibraryMap",
 	"DumpConnections","DumpLifecycle","DumpInput","DumpApiService","DumpModuleLoaderService","DumpPersistenceService","DumpUIAdapter","DumpUICreate","DumpSyntax","Dump",
 	"UIMap","MainFrame","Description","Announcement",
@@ -2001,17 +2001,17 @@ function installRuntimeArchitecture()
 		designTokens=DesignTokens,
 		themeResolver=DesignThemeResolver,
 		Themes={
-			dark=DesignThemeDark,
-			light=DesignThemeLight,
-			midnight=DesignThemeMidnight,
-			crimson=DesignThemeCrimson,
-			evergreen=DesignThemeEvergreen,
-			sakura=DesignThemeSakura
+			raycast=DesignThemeRaycast,
+			everforest=DesignThemeEverforest,
+			proof=DesignThemeProof,
+			linear=DesignThemeLinear,
+			material=DesignThemeMaterial,
+			absolutely=DesignThemeAbsolutely
 		}
 	}
 
 	function themeRuntime.Resolve(id,overrides)
-		local theme=themeRuntime.Themes and themeRuntime.Themes[tostring(id or "dark"):lower()]
+		local theme=themeRuntime.Themes and themeRuntime.Themes[tostring(id or "raycast"):lower()]
 		if DesignThemeResolver and DesignThemeResolver.resolve and theme then
 			return DesignThemeResolver.resolve(theme,overrides)
 		end
