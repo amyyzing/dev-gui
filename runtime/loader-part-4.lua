@@ -356,9 +356,9 @@ keybindRows={
 	{label="QB AIM LOCK RECEIVER",key="qbAimLockKey"},
 	{label="QB AIM THROW",key="qbAimThrowKey"},
 	{label="QB AIM TOGGLE",key="qbAimToggleKey"},
-	{label="AUTO ST HOLD",key="autoSTKey"},
-	{label="JPV HOLD",key="jpvKey"},
-	{label="STICKY HEAD HOLD",key="stickyHeadKey"},
+	{label="AUTO ST TOGGLE",key="autoSTKey"},
+	{label="JPV TOGGLE",key="jpvKey"},
+	{label="STICKY HEAD TOGGLE",key="stickyHeadKey"},
 }
 
 keybindSections=(getUIMapPageCategories and getUIMapPageCategories("page2","KeybindPage")) or (UIMapModule and UIMapModule.KeybindPage and UIMapModule.KeybindPage.Sections) or {

@@ -24,9 +24,9 @@ local function defaultBindingRows(app)
 		{label="Jump Boost Toggle",key="boostToggleKey"},
 		{label="Always Boost Toggle",key="alwaysBoostToggleKey"},
 		{label="ESP Toggle",key="espToggleKey"},
-		{label="Auto ST Hold",key="autoSTKey"},
-		{label="JPV Hold",key="jpvKey"},
-		{label="Sticky Head Hold",key="stickyHeadKey"},
+		{label="Auto ST Toggle",key="autoSTKey"},
+		{label="JPV Toggle",key="jpvKey"},
+		{label="Sticky Head Toggle",key="stickyHeadKey"},
 	}
 end
 

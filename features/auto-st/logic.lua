@@ -79,12 +79,10 @@ function autoST.new(app,parent)
 	local buildToggleRow=app.buildToggleRow
 	local api={}
 	local enabled=false
-	local holding=false
 	local destroyed=false
 	local toggle=nil
 	local section=nil
 	local inputBegan=nil
-	local inputEnded=nil
 	local heartbeat=nil
 	local cachedBall=nil
 	local cacheExpires=0
@@ -99,7 +97,6 @@ function autoST.new(app,parent)
 	local function setEnabled(value)
 		enabled=value and true or false
 		state.autoSTEnabled=enabled
-		if not enabled then holding=false end
 		syncToggle()
 	end
 
@@ -116,7 +113,7 @@ function autoST.new(app,parent)
 	end
 
 	local controls=nil
-	section,controls=makeSection(parent,6,"Auto ST","hold the configured key",{
+	section,controls=makeSection(parent,6,"Auto ST","press the configured key to toggle",{
 		headerToggle={
 			startState=false,
 			onChange=setEnabled,
@@ -134,7 +131,7 @@ function autoST.new(app,parent)
 		return Enum.KeyCode.V
 	end
 
-	local function matchesHoldInput(input)
+	local function matchesToggleInput(input)
 		if input.KeyCode==Enum.KeyCode.ButtonL2 then return true end
 		local binding=inputToBinding(input)
 		local key=configuredKey()
@@ -142,16 +139,11 @@ function autoST.new(app,parent)
 	end
 
 	inputBegan=inputService.InputBegan:Connect(function(input,processed)
-		if processed or not enabled then return end
-		if matchesHoldInput(input) then holding=true end
-	end)
-
-	inputEnded=inputService.InputEnded:Connect(function(input)
-		if matchesHoldInput(input) then holding=false end
+		if not processed and matchesToggleInput(input) then setEnabled(not enabled) end
 	end)
 
 	heartbeat=runService.Heartbeat:Connect(function()
-		if destroyed or not enabled or not holding then return end
+		if destroyed or not enabled then return end
 		local _,rootPart=characterRoot()
 		if not rootPart then return end
 
@@ -177,10 +169,8 @@ function autoST.new(app,parent)
 		if destroyed then return end
 		destroyed=true
 		enabled=false
-		holding=false
 		cachedBall=nil
 		safeDisconnect(inputBegan)
-		safeDisconnect(inputEnded)
 		safeDisconnect(heartbeat)
 		destroyControl(toggle)
 	end

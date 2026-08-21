@@ -55,14 +55,12 @@ function stickyHead.new(app,parent)
 	local inputToBinding=app.inputToBinding
 	local api={}
 	local enabled=false
-	local holding=false
 	local destroyed=false
 	local toggle=nil
 	local rangeSlider=nil
 	local smoothnessSlider=nil
 	local strengthSlider=nil
-	local beganConnection=nil
-	local endedConnection=nil
+	local inputConnection=nil
 	local heartbeatConnection=nil
 
 	state.stickyHeadEnabled=false
@@ -81,11 +79,10 @@ function stickyHead.new(app,parent)
 	local function setEnabled(value)
 		enabled=value and true or false
 		state.stickyHeadEnabled=enabled
-		if not enabled then holding=false end
 		syncToggle()
 	end
 
-	local section,controls=makeSection(parent,8,"Sticky Head","hold the configured key",{
+	local section,controls=makeSection(parent,8,"Sticky Head","press the configured key to toggle",{
 		headerToggle={startState=false,onChange=setEnabled},
 	})
 	toggle=controls and controls.toggle
@@ -104,20 +101,17 @@ function stickyHead.new(app,parent)
 		changed()
 	end)
 
-	local function matchesHold(input)
+	local function matchesToggle(input)
 		if input.KeyCode==Enum.KeyCode.ButtonL1 then return true end
 		local key=app.getStickyHeadKey and app.getStickyHeadKey() or Enum.KeyCode.Unknown
 		return key~=Enum.KeyCode.Unknown and inputToBinding(input)==key
 	end
 
-	beganConnection=inputService.InputBegan:Connect(function(input,processed)
-		if not processed and enabled and matchesHold(input) then holding=true end
-	end)
-	endedConnection=inputService.InputEnded:Connect(function(input)
-		if matchesHold(input) then holding=false end
+	inputConnection=inputService.InputBegan:Connect(function(input,processed)
+		if not processed and matchesToggle(input) then setEnabled(not enabled) end
 	end)
 	heartbeatConnection=runService.Heartbeat:Connect(function()
-		if destroyed or not enabled or not holding then return end
+		if destroyed or not enabled then return end
 		local _,root=localRoot()
 		if not root then return end
 		local target=closestHead(root,state.stickyHeadRange)
@@ -166,9 +160,7 @@ function stickyHead.new(app,parent)
 		if destroyed then return end
 		destroyed=true
 		enabled=false
-		holding=false
-		disconnect(beganConnection)
-		disconnect(endedConnection)
+		disconnect(inputConnection)
 		disconnect(heartbeatConnection)
 		destroyControl(toggle)
 		destroyControl(rangeSlider)

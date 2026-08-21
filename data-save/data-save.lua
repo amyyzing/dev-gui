@@ -836,9 +836,9 @@ function dataSave.new(app)
 				qbAimLock=encodeBinding(getValue(app,"qbAimLockKey",Enum.KeyCode.H)),
 				qbAimThrow=encodeBinding(getValue(app,"qbAimThrowKey",Enum.KeyCode.T)),
 				qbAimToggle=encodeBinding(getValue(app,"qbAimToggleKey",Enum.KeyCode.P)),
-				autoSTHold=encodeBinding(getValue(app,"autoSTKey",Enum.KeyCode.V)),
-				jpvHold=encodeBinding(getValue(app,"jpvKey",Enum.KeyCode.Unknown)),
-				stickyHeadHold=encodeBinding(getValue(app,"stickyHeadKey",Enum.KeyCode.Unknown)),
+				autoSTToggle=encodeBinding(getValue(app,"autoSTKey",Enum.KeyCode.V)),
+				jpvToggle=encodeBinding(getValue(app,"jpvKey",Enum.KeyCode.Unknown)),
+				stickyHeadToggle=encodeBinding(getValue(app,"stickyHeadKey",Enum.KeyCode.Unknown)),
 			},
 
 			presetEditor=collectPresetEditor(app),
@@ -975,9 +975,9 @@ function dataSave.new(app)
 			qbAimLock="qbAimLockKey",
 			qbAimThrow="qbAimThrowKey",
 			qbAimToggle="qbAimToggleKey",
-			autoSTHold="autoSTKey",
-			jpvHold="jpvKey",
-			stickyHeadHold="stickyHeadKey",
+			autoSTToggle="autoSTKey",
+			jpvToggle="jpvKey",
+			stickyHeadToggle="stickyHeadKey",
 		}
 
 		for savedName,stateName in pairs(keyMap) do
@@ -985,8 +985,14 @@ function dataSave.new(app)
 				setValue(app,stateName,decodeBinding(keybinds[savedName]))
 			end
 		end
-		if keybinds.jpvHold==nil and keybinds.jpvToggle~=nil then
-			setValue(app,"jpvKey",decodeBinding(keybinds.jpvToggle))
+		if keybinds.autoSTToggle==nil and keybinds.autoSTHold~=nil then
+			setValue(app,"autoSTKey",decodeBinding(keybinds.autoSTHold))
+		end
+		if keybinds.jpvToggle==nil and keybinds.jpvHold~=nil then
+			setValue(app,"jpvKey",decodeBinding(keybinds.jpvHold))
+		end
+		if keybinds.stickyHeadToggle==nil and keybinds.stickyHeadHold~=nil then
+			setValue(app,"stickyHeadKey",decodeBinding(keybinds.stickyHeadHold))
 		end
 
 		if keybinds.toggleESP~=nil then

@@ -186,7 +186,7 @@ description.Categories={
 
 		autoST={
 			["Auto ST"]="auto st",
-			["Auto ST Hold"]="hold",
+			["Auto ST Toggle"]="toggle",
 		},
 
 		jpv={
@@ -198,7 +198,7 @@ description.Categories={
 
 		stickyHead={
 			["Sticky Head"]="sticky head",
-			["Sticky Head Hold"]="hold",
+			["Sticky Head Toggle"]="toggle",
 			["Range"]="range",
 			["Smoothness"]="smoothness",
 			["Strength"]="strength",
