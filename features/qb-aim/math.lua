@@ -36,14 +36,17 @@ local function ballAt(originPosition,velocity,time)
 	return originPosition+velocity*time+0.5*gravityVector*time*time
 end
 
-local function landing(originPosition,velocity)
-	local discriminant=velocity.Y*velocity.Y+2*ballGravity*originPosition.Y
+local function landing(originPosition,velocity,groundY)
+	groundY=tonumber(groundY) or 0
+	local height=originPosition.Y-groundY
+	local discriminant=velocity.Y*velocity.Y+2*ballGravity*height
 	if discriminant<0 then return nil,nil end
 
 	local time=(velocity.Y+math.sqrt(discriminant))/ballGravity
 	if time<=0 then return nil,nil end
 
-	return ballAt(originPosition,velocity,time),time
+	local position=ballAt(originPosition,velocity,time)
+	return Vector3.new(position.X,groundY,position.Z),time
 end
 
 local function leadDelay(params,time)
@@ -242,7 +245,7 @@ local function interceptCandidate(params,originPosition,receiverStart,wrVel,qbVe
 	local speedError=math.abs(requiredSpeed-ballSpeed)
 	local residual=math.abs(polynomial and polynomialValue(polynomial,time,stats) or interceptValue(params,originPosition,receiverStart,wrVel,qbVel,ballSpeed,time))
 	local verticalVelocityAtCatch=worldVelocity.Y+gravityVector.Y*time
-	local landingPosition,landingTime=landing(originPosition,worldVelocity)
+	local landingPosition,landingTime=landing(originPosition,worldVelocity,params.groundY)
 	local leadDistance=flat(wrVel).Magnitude*receiverLeadDelay
 
 	return{
@@ -402,7 +405,7 @@ function qbAimMath.solve(params)
 	local wrVel=clampMagnitude(flat(params.targetVelocity or Vector3.zero),maxRunSpeed)
 	local qbVel=clampMagnitude(flat(params.qbVelocity or Vector3.zero),maxRunSpeed)
 	local originPosition=params.originPosition
-	local receiverBasePosition=params.receiverAnchorPosition or params.receiverPosition
+	local receiverBasePosition=params.receiverPosition
 	if not(originPosition and receiverBasePosition) then
 		return nil
 	end
@@ -531,8 +534,6 @@ function qbAimMath.solve(params)
 		best.qbReleaseOffset=qbReleaseOffset
 		best.qbSharedReleaseOffset=qbReleaseOffset
 		best.receiverReleaseOffset=receiverReleaseOffset
-		best.receiverAnchorSource=params.receiverAnchorSource or "root"
-		best.receiverAnchorPosition=receiverBasePosition
 		best.futureReleaseOriginLatch=qbReleaseOffset>0
 		best.remoteFireDelayed=params.remoteFireDelayed~=false
 	end

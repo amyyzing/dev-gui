@@ -1,7 +1,7 @@
 local view={}
 
 function view.new(app,page,controller)
-	assert(app.UI,"dev-gui UI syntax missing")
+	assert(app.UI,"gui UI syntax missing")
 	assert(controller,"Discord controller missing")
 
 	local UI=app.UI

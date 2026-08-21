@@ -16,36 +16,33 @@ def test_dump_file_names_stay_short_and_flat():
     assert not any(path.is_file() for path in (ROOT / "dump").glob("*/*.lua"))
 
 
-def test_legacy_loader_redirects_to_production_gui():
+def test_loader_is_bound_to_the_dev_environment():
     loader = read("loader.lua")
     dump_start = read("dump/start.lua")
     runtime = read("runtime/loader-part-1.lua")
-    assert 'apiUrl="https://lint-bot-production.up.railway.app"' in loader
-    assert 'moduleSource="gui"' in loader
-    assert 'path="loader.lua"' in loader
-    assert 'fresh=true' in loader
-    assert "DEV_GUI_BOOT_CONFIG" not in loader
-    assert "/bundle/get" not in loader
-
-    # The old modular runtime remains independently buildable for rollback,
-    # but it is no longer the user-facing entry point.
+    assert 'API_URL="https://dev-gui-api-production.up.railway.app"' in loader
+    assert 'MODULE_SOURCE="dev-gui"' in loader
+    assert 'API_URL.."/bundle/get"' in loader
+    assert "DEV_GUI_BOOT_CONFIG" in loader
     assert 'TRUSTED_API_URL="https://dev-gui-api-production.up.railway.app"' in dump_start
-    assert 'trustedApiUrl="https://dev-gui-api-production.up.railway.app"' in runtime
+    assert '["https://dev-gui-api-production.up.railway.app"]=true' in runtime
 
 
-def test_runtime_identity_does_not_reuse_main_gui_names():
+def test_runtime_uses_dev_gui_names():
     runtime = read("runtime/loader-part-1.lua")
-    assert 'return "dev-gui"' in runtime
-    assert 'screenGuiName or "DevGuiUI"' in runtime
-    assert '"devGuiRefreshModules"' in runtime
-    assert "_G.refreshModules" not in runtime
-    assert 'screenGuiName="HitboxUI"' not in runtime
-    assert '"HitboxUI_DarkInfluenced_GUIOnly"' not in runtime
+    dump_start = read("dump/start.lua")
+    assert 'AppId="dev-gui"' in dump_start
+    assert 'ScreenGuiName="DevGuiUI"' in dump_start
+    assert 'RefreshGlobalName="devGuiRefreshModules"' in dump_start
+    assert 'CleanupGlobalName="DEV_GUI_RUNTIME_CLEANUP"' in dump_start
+    assert 'LoaderConfigGlobalName="DEV_GUI_BOOT_CONFIG"' in dump_start
+    assert 'CleanupGlobalName or "GUI_RUNTIME_CLEANUP"' in runtime
+    assert 'LoaderConfigGlobalName or "GUI_BOOT_CONFIG"' in runtime
 
 
 def test_dump_init_is_the_single_composition_boundary():
     dump_init = read("dump/init.lua")
-    assert 'AppId="dev-gui"' in dump_init
+    assert "AppId=appSource" in dump_init
     assert "UI=required.Syntax.new" in dump_init
     assert "Runtime={" in dump_init
     assert "Services={" in dump_init
@@ -89,17 +86,17 @@ def test_discord_refresh_clears_a_stale_invite_before_publishing():
     assert "snapshot.inviteLink=inviteLink" in controller
 
 
-def test_process_global_context_actions_are_dev_gui_namespaced():
+def test_process_global_context_actions_use_main_gui_names():
     qb_aim = read("features/qb-aim/logic.lua")
-    assert '"DevGui_QBAim_ControllerThrow"' in qb_aim
-    assert '"DevGui_QBAim_ControllerToggle"' in qb_aim
-    assert '"QBAim_ControllerThrow"' not in qb_aim
-    assert '"QBAim_ControllerToggle"' not in qb_aim
+    assert '"QBAim_ControllerThrow"' in qb_aim
+    assert '"QBAim_ControllerToggle"' in qb_aim
+    assert '"DevGui_QBAim_ControllerThrow"' not in qb_aim
+    assert '"DevGui_QBAim_ControllerToggle"' not in qb_aim
 
     for platform in ("pc", "mobile"):
         mainframe = read(f"platforms/{platform}/gui/mainframe.lua")
-        assert '"DevGui_MouseInputSink"' in mainframe
-        assert '"HitboxUI_MouseInputSink"' not in mainframe
+        assert '"HitboxUI_MouseInputSink"' in mainframe
+        assert '"DevGui_MouseInputSink"' not in mainframe
 
 
 def test_new_modules_are_registered_for_remote_loading():
@@ -124,7 +121,16 @@ def test_new_modules_are_registered_for_remote_loading():
 def test_documented_one_line_loader_uses_railway_not_private_github_raw():
     readme = read("README.md")
     assert 'game:HttpGet("https://dev-gui-api-production.up.railway.app/loader/dev-gui")' in readme
-    assert "raw.githubusercontent.com" not in readme
+    assert "getgenv().DEV_GUI_BOOT_CONFIG" in readme
+    assert "./sync.ps1" in readme
+    assert "raw.githubusercontent.com/amyyzing/gui" not in readme
+
+
+def test_customizer_starts_with_theme_without_an_appearance_intro():
+    colors = read("features/colors/logic.lua")
+    assert 'Text="appearance"' not in colors
+    assert "local introRow=" not in colors
+    assert 'makePanel(1,"Theme","ThemePanelExpanded")' in colors
 
 
 def test_reworked_theme_list_is_complete_and_raycast_is_default():
@@ -165,8 +171,8 @@ def test_reworked_theme_list_is_complete_and_raycast_is_default():
     assert 'if id=="dracula" then id="proof" end' in data_save
     assert "local function migrateThemeColors" in data_save
     assert "if tonumber(style[field])~=old[i] then return id end" in data_save
-    assert "themes=devThemes" in read("runtime/loader-part-5.lua")
-    assert "themes=devThemes" in read("runtime/loader-part-3.lua")
+    assert "themes=guiThemes" in read("runtime/loader-part-5.lua")
+    assert "themes=guiThemes" in read("runtime/loader-part-3.lua")
 
     for path in ("gui/pc.luau", "gui/mobile.luau"):
         assert 'uiMap.LibraryProfileId="raycast"' in read(path)
@@ -305,7 +311,13 @@ def test_header_art_is_center_cropped_for_every_theme():
     for name in names:
         image = ROOT / "assets" / "headers" / f"{name}.png"
         assert image.is_file() and image.stat().st_size > 1000
-        assert f'{name}="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/{name}.png"' in runtime
+        assert f"\t{name}=true," in runtime
+
+    assert 'Url=trustedApiUrl.."/asset/header"' in runtime
+    assert "apiKey=getApiKey()" in runtime
+    assert "source=getModuleSource()" in runtime
+    assert "raw.githubusercontent.com/amyyzing/dev-gui" not in runtime
+    assert "raw.githubusercontent.com/amyyzing/gui/main/assets/headers" not in runtime
 
     for platform in ("pc", "mobile"):
         shell = read(f"platforms/{platform}/gui/mainframe.lua")
@@ -353,7 +365,7 @@ def test_customizer_wheel_only_accents_active_or_hovered_modes():
     assert "elseif isCustom then" not in colors
 
 
-def test_dev_controls_use_an_authorized_module_path():
+def test_gui_controls_use_an_authorized_module_path():
     loader = read("runtime/loader-part-1.lua")
     assert 'GuiLogic="features/colors/gui.lua"' in loader
     assert '"gui/gui-logic.lua"' not in loader

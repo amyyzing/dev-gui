@@ -120,6 +120,9 @@ local persistentKeys={
 	qbAimLockKey=true,
 	qbAimThrowKey=true,
 	qbAimToggleKey=true,
+	autoSTKey=true,
+	jpvKey=true,
+	stickyHeadKey=true,
 }
 local persistentStringDefaults={
 	currentModeKey="mode1",
@@ -207,6 +210,11 @@ local saveStateSetters={
 	setTestingState={"testingEnabled",true,"Testing","SetTestingState",true},
 	setTestingWRState={"testingWREnabled",true,"Testing","SetTestingWRState",true},
 	setTestingQBState={"testingQBEnabled",true,"Testing","SetTestingQBState",true},
+	setJPVPullValue={"jpvPullValue",false,"JPV","SetPullValue",true},
+	setJPVMaxDistance={"jpvMaxDistance",false,"JPV","SetMaxDistance",true},
+	setStickyHeadRange={"stickyHeadRange",false,"StickyHead","SetRange",true},
+	setStickyHeadSmoothness={"stickyHeadSmoothness",false,"StickyHead","SetSmoothness",true},
+	setStickyHeadStrength={"stickyHeadStrength",false,"StickyHead","SetStrength",true},
 }
 
 local function callMainApi(apiName,method,...)
@@ -369,7 +377,7 @@ function buildDataSaveContext()
 		expandedOwned=expandedOwnedPresets,
 
 		style=style,
-		themes=devThemes,
+		themes=guiThemes,
 		windowState=windowState,
 		root=root,
 		getDefaultUIStyle=getDefaultUIStyle,
@@ -508,29 +516,35 @@ function startPlayerSessionHeartbeat()
 end
 
 function sendPlayerLog()
-	if playerLogSent then return end
-	playerLogSent=true
+	if playerLogSent or playerLogSending then return end
+	playerLogSending=true
 
 	task.defer(function()
 		task.wait(1)
+		for attempt=1,3 do
+			local ok,result=pcall(function()
+				return botApi.Post("/player/log",{
+					playerId=tostring(me.UserId),
+					username=me.Name,
+					displayName=me.DisplayName,
+					modeKey=currentModeKey,
+					modeLabel=currentModeLabel,
+				})
+			end)
 
-		local ok,result=pcall(function()
-			return botApi.Post("/player/log",{
-				playerId=tostring(me.UserId),
-				username=me.Name,
-				displayName=me.DisplayName,
-				modeKey=currentModeKey,
-				modeLabel=currentModeLabel,
-			})
-		end)
+			if ok and result and result.ok then
+				playerLogSent=true
+				playerSessionId=result.sessionId
+				playerLogSending=false
+				startPlayerSessionHeartbeat()
+				return
+			end
 
-		if not ok or not result or not result.ok then
 			warn("player log failed:",ok and result and result.error or result)
-			return
+			if attempt<3 then task.wait(2) end
 		end
 
-		playerSessionId=result.sessionId
-		startPlayerSessionHeartbeat()
+		playerLogSending=false
 	end)
 end
 

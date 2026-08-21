@@ -67,8 +67,6 @@ local landingInfoEnabled=false
 local landingInfoSize=UDim2.new(0,220,0,78)
 local landingInfoOffset=Vector3.new(0,3.2,0)
 local circleTangentMargin=1e-6
-local catchAnchorMaxOffset=10
-local catchAnchorBlend=1.00
 local playThrowAnimation=true
 local throwAnimationName="UF_QuarterbackThrow"
 local throwAnimationSpeed=1.35
@@ -94,8 +92,8 @@ local throwDelay=defaultThrowDelay
 --   2. wait
 --   3. send
 local useLocalThrowFallback=false
-local qbTargetHighlightName="DevGuiQBAimTargetHighlight"
-local espHighlightName="DevGuiESPHighlight"
+local qbTargetHighlightName="QBAimTargetHighlight"
+local espHighlightName="MyESPHighlight"
 local validTeamIds={
 	HomeTeam=true,
 	AwayTeam=true,
@@ -316,22 +314,6 @@ local function getPlayerTeamID(player)
 
 	if ok then
 		return tostring(value)
-	end
-
-	return nil
-end
-
-local function getPlayerTackleBox(player)
-	local replicated=player and player:FindFirstChild("Replicated")
-	local tackleBoxValue=replicated and replicated:FindFirstChild("TackleBox")
-	if not tackleBoxValue then return nil end
-
-	local ok,value=pcall(function()
-		return tackleBoxValue.Value
-	end)
-
-	if ok and typeof(value)=="Instance" and value:IsA("BasePart") and value.Parent then
-		return value
 	end
 
 	return nil
@@ -741,8 +723,8 @@ function qbAim.new(app,parent)
 	local possessionSettleUntil=0
 	local throwInProgress=false
 	local lastThrowAt=-math.huge
-	local controllerThrowActionName="DevGui_QBAim_ControllerThrow"
-	local controllerToggleActionName="DevGui_QBAim_ControllerToggle"
+	local controllerThrowActionName="QBAim_ControllerThrow"
+	local controllerToggleActionName="QBAim_ControllerToggle"
 	local controllerThrowBinding=nil
 	local controllerToggleBinding=nil
 	local controllerThrowInputActive=false
@@ -863,6 +845,30 @@ function qbAim.new(app,parent)
 		end
 
 		return player and player.Character and root(player.Character) or nil
+	end
+
+	local function fieldGroundY(position)
+		if typeof(position)~="Vector3" then return nil end
+
+		local ignore={}
+		for _,player in ipairs(currentPlayers()) do
+			local character=characterOf(player)
+			if character then
+				ignore[#ignore+1]=character
+			end
+		end
+
+		local params=RaycastParams.new()
+		params.FilterType=Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances=ignore
+		params.IgnoreWater=true
+
+		local result=workspace:Raycast(position,Vector3.new(0,-220,0),params)
+		if result and result.Position.Y<=position.Y then
+			return result.Position.Y
+		end
+
+		return nil
 	end
 
 	local function currentHeldBall()
@@ -1461,7 +1467,7 @@ function qbAim.new(app,parent)
 		if original and folder and (not preview.center or preview.orig~=original or not preview.center.Parent) then
 			destroyPreviewCenter()
 			preview.center=original:Clone()
-			preview.center.Name="DevGuiClonedCenter"
+			preview.center.Name="ClonedCenter"
 			preview.center.Parent=folder
 			prepPreviewObject(preview.center)
 			preview.orig=original
@@ -1674,25 +1680,6 @@ function qbAim.new(app,parent)
 		return velocity,movementShape(originPosition,receiverRoot.Position,velocity),state
 	end
 
-	local function receiverCatchAnchor(receiver,receiverRoot)
-		if not receiverRoot then
-			return nil,"none"
-		end
-
-		local rootPosition=receiverRoot.Position
-		local tackleBox=getPlayerTackleBox(receiver)
-		if tackleBox then
-			local boxPosition=tackleBox.Position
-			local offset=boxPosition-rootPosition
-			if flat(offset).Magnitude<=catchAnchorMaxOffset and math.abs(offset.Y)<=catchAnchorMaxOffset then
-				local blended=rootPosition:Lerp(boxPosition,catchAnchorBlend)
-				return Vector3.new(blended.X,rootPosition.Y,blended.Z),"tackle_box"
-			end
-		end
-
-		return rootPosition,"root"
-	end
-
 	local function origin(qbRoot,ball)
 		local fallbackPosition=ball and ball.Position or qbRoot.Position
 		local c2Pos=c2Position()
@@ -1766,10 +1753,10 @@ function qbAim.new(app,parent)
 			return marker
 		end
 
-		marker=folder:FindFirstChild("DevGuiPreviewC1Marker")
+		marker=folder:FindFirstChild("PreviewC1Marker")
 		if not(marker and marker:IsA("BasePart")) then
 			marker=Instance.new("Part")
-			marker.Name="DevGuiPreviewC1Marker"
+			marker.Name="PreviewC1Marker"
 			marker.Shape=Enum.PartType.Ball
 			marker.Size=Vector3.new(catchMarkerSize,catchMarkerSize,catchMarkerSize)
 			marker.Anchored=true
@@ -1822,7 +1809,7 @@ function qbAim.new(app,parent)
 
 		local _,folder=originalCenter()
 		if folder then
-			local existing=folder:FindFirstChild("DevGuiPreviewC3InfoAnchor")
+			local existing=folder:FindFirstChild("PreviewC3InfoAnchor")
 			if existing then
 				existing:Destroy()
 			end
@@ -1837,10 +1824,10 @@ function qbAim.new(app,parent)
 
 		local anchor=preview.c3InfoAnchor
 		if not(anchor and anchor.Parent) then
-			anchor=folder:FindFirstChild("DevGuiPreviewC3InfoAnchor")
+			anchor=folder:FindFirstChild("PreviewC3InfoAnchor")
 			if not(anchor and anchor:IsA("BasePart")) then
 				anchor=Instance.new("Part")
-				anchor.Name="DevGuiPreviewC3InfoAnchor"
+				anchor.Name="PreviewC3InfoAnchor"
 				anchor.Size=Vector3.new(0.25,0.25,0.25)
 				anchor.Transparency=1
 				anchor.Anchored=true
@@ -2084,15 +2071,20 @@ function qbAim.new(app,parent)
 
 		receiverReleaseOffset=receiverReleaseOffset or 0
 		local originPosition=originOverride or origin(qbRoot,ball)
-		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
-		local catchPosition=receiverAnchorPosition or receiverRoot.Position
-		local catchY=getModeKey(app)=="mode2" and catchPosition.Y+catchHeight or catchHeight
+		local receiverPosition=receiverRoot.Position
+		local groundY=0
+		local catchY=catchHeight
+		if getModeKey(app)=="mode2" then
+			groundY=fieldGroundY(receiverPosition)
+			if not groundY then
+				return nil,nil
+			end
+			catchY=groundY+catchHeight
+		end
 		return mathCore.solve({
 			originPosition=originPosition,
-			receiverPosition=receiverRoot.Position,
-			receiverAnchorPosition=receiverAnchorPosition,
-			receiverAnchorSource=receiverAnchorSource,
+			receiverPosition=receiverPosition,
 			targetVelocity=targetVelocity,
 			shape=shape,
 			ballPower=ballPower or currentBallPower(),
@@ -2101,6 +2093,7 @@ function qbAim.new(app,parent)
 			receiverReleaseOffset=receiverReleaseOffset,
 			predictorState=predictorState,
 			catchY=catchY,
+			groundY=groundY,
 			solveYBias=catchSolveYBias,
 			leadDelay=leadDelay,
 			leadDelayBaseline=leadDelayBaseline,
@@ -2131,12 +2124,17 @@ function qbAim.new(app,parent)
 		local delay=math.clamp(tonumber(state.qbAimThrowDelay) or defaultThrowDelay,throwDelayMin,throwDelayMax)
 		local now=os.clock()
 		local currentOrigin=recordQBOrigin(now,qbRoot,releaseBall or currentHeldBall())
-		local sampledOrigin=delayedQBOrigin(now,delay,currentOrigin)
+		local sampledOrigin=currentOrigin
+		local appliedOriginDelay=0
+		if getModeKey(app)~="mode2" then
+			sampledOrigin=delayedQBOrigin(now,delay,currentOrigin)
+			appliedOriginDelay=delay
+		end
 		local plan=buildPlan(receiver,ballPower,releaseBall,wrOffset or 0,sampledOrigin)
 		if plan then
 			plan.centerReleaseOrigin=sampledOrigin
 			plan.throwDelay=delay
-			plan.originHistoryDelay=delay
+			plan.originHistoryDelay=appliedOriginDelay
 			plan.releaseTimingOffset=0
 			plan.releaseYOffset=0
 			plan.receiverTimingOffset=wrOffset or 0

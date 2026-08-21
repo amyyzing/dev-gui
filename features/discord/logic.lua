@@ -3,7 +3,7 @@ local discord={}
 function discord.new(app,page)
 	assert(app.DiscordControllerModule,"Discord controller module missing")
 	assert(app.DiscordViewModule,"Discord view module missing")
-	assert(app.UI,"dev-gui UI syntax missing")
+	assert(app.UI,"gui UI syntax missing")
 
 	local controller=app.DiscordControllerModule.new({botApi=app.botApi})
 	local view=app.DiscordViewModule.new({UI=app.UI},page,controller)

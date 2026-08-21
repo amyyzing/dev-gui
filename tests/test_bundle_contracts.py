@@ -43,15 +43,16 @@ class BundleContracts(unittest.TestCase):
         for relative in manifest["uiLibrary"]:
             self.assertTrue((ui_root / relative).is_file(), relative)
 
-    def test_legacy_loader_hands_off_to_production_gui(self):
+    def test_dev_loader_uses_the_dev_environment_without_disk_cache(self):
         loader = (ROOT / "loader.lua").read_text(encoding="utf-8")
-        self.assertIn('apiUrl="https://lint-bot-production.up.railway.app"', loader)
-        self.assertIn('moduleSource="gui"', loader)
-        self.assertIn('path="loader.lua"', loader)
-        self.assertIn('fresh=true', loader)
-        self.assertIn('sharedEnv.GUI_BOOT_CONFIG=guiConfig', loader)
-        self.assertNotIn("DEV_GUI_BOOT_CONFIG", loader)
-        self.assertNotIn("/bundle/get", loader)
+        self.assertIn('API_URL="https://dev-gui-api-production.up.railway.app"', loader)
+        self.assertIn('MODULE_SOURCE="dev-gui"', loader)
+        self.assertIn('rawget(sharedEnv,"DEV_GUI_BOOT_CONFIG")', loader)
+        self.assertIn('API_URL.."/bundle/get"', loader)
+        self.assertIn('rawget(sharedEnv,"DEV_GUI_BUNDLE_CACHE")', loader)
+        self.assertIn('rawget(sharedEnv,"DEV_GUI_RUNTIME_CLEANUP")', loader)
+        for disk_api in ("readfile", "writefile", "isfile", "isfolder", "makefolder"):
+            self.assertNotIn(disk_api, loader)
 
     def test_runtime_prefers_bundle_factories_before_remote_calls(self):
         runtime = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
@@ -61,7 +62,7 @@ class BundleContracts(unittest.TestCase):
         self.assertIn('setLoaderProgress("registering bundled modules"', runtime)
         self.assertNotIn("task.delay(0.48", runtime)
 
-    def test_dev_gui_owns_section_creation(self):
+    def test_gui_owns_section_creation(self):
         manifest = json.loads((ROOT / "build" / "bundle-manifest.json").read_text(encoding="utf-8"))
         runtime = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
 
@@ -83,23 +84,33 @@ class BundleContracts(unittest.TestCase):
         for name in retired:
             self.assertNotIn(f"design/themes/{name}.lua", runtime)
 
-    def test_migrated_entry_keeps_esp_unfilled_calibrate_and_player_logs(self):
-        production = ROOT.parent / "gui"
-        runtime1 = (production / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
-        runtime2 = (production / "runtime" / "loader-part-2.lua").read_text(encoding="utf-8")
-        runtime5 = (production / "runtime" / "loader-part-5.lua").read_text(encoding="utf-8")
+    def test_ui_library_owns_the_current_theme_catalog(self):
+        manifest = json.loads((ROOT / "build" / "bundle-manifest.json").read_text(encoding="utf-8"))
+        ui_root = ROOT.parent / "495-ui-library"
+        library_map = (ui_root / "gui" / "library-map.lua").read_text(encoding="utf-8")
+        expected = {"raycast", "everforest", "proof", "linear", "material", "absolutely"}
 
-        self.assertIn('ESP="features/esp/gui.lua"', runtime1)
-        self.assertIn('ESPLogic="features/esp/logic.lua"', runtime1)
-        self.assertIn('{api="ESP",name="ESP"', runtime2)
-        self.assertIn('botApi.Post("/player/log"', runtime5)
+        self.assertEqual(
+            {Path(path).stem for path in manifest["uiLibrary"] if path.startswith("design/themes/")},
+            expected,
+        )
+        self.assertIn('libraryMap.DefaultProfileId="raycast"', library_map)
+        self.assertIn('UnfilledRole="MUTED"', library_map)
+        self.assertIn('UnfilledTransparency=0.70', library_map)
+        for theme in expected:
+            self.assertIn(f'{theme}=profile("{theme}"', library_map)
 
-        for root in (ROOT, production):
-            qb = (root / "features" / "qb-aim" / "logic.lua").read_text(encoding="utf-8")
-            line = next(line for line in qb.splitlines() if "autoCalibrateButton=make" in line)
-            self.assertIn('ThemeRole="MUTED"', line)
-            self.assertIn("BackgroundTransparency=0.70", line)
-            self.assertIn("AutoButtonColor=false", line)
+        for path in (ROOT / "gui" / "pc.luau", ROOT / "gui" / "mobile.luau"):
+            source = path.read_text(encoding="utf-8")
+            self.assertLess(source.index("libraryMap.GetProfile(profileId)"), source.index("guiThemes[profileId]"))
+
+    def test_auto_calibrate_uses_the_unfilled_control_role(self):
+        qb = (ROOT / "features" / "qb-aim" / "logic.lua").read_text(encoding="utf-8")
+        line = next(line for line in qb.splitlines() if "autoCalibrateButton=make" in line)
+        self.assertIn("BackgroundColor3=colors.MUTED or colors.muted", line)
+        self.assertIn("BackgroundTransparency=0.70", line)
+        self.assertIn('ThemeRole="MUTED"', line)
+        self.assertIn("AutoButtonColor=false", line)
 
 
 if __name__ == "__main__":

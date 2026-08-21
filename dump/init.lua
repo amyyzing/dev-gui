@@ -1,4 +1,4 @@
--- The sole public boundary for dev-gui implementation details.
+-- The sole public boundary for GUI implementation details.
 local environment=(getfenv and getfenv()) or _G
 
 local required={
@@ -17,7 +17,7 @@ local uiAdapter=required.Adapter.new(environment)
 local uiCreator=required.Create.new(uiAdapter)
 
 return{
-	AppId="dev-gui",
+	AppId=appSource,
 	UI=required.Syntax.new(uiCreator),
 	Runtime={
 		Connections=required.Connections,

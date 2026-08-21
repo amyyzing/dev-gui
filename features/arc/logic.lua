@@ -41,7 +41,7 @@ local function isNormalArcVisual(instance)
 
 	local ancestor=instance
 	while ancestor and ancestor~=workspace do
-		if ancestor.Name=="DevGuiClonedCenter" then
+		if ancestor.Name=="ClonedCenter" then
 			return false
 		end
 		if arcRootNames[ancestor.Name] then

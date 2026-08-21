@@ -184,6 +184,26 @@ description.Categories={
 			["receiver tracking missing"]="wr not tracked",
 		},
 
+		autoST={
+			["Auto ST"]="auto st",
+			["Auto ST Hold"]="hold",
+		},
+
+		jpv={
+			["Jump Pull Vector"]="jpv",
+			["JPV Toggle"]="toggle",
+			["Pull"]="pull",
+			["Distance"]="distance",
+		},
+
+		stickyHead={
+			["Sticky Head"]="sticky head",
+			["Sticky Head Hold"]="hold",
+			["Range"]="range",
+			["Smoothness"]="smoothness",
+			["Strength"]="strength",
+		},
+
 		testing={
 			["Testing"]="Testing",
 			["incoming C1 capture"]="c1",

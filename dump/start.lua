@@ -219,6 +219,8 @@ local runtimeEnv=setmetatable({
 		AppId="dev-gui",
 		ScreenGuiName="DevGuiUI",
 		RefreshGlobalName="devGuiRefreshModules",
+		CleanupGlobalName="DEV_GUI_RUNTIME_CLEANUP",
+		LoaderConfigGlobalName="DEV_GUI_BOOT_CONFIG",
 	},
 },{__index=parentEnv})
 runtimeEnv._G=runtimeEnv

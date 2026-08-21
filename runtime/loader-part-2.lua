@@ -161,6 +161,7 @@ end
 AnnouncementAPI=nil
 playerSessionId=nil
 playerSessionHeartbeatStarted=false
+playerLogSending=false
 sendPlayerSessionUpdate=function() end
 resetKeybindPresetPageDefaults=function() end
 
@@ -339,6 +340,14 @@ mainPageDefaults={
 	testingEnabled=false,
 	testingWREnabled=true,
 	testingQBEnabled=true,
+	autoSTEnabled=false,
+	jpvEnabled=false,
+	jpvPullValue=1,
+	jpvMaxDistance=10,
+	stickyHeadEnabled=false,
+	stickyHeadRange=10,
+	stickyHeadSmoothness=12,
+	stickyHeadStrength=12,
 }
 
 mainPageState={}
@@ -429,6 +438,9 @@ function makeMainCtx()
 		HitboxLogicModule=HitboxLogicModule,
 		ParamsLogicModule=ParamsLogicModule,
 		BoostLogicModule=BoostLogicModule,
+		AutoSTLogicModule=AutoSTLogicModule,
+		JPVLogicModule=JPVLogicModule,
+		StickyHeadLogicModule=StickyHeadLogicModule,
 		ESPLogicModule=ESPLogicModule,
 		ESPDefenseLogicModule=ESPDefenseLogicModule,
 		ESPOffenseLogicModule=ESPOffenseLogicModule,
@@ -440,6 +452,9 @@ function makeMainCtx()
 		getHitboxToggleKey=function() return hitboxToggleKey end,
 		getJumpBoostToggleKey=function() return boostToggleKey end,
 		getAlwaysBoostToggleKey=function() return alwaysBoostToggleKey end,
+		getAutoSTKey=function() return autoSTKey end,
+		getJPVKey=function() return jpvKey end,
+		getStickyHeadKey=function() return stickyHeadKey end,
 		getESPToggleKey=function() return espToggleKey end,
 		getQBAimLockKey=function() return qbAimLockKey end,
 		getQBAimThrowKey=function() return qbAimThrowKey end,
@@ -501,6 +516,9 @@ mainPageModules=(getUIMapPageModules and getUIMapPageModules("main","MainPage"))
 	{api="ESP",name="ESP",column="right",order=3,title="ESP"},
 	{api="QBAim",name="QBAim",column="right",order=4,title="QB Aim"},
 	{api="Testing",name="Testing",column="right",order=5,title="Testing"},
+	{api="AutoST",name="AutoST",column="right",order=6,title="Auto ST"},
+	{api="JPV",name="JPV",column="right",order=7,title="Jump Pull Vector"},
+	{api="StickyHead",name="StickyHead",column="right",order=8,title="Sticky Head"},
 }
 
 function getMainColumn(name)

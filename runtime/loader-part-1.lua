@@ -49,7 +49,7 @@ local function exactTheme(id,name,primary,accent,secondary,palette)
 	return theme
 end
 
-devThemes={
+guiThemes={
 	raycast=exactTheme("raycast","Raycast",{16,16,16},{255,99,99},{207,47,152},{
 		bg={16,16,16},topbar={16,16,16},panel={20,20,20},card={21,21,21},section={20,20,20},
 		button={21,21,21},input={21,21,21},sliderBg={21,21,21},sliderFill={255,99,99},
@@ -128,15 +128,26 @@ colors=setmetatable({
 	end,
 })
 
-local headerArtUrls={
-	raycast="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/raycast.png",
-	everforest="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/everforest.png",
-	proof="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/proof.png",
-	linear="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/linear.png",
-	material="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/material.png",
-	absolutely="https://raw.githubusercontent.com/amyyzing/dev-gui/main/assets/headers/absolutely.png",
+local headerArtIds={
+	raycast=true,
+	everforest=true,
+	proof=true,
+	linear=true,
+	material=true,
+	absolutely=true,
 }
 local headerArtCache={}
+
+local function isPng(data)
+	return type(data)=="string"
+		and #data>8
+		and string.byte(data,1)==137
+		and data:sub(2,4)=="PNG"
+		and string.byte(data,5)==13
+		and string.byte(data,6)==10
+		and string.byte(data,7)==26
+		and string.byte(data,8)==10
+end
 
 function getHeaderArt(id)
 	id=tostring(id or "raycast"):lower()
@@ -144,19 +155,39 @@ function getHeaderArt(id)
 		return headerArtCache[id]
 	end
 
-	local url=headerArtUrls[id]
 	local assetFn=getcustomasset or getsynasset
-	if not url or type(writefile)~="function" or type(assetFn)~="function" then
+	if not headerArtIds[id] or type(writefile)~="function" or type(assetFn)~="function" then
 		return nil
 	end
 
-	local path="dev_gui_header_"..id.."_1.png"
+	local path="gui_header_"..id.."_2.png"
 	local exists=type(isfile)=="function" and isfile(path)
 	if not exists then
-		local ok,data=pcall(function()
-			return game:HttpGet(url,true)
+		local requestFn=botApi and botApi.GetRequestFunction and botApi.GetRequestFunction()
+		if not requestFn then
+			return nil
+		end
+
+		local ok,response=pcall(function()
+			return requestFn({
+				Url=trustedApiUrl.."/asset/header",
+				Method="POST",
+				Headers={
+					["Content-Type"]="application/json",
+				},
+				Body=HttpService:JSONEncode({
+					apiKey=getApiKey(),
+					source=getModuleSource(),
+					id=id,
+				}),
+			})
 		end)
-		if not ok or type(data)~="string" or #data<8 then
+		if not ok then
+			return nil
+		end
+		local status=tonumber(response and(response.StatusCode or response.Status))
+		local data=response and(response.Body or response.body)
+		if (status and status>=400) or not isPng(data) then
 			return nil
 		end
 		local wrote=pcall(writefile,path,data)
@@ -228,6 +259,9 @@ espToggleKey=Enum.KeyCode.Unknown
 qbAimLockKey=Enum.KeyCode.H
 qbAimThrowKey=Enum.KeyCode.T
 qbAimToggleKey=Enum.KeyCode.P
+autoSTKey=Enum.KeyCode.V
+jpvKey=Enum.KeyCode.Unknown
+stickyHeadKey=Enum.KeyCode.Unknown
 qbAimTeamFilter=true
 qbAimShowArc=true
 qbAimTargetHighlight=true
@@ -599,12 +633,17 @@ function getModuleSource()
 	if type(bootApi)=="table" and type(bootApi.Source)=="string" and bootApi.Source~="" then
 		return bootApi.Source
 	end
-	return "dev-gui"
+	return "gui"
 end
 
 appModuleSource={id=getModuleSource()}
 
-trustedApiUrl="https://dev-gui-api-production.up.railway.app"
+local trustedApiUrls={
+	["https://lint-bot-production.up.railway.app"]=true,
+	["https://dev-gui-api-production.up.railway.app"]=true,
+}
+local requestedApiUrl=type(bootApi)=="table" and tostring(bootApi.Url or "") or ""
+trustedApiUrl=trustedApiUrls[requestedApiUrl] and requestedApiUrl or "https://lint-bot-production.up.railway.app"
 
 allowedApiPaths={
 	["/module/get"]=true,
@@ -769,6 +808,12 @@ modulePaths={
 	ParamsLogic="features/params/logic.lua",
 	Boost="features/boost/gui.lua",
 	BoostLogic="features/boost/logic.lua",
+	AutoST="features/auto-st/gui.lua",
+	AutoSTLogic="features/auto-st/logic.lua",
+	JPV="features/jpv/gui.lua",
+	JPVLogic="features/jpv/logic.lua",
+	StickyHead="features/sticky-head/gui.lua",
+	StickyHeadLogic="features/sticky-head/logic.lua",
 	ESP="features/esp/gui.lua",
 	ESPLogic="features/esp/logic.lua",
 	ESPDefense="features/esp-defense/gui.lua",
@@ -856,7 +901,7 @@ startupModuleNames={
 	"GuiFusion","GuiLogic","UILibraryMap",
 	"DumpConnections","DumpLifecycle","DumpInput","DumpApiService","DumpModuleLoaderService","DumpPersistenceService","DumpUIAdapter","DumpUICreate","DumpSyntax","Dump",
 	"UIMap","MainFrame","Description","Announcement",
-	"HitboxLogic","Hitbox","ParamsLogic","Params","BoostLogic","Boost",
+	"HitboxLogic","Hitbox","ParamsLogic","Params","BoostLogic","Boost","AutoSTLogic","AutoST","JPVLogic","JPV","StickyHeadLogic","StickyHead",
 	"ESPDefenseLogic","ESPDefense","ESPOffenseLogic","ESPOffense","ESPLogic","ESP",
 	"QBInterception","QBAimMath","QBAimLogic","QBAim","TestingLogic","Testing",
 	"DataSave",
@@ -1317,8 +1362,10 @@ end
 
 local runtimeBootConfig=rawget(getfenv(),"bootConfig")
 if type(runtimeBootConfig)~="table" then runtimeBootConfig={} end
-screenGuiName=tostring(runtimeBootConfig.ScreenGuiName or "DevGuiUI")
-for _,existingName in ipairs({screenGuiName}) do
+local runtimeCleanupGlobalName=tostring(runtimeBootConfig.CleanupGlobalName or "GUI_RUNTIME_CLEANUP")
+local loaderConfigGlobalName=tostring(runtimeBootConfig.LoaderConfigGlobalName or "GUI_BOOT_CONFIG")
+screenGuiName=tostring(runtimeBootConfig.ScreenGuiName or "HitboxUI")
+for _,existingName in ipairs({"HitboxUI_DarkInfluenced_GUIOnly","1",screenGuiName}) do
 	old=guiParent:FindFirstChild(existingName)
 	if old then old:Destroy() end
 end
@@ -1367,7 +1414,7 @@ loaderBoxH=tonumber(loaderBoxConfig.H) or 320
 loaderPageNames=type(loaderGuiMap.PreloadPages)=="table" and loaderGuiMap.PreloadPages or {"maps","customize","page2","settings","server"}
 loaderStepTotal=#startupModuleFiles+#loaderPageNames+4
 
-local loaderRaycast=devThemes.raycast.Theme
+local loaderRaycast=guiThemes.raycast.Theme
 local loaderColors={
 	bg=loaderRaycast.bg,
 	topbar=loaderRaycast.topbar,
@@ -2096,7 +2143,7 @@ function getDefaultUILibProfile()
 		return UIMapModule.GetDefaultProfile()
 	end
 
-	return UIMapModule and UIMapModule.Profiles and UIMapModule.Profiles.raycast or devThemes.raycast
+	return UIMapModule and UIMapModule.Profiles and UIMapModule.Profiles.raycast or guiThemes.raycast
 end
 
 function getDefaultUILibId()
@@ -2296,7 +2343,7 @@ mainFrame=nil
 applyUIStrokeTheme=nil
 
 function destroyKnownGuiResidue()
-	local guiNames={screenGuiName or "DevGuiUI"}
+	local guiNames={"HitboxUI_DarkInfluenced_GUIOnly","1",screenGuiName or "HitboxUI"}
 	local parents={guiParent}
 
 	for _,parent in ipairs(parents) do
@@ -2313,13 +2360,13 @@ function destroyKnownGuiResidue()
 	end
 
 	local residueNames={
-		DevGuiClonedCenter=true,
-		DevGuiPreviewC1Marker=true,
-		DevGuiPreviewC3InfoAnchor=true,
-		DevGuiTestingC1Marker=true,
-		DevGuiTestingC1GroundMarker=true,
-		DevGuiQBAimTargetHighlight=true,
-		DevGuiESPHighlight=true,
+		ClonedCenter=true,
+		PreviewC1Marker=true,
+		PreviewC3InfoAnchor=true,
+		TestingC1Marker=true,
+		TestingC1GroundMarker=true,
+		QBAimTargetHighlight=true,
+		MyESPHighlight=true,
 	}
 
 	for _,container in ipairs({Workspace,guiParent}) do
@@ -2339,7 +2386,7 @@ function cleanupForManualReload(skipResidueScan)
 	if type(getgenv)=="function" then
 		local envOk,env=pcall(getgenv)
 		if envOk and type(env)=="table" then
-			env.DEV_GUI_RUNTIME_CLEANUP=nil
+			env[runtimeCleanupGlobalName]=nil
 		end
 	end
 
@@ -2420,7 +2467,7 @@ end
 if type(getgenv)=="function" then
 	local envOk,env=pcall(getgenv)
 	if envOk and type(env)=="table" then
-		env.DEV_GUI_RUNTIME_CLEANUP=function()
+		env[runtimeCleanupGlobalName]=function()
 			cleanupForManualReload()
 		end
 	end
@@ -2452,22 +2499,21 @@ function refreshRemoteModulesNow()
 	cleanupForManualReload()
 	task.defer(function()
 		local bootConfig=nil
-		local previousDevelopment=nil
+		local previousFresh=nil
 		if type(getgenv)=="function" then
 			local envOk,env=pcall(getgenv)
 			if envOk and type(env)=="table" then
-				bootConfig=rawget(env,"DEV_GUI_BOOT_CONFIG")
+				bootConfig=rawget(env,loaderConfigGlobalName)
 				if type(bootConfig)~="table" then
 					bootConfig={}
-					env.DEV_GUI_BOOT_CONFIG=bootConfig
+					env[loaderConfigGlobalName]=bootConfig
 				end
-				previousDevelopment=bootConfig.Development
-				bootConfig.Development=true
-				env.DEV_GUI_BUNDLE_CACHE=nil
+				previousFresh=bootConfig.Fresh
+				bootConfig.Fresh=true
 			end
 		end
 		local ok,reloadErr=pcall(chunk)
-		if bootConfig then bootConfig.Development=previousDevelopment end
+		if bootConfig then bootConfig.Fresh=previousFresh end
 		if not ok then
 			warn("update run failed:",reloadErr)
 		end
@@ -2480,7 +2526,7 @@ function exposeManualModuleRefresh()
 	local refresh=function()
 		return refreshRemoteModulesNow()
 	end
-	local globalName=tostring(runtimeBootConfig.RefreshGlobalName or "devGuiRefreshModules")
+	local globalName=tostring(runtimeBootConfig.RefreshGlobalName or "refreshModules")
 	_G[globalName]=refresh
 
 	if type(getgenv)=="function" then

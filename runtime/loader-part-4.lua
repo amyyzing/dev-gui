@@ -356,6 +356,9 @@ keybindRows={
 	{label="QB AIM LOCK RECEIVER",key="qbAimLockKey"},
 	{label="QB AIM THROW",key="qbAimThrowKey"},
 	{label="QB AIM TOGGLE",key="qbAimToggleKey"},
+	{label="AUTO ST HOLD",key="autoSTKey"},
+	{label="JPV TOGGLE",key="jpvKey"},
+	{label="STICKY HEAD HOLD",key="stickyHeadKey"},
 }
 
 keybindSections=(getUIMapPageCategories and getUIMapPageCategories("page2","KeybindPage")) or (UIMapModule and UIMapModule.KeybindPage and UIMapModule.KeybindPage.Sections) or {
@@ -540,6 +543,9 @@ resetKeybindPresetPageDefaults=function()
 	qbAimLockKey=Enum.KeyCode.H
 	qbAimThrowKey=Enum.KeyCode.T
 	qbAimToggleKey=Enum.KeyCode.P
+	autoSTKey=Enum.KeyCode.V
+	jpvKey=Enum.KeyCode.Unknown
+	stickyHeadKey=Enum.KeyCode.Unknown
 
 	if DataSaveAPI and type(DataSaveAPI.ResetPresetEditor)=="function" then
 		DataSaveAPI.ResetPresetEditor(true)

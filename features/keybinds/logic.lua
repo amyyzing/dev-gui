@@ -15,12 +15,18 @@ local function defaultBindingRows(app)
 	ensure("boostToggleKey")
 	ensure("alwaysBoostToggleKey")
 	ensure("espToggleKey")
+	if state.autoSTKey==nil then state.autoSTKey=Enum.KeyCode.V end
+	ensure("jpvKey")
+	ensure("stickyHeadKey")
 	return{
 		{label="Toggle open / hide GUI",key="uiToggleKey"},
 		{label="Hitbox Toggle",key="hitboxToggleKey"},
 		{label="Jump Boost Toggle",key="boostToggleKey"},
 		{label="Always Boost Toggle",key="alwaysBoostToggleKey"},
 		{label="ESP Toggle",key="espToggleKey"},
+		{label="Auto ST Hold",key="autoSTKey"},
+		{label="JPV Toggle",key="jpvKey"},
+		{label="Sticky Head Hold",key="stickyHeadKey"},
 	}
 end
 

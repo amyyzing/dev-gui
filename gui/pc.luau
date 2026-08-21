@@ -3,7 +3,7 @@
 -- 495-ui-library through UILibraryMapModule.
 local env=(getfenv and getfenv()) or _G
 local libraryMap=rawget(env,"UILibraryMapModule") or {}
-local devThemes=rawget(env,"devThemes") or {}
+local guiThemes=rawget(env,"guiThemes") or {}
 
 local uiMap={}
 
@@ -102,6 +102,9 @@ uiMap.PageStructure={
 				{api="ESP",name="ESP",column="right",order=3,title="ESP"},
 				{api="QBAim",name="QBAim",column="right",order=4,title="QB Aim"},
 				{api="Testing",name="Testing",column="right",order=5,title="Testing"},
+				{api="AutoST",name="AutoST",column="right",order=6,title="Auto ST"},
+				{api="JPV",name="JPV",column="right",order=7,title="Jump Pull Vector"},
+				{api="StickyHead",name="StickyHead",column="right",order=8,title="Sticky Head"},
 			},
 		},
 
@@ -334,12 +337,12 @@ end
 
 function uiMap.GetLibraryProfile(id)
 	local profileId=tostring(id or uiMap.LibraryProfileId):lower()
-	if devThemes[profileId] then
-		return devThemes[profileId]
-	end
-
 	if type(libraryMap.GetProfile)=="function" then
 		return libraryMap.GetProfile(profileId)
+	end
+
+	if guiThemes[profileId] then
+		return guiThemes[profileId]
 	end
 
 	return libraryMap.Profiles and libraryMap.Profiles[uiMap.LibraryProfileId] or {}

@@ -239,9 +239,11 @@ local refreshHookNames={
 	"updateResponsiveLayout",
 }
 
+local rootVersion=3
+
 local function cloneRoot()
 	return{
-		version=2,
+		version=rootVersion,
 		modes={},
 	}
 end
@@ -411,20 +413,40 @@ local function dropMapSettings(root)
 	return root
 end
 
+local function cloneSettings(value)
+	if type(value)~="table" then return value end
+
+	local copy={}
+	for key,item in pairs(value) do
+		copy[key]=cloneSettings(item)
+	end
+	return copy
+end
+
 local function normalizeRoot(raw)
 	if type(raw)~="table" then
 		return cloneRoot()
 	end
 
 	if type(raw.modes)=="table" then
-		raw.version=raw.version or 2
+		if (tonumber(raw.version) or 2)<rootVersion and type(raw.modes.mode1)=="table" then
+			for _,modeKey in ipairs({"mode2","mode3"}) do
+				if type(raw.modes[modeKey])~="table" then
+					raw.modes[modeKey]=cloneSettings(raw.modes.mode1)
+				end
+			end
+		end
+		raw.version=rootVersion
 		return dropMapSettings(raw)
 	end
 
+	local legacy=cloneSettings(raw)
 	return dropMapSettings({
-		version=2,
+		version=rootVersion,
 		modes={
-			mode1=raw,
+			mode1=cloneSettings(legacy),
+			mode2=cloneSettings(legacy),
+			mode3=cloneSettings(legacy),
 		},
 	})
 end
@@ -701,7 +723,7 @@ function dataSave.new(app)
 		local r=api.GetRoot()
 		local modeKey=getModeKey(app)
 
-		r.version=2
+		r.version=rootVersion
 		r.lastMode=modeKey
 		r.updatedAt=os.time()
 		r.modes[modeKey]=currentSettings
@@ -773,6 +795,17 @@ function dataSave.new(app)
 				radius=getValue(app,"ballDetectionRadius",10),
 			},
 
+			jpv={
+				pull=getValue(app,"jpvPullValue",1),
+				maxDistance=getValue(app,"jpvMaxDistance",10),
+			},
+
+			stickyHead={
+				range=getValue(app,"stickyHeadRange",10),
+				smoothness=getValue(app,"stickyHeadSmoothness",12),
+				strength=getValue(app,"stickyHeadStrength",12),
+			},
+
 			esp={
 				enabled=getValue(app,"actionStatusOn",false),
 			},
@@ -803,6 +836,9 @@ function dataSave.new(app)
 				qbAimLock=encodeBinding(getValue(app,"qbAimLockKey",Enum.KeyCode.H)),
 				qbAimThrow=encodeBinding(getValue(app,"qbAimThrowKey",Enum.KeyCode.T)),
 				qbAimToggle=encodeBinding(getValue(app,"qbAimToggleKey",Enum.KeyCode.P)),
+				autoSTHold=encodeBinding(getValue(app,"autoSTKey",Enum.KeyCode.V)),
+				jpvToggle=encodeBinding(getValue(app,"jpvKey",Enum.KeyCode.Unknown)),
+				stickyHeadHold=encodeBinding(getValue(app,"stickyHeadKey",Enum.KeyCode.Unknown)),
 			},
 
 			presetEditor=collectPresetEditor(app),
@@ -904,6 +940,15 @@ function dataSave.new(app)
 		setClamped(app,"boostChance",boost.chance,0,100,100)
 		setClamped(app,"ballDetectionRadius",boost.radius,1,50,10)
 
+		local jpv=settings.jpv or {}
+		applyClamped(app,"setJPVPullValue","jpvPullValue",jpv.pull,0.01,2,1)
+		applyClamped(app,"setJPVMaxDistance","jpvMaxDistance",jpv.maxDistance,1,50,10)
+
+		local stickyHead=settings.stickyHead or {}
+		applyClamped(app,"setStickyHeadRange","stickyHeadRange",stickyHead.range,1,50,10)
+		applyClamped(app,"setStickyHeadSmoothness","stickyHeadSmoothness",stickyHead.smoothness,1,100,12)
+		applyClamped(app,"setStickyHeadStrength","stickyHeadStrength",stickyHead.strength,1,100,12)
+
 		local esp=settings.esp or {}
 		applyBoolean(app,"setESPState","actionStatusOn",esp.enabled)
 
@@ -930,6 +975,9 @@ function dataSave.new(app)
 			qbAimLock="qbAimLockKey",
 			qbAimThrow="qbAimThrowKey",
 			qbAimToggle="qbAimToggleKey",
+			autoSTHold="autoSTKey",
+			jpvToggle="jpvKey",
+			stickyHeadHold="stickyHeadKey",
 		}
 
 		for savedName,stateName in pairs(keyMap) do

@@ -31,7 +31,7 @@ class BootstrapContracts(unittest.TestCase):
     def test_loader_keeps_the_raycast_palette(self):
         runtime = source("runtime/loader-part-1.lua")
 
-        self.assertIn("local loaderRaycast=devThemes.raycast.Theme", runtime)
+        self.assertIn("local loaderRaycast=guiThemes.raycast.Theme", runtime)
         self.assertIn("BackgroundColor3=loaderColors.accent", runtime)
         self.assertIn("isProblem and loaderColors.error or loaderColors.accent", runtime)
         self.assertGreaterEqual(runtime.count("not isFixedLoaderThemeInstance(instance)"), 2)
@@ -121,6 +121,15 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("pcall(DataSaveAPI.SaveNow)", main_runtime)
         self.assertIn("pcall(DataSaveAPI.SetMode,currentModeKey,true)", main_runtime)
 
+    def test_legacy_player_settings_are_migrated_without_losing_modes(self):
+        persistence = source("data-save/data-save.lua")
+        self.assertIn("local rootVersion=3", persistence)
+        self.assertIn('for _,modeKey in ipairs({"mode2","mode3"}) do', persistence)
+        self.assertIn("raw.modes[modeKey]=cloneSettings(raw.modes.mode1)", persistence)
+        self.assertIn("mode1=cloneSettings(legacy)", persistence)
+        self.assertIn("mode2=cloneSettings(legacy)", persistence)
+        self.assertIn("mode3=cloneSettings(legacy)", persistence)
+
     def test_window_resize_handle_is_visible(self):
         for path in ("gui/pc.luau", "gui/mobile.luau"):
             self.assertIn("ResizeHandleVisible=true", source(path))
@@ -133,13 +142,17 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("if ok and played==true then", logic)
         self.assertIn('return true,"pumpfake"', logic)
 
-    def test_qb_c2_origin_uses_recorded_history_instead_of_reverse_physics(self):
+    def test_park_qb_c2_origin_stays_on_the_live_release_point(self):
         logic = source("features/qb-aim/logic.lua")
         self.assertIn('buildSlider(sectionBody,"Throw Delay"', logic)
         self.assertIn("local function recordQBOrigin(now,qbRoot,ball)", logic)
         self.assertIn("local function delayedQBOrigin(now,delay,currentPosition)", logic)
         self.assertIn("local targetTime=now-delay", logic)
         self.assertIn("previous.pos:Lerp(current.pos", logic)
+        self.assertIn("local sampledOrigin=currentOrigin", logic)
+        self.assertIn('if getModeKey(app)~="mode2" then', logic)
+        self.assertIn("sampledOrigin=delayedQBOrigin(now,delay,currentOrigin)", logic)
+        self.assertIn("plan.originHistoryDelay=appliedOriginDelay", logic)
         self.assertIn("setAttachmentCFrame(c2,xAxisCFrame(startPoint,plan.velocity)", logic)
         self.assertNotIn("workspace.Gravity*releaseDelay*releaseDelay", logic)
         self.assertNotIn(
@@ -147,7 +160,7 @@ class QBAimDefaultsContracts(unittest.TestCase):
             logic,
         )
 
-    def test_throw_delay_replaces_drift_and_delays_only_recorded_qb_origin(self):
+    def test_throw_delay_replaces_drift_without_moving_the_park_release_point(self):
         production = "\n".join(
             source(path)
             for path in (
@@ -171,25 +184,64 @@ class QBAimDefaultsContracts(unittest.TestCase):
             self.assertNotIn(removed, production)
 
         logic = source("features/qb-aim/logic.lua")
-        self.assertIn("delayedQBOrigin(now,delay,currentOrigin)", logic)
+        self.assertIn("local sampledOrigin=currentOrigin", logic)
+        self.assertIn('if getModeKey(app)~="mode2" then', logic)
+        self.assertIn("sampledOrigin=delayedQBOrigin(now,delay,currentOrigin)", logic)
         self.assertIn("buildPlan(receiver,ballPower,releaseBall,wrOffset or 0,sampledOrigin)", logic)
-        self.assertIn("plan.originHistoryDelay=delay", logic)
+        self.assertIn("plan.originHistoryDelay=appliedOriginDelay", logic)
         self.assertIn("plan.receiverTimingOffset=wrOffset or 0", logic)
         self.assertNotIn("(wrOffset or 0)+delay", logic)
         self.assertNotIn("(wrOffset or 0)-delay", logic)
 
-    def test_qb_peak_is_absolute_in_gameplay_and_squad_but_relative_in_park(self):
+    def test_qb_peak_uses_the_field_plane_in_park_only(self):
         logic = source("features/qb-aim/logic.lua")
+        math_source = source("features/qb-aim/math.lua")
+
+        for removed in (
+            "getPlayerTackleBox",
+            "receiverCatchAnchor",
+            "receiverAnchorPosition",
+            "receiverAnchorSource",
+            "catchAnchorMaxOffset",
+            "catchAnchorBlend",
+            'FindFirstChild("TackleBox")',
+        ):
+            self.assertNotIn(removed, logic)
+            self.assertNotIn(removed, math_source)
+
+        self.assertIn("local receiverPosition=receiverRoot.Position", logic)
+        self.assertIn("receiverPosition=receiverPosition,", logic)
+        self.assertIn("local receiverBasePosition=params.receiverPosition", math_source)
+        self.assertIn("local function fieldGroundY(position)", logic)
+        self.assertIn("for _,player in ipairs(currentPlayers()) do", logic)
+        self.assertIn("params.FilterDescendantsInstances=ignore", logic)
         self.assertIn(
-            'local catchY=getModeKey(app)=="mode2" and catchPosition.Y+catchHeight or catchHeight',
-            logic,
+            "workspace:Raycast(position,Vector3.new(0,-220,0),params)", logic
         )
-        self.assertNotIn("local function fieldGroundY", logic)
-        self.assertNotIn("workspace:Raycast(position+Vector3.new(0,30,0)", logic)
+        self.assertIn("local catchY=catchHeight", logic)
+        self.assertIn('if getModeKey(app)=="mode2" then', logic)
+        self.assertIn("local groundY=0", logic)
+        self.assertIn("groundY=fieldGroundY(receiverPosition)", logic)
+        self.assertIn("if not groundY then", logic)
+        self.assertIn("catchY=groundY+catchHeight", logic)
+        self.assertIn("groundY=groundY,", logic)
+        self.assertNotIn("fieldGroundY(catchPosition) or 0", logic)
+        self.assertNotIn("catchPosition.Y+catchHeight", logic)
+
+        self.assertIn("local function landing(originPosition,velocity,groundY)", math_source)
+        self.assertIn("local height=originPosition.Y-groundY", math_source)
+        self.assertIn(
+            "landing(originPosition,worldVelocity,params.groundY)", math_source
+        )
 
     def test_auto_calibrate_uses_one_throw_animation_and_stable_ball_release(self):
         logic = source("features/qb-aim/logic.lua")
         self.assertIn('Text="Auto Calibrate"', logic)
+        self.assertIn(
+            'BackgroundColor3=colors.muted,BackgroundTransparency=0.70',
+            logic,
+        )
+        self.assertIn('ThemeRole="MUTED"', logic)
         self.assertIn("function api.AutoCalibrate()", logic)
         self.assertIn("animator.AnimationPlayed:Connect", logic)
         self.assertIn("startCalibration(os.clock(),currentHeldBall(),throwReleaseWait)", logic)
@@ -304,7 +356,7 @@ class LifecycleContracts(unittest.TestCase):
         self.assertNotIn("LandingMarker_BallTrackingUX=true", arc)
         self.assertIn("arcRootNames[ancestor.Name]", arc)
         self.assertIn('ancestor.Parent.Name=="Local"', arc)
-        self.assertIn('ancestor.Name=="DevGuiClonedCenter"', arc)
+        self.assertIn('ancestor.Name=="ClonedCenter"', arc)
         for visual_class in (
             "BasePart",
             "Decal",
@@ -337,14 +389,30 @@ class LifecycleContracts(unittest.TestCase):
     def test_normal_reexecution_cleans_the_previous_runtime(self):
         loader = source("loader.lua")
         runtime = source("runtime/loader-part-1.lua")
-        production_loader = (ROOT.parent / "gui" / "loader.lua").read_text(encoding="utf-8")
-        self.assertIn('path="loader.lua"', loader)
-        self.assertIn('moduleSource="gui"', loader)
-        self.assertIn('{"GUI_RUNTIME_CLEANUP","DEV_GUI_RUNTIME_CLEANUP"}', production_loader)
-        self.assertIn("sharedEnv[cleanupName]=nil", production_loader)
-        self.assertIn("env.DEV_GUI_RUNTIME_CLEANUP=function()", runtime)
+        self.assertIn('rawget(sharedEnv,"DEV_GUI_RUNTIME_CLEANUP")', loader)
+        self.assertIn("sharedEnv.DEV_GUI_RUNTIME_CLEANUP=nil", loader)
+        self.assertIn('type(cleanup)=="function"', loader)
+        self.assertIn('CleanupGlobalName or "GUI_RUNTIME_CLEANUP"', runtime)
         self.assertIn("cleanupForManualReload()", runtime)
-        self.assertIn("env.DEV_GUI_RUNTIME_CLEANUP=nil", runtime)
+        self.assertIn("env[runtimeCleanupGlobalName]=nil", runtime)
+
+    def test_player_execution_log_retries_before_giving_up(self):
+        state = source("runtime/loader-part-2.lua")
+        runtime = source("runtime/loader-part-5.lua")
+        self.assertIn("playerLogSending=false", state)
+        self.assertIn("if playerLogSent or playerLogSending then return end", runtime)
+        self.assertIn("for attempt=1,3 do", runtime)
+        self.assertIn("if attempt<3 then task.wait(2) end", runtime)
+        self.assertLess(runtime.index("playerLogSent=true"), runtime.index("playerSessionId=result.sessionId"))
+
+    def test_new_modules_use_the_injected_environment_source(self):
+        runtime = source("runtime/loader-part-1.lua")
+        self.assertIn("bootModuleSource.Id or bootModuleSource.id", runtime)
+        self.assertIn('Source=appModuleSource.id', runtime)
+        self.assertIn('local result=botApi.Post("/module/get",{path=modulePath})', runtime)
+        self.assertIn('result=botApi.Post("/module/batch",{paths=apiPaths})', runtime)
+        self.assertNotIn("mergedModuleFallback", runtime)
+        self.assertNotIn('source="dev-gui"', runtime)
 
     def test_footer_reset_only_targets_config_pages_and_first_run_defaults(self):
         pc_shell = source("platforms/pc/gui/mainframe.lua")
@@ -515,7 +583,6 @@ class RuntimeFallbackContracts(unittest.TestCase):
         )
         self.assertIn(expected, defense)
         self.assertIn(expected, offense)
-
 
 if __name__ == "__main__":
     unittest.main()
