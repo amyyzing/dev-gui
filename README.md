@@ -4,7 +4,7 @@ The main Untitled GUI source. It uses the main Railway API, credential, saved da
 and module source.
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/amyyzing/gui/main/loader.lua"))()
+loadstring(game:HttpGet("https://lint-bot-production.up.railway.app/loader/gui"))()
 ```
 
 `loader.lua` is the stable entry point. It fetches `main.lua`, then the runtime and

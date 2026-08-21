@@ -3,10 +3,15 @@
 local HttpService=game:GetService("HttpService")
 
 local sharedEnv=(type(getgenv)=="function" and getgenv()) or _G
-local config=rawget(sharedEnv,"GUI_BOOT_CONFIG")
-if type(config)~="table" then
-	config={}
+local previousBootConfig=rawget(sharedEnv,"GUI_BOOT_CONFIG")
+local config={}
+if type(previousBootConfig)=="table" then
+	for key,value in pairs(previousBootConfig) do
+		config[key]=value
+	end
 end
+local fresh=config.Fresh~=false
+config.Fresh=fresh
 
 local apiUrl="https://lint-bot-production.up.railway.app"
 local apiKey="mydayohmy"
@@ -38,10 +43,8 @@ local requestBody={
 	apiKey=apiKey,
 	source=moduleSource,
 	path="main.lua",
+	fresh=fresh,
 }
-if config.Fresh==true then
-	requestBody.fresh=true
-end
 
 local requestOk,response=pcall(function()
 	return requestFn({
@@ -129,12 +132,14 @@ if setfenv then
 	setfenv(chunk,parentEnv)
 end
 
+sharedEnv.GUI_BOOT_CONFIG=config
 local runOk,runError=xpcall(chunk,function(err)
 	if debug and type(debug.traceback)=="function" then
 		return debug.traceback(tostring(err),2)
 	end
 	return tostring(err)
 end)
+sharedEnv.GUI_BOOT_CONFIG=previousBootConfig
 if not runOk then
 	error("loader startup failed: "..tostring(runError))
 end

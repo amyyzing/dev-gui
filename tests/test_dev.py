@@ -125,7 +125,8 @@ def test_new_modules_are_registered_for_remote_loading():
 
 def test_documented_one_line_loader_uses_railway_not_private_github_raw():
     readme = read("README.md")
-    assert 'game:HttpGet("https://raw.githubusercontent.com/amyyzing/gui/main/loader.lua")' in readme
+    assert 'game:HttpGet("https://lint-bot-production.up.railway.app/loader/gui")' in readme
+    assert "raw.githubusercontent.com/amyyzing/gui" not in readme
 
 
 def test_reworked_theme_list_is_complete_and_raycast_is_default():
