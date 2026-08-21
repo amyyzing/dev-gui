@@ -2111,9 +2111,10 @@ function qbAim.new(app,parent)
 		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
 		local catchPosition=receiverAnchorPosition or receiverRoot.Position
+		local groundY=0
 		local catchY=catchHeight
 		if getModeKey(app)=="mode2" then
-			local groundY=fieldGroundY(catchPosition)
+			groundY=fieldGroundY(catchPosition)
 			if not groundY then
 				return nil,nil
 			end
@@ -2132,6 +2133,7 @@ function qbAim.new(app,parent)
 			receiverReleaseOffset=receiverReleaseOffset,
 			predictorState=predictorState,
 			catchY=catchY,
+			groundY=groundY,
 			solveYBias=catchSolveYBias,
 			leadDelay=leadDelay,
 			leadDelayBaseline=leadDelayBaseline,

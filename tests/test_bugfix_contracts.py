@@ -197,11 +197,20 @@ class QBAimDefaultsContracts(unittest.TestCase):
         )
         self.assertIn("local catchY=catchHeight", logic)
         self.assertIn('if getModeKey(app)=="mode2" then', logic)
-        self.assertIn("local groundY=fieldGroundY(catchPosition)", logic)
+        self.assertIn("local groundY=0", logic)
+        self.assertIn("groundY=fieldGroundY(catchPosition)", logic)
         self.assertIn("if not groundY then", logic)
         self.assertIn("catchY=groundY+catchHeight", logic)
+        self.assertIn("groundY=groundY,", logic)
         self.assertNotIn("fieldGroundY(catchPosition) or 0", logic)
         self.assertNotIn("catchPosition.Y+catchHeight", logic)
+
+        math_source = source("features/qb-aim/math.lua")
+        self.assertIn("local function landing(originPosition,velocity,groundY)", math_source)
+        self.assertIn("local height=originPosition.Y-groundY", math_source)
+        self.assertIn(
+            "landing(originPosition,worldVelocity,params.groundY)", math_source
+        )
 
     def test_auto_calibrate_uses_one_throw_animation_and_stable_ball_release(self):
         logic = source("features/qb-aim/logic.lua")
