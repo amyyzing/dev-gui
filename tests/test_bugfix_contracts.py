@@ -142,13 +142,17 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("if ok and played==true then", logic)
         self.assertIn('return true,"pumpfake"', logic)
 
-    def test_qb_c2_origin_uses_recorded_history_instead_of_reverse_physics(self):
+    def test_park_qb_c2_origin_stays_on_the_live_release_point(self):
         logic = source("features/qb-aim/logic.lua")
         self.assertIn('buildSlider(sectionBody,"Throw Delay"', logic)
         self.assertIn("local function recordQBOrigin(now,qbRoot,ball)", logic)
         self.assertIn("local function delayedQBOrigin(now,delay,currentPosition)", logic)
         self.assertIn("local targetTime=now-delay", logic)
         self.assertIn("previous.pos:Lerp(current.pos", logic)
+        self.assertIn("local sampledOrigin=currentOrigin", logic)
+        self.assertIn('if getModeKey(app)~="mode2" then', logic)
+        self.assertIn("sampledOrigin=delayedQBOrigin(now,delay,currentOrigin)", logic)
+        self.assertIn("plan.originHistoryDelay=appliedOriginDelay", logic)
         self.assertIn("setAttachmentCFrame(c2,xAxisCFrame(startPoint,plan.velocity)", logic)
         self.assertNotIn("workspace.Gravity*releaseDelay*releaseDelay", logic)
         self.assertNotIn(
@@ -156,7 +160,7 @@ class QBAimDefaultsContracts(unittest.TestCase):
             logic,
         )
 
-    def test_throw_delay_replaces_drift_and_delays_only_recorded_qb_origin(self):
+    def test_throw_delay_replaces_drift_without_moving_the_park_release_point(self):
         production = "\n".join(
             source(path)
             for path in (
@@ -180,9 +184,11 @@ class QBAimDefaultsContracts(unittest.TestCase):
             self.assertNotIn(removed, production)
 
         logic = source("features/qb-aim/logic.lua")
-        self.assertIn("delayedQBOrigin(now,delay,currentOrigin)", logic)
+        self.assertIn("local sampledOrigin=currentOrigin", logic)
+        self.assertIn('if getModeKey(app)~="mode2" then', logic)
+        self.assertIn("sampledOrigin=delayedQBOrigin(now,delay,currentOrigin)", logic)
         self.assertIn("buildPlan(receiver,ballPower,releaseBall,wrOffset or 0,sampledOrigin)", logic)
-        self.assertIn("plan.originHistoryDelay=delay", logic)
+        self.assertIn("plan.originHistoryDelay=appliedOriginDelay", logic)
         self.assertIn("plan.receiverTimingOffset=wrOffset or 0", logic)
         self.assertNotIn("(wrOffset or 0)+delay", logic)
         self.assertNotIn("(wrOffset or 0)-delay", logic)

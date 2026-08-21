@@ -2124,12 +2124,17 @@ function qbAim.new(app,parent)
 		local delay=math.clamp(tonumber(state.qbAimThrowDelay) or defaultThrowDelay,throwDelayMin,throwDelayMax)
 		local now=os.clock()
 		local currentOrigin=recordQBOrigin(now,qbRoot,releaseBall or currentHeldBall())
-		local sampledOrigin=delayedQBOrigin(now,delay,currentOrigin)
+		local sampledOrigin=currentOrigin
+		local appliedOriginDelay=0
+		if getModeKey(app)~="mode2" then
+			sampledOrigin=delayedQBOrigin(now,delay,currentOrigin)
+			appliedOriginDelay=delay
+		end
 		local plan=buildPlan(receiver,ballPower,releaseBall,wrOffset or 0,sampledOrigin)
 		if plan then
 			plan.centerReleaseOrigin=sampledOrigin
 			plan.throwDelay=delay
-			plan.originHistoryDelay=delay
+			plan.originHistoryDelay=appliedOriginDelay
 			plan.releaseTimingOffset=0
 			plan.releaseYOffset=0
 			plan.receiverTimingOffset=wrOffset or 0
