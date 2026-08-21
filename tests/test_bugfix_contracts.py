@@ -187,14 +187,16 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertNotIn("(wrOffset or 0)+delay", logic)
         self.assertNotIn("(wrOffset or 0)-delay", logic)
 
-    def test_qb_peak_is_absolute_in_gameplay_and_squad_but_relative_in_park(self):
+    def test_qb_peak_uses_the_field_plane_in_park_only(self):
         logic = source("features/qb-aim/logic.lua")
-        self.assertIn(
-            'local catchY=getModeKey(app)=="mode2" and catchPosition.Y+catchHeight or catchHeight',
-            logic,
-        )
-        self.assertNotIn("local function fieldGroundY", logic)
-        self.assertNotIn("workspace:Raycast(position+Vector3.new(0,30,0)", logic)
+        self.assertIn("local function fieldGroundY(position)", logic)
+        self.assertIn("for _,player in ipairs(currentPlayers()) do", logic)
+        self.assertIn("params.FilterDescendantsInstances=ignore", logic)
+        self.assertIn("workspace:Raycast(position+Vector3.new(0,30,0)", logic)
+        self.assertIn("local catchY=catchHeight", logic)
+        self.assertIn('if getModeKey(app)=="mode2" then', logic)
+        self.assertIn("catchY=(fieldGroundY(catchPosition) or 0)+catchHeight", logic)
+        self.assertNotIn("catchPosition.Y+catchHeight", logic)
 
     def test_auto_calibrate_uses_one_throw_animation_and_stable_ball_release(self):
         logic = source("features/qb-aim/logic.lua")

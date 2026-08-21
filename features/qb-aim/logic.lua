@@ -865,6 +865,30 @@ function qbAim.new(app,parent)
 		return player and player.Character and root(player.Character) or nil
 	end
 
+	local function fieldGroundY(position)
+		if typeof(position)~="Vector3" then return nil end
+
+		local ignore={}
+		for _,player in ipairs(currentPlayers()) do
+			local character=characterOf(player)
+			if character then
+				ignore[#ignore+1]=character
+			end
+		end
+
+		local params=RaycastParams.new()
+		params.FilterType=Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances=ignore
+		params.IgnoreWater=true
+
+		local result=workspace:Raycast(position+Vector3.new(0,30,0),Vector3.new(0,-220,0),params)
+		if result and result.Position.Y<=position.Y-1 then
+			return result.Position.Y
+		end
+
+		return nil
+	end
+
 	local function currentHeldBall()
 		if ballTracker and type(ballTracker.getHeldBall)=="function" then
 			local ball=ballTracker:getHeldBall(localPlayer,35)
@@ -2087,7 +2111,10 @@ function qbAim.new(app,parent)
 		local receiverAnchorPosition,receiverAnchorSource=receiverCatchAnchor(receiver,receiverRoot)
 		local targetVelocity,shape,predictorState=routeVelocity(receiver,data,originPosition,receiverRoot,selectedRouteLock)
 		local catchPosition=receiverAnchorPosition or receiverRoot.Position
-		local catchY=getModeKey(app)=="mode2" and catchPosition.Y+catchHeight or catchHeight
+		local catchY=catchHeight
+		if getModeKey(app)=="mode2" then
+			catchY=(fieldGroundY(catchPosition) or 0)+catchHeight
+		end
 		return mathCore.solve({
 			originPosition=originPosition,
 			receiverPosition=receiverRoot.Position,
