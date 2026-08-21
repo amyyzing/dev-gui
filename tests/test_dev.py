@@ -16,19 +16,21 @@ def test_dump_file_names_stay_short_and_flat():
     assert not any(path.is_file() for path in (ROOT / "dump").glob("*/*.lua"))
 
 
-def test_loader_is_bound_to_dev_gui_source_and_dump_bootstrap():
+def test_legacy_loader_redirects_to_production_gui():
     loader = read("loader.lua")
     dump_start = read("dump/start.lua")
     runtime = read("runtime/loader-part-1.lua")
-    assert 'MODULE_SOURCE="dev-gui"' in loader
-    assert 'BOOTSTRAP_PATH="dump/start.lua"' in loader
-    assert 'API_URL="https://dev-gui-api-production.up.railway.app"' in loader
-    assert 'DEFAULT_API_KEY="dev-gui-4145ccb4cdf3a8cca616d7109c9a0fbe16e91c56f629e371de52b9fe7c2c49c6"' in loader
+    assert 'apiUrl="https://lint-bot-production.up.railway.app"' in loader
+    assert 'moduleSource="gui"' in loader
+    assert 'path="loader.lua"' in loader
+    assert 'fresh=true' in loader
+    assert "DEV_GUI_BOOT_CONFIG" not in loader
+    assert "/bundle/get" not in loader
+
+    # The old modular runtime remains independently buildable for rollback,
+    # but it is no longer the user-facing entry point.
     assert 'TRUSTED_API_URL="https://dev-gui-api-production.up.railway.app"' in dump_start
     assert 'trustedApiUrl="https://dev-gui-api-production.up.railway.app"' in runtime
-    assert "lint-bot-production.up.railway.app" not in loader + dump_start + runtime
-    assert "DEV_GUI_BOOT_CONFIG" in loader
-    assert "GUI_BOOT_CONFIG" not in loader.replace("DEV_GUI_BOOT_CONFIG", "")
 
 
 def test_runtime_identity_does_not_reuse_main_gui_names():

@@ -43,27 +43,15 @@ class BundleContracts(unittest.TestCase):
         for relative in manifest["uiLibrary"]:
             self.assertTrue((ui_root / relative).is_file(), relative)
 
-    def test_normal_loader_revalidates_its_memory_only_bundle_cache(self):
+    def test_legacy_loader_hands_off_to_production_gui(self):
         loader = (ROOT / "loader.lua").read_text(encoding="utf-8")
-        self.assertEqual(loader.count('API_URL.."/bundle/get"'), 1)
-        self.assertIn('rawget(sharedEnv,"DEV_GUI_BUNDLE_CACHE")', loader)
-        self.assertIn('local useCachedBundle=memoryCache~=nil and config.Fresh~=true', loader)
-        self.assertIn('if useCachedBundle then requestBody.buildId=memoryCache.BuildId end', loader)
-        self.assertIn('if requestOk and status==304 and useCachedBundle then', loader)
-        self.assertIn('chunk=memoryCache.Chunk', loader)
-        self.assertIn('rawget(sharedEnv,"DEV_GUI_RUNTIME_CLEANUP")', loader)
-        self.assertEqual(loader.count("stopPreviousRuntime()"), 3)
-        self.assertIn('sharedEnv.DEV_GUI_BUNDLE_CACHE={Platform=platform,BuildId=buildId,Chunk=chunk}', loader)
-        self.assertIn('runModularFallback', loader)
-        self.assertIn('local fresh=config.Fresh~=false', loader)
-        self.assertIn('path=BOOTSTRAP_PATH,fresh=fresh', loader)
-        self.assertIn('if config.Development==true or config.UseModules==true then', loader)
-        for disk_api in ("readfile", "writefile", "isfile", "isfolder", "makefolder"):
-            self.assertNotIn(disk_api, loader)
-
-        runtime = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
-        self.assertIn('bootConfig.Development=true', runtime)
-        self.assertIn('env.DEV_GUI_BUNDLE_CACHE=nil', runtime)
+        self.assertIn('apiUrl="https://lint-bot-production.up.railway.app"', loader)
+        self.assertIn('moduleSource="gui"', loader)
+        self.assertIn('path="loader.lua"', loader)
+        self.assertIn('fresh=true', loader)
+        self.assertIn('sharedEnv.GUI_BOOT_CONFIG=guiConfig', loader)
+        self.assertNotIn("DEV_GUI_BOOT_CONFIG", loader)
+        self.assertNotIn("/bundle/get", loader)
 
     def test_runtime_prefers_bundle_factories_before_remote_calls(self):
         runtime = (ROOT / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
@@ -94,6 +82,24 @@ class BundleContracts(unittest.TestCase):
         self.assertEqual(theme_names, expected)
         for name in retired:
             self.assertNotIn(f"design/themes/{name}.lua", runtime)
+
+    def test_migrated_entry_keeps_esp_unfilled_calibrate_and_player_logs(self):
+        production = ROOT.parent / "gui"
+        runtime1 = (production / "runtime" / "loader-part-1.lua").read_text(encoding="utf-8")
+        runtime2 = (production / "runtime" / "loader-part-2.lua").read_text(encoding="utf-8")
+        runtime5 = (production / "runtime" / "loader-part-5.lua").read_text(encoding="utf-8")
+
+        self.assertIn('ESP="features/esp/gui.lua"', runtime1)
+        self.assertIn('ESPLogic="features/esp/logic.lua"', runtime1)
+        self.assertIn('{api="ESP",name="ESP"', runtime2)
+        self.assertIn('botApi.Post("/player/log"', runtime5)
+
+        for root in (ROOT, production):
+            qb = (root / "features" / "qb-aim" / "logic.lua").read_text(encoding="utf-8")
+            line = next(line for line in qb.splitlines() if "autoCalibrateButton=make" in line)
+            self.assertIn('ThemeRole="MUTED"', line)
+            self.assertIn("BackgroundTransparency=0.70", line)
+            self.assertIn("AutoButtonColor=false", line)
 
 
 if __name__ == "__main__":
