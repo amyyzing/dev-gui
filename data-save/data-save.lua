@@ -837,7 +837,7 @@ function dataSave.new(app)
 				qbAimThrow=encodeBinding(getValue(app,"qbAimThrowKey",Enum.KeyCode.T)),
 				qbAimToggle=encodeBinding(getValue(app,"qbAimToggleKey",Enum.KeyCode.P)),
 				autoSTHold=encodeBinding(getValue(app,"autoSTKey",Enum.KeyCode.V)),
-				jpvToggle=encodeBinding(getValue(app,"jpvKey",Enum.KeyCode.Unknown)),
+				jpvHold=encodeBinding(getValue(app,"jpvKey",Enum.KeyCode.Unknown)),
 				stickyHeadHold=encodeBinding(getValue(app,"stickyHeadKey",Enum.KeyCode.Unknown)),
 			},
 
@@ -976,7 +976,7 @@ function dataSave.new(app)
 			qbAimThrow="qbAimThrowKey",
 			qbAimToggle="qbAimToggleKey",
 			autoSTHold="autoSTKey",
-			jpvToggle="jpvKey",
+			jpvHold="jpvKey",
 			stickyHeadHold="stickyHeadKey",
 		}
 
@@ -984,6 +984,9 @@ function dataSave.new(app)
 			if keybinds[savedName]~=nil then
 				setValue(app,stateName,decodeBinding(keybinds[savedName]))
 			end
+		end
+		if keybinds.jpvHold==nil and keybinds.jpvToggle~=nil then
+			setValue(app,"jpvKey",decodeBinding(keybinds.jpvToggle))
 		end
 
 		if keybinds.toggleESP~=nil then

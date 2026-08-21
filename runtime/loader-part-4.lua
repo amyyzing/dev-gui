@@ -357,7 +357,7 @@ keybindRows={
 	{label="QB AIM THROW",key="qbAimThrowKey"},
 	{label="QB AIM TOGGLE",key="qbAimToggleKey"},
 	{label="AUTO ST HOLD",key="autoSTKey"},
-	{label="JPV TOGGLE",key="jpvKey"},
+	{label="JPV HOLD",key="jpvKey"},
 	{label="STICKY HEAD HOLD",key="stickyHeadKey"},
 }
 

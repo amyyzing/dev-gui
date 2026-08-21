@@ -66,13 +66,15 @@ function jpv.new(app,parent)
 	local inputToBinding=app.inputToBinding
 	local api={}
 	local enabled=false
+	local holding=false
 	local pullActive=false
 	local pullStarted=0
 	local destroyed=false
 	local toggle=nil
 	local pullSlider=nil
 	local distanceSlider=nil
-	local inputConnection=nil
+	local beganConnection=nil
+	local endedConnection=nil
 	local characterConnection=nil
 	local jumpingConnection=nil
 	local heartbeatConnection=nil
@@ -92,11 +94,14 @@ function jpv.new(app,parent)
 	local function setEnabled(value)
 		enabled=value and true or false
 		state.jpvEnabled=enabled
-		if not enabled then pullActive=false end
+		if not enabled then
+			holding=false
+			pullActive=false
+		end
 		syncToggle()
 	end
 
-	local section,controls=makeSection(parent,7,"Jump Pull Vector","pull toward the ball after jumping",{
+	local section,controls=makeSection(parent,7,"Jump Pull Vector","hold the configured key while jumping",{
 		headerToggle={startState=false,onChange=setEnabled},
 	})
 	toggle=controls and controls.toggle
@@ -117,7 +122,7 @@ function jpv.new(app,parent)
 		local humanoid=character and (character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid",3))
 		if humanoid then
 			jumpingConnection=humanoid.Jumping:Connect(function()
-				if enabled then
+				if enabled and holding then
 					pullActive=true
 					pullStarted=os.clock()
 				end
@@ -128,14 +133,23 @@ function jpv.new(app,parent)
 	bindCharacter(localPlayer.Character)
 	characterConnection=localPlayer.CharacterAdded:Connect(bindCharacter)
 
-	inputConnection=inputService.InputBegan:Connect(function(input,processed)
-		if processed then return end
+	local function matchesHold(input)
 		local key=app.getJPVKey and app.getJPVKey() or Enum.KeyCode.Unknown
-		if key~=Enum.KeyCode.Unknown and inputToBinding(input)==key then setEnabled(not enabled) end
+		return key~=Enum.KeyCode.Unknown and inputToBinding(input)==key
+	end
+
+	beganConnection=inputService.InputBegan:Connect(function(input,processed)
+		if not processed and enabled and matchesHold(input) then holding=true end
+	end)
+	endedConnection=inputService.InputEnded:Connect(function(input)
+		if matchesHold(input) then
+			holding=false
+			pullActive=false
+		end
 	end)
 
 	heartbeatConnection=runService.Heartbeat:Connect(function()
-		if destroyed or not enabled or not pullActive then return end
+		if destroyed or not enabled or not holding or not pullActive then return end
 		if os.clock()-pullStarted>pullDuration then
 			pullActive=false
 			return
@@ -182,8 +196,10 @@ function jpv.new(app,parent)
 		if destroyed then return end
 		destroyed=true
 		enabled=false
+		holding=false
 		pullActive=false
-		disconnect(inputConnection)
+		disconnect(beganConnection)
+		disconnect(endedConnection)
 		disconnect(characterConnection)
 		disconnect(jumpingConnection)
 		disconnect(heartbeatConnection)

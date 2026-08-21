@@ -39,8 +39,10 @@ def test_feature_toggles_are_session_only_but_values_and_keys_are_saved():
     ):
         assert f'getValue(app,"{state_name}"' in data_save
 
-    for field in ("autoSTHold", "jpvToggle", "stickyHeadHold"):
+    for field in ("autoSTHold", "jpvHold", "stickyHeadHold"):
         assert f"{field}=" in data_save
+
+    assert 'keybinds.jpvToggle' in data_save
 
     for key in ("autoSTKey", "jpvKey", "stickyHeadKey"):
         assert f"{key}=true" in persistent
@@ -67,6 +69,9 @@ def test_jpv_and_sticky_head_keep_the_supplied_defaults_and_lifecycle():
     assert "ball.Position+Vector3.new(0,2.5,0)" in jpv
     assert "state.jpvEnabled=false" in jpv
     assert "characterConnection=localPlayer.CharacterAdded:Connect(bindCharacter)" in jpv
+    assert "if enabled and holding then" in jpv
+    assert "inputService.InputEnded:Connect" in jpv
+    assert "not enabled or not holding or not pullActive" in jpv
 
     assert "state.stickyHeadRange=clamp(state.stickyHeadRange,1,50,10)" in sticky
     assert "state.stickyHeadSmoothness=clamp(state.stickyHeadSmoothness,1,100,12)" in sticky
