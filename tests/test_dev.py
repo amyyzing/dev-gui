@@ -129,6 +129,13 @@ def test_documented_one_line_loader_uses_railway_not_private_github_raw():
     assert "raw.githubusercontent.com/amyyzing/gui" not in readme
 
 
+def test_customizer_starts_with_theme_without_an_appearance_intro():
+    colors = read("features/colors/logic.lua")
+    assert 'Text="appearance"' not in colors
+    assert "local introRow=" not in colors
+    assert 'makePanel(1,"Theme","ThemePanelExpanded")' in colors
+
+
 def test_reworked_theme_list_is_complete_and_raycast_is_default():
     runtime = read("runtime/loader-part-1.lua")
     colors = read("features/colors/logic.lua")

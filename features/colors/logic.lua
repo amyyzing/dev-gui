@@ -1313,38 +1313,7 @@ function colors.new(app,page)
 		syncHighlightControls()
 	end
 
-	local introRow=make("Frame",{
-		BackgroundTransparency=1,
-		Size=UDim2.new(1,0,0,46),
-		ZIndex=5,
-		LayoutOrder=1,
-	},page)
-
-	make("TextLabel",{
-		BackgroundTransparency=1,
-		Position=UDim2.fromOffset(4,6),
-		Size=UDim2.new(1,-8,0,22),
-		Text="appearance",
-		Font=Enum.Font.GothamBold,
-		TextSize=18,
-		TextColor3=colors.text,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},introRow)
-
-	make("TextLabel",{
-		BackgroundTransparency=1,
-		Position=UDim2.fromOffset(4,30),
-		Size=UDim2.new(1,-8,0,16),
-		Text="",
-		Font=Enum.Font.Gotham,
-		TextSize=12,
-		TextColor3=colors.muted,
-		TextXAlignment=Enum.TextXAlignment.Left,
-		ZIndex=6,
-	},introRow)
-
-	local themePanel=makePanel(2,"Theme","ThemePanelExpanded")
+	local themePanel=makePanel(1,"Theme","ThemePanelExpanded")
 
 	local themeGrid=make("Frame",{
 		BackgroundTransparency=1,
@@ -1449,7 +1418,7 @@ function colors.new(app,page)
 		themeCards[#themeCards+1]={Preset=preset,Card=card,Marker=marker,label=label}
 	end
 
-	local colorPanel=makePanel(3,"Colours","ColoursPanelExpanded")
+	local colorPanel=makePanel(2,"Colours","ColoursPanelExpanded")
 
 	local targetRow=make("Frame",{
 		BackgroundTransparency=1,
@@ -1922,7 +1891,7 @@ function colors.new(app,page)
 		end
 	end
 
-	local highlightPanel=makePanel(4,"Highlights","HighlightPanelExpanded")
+	local highlightPanel=makePanel(3,"Highlights","HighlightPanelExpanded")
 
 	local highlightModeRow=make("Frame",{
 		BackgroundTransparency=1,
