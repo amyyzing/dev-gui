@@ -543,7 +543,7 @@ resetKeybindPresetPageDefaults=function()
 	qbAimLockKey=Enum.KeyCode.H
 	qbAimThrowKey=Enum.KeyCode.T
 	qbAimToggleKey=Enum.KeyCode.P
-	autoSTKey=Enum.KeyCode.V
+	autoSTKey=Enum.KeyCode.Unknown
 	jpvKey=Enum.KeyCode.Unknown
 	stickyHeadKey=Enum.KeyCode.Unknown
 

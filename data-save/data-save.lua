@@ -836,7 +836,7 @@ function dataSave.new(app)
 				qbAimLock=encodeBinding(getValue(app,"qbAimLockKey",Enum.KeyCode.H)),
 				qbAimThrow=encodeBinding(getValue(app,"qbAimThrowKey",Enum.KeyCode.T)),
 				qbAimToggle=encodeBinding(getValue(app,"qbAimToggleKey",Enum.KeyCode.P)),
-				autoSTToggle=encodeBinding(getValue(app,"autoSTKey",Enum.KeyCode.V)),
+				autoSTToggle=encodeBinding(getValue(app,"autoSTKey",Enum.KeyCode.Unknown)),
 				jpvToggle=encodeBinding(getValue(app,"jpvKey",Enum.KeyCode.Unknown)),
 				stickyHeadToggle=encodeBinding(getValue(app,"stickyHeadKey",Enum.KeyCode.Unknown)),
 			},

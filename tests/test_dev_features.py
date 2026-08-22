@@ -59,6 +59,20 @@ def test_feature_toggles_are_session_only_but_values_and_keys_are_saved():
         assert f"{key}=true" in persistent
 
 
+def test_dev_feature_keybinds_have_no_hidden_fallbacks():
+    runtime = read("runtime/loader-part-1.lua")
+    reset = read("runtime/loader-part-4.lua")
+    keybinds = read("features/keybinds/logic.lua")
+    data_save = read("data-save/data-save.lua")
+
+    assert "autoSTKey=Enum.KeyCode.Unknown" in runtime
+    assert "autoSTKey=Enum.KeyCode.Unknown" in reset
+    assert 'ensure("autoSTKey")' in keybinds
+    assert 'getValue(app,"autoSTKey",Enum.KeyCode.Unknown)' in data_save
+    for source in (runtime, reset, keybinds, data_save):
+        assert "autoSTKey=Enum.KeyCode.V" not in source
+
+
 def test_auto_st_uses_fixed_right_anchor_and_bounded_shortest_yaw():
     source = read("features/auto-st/logic.lua")
     assert "relativeVelocity:Dot(relativeVelocity)" in source
@@ -66,6 +80,8 @@ def test_auto_st_uses_fixed_right_anchor_and_bounded_shortest_yaw():
     assert "rightAnchor=center+desiredRight*rightAnchorOffset" in source
     assert "targetYaw=yawFromRight(anchorDirection.Unit)" in source
     assert "nextBallScanAt=now+ballScanInterval" in source
+    assert 'for _,rootName in ipairs({"Games","MiniGames"})' in source
+    assert "refreshKnownFootballCandidates()" in source
     assert "shortestAngle(currentYaw,targetYaw)" in source
     assert "math.clamp(yawError,-turnRate*dt,turnRate*dt)" in source
     assert "humanoid.AutoRotate=false" in source

@@ -134,6 +134,27 @@ function autoST.new(app,parent)
 		ballIndexReady=true
 	end
 
+	local function refreshKnownFootballCandidates()
+		for _,rootName in ipairs({"Games","MiniGames"}) do
+			local games=workspace:FindFirstChild(rootName)
+			if games then
+				for _,gameFolder in ipairs(games:GetChildren()) do
+					local replicated=gameFolder:FindFirstChild("Replicated")
+					if replicated then
+						for _,container in ipairs(replicated:GetChildren()) do
+							if hasFootballName(container) then
+								indexCandidate(container)
+								for _,instance in ipairs(container:GetDescendants()) do
+									indexCandidate(instance)
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
 	local function closestFootball(rootPart)
 		local best=nil
 		local bestDistance=detectionRange
@@ -246,6 +267,7 @@ function autoST.new(app,parent)
 			and (trackedBall.Position-rootPart.Position).Magnitude<=detectionRange) then
 			trackedBall=nil
 			if now>=nextBallScanAt then
+				refreshKnownFootballCandidates()
 				trackedBall=closestFootball(rootPart)
 				nextBallScanAt=now+ballScanInterval
 			end
