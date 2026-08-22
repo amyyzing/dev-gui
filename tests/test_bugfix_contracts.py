@@ -592,6 +592,10 @@ class RuntimeFallbackContracts(unittest.TestCase):
         pumpfake = qb_aim.index("if qbAim._playPumpFakeAnimation(mechanics) then")
         self.assertLess(local_fallback, pumpfake)
         self.assertIn("qbAim._localThrowTrack=track", qb_aim)
+        self.assertIn(
+            "track.Priority=Enum.AnimationPriority.Action2",
+            qb_aim,
+        )
 
     def test_style_fallback_does_not_self_reference_parameter(self):
         runtime = source("runtime/loader-part-1.lua")

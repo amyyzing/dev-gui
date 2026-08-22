@@ -658,7 +658,9 @@ function qbAim._playLocalThrowAnimation()
 	qbAim._localThrowTrack=track
 
 	pcall(function()
-		track.Priority=Enum.AnimationPriority.Action
+		-- The game's QB idle is repeatedly restarted at Action priority.
+		-- Action2 keeps the throw visible, matching the native pump-fake track.
+		track.Priority=Enum.AnimationPriority.Action2
 		track.Looped=false
 	end)
 
