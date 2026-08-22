@@ -147,7 +147,7 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("local useLocalThrowFallback=true", logic)
         self.assertIn("return animator:LoadAnimation(animation)", logic)
         self.assertIn("track:Play(0.05,1,throwAnimationSpeed)", logic)
-        self.assertIn('return ok,"local"', logic)
+        self.assertIn('return true,"local"', logic)
 
     def test_park_qb_c2_origin_stays_on_the_live_release_point(self):
         logic = source("features/qb-aim/logic.lua")
@@ -573,6 +573,26 @@ class LifecycleContracts(unittest.TestCase):
 
 
 class RuntimeFallbackContracts(unittest.TestCase):
+    def test_qb_throw_animation_uses_confirmed_held_ball_and_local_fallback(self):
+        qb_aim = source("features/qb-aim/logic.lua")
+        self.assertIn("function qbAim._playThrowAnimation(heldBall)", qb_aim)
+        self.assertIn(
+            "if not playThrowAnimation or not heldBall then return false end",
+            qb_aim,
+        )
+        self.assertIn(
+            "animationPlayed=qbAim._playThrowAnimation(heldBall)",
+            qb_aim,
+        )
+        self.assertNotIn(
+            "if not playThrowAnimation or not getHeldBall() then return false end",
+            qb_aim,
+        )
+        local_fallback = qb_aim.index("if useLocalThrowFallback then")
+        pumpfake = qb_aim.index("if qbAim._playPumpFakeAnimation(mechanics) then")
+        self.assertLess(local_fallback, pumpfake)
+        self.assertIn("qbAim._localThrowTrack=track", qb_aim)
+
     def test_style_fallback_does_not_self_reference_parameter(self):
         runtime = source("runtime/loader-part-1.lua")
         self.assertIn(

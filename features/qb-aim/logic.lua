@@ -648,11 +648,24 @@ function qbAim._playLocalThrowAnimation()
 
 	if not(ok and track) then return false end
 
+	local previousTrack=qbAim._localThrowTrack
+	if previousTrack and previousTrack~=track then
+		pcall(function()
+			previousTrack:Stop(0)
+			previousTrack:Destroy()
+		end)
+	end
+	qbAim._localThrowTrack=track
+
 	pcall(function()
 		track.Priority=Enum.AnimationPriority.Action
+		track.Looped=false
 	end)
-	track:Play(0.05,1,throwAnimationSpeed)
-	return true
+
+	local played=pcall(function()
+		track:Play(0.05,1,throwAnimationSpeed)
+	end)
+	return played and track.IsPlaying==true
 end
 
 function qbAim._playPumpFakeAnimation(mechanics)
@@ -669,8 +682,8 @@ function qbAim._playPumpFakeAnimation(mechanics)
 	return ok
 end
 
-function qbAim._playThrowAnimation()
-	if not playThrowAnimation or not getHeldBall() then return false end
+function qbAim._playThrowAnimation(heldBall)
+	if not playThrowAnimation or not heldBall then return false end
 
 	local mechanics=qbAim._getGlobalMechanics()
 	if mechanics and type(mechanics.PlayAnimation)=="function" then
@@ -682,13 +695,15 @@ function qbAim._playThrowAnimation()
 		end
 	end
 
-	if qbAim._playPumpFakeAnimation(mechanics) then
-		return true,"pumpfake"
-	end
-
 	if useLocalThrowFallback then
 		local ok=qbAim._playLocalThrowAnimation()
-		return ok,"local"
+		if ok then
+			return true,"local"
+		end
+	end
+
+	if qbAim._playPumpFakeAnimation(mechanics) then
+		return true,"pumpfake"
 	end
 
 	return false,"none"
@@ -2277,7 +2292,7 @@ function qbAim.new(app,parent)
 		local skipAnimation=options.skipAnimation==true or options.noAnimation==true
 		local animationPlayed=false
 		if not skipAnimation then
-			animationPlayed=qbAim._playThrowAnimation()
+			animationPlayed=qbAim._playThrowAnimation(heldBall)
 			if animationPlayed then
 				startCalibration(os.clock(),heldBall,throwReleaseWait)
 			end
