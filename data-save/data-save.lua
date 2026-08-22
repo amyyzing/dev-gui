@@ -985,16 +985,6 @@ function dataSave.new(app)
 				setValue(app,stateName,decodeBinding(keybinds[savedName]))
 			end
 		end
-		if keybinds.autoSTToggle==nil and keybinds.autoSTHold~=nil then
-			setValue(app,"autoSTKey",decodeBinding(keybinds.autoSTHold))
-		end
-		if keybinds.jpvToggle==nil and keybinds.jpvHold~=nil then
-			setValue(app,"jpvKey",decodeBinding(keybinds.jpvHold))
-		end
-		if keybinds.stickyHeadToggle==nil and keybinds.stickyHeadHold~=nil then
-			setValue(app,"stickyHeadKey",decodeBinding(keybinds.stickyHeadHold))
-		end
-
 		if keybinds.toggleESP~=nil then
 			setValue(app,"espToggleKey",decodeBinding(keybinds.toggleESP))
 		elseif keybinds.toggleActionStatus~=nil then

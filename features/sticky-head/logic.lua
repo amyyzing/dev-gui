@@ -102,7 +102,6 @@ function stickyHead.new(app,parent)
 	end)
 
 	local function matchesToggle(input)
-		if input.KeyCode==Enum.KeyCode.ButtonL1 then return true end
 		local key=app.getStickyHeadKey and app.getStickyHeadKey() or Enum.KeyCode.Unknown
 		return key~=Enum.KeyCode.Unknown and inputToBinding(input)==key
 	end

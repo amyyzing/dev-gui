@@ -53,20 +53,26 @@ def test_feature_toggles_are_session_only_but_values_and_keys_are_saved():
         assert f"{field}=" in data_save
 
     for legacy_field in ("keybinds.autoSTHold", "keybinds.jpvHold", "keybinds.stickyHeadHold"):
-        assert legacy_field in data_save
+        assert legacy_field not in data_save
 
     for key in ("autoSTKey", "jpvKey", "stickyHeadKey"):
         assert f"{key}=true" in persistent
 
 
-def test_auto_st_keeps_the_supplied_intercept_and_side_alignment():
+def test_auto_st_uses_fixed_right_anchor_and_bounded_shortest_yaw():
     source = read("features/auto-st/logic.lua")
-    assert "Vector3.new(0,-28,0)" in source
-    assert "for time=0.03,1.2,0.04 do" in source
-    assert "Vector3.new(unit.Z,0,-unit.X)" in source
-    assert "rootPart.CFrame:Lerp(targetCFrame,alignSpeed)" in source
+    assert "relativeVelocity:Dot(relativeVelocity)" in source
+    assert "-relativePosition:Dot(relativeVelocity)/speedSquared" in source
+    assert "rightAnchor=center+desiredRight*rightAnchorOffset" in source
+    assert "targetYaw=yawFromRight(anchorDirection.Unit)" in source
+    assert "nextBallScanAt=now+ballScanInterval" in source
+    assert "shortestAngle(currentYaw,targetYaw)" in source
+    assert "math.clamp(yawError,-turnRate*dt,turnRate*dt)" in source
+    assert "humanoid.AutoRotate=false" in source
+    assert 'scheduler.Register("RenderStepped",schedulerJobId,alignmentInterval' in source
+    assert source.count("workspace:GetDescendants()") == 1
     assert "state.autoSTEnabled=false" in source
-    assert "Enum.KeyCode.ButtonL2" in source
+    assert "Enum.KeyCode.ButtonL2" not in source
 
 
 def test_jpv_and_sticky_head_keep_the_supplied_defaults_and_lifecycle():
@@ -91,7 +97,7 @@ def test_jpv_and_sticky_head_keep_the_supplied_defaults_and_lifecycle():
     assert "state.stickyHeadSmoothness=clamp(state.stickyHeadSmoothness,1,100,12)" in sticky
     assert "state.stickyHeadStrength=clamp(state.stickyHeadStrength,1,100,12)" in sticky
     assert "state.stickyHeadEnabled=false" in sticky
-    assert "Enum.KeyCode.ButtonL1" in sticky
+    assert "Enum.KeyCode.ButtonL1" not in sticky
     assert "head.Position+Vector3.new(0,2.5,0)" in sticky
 
 
