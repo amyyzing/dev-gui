@@ -24,6 +24,16 @@ def test_dev_features_are_registered_on_the_right_side():
         assert '{api="StickyHead",name="StickyHead",column="right",order=8,title="Sticky Head"}' in source
 
 
+def test_dev_feature_categories_have_no_descriptions():
+    expected = (
+        ("features/auto-st/logic.lua", 'makeSection(parent,6,"Auto ST","",{'),
+        ("features/jpv/logic.lua", 'makeSection(parent,7,"Jump Pull Vector","",{'),
+        ("features/sticky-head/logic.lua", 'makeSection(parent,8,"Sticky Head","",{'),
+    )
+    for path, section in expected:
+        assert section in read(path)
+
+
 def test_feature_toggles_are_session_only_but_values_and_keys_are_saved():
     data_save = read("data-save/data-save.lua")
     defaults = read("runtime/loader-part-2.lua")

@@ -96,7 +96,7 @@ function jpv.new(app,parent)
 		syncToggle()
 	end
 
-	local section,controls=makeSection(parent,7,"Jump Pull Vector","press the configured key to toggle",{
+	local section,controls=makeSection(parent,7,"Jump Pull Vector","",{
 		headerToggle={startState=false,onChange=setEnabled},
 	})
 	toggle=controls and controls.toggle

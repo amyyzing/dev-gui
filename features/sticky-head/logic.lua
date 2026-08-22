@@ -82,7 +82,7 @@ function stickyHead.new(app,parent)
 		syncToggle()
 	end
 
-	local section,controls=makeSection(parent,8,"Sticky Head","press the configured key to toggle",{
+	local section,controls=makeSection(parent,8,"Sticky Head","",{
 		headerToggle={startState=false,onChange=setEnabled},
 	})
 	toggle=controls and controls.toggle

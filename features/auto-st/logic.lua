@@ -113,7 +113,7 @@ function autoST.new(app,parent)
 	end
 
 	local controls=nil
-	section,controls=makeSection(parent,6,"Auto ST","press the configured key to toggle",{
+	section,controls=makeSection(parent,6,"Auto ST","",{
 		headerToggle={
 			startState=false,
 			onChange=setEnabled,
