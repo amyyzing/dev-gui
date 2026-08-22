@@ -399,7 +399,7 @@ class LifecycleContracts(unittest.TestCase):
         self.assertIn('rawget(sharedEnv,"DEV_GUI_RUNTIME_CLEANUP")', loader)
         self.assertIn("sharedEnv.DEV_GUI_RUNTIME_CLEANUP=nil", loader)
         self.assertIn('type(cleanup)=="function"', loader)
-        self.assertIn('CleanupGlobalName or "GUI_RUNTIME_CLEANUP"', runtime)
+        self.assertIn('runtimeIsDevBundle and "DEV_GUI_RUNTIME_CLEANUP"', runtime)
         self.assertIn("cleanupForManualReload()", runtime)
         self.assertIn("env[runtimeCleanupGlobalName]=nil", runtime)
 

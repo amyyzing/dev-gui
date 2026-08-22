@@ -120,8 +120,12 @@ def test_jpv_and_sticky_head_keep_the_supplied_defaults_and_lifecycle():
 def test_dev_update_reuses_only_the_dev_loader_configuration():
     runtime = read("runtime/loader-part-1.lua")
     loader = read("loader.lua")
-    assert 'LoaderConfigGlobalName or "GUI_BOOT_CONFIG"' in runtime
+    assert 'runtimeIsDevBundle and "DEV_GUI_BOOT_CONFIG"' in runtime
     assert "rawget(env,loaderConfigGlobalName)" in runtime
     assert "env[loaderConfigGlobalName]=bootConfig" in runtime
+    assert 'runtimeIsDevBundle and "DEV_GUI_RUNTIME_CLEANUP"' in runtime
+    assert 'runtimeIsDevBundle and "DEV_GUI_BOOT_CONFIG"' in runtime
+    assert 'runtimeIsDevBundle and "devGuiRefreshModules"' in runtime
+    assert 'runtimeIsDevBundle and "DevGuiUI"' in runtime
     assert 'rawget(sharedEnv,"DEV_GUI_RUNTIME_CLEANUP")' in loader
     assert 'rawget(sharedEnv,"GUI_RUNTIME_CLEANUP")' not in loader

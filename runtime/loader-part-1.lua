@@ -1362,9 +1362,11 @@ end
 
 local runtimeBootConfig=rawget(getfenv(),"bootConfig")
 if type(runtimeBootConfig)~="table" then runtimeBootConfig={} end
-local runtimeCleanupGlobalName=tostring(runtimeBootConfig.CleanupGlobalName or "GUI_RUNTIME_CLEANUP")
-local loaderConfigGlobalName=tostring(runtimeBootConfig.LoaderConfigGlobalName or "GUI_BOOT_CONFIG")
-screenGuiName=tostring(runtimeBootConfig.ScreenGuiName or "HitboxUI")
+local runtimeIsDevBundle=type(rawget(getfenv(),"bootBundleMeta"))=="table"
+local runtimeCleanupGlobalName=tostring(runtimeBootConfig.CleanupGlobalName or (runtimeIsDevBundle and "DEV_GUI_RUNTIME_CLEANUP" or "GUI_RUNTIME_CLEANUP"))
+local loaderConfigGlobalName=tostring(runtimeBootConfig.LoaderConfigGlobalName or (runtimeIsDevBundle and "DEV_GUI_BOOT_CONFIG" or "GUI_BOOT_CONFIG"))
+local runtimeRefreshGlobalName=tostring(runtimeBootConfig.RefreshGlobalName or (runtimeIsDevBundle and "devGuiRefreshModules" or "refreshModules"))
+screenGuiName=tostring(runtimeBootConfig.ScreenGuiName or (runtimeIsDevBundle and "DevGuiUI" or "HitboxUI"))
 for _,existingName in ipairs({"HitboxUI_DarkInfluenced_GUIOnly","1",screenGuiName}) do
 	old=guiParent:FindFirstChild(existingName)
 	if old then old:Destroy() end
@@ -2526,7 +2528,7 @@ function exposeManualModuleRefresh()
 	local refresh=function()
 		return refreshRemoteModulesNow()
 	end
-	local globalName=tostring(runtimeBootConfig.RefreshGlobalName or "refreshModules")
+	local globalName=runtimeRefreshGlobalName
 	_G[globalName]=refresh
 
 	if type(getgenv)=="function" then

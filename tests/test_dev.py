@@ -36,8 +36,8 @@ def test_runtime_uses_dev_gui_names():
     assert 'RefreshGlobalName="devGuiRefreshModules"' in dump_start
     assert 'CleanupGlobalName="DEV_GUI_RUNTIME_CLEANUP"' in dump_start
     assert 'LoaderConfigGlobalName="DEV_GUI_BOOT_CONFIG"' in dump_start
-    assert 'CleanupGlobalName or "GUI_RUNTIME_CLEANUP"' in runtime
-    assert 'LoaderConfigGlobalName or "GUI_BOOT_CONFIG"' in runtime
+    assert 'runtimeIsDevBundle and "DEV_GUI_RUNTIME_CLEANUP"' in runtime
+    assert 'runtimeIsDevBundle and "DEV_GUI_BOOT_CONFIG"' in runtime
 
 
 def test_dump_init_is_the_single_composition_boundary():
