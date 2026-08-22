@@ -91,7 +91,7 @@ local throwDelay=defaultThrowDelay
 --   1. lock the wr
 --   2. wait
 --   3. send
-local useLocalThrowFallback=false
+local useLocalThrowFallback=true
 local qbTargetHighlightName="QBAimTargetHighlight"
 local espHighlightName="MyESPHighlight"
 local validTeamIds={

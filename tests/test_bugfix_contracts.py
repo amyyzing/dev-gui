@@ -142,6 +142,13 @@ class QBAimDefaultsContracts(unittest.TestCase):
         self.assertIn("if ok and played==true then", logic)
         self.assertIn('return true,"pumpfake"', logic)
 
+    def test_throw_animation_uses_local_animator_when_mechanics_is_unavailable(self):
+        logic = source("features/qb-aim/logic.lua")
+        self.assertIn("local useLocalThrowFallback=true", logic)
+        self.assertIn("return animator:LoadAnimation(animation)", logic)
+        self.assertIn("track:Play(0.05,1,throwAnimationSpeed)", logic)
+        self.assertIn('return ok,"local"', logic)
+
     def test_park_qb_c2_origin_stays_on_the_live_release_point(self):
         logic = source("features/qb-aim/logic.lua")
         self.assertIn('buildSlider(sectionBody,"Throw Delay"', logic)
